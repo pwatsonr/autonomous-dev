@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "state_v1.json",
+  "title": "Autonomous Dev Request State File",
+  "description": "JSON Schema for the state.json file format, version 1. Defines the shape of every autonomous development request's persistent state.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "status",
+    "priority",
+    "title",
+    "repository",
+    "branch",
+    "created_at",
+    "updated_at",
+    "cost_accrued_usd",
+    "turn_count",
+    "escalation_count",
+    "blocked_by",
+    "phase_history",
+    "current_phase_metadata",
+    "error",
+    "last_checkpoint"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Schema version identifier. Must always be 1 for this schema."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^REQ-[0-9]{8}-[0-9a-f]{4}$",
+      "description": "Unique request identifier in the format REQ-YYYYMMDD-XXXX."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "intake",
+        "prd",
+        "prd_review",
+        "tdd",
+        "tdd_review",
+        "plan",
+        "plan_review",
+        "spec",
+        "spec_review",
+        "code",
+        "code_review",
+        "integration",
+        "deploy",
+        "monitor",
+        "paused",
+        "failed",
+        "cancelled"
+      ],
+      "description": "Current pipeline status. One of 14 pipeline phases or 3 terminal/paused states."
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9,
+      "description": "Request priority from 0 (highest) to 9 (lowest)."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Human-readable title for the request."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 10000,
+      "default": "",
+      "description": "Optional detailed description of the request."
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^/",
+      "description": "Absolute path to the target repository."
+    },
+    "branch": {
+      "type": "string",
+      "pattern": "^autonomous/REQ-[0-9]{8}-[0-9a-f]{4}$",
+      "description": "Git branch name, derived from the request ID."
+    },
+    "worktree_path": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Path to the Git worktree, if one has been created."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the request was created."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the last state update."
+    },
+    "cost_accrued_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Total cost accrued in USD for this request."
+    },
+    "turn_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of agent turns consumed."
+    },
+    "escalation_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of times this request has been escalated to a human."
+    },
+    "blocked_by": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "List of request IDs that this request is blocked by."
+    },
+    "phase_history": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PhaseHistoryEntry"
+      },
+      "default": [],
+      "description": "Ordered list of phase transitions this request has undergone."
+    },
+    "current_phase_metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {},
+      "description": "Extensible metadata bag for the current phase. Structure varies by phase."
+    },
+    "error": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["message", "code", "phase", "timestamp"],
+          "properties": {
+            "message": {
+              "type": "string",
+              "description": "Human-readable error message."
+            },
+            "code": {
+              "type": "string",
+              "enum": [
+                "timeout",
+                "timeout_exhausted",
+                "retries_exhausted",
+                "review_failed",
+                "state_corruption",
+                "event_log_corruption",
+                "session_crash",
+                "cost_cap_exceeded",
+                "turn_budget_exceeded",
+                "context_window_exhaustion",
+                "rate_limited",
+                "dependency_failed",
+                "cancelled_by_operator",
+                "kill_switch",
+                "unknown"
+              ],
+              "description": "Machine-readable error code."
+            },
+            "phase": {
+              "type": "string",
+              "description": "The phase in which the error occurred."
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 timestamp of when the error occurred."
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "default": null,
+      "description": "Error details if the request has failed, or null."
+    },
+    "last_checkpoint": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "string",
+          "enum": [
+            "intake",
+            "prd",
+            "prd_review",
+            "tdd",
+            "tdd_review",
+            "plan",
+            "plan_review",
+            "spec",
+            "spec_review",
+            "code",
+            "code_review",
+            "integration",
+            "deploy",
+            "monitor"
+          ]
+        }
+      ],
+      "default": null,
+      "description": "Last successfully checkpointed pipeline phase, or null. Does not include paused, failed, or cancelled."
+    },
+    "paused_from": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "The phase the request was in when it was paused."
+    },
+    "paused_reason": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Reason the request was paused."
+    },
+    "failure_reason": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Reason the request failed."
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Optimistic concurrency control counter. Incremented on every write."
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "Set of tags for categorizing the request."
+    }
+  },
+  "$defs": {
+    "PhaseHistoryEntry": {
+      "type": "object",
+      "required": [
+        "state",
+        "entered_at",
+        "exited_at",
+        "session_id",
+        "turns_used",
+        "cost_usd"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "description": "The phase this entry represents."
+        },
+        "entered_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of when the phase was entered."
+        },
+        "exited_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of when the phase was exited, or null if still active."
+        },
+        "session_id": {
+          "type": ["string", "null"],
+          "description": "The session ID that processed this phase, or null."
+        },
+        "turns_used": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of agent turns consumed in this phase."
+        },
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Cost in USD accrued during this phase."
+        },
+        "exit_reason": {
+          "type": ["string", "null"],
+          "enum": [
+            "completed",
+            "review_pass",
+            "review_fail",
+            "timeout",
+            "error",
+            "paused",
+            "cancelled",
+            null
+          ],
+          "default": null,
+          "description": "Reason the phase was exited, or null if still active."
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of retries within this phase."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

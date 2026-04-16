@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "event_v1.json",
+  "title": "Autonomous Dev Event Log Entry",
+  "description": "JSON Schema for a single event line in events.jsonl, version 1. Defines the shape of every event log entry.",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "event_type",
+    "request_id",
+    "session_id"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the event occurred."
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "request_created",
+        "state_transition",
+        "phase_started",
+        "phase_completed",
+        "review_pass",
+        "review_fail",
+        "retry",
+        "timeout",
+        "error",
+        "paused",
+        "resumed",
+        "failed",
+        "cancelled",
+        "escalation",
+        "checkpoint_created",
+        "checkpoint_restored",
+        "cost_update",
+        "context_window_warning",
+        "dependency_resolved",
+        "dependency_blocked",
+        "session_started",
+        "session_ended",
+        "artifact_created",
+        "pr_created",
+        "pr_merged",
+        "cleanup_started",
+        "cleanup_completed"
+      ],
+      "description": "The type of event. One of 25 defined event types."
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "^REQ-[0-9]{8}-[0-9a-f]{4}$",
+      "description": "The request ID this event belongs to."
+    },
+    "session_id": {
+      "type": ["string", "null"],
+      "description": "The session ID that generated this event, or null for supervisor-generated events."
+    },
+    "from_state": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "The state the request was in before this event, if applicable."
+    },
+    "to_state": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "The state the request transitioned to, if applicable."
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "default": {},
+      "description": "Additional event-specific metadata. Structure varies by event_type."
+    }
+  },
+  "additionalProperties": false
+}
