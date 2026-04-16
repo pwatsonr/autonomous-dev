@@ -1,0 +1,39 @@
+# Agent Factory Configuration
+registry:
+  agents-dir: "agents/"
+  max-agents: 50
+
+observation:
+  default-threshold: 10
+  per-agent-overrides: {}
+
+domain-matching:
+  similarity-threshold: 0.6
+  max-results: 5
+
+rate-limits:
+  modifications-per-agent-per-week: 1
+  agent-creations-per-week: 1
+
+anomaly-thresholds:
+  approval-rate-drop: 0.70
+  quality-decline-points: 0.5
+  quality-decline-window: 10
+  escalation-rate: 0.30
+  token-budget-multiplier: 2.0
+
+model-registry:
+  - "claude-sonnet-4-20250514"
+  - "claude-opus-4-20250514"
+
+paths:
+  audit-log: "data/agent-audit.log"
+  metrics-jsonl: "data/metrics/agent-invocations.jsonl"
+  metrics-db: "data/agent-metrics.db"
+  weakness-reports: "data/weakness-reports.jsonl"
+  proposals: "data/proposals.jsonl"
+  domain-gaps: "data/domain-gaps.jsonl"
+  evaluations-dir: "data/evaluations/"
+  proposed-agents-dir: "data/proposed-agents/"
+  canary-state: "data/canary-state.json"
+  compatibility: "data/agent-compatibility.json"
