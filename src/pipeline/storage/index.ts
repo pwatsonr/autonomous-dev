@@ -1,0 +1,10 @@
+export { DocumentStorage } from './document-storage';
+export { AtomicWriteError } from './atomic-io';
+export { DirectoryManager } from './directory-manager';
+export { AuditLogger, AuditIntegrityError, type PipelineEvent } from './audit-logger';
+export { QuotaEnforcer, QuotaExceededError, type QuotaViolation } from './quota-enforcer';
+export { type CreateDocumentRequest, type DocumentHandle } from './document-creator';
+export { type DocumentContent, DocumentNotFoundError } from './document-reader';
+export { type DocumentFilter } from './document-lister';
+export { type WriteVersionRequest, type VersionRecord } from './version-writer';
+export { loadConfig, ConfigValidationError } from './config-loader';
