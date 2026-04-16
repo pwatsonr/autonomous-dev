@@ -1,0 +1,92 @@
+# Slack App Manifest for Autonomous Dev
+#
+# Defines the bot configuration, slash commands, OAuth scopes, interactivity,
+# and event subscriptions for the autonomous development pipeline.
+#
+# Replace ${SLACK_HOST} with the actual host before deploying.
+#
+# Implements SPEC-008-4-01, Task 2.
+
+display_information:
+  name: Autonomous Dev
+  description: Autonomous development pipeline intake and status
+  background_color: "#2c3e50"
+
+features:
+  bot_user:
+    display_name: autonomous-dev
+    always_online: true
+  slash_commands:
+    - command: /ad-submit
+      url: https://${SLACK_HOST}/slack/commands
+      description: Submit a new request to the pipeline
+      usage_hint: "[description] --priority high --repo owner/name"
+      should_escape: true
+    - command: /ad-status
+      url: https://${SLACK_HOST}/slack/commands
+      description: View request status
+      usage_hint: "REQ-000042"
+      should_escape: false
+    - command: /ad-list
+      url: https://${SLACK_HOST}/slack/commands
+      description: List all active requests
+      usage_hint: "[--priority high|normal|low]"
+      should_escape: false
+    - command: /ad-cancel
+      url: https://${SLACK_HOST}/slack/commands
+      description: Cancel a request
+      usage_hint: "REQ-000042"
+      should_escape: false
+    - command: /ad-pause
+      url: https://${SLACK_HOST}/slack/commands
+      description: Pause a request
+      usage_hint: "REQ-000042"
+      should_escape: false
+    - command: /ad-resume
+      url: https://${SLACK_HOST}/slack/commands
+      description: Resume a paused request
+      usage_hint: "REQ-000042"
+      should_escape: false
+    - command: /ad-priority
+      url: https://${SLACK_HOST}/slack/commands
+      description: Change request priority
+      usage_hint: "REQ-000042 high|normal|low"
+      should_escape: false
+    - command: /ad-logs
+      url: https://${SLACK_HOST}/slack/commands
+      description: View request activity log
+      usage_hint: "REQ-000042 [--all]"
+      should_escape: false
+    - command: /ad-feedback
+      url: https://${SLACK_HOST}/slack/commands
+      description: Send feedback to an active request
+      usage_hint: "REQ-000042 [message]"
+      should_escape: true
+    - command: /ad-kill
+      url: https://${SLACK_HOST}/slack/commands
+      description: Emergency stop all requests (admin only)
+      should_escape: false
+
+oauth_config:
+  scopes:
+    bot:
+      - commands
+      - chat:write
+      - chat:write.public
+      - im:write
+      - users:read
+      - channels:read
+      - groups:read
+
+settings:
+  interactivity:
+    is_enabled: true
+    request_url: https://${SLACK_HOST}/slack/interactions
+  event_subscriptions:
+    request_url: https://${SLACK_HOST}/slack/events
+    bot_events:
+      - message.channels
+      - message.groups
+      - message.im
+  org_deploy_enabled: false
+  socket_mode_enabled: false

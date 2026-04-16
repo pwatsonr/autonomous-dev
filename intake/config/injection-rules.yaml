@@ -1,0 +1,43 @@
+version: 1
+rules:
+  - id: system_prompt_override
+    pattern: '(?i)(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?|context)'
+    severity: critical
+    action: block
+    message: "Request contains a suspected prompt injection pattern."
+
+  - id: role_assumption
+    pattern: '(?i)(you\s+are\s+now|act\s+as|pretend\s+to\s+be|assume\s+the\s+role)\s+'
+    severity: high
+    action: flag
+    message: "Request contains a role assumption directive."
+
+  - id: system_message_injection
+    pattern: '(?i)<\s*system\s*>|<<\s*SYS\s*>>|\[INST\]|\[SYSTEM\]'
+    severity: critical
+    action: block
+    message: "Request contains system message delimiters."
+
+  - id: template_delimiter
+    pattern: '\{\{.*\}\}|\$\{.*\}|<%.*%>'
+    severity: medium
+    action: escape
+    message: "Request contains template delimiters that will be escaped."
+
+  - id: output_manipulation
+    pattern: '(?i)(begin\s+your\s+response|start\s+with|always\s+respond|your\s+output\s+must)'
+    severity: medium
+    action: flag
+    message: "Request contains output manipulation directives."
+
+  - id: instruction_injection
+    pattern: '(?i)(important\s*:|note\s*:|instruction\s*:|rule\s*:)\s*(do\s+not|never|always|you\s+must)'
+    severity: high
+    action: flag
+    message: "Request contains embedded instructions."
+
+  - id: data_exfiltration
+    pattern: '(?i)(repeat|print|show|reveal|output)\s+(the\s+)?(system\s+prompt|instructions|configuration|api\s+key|secret|token)'
+    severity: critical
+    action: block
+    message: "Request attempts to extract system information."
