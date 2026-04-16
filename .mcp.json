@@ -1,0 +1,32 @@
+{
+  "mcpServers": {
+    "grafana": {
+      "type": "sse",
+      "url": "${GRAFANA_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${GRAFANA_MCP_TOKEN}"
+      }
+    },
+    "prometheus": {
+      "type": "sse",
+      "url": "${PROMETHEUS_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${PROMETHEUS_MCP_TOKEN}"
+      }
+    },
+    "opensearch": {
+      "type": "sse",
+      "url": "${OPENSEARCH_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${OPENSEARCH_MCP_TOKEN}"
+      }
+    },
+    "sentry": {
+      "type": "sse",
+      "url": "${SENTRY_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${SENTRY_MCP_TOKEN}"
+      }
+    }
+  }
+}

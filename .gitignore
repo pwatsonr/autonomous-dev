@@ -1,0 +1,24 @@
+# Runtime state (never commit)
+.autonomous-dev/
+node_modules/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+coverage/
+*.tmp
+
+# Daemon runtime
+daemon.lock
+heartbeat.json
+crash-state.json
+kill-switch.flag
