@@ -12,18 +12,19 @@ set -euo pipefail
 # --- Constants ---------------------------------------------------------------
 # All paths derived from $HOME and the script's own location.
 
-readonly PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-readonly DAEMON_HOME="${HOME}/.autonomous-dev"
-readonly LOCK_FILE="${DAEMON_HOME}/daemon.lock"
-readonly HEARTBEAT_FILE="${DAEMON_HOME}/heartbeat.json"
-readonly CRASH_STATE_FILE="${DAEMON_HOME}/crash-state.json"
-readonly KILL_SWITCH_FILE="${DAEMON_HOME}/kill-switch.flag"
-readonly COST_LEDGER_FILE="${DAEMON_HOME}/cost-ledger.json"
-readonly LOG_DIR="${DAEMON_HOME}/logs"
-readonly LOG_FILE="${LOG_DIR}/daemon.log"
-readonly CONFIG_FILE="${HOME}/.claude/autonomous-dev.json"
-readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
-readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
+# Allow tests to override paths via environment variables
+PLUGIN_DIR="${PLUGIN_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+DAEMON_HOME="${DAEMON_HOME:-${HOME}/.autonomous-dev}"
+LOCK_FILE="${LOCK_FILE:-${DAEMON_HOME}/daemon.lock}"
+HEARTBEAT_FILE="${HEARTBEAT_FILE:-${DAEMON_HOME}/heartbeat.json}"
+CRASH_STATE_FILE="${CRASH_STATE_FILE:-${DAEMON_HOME}/crash-state.json}"
+KILL_SWITCH_FILE="${KILL_SWITCH_FILE:-${DAEMON_HOME}/kill-switch.flag}"
+COST_LEDGER_FILE="${COST_LEDGER_FILE:-${DAEMON_HOME}/cost-ledger.json}"
+LOG_DIR="${LOG_DIR:-${DAEMON_HOME}/logs}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/daemon.log}"
+CONFIG_FILE="${CONFIG_FILE:-${HOME}/.claude/autonomous-dev.json}"
+DEFAULTS_FILE="${DEFAULTS_FILE:-${PLUGIN_DIR}/config/defaults.json}"
+ALERTS_DIR="${ALERTS_DIR:-${DAEMON_HOME}/alerts}"
 
 # --- Runtime State Variables -------------------------------------------------
 
