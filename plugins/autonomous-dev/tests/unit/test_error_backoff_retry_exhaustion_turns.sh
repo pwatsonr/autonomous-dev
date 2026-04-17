@@ -384,8 +384,8 @@ test_retry_exhaustion_alert() {
     assert_file_exists "${found}"
 
     local atype
-    atype=$(jq -r '.type' "${found}")
-    assert_eq "retry_exhaustion" "${atype}" "Alert type should be retry_exhaustion"
+    atype=$(jq -r '.event_type' "${found}")
+    assert_eq "retry_exhaustion" "${atype}" "Alert event_type should be retry_exhaustion"
 }
 
 # =============================================================================

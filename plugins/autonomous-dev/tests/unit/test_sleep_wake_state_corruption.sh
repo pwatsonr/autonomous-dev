@@ -538,8 +538,8 @@ test_cost_ledger_corrupt_alert() {
 
     # Verify alert content
     local atype
-    atype=$(jq -r '.type' "${found}")
-    assert_eq "cost_ledger_corruption" "${atype}" "Alert type should be cost_ledger_corruption"
+    atype=$(jq -r '.event_type' "${found}")
+    assert_eq "cost_ledger_corruption" "${atype}" "Alert event_type should be cost_ledger_corruption"
 }
 
 # =============================================================================
