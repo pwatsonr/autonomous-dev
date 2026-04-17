@@ -1,0 +1,11 @@
+{
+  "name": "autonomous-dev",
+  "description": "Autonomous AI development system for Claude Code",
+  "plugins": [
+    {
+      "name": "autonomous-dev",
+      "path": ".",
+      "version": "0.1.0"
+    }
+  ]
+}
