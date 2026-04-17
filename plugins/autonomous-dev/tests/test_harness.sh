@@ -86,7 +86,11 @@ run_test() {
   local test_func="$2"
   (( _TESTS_RUN++ )) || true
   setup
-  if "$test_func"; then
+  # Run test in subshell so set -e in the test function
+  # doesn't kill the harness when testing error paths
+  local _rc=0
+  ( set +e; "$test_func" ) || _rc=$?
+  if [[ $_rc -eq 0 ]]; then
     echo "PASS: ${test_name}"
     (( _TESTS_PASSED++ )) || true
   else
