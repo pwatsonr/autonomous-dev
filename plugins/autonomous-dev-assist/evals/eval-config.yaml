@@ -1,0 +1,107 @@
+# eval-config.yaml -- Evaluation framework configuration
+# Defines test suites, scoring criteria, and pass thresholds for the
+# autonomous-dev-assist plugin's skills and agents.
+
+framework:
+  name: autonomous-dev-assist-evals
+  version: "1.0.0"
+  description: >
+    Eval harness that validates help, troubleshoot, config, and onboarding
+    skills return accurate, complete, and actionable answers.
+
+# ---------------------------------------------------------------------------
+# Test suites
+# ---------------------------------------------------------------------------
+suites:
+  help:
+    file: test-cases/help-questions.yaml
+    description: "Validates the help skill answers questions about commands, concepts, and comparisons correctly."
+    enabled: true
+
+  troubleshoot:
+    file: test-cases/troubleshoot-scenarios.yaml
+    description: "Validates the troubleshoot skill diagnoses problems and suggests correct resolutions."
+    enabled: true
+
+  config:
+    file: test-cases/config-questions.yaml
+    description: "Validates the config guide skill references correct parameters, defaults, and ranges."
+    enabled: true
+
+  onboarding:
+    file: test-cases/onboarding-questions.yaml
+    description: "Validates the onboarding skill walks new users through setup correctly."
+    enabled: false  # placeholder -- no test cases yet
+
+# ---------------------------------------------------------------------------
+# Scoring criteria
+# ---------------------------------------------------------------------------
+scoring:
+  # How each dimension is weighted in the composite score (must sum to 100).
+  weights:
+    accuracy: 50       # Are facts correct? Do mentioned commands/params exist?
+    completeness: 30   # Are all expected topics covered?
+    actionability: 20  # Does the answer give concrete next steps?
+
+  # Per-dimension scoring rules
+  accuracy:
+    description: >
+      Measures factual correctness. Deductions for wrong command names, wrong
+      defaults, non-existent parameters, or contradictory information.
+    method: topic_and_mention_match
+    # Fraction of must_mention items found in the response
+    perfect: 1.0
+    zero: 0.0
+
+  completeness:
+    description: >
+      Measures whether all expected_topics are addressed. Each missing topic
+      reduces the score proportionally.
+    method: topic_coverage
+    perfect: 1.0
+    zero: 0.0
+
+  actionability:
+    description: >
+      Measures whether the response contains executable commands, concrete
+      config snippets, or clear step-by-step instructions the user can follow.
+    method: keyword_heuristic
+    # At least one code block or command invocation present
+    indicators:
+      - "```"
+      - "autonomous-dev "
+      - "claude "
+      - "$ "
+
+# ---------------------------------------------------------------------------
+# Pass thresholds
+# ---------------------------------------------------------------------------
+thresholds:
+  # Minimum composite score (0-100) for a single test case to pass.
+  per_case: 60
+
+  # Minimum average composite score across all cases in a suite to pass.
+  per_suite: 80
+
+  # If any suite drops below this, the runner exits non-zero.
+  global_minimum: 80
+
+  # Maximum percentage of individual test cases allowed to fail per suite.
+  max_case_failure_pct: 20
+
+# ---------------------------------------------------------------------------
+# Runner settings
+# ---------------------------------------------------------------------------
+runner:
+  # How to invoke the skill under test. {{skill}} is replaced at runtime.
+  invoke_command: "claude -p"
+  # Timeout per invocation in seconds.
+  timeout_seconds: 120
+  # Number of retries on transient failures (rate-limit, timeout).
+  retries: 1
+  # Parallel invocations (1 = sequential).
+  parallelism: 1
+  # Where to write the report.
+  report_dir: evals/reports
+  # Report format.
+  report_format: text  # text | json

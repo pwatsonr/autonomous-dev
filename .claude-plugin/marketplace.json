@@ -32,6 +32,29 @@
       ],
       "category": "development",
       "tags": ["autonomous", "pipeline", "sdlc", "self-improving", "agent-factory"]
+    },
+    {
+      "name": "autonomous-dev-assist",
+      "source": "./plugins/autonomous-dev-assist",
+      "description": "Expert assistance, troubleshooting, and eval harness for the autonomous-dev plugin. Answers questions about commands, configuration, agents, pipeline phases, and common issues. Includes an eval framework to validate skill accuracy over time.",
+      "version": "0.1.0",
+      "author": {
+        "name": "pwatsonr",
+        "url": "https://github.com/pwatsonr"
+      },
+      "homepage": "https://github.com/pwatsonr/autonomous-dev",
+      "repository": "https://github.com/pwatsonr/autonomous-dev",
+      "license": "MIT",
+      "keywords": [
+        "autonomous-dev",
+        "help",
+        "troubleshooting",
+        "runbook",
+        "eval",
+        "testing"
+      ],
+      "category": "support",
+      "tags": ["help", "troubleshooting", "eval", "quickstart", "runbook"]
     }
   ]
 }
