@@ -7,6 +7,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_EVENT_LOGGER_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_EVENT_LOGGER_LOADED=1
+
 _EL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_EL_DIR}/state_file_manager.sh"
 

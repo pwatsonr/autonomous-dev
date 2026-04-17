@@ -7,6 +7,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_REQUEST_TRACKER_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_REQUEST_TRACKER_LOADED=1
+
 _RT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_RT_DIR}/state_file_manager.sh"
 source "${_RT_DIR}/event_logger.sh"

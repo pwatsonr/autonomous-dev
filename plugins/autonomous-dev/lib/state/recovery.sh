@@ -11,6 +11,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_RECOVERY_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_RECOVERY_LOADED=1
+
 _REC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_REC_DIR}/state_file_manager.sh"
 source "${_REC_DIR}/event_logger.sh"

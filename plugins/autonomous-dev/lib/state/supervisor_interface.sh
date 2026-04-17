@@ -11,6 +11,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_SUPERVISOR_INTERFACE_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_SUPERVISOR_INTERFACE_LOADED=1
+
 _SI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_SI_DIR}/state_file_manager.sh"
 source "${_SI_DIR}/event_logger.sh"

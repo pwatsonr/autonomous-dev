@@ -19,6 +19,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_CONFIG_LOADER_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_CONFIG_LOADER_LOADED=1
+
 # ---------------------------------------------------------------------------
 # Resolve PLUGIN_ROOT: directory containing this script's parent
 # ---------------------------------------------------------------------------

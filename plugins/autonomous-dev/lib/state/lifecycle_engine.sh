@@ -12,6 +12,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_LIFECYCLE_ENGINE_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_LIFECYCLE_ENGINE_LOADED=1
+
 _LE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_LE_DIR}/state_file_manager.sh"
 

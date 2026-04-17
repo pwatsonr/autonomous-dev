@@ -12,6 +12,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_CONFIG_VALIDATOR_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_CONFIG_VALIDATOR_LOADED=1
+
 # ---------------------------------------------------------------------------
 # Resolve PLUGIN_ROOT if not already set
 # ---------------------------------------------------------------------------

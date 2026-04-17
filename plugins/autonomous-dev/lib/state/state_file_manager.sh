@@ -8,6 +8,12 @@
 
 set -euo pipefail
 
+# Source guard — prevent re-declaration of readonly variables
+if [[ -n "${_STATE_FILE_MANAGER_LOADED:-}" ]]; then
+  return 0 2>/dev/null || true
+fi
+_STATE_FILE_MANAGER_LOADED=1
+
 # Resolve the directory this script lives in (for finding schema files)
 _SFM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _SCHEMA_DIR="${_SFM_DIR}/schema"

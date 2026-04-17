@@ -11,6 +11,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_LOCK_MANAGER_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_LOCK_MANAGER_LOADED=1
+
 # Lock file location
 readonly DAEMON_LOCK_FILE="${HOME}/.autonomous-dev/daemon.lock"
 

@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_RATE_LIMIT_HANDLER_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_RATE_LIMIT_HANDLER_LOADED=1
+
 # ---------------------------------------------------------------------------
 # Resolve PLUGIN_ROOT for sourcing sibling libraries
 # ---------------------------------------------------------------------------
