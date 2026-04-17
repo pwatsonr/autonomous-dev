@@ -62,7 +62,11 @@ assert_dir_not_exists() {
 assert_permissions() {
   local path="$1" expected="$2"
   local actual
-  actual="$(stat -f '%Lp' "$path" 2>/dev/null || stat -c '%a' "$path" 2>/dev/null)"
+  if [[ "$(uname)" == "Darwin" ]]; then
+    actual="$(stat -f '%Lp' "$path" 2>/dev/null)" || true
+  else
+    actual="$(stat -c '%a' "$path" 2>/dev/null)" || true
+  fi
   if [[ "$actual" == "$expected" ]]; then return 0; fi
   echo "  ASSERT_PERMISSIONS FAILED: ${path} has ${actual}, expected ${expected}" >&2
   return 1

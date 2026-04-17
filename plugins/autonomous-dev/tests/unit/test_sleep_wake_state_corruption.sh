@@ -230,7 +230,7 @@ test_sleep_recovery_event_logged() {
     # Assert events.jsonl exists and has session_interrupted event
     assert_file_exists "${req_dir}/events.jsonl"
     local event_type
-    event_type=$(tail -1 "${req_dir}/events.jsonl" | jq -r '.type')
+    event_type=$(tail -1 "${req_dir}/events.jsonl" | jq -r '.event_type')
     assert_eq "session_interrupted" "${event_type}" "Last event should be session_interrupted"
 }
 

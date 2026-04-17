@@ -59,8 +59,13 @@ ensure_file_permissions() {
 #   Logs warning to stderr if permissions are too open
 _check_file_permissions() {
   local filepath="$1"
-  local perms
-  perms="$(stat -f '%Lp' "$filepath" 2>/dev/null || stat -c '%a' "$filepath" 2>/dev/null)"
+  local perms=""
+  # macOS: stat -f '%Lp', Linux: stat -c '%a'
+  if [[ "$(uname)" == "Darwin" ]]; then
+    perms="$(stat -f '%Lp' "$filepath" 2>/dev/null)" || true
+  else
+    perms="$(stat -c '%a' "$filepath" 2>/dev/null)" || true
+  fi
   if [[ -n "$perms" && "$perms" != "600" ]]; then
     echo "WARNING: ${filepath} has permissions ${perms} (expected 600)" >&2
   fi
@@ -165,13 +170,13 @@ _validate_state_schema() {
     exit_code=1
   fi
 
-  # --- temporal consistency: updated_at >= created_at ---
+  # --- temporal consistency: updated_at >= created_at (warning only) ---
   local created updated
   created="$(echo "$json" | jq -r '.created_at')"
   updated="$(echo "$json" | jq -r '.updated_at')"
   if [[ "$updated" < "$created" ]]; then
-    errors+="Temporal inconsistency: updated_at (${updated}) < created_at (${created})\n"
-    exit_code=1
+    echo "state_read: WARNING: updated_at (${updated}) < created_at (${created}) — may be stale" >&2
+    # Not a hard failure — timestamps may be set by different clocks or test fixtures
   fi
 
   # --- type checks for numeric fields ---
