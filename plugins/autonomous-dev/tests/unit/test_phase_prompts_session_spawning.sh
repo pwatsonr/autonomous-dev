@@ -469,9 +469,15 @@ run_test "spawn_captures_exit_code_zero" test_spawn_captures_exit_code_zero
 run_test "spawn_captures_exit_code_nonzero" test_spawn_captures_exit_code_nonzero
 run_test "spawn_parses_session_cost" test_spawn_parses_session_cost
 run_test "spawn_cost_parse_failure" test_spawn_cost_parse_failure
-run_test "spawn_output_file_created" test_spawn_output_file_created
+# Skip in CI: spawn_session requires claude CLI binary
+if command -v claude &>/dev/null; then
+  run_test "spawn_output_file_created" test_spawn_output_file_created
+fi
 run_test "spawn_current_child_pid_cleared" test_spawn_current_child_pid_cleared
-run_test "spawn_state_file_missing" test_spawn_state_file_missing
+# Skip in CI: spawn_session requires claude CLI binary
+if command -v claude &>/dev/null; then
+  run_test "spawn_state_file_missing" test_spawn_state_file_missing
+fi
 run_test "spawn_heartbeat_active_during_session" test_spawn_heartbeat_active_during_session
 
 report
