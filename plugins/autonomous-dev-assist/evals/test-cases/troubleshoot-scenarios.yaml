@@ -1,0 +1,492 @@
+# troubleshoot-scenarios.yaml -- Test cases for the troubleshoot skill
+# 20+ cases across: daemon, state-machine, cost/budget, review-gate,
+# agent-factory, production-intelligence, emergency
+
+suite: troubleshoot
+skill: troubleshoot
+description: >
+  Validates that the troubleshoot skill correctly diagnoses problems, suggests
+  diagnostic commands, and recommends appropriate fixes.
+
+cases:
+
+# ============================================================================
+# Category 1: Daemon issues (5 cases)
+# ============================================================================
+
+  - id: ts-daemon-001
+    category: daemon
+    severity: high
+    scenario: "Daemon will not start on macOS"
+    symptoms:
+      - "Running 'autonomous-dev daemon start' prints 'ERROR: Daemon not installed'"
+      - "User has not run install-daemon yet"
+    expected_diagnosis: >
+      The LaunchAgent plist has not been installed. The daemon start command
+      checks for the plist file at ~/Library/LaunchAgents/com.autonomous-dev.daemon.plist
+      and exits if it is missing.
+    expected_commands:
+      - "autonomous-dev install-daemon"
+      - "autonomous-dev daemon start"
+      - "autonomous-dev daemon status"
+    expected_fix:
+      - "Run 'autonomous-dev install-daemon' to register the LaunchAgent"
+      - "Then run 'autonomous-dev daemon start' to start the service"
+
+  - id: ts-daemon-002
+    category: daemon
+    severity: medium
+    scenario: "Daemon appears running but is not processing requests"
+    symptoms:
+      - "'autonomous-dev daemon status' shows 'Service: running'"
+      - "No heartbeat updates in over 30 minutes"
+      - "Requests remain in 'intake' state"
+    expected_diagnosis: >
+      The daemon process may be alive but stuck. Possible causes include a
+      stale lock file with a zombie process, the kill switch being engaged
+      silently, or the supervisor loop hanging on a long-running phase.
+    expected_commands:
+      - "autonomous-dev daemon status"
+      - "cat ~/.autonomous-dev/heartbeat.json"
+      - "cat ~/.autonomous-dev/kill-switch.flag"
+      - "cat ~/.autonomous-dev/crash-state.json"
+      - "ls -la ~/.autonomous-dev/daemon.lock"
+    expected_fix:
+      - "Check if the kill switch is engaged and reset it if so"
+      - "Check the heartbeat timestamp -- if stale, the supervisor loop is stuck"
+      - "Check the lock file PID and verify the process is alive with 'kill -0 <PID>'"
+      - "If PID is dead, remove the stale lock: rm ~/.autonomous-dev/daemon.lock"
+      - "Restart the daemon: autonomous-dev daemon stop && autonomous-dev daemon start"
+
+  - id: ts-daemon-003
+    category: daemon
+    severity: high
+    scenario: "Daemon keeps crashing and the circuit breaker has tripped"
+    symptoms:
+      - "'autonomous-dev daemon status' shows 'Circuit breaker: TRIPPED'"
+      - "Multiple consecutive crash entries in crash-state.json"
+      - "Service restarts but immediately stops again"
+    expected_diagnosis: >
+      The circuit breaker trips after the configured number of consecutive
+      crashes (default: 3). A persistent error in a phase prompt, missing
+      dependency, or corrupted state file is likely causing repeated failures.
+    expected_commands:
+      - "autonomous-dev daemon status"
+      - "cat ~/.autonomous-dev/crash-state.json"
+      - "tail -100 ~/.autonomous-dev/logs/daemon.log"
+      - "autonomous-dev config validate"
+    expected_fix:
+      - "Review daemon logs to identify the root cause of crashes"
+      - "Fix the underlying issue (config, state file, dependency)"
+      - "Reset the circuit breaker: autonomous-dev circuit-breaker reset"
+      - "Restart the daemon: autonomous-dev daemon start"
+
+  - id: ts-daemon-004
+    category: daemon
+    severity: low
+    scenario: "Daemon log files are growing very large"
+    symptoms:
+      - "Disk space warnings"
+      - "Log files in ~/.autonomous-dev/logs/ exceed 50 MB"
+    expected_diagnosis: >
+      The daemon has a default log_max_size_mb of 50 and log_retention_days of 7.
+      If logs are growing beyond these limits, the cleanup engine or ledger
+      rotation may not be running correctly.
+    expected_commands:
+      - "du -sh ~/.autonomous-dev/logs/"
+      - "ls -lh ~/.autonomous-dev/logs/"
+      - "autonomous-dev config show"
+    expected_fix:
+      - "Verify log_max_size_mb and log_retention_days in config"
+      - "Manually remove old log files if needed"
+      - "Ensure the cleanup engine is functioning by checking daemon logs"
+
+  - id: ts-daemon-005
+    category: daemon
+    severity: medium
+    scenario: "Daemon runs on Linux but systemd reports it as failed"
+    symptoms:
+      - "'systemctl --user status autonomous-dev.service' shows 'failed'"
+      - "Journal shows exit code 1"
+    expected_diagnosis: >
+      The systemd unit failed during execution. Common causes are a missing
+      dependency (jq, claude CLI), permission issues on state directories,
+      or an invalid configuration file.
+    expected_commands:
+      - "systemctl --user status autonomous-dev.service"
+      - "journalctl --user -u autonomous-dev.service --no-pager -n 50"
+      - "autonomous-dev config validate"
+      - "which jq && which claude"
+    expected_fix:
+      - "Check journal output for the specific error"
+      - "Install missing dependencies (jq, claude CLI)"
+      - "Ensure ~/.autonomous-dev/ directory exists and is writable"
+      - "Validate config: autonomous-dev config validate"
+      - "Restart: systemctl --user restart autonomous-dev.service"
+
+# ============================================================================
+# Category 2: State machine stuck (3 cases)
+# ============================================================================
+
+  - id: ts-state-001
+    category: state-machine
+    severity: high
+    scenario: "A request is stuck in the 'prd_review' phase and will not advance"
+    symptoms:
+      - "Request state.json shows phase 'prd_review' for hours"
+      - "No new review attempts in logs"
+      - "Review gate shows no recent scores"
+    expected_diagnosis: >
+      The document state machine may be blocked because the review gate has
+      not returned a passing score, the reviewer agents failed to produce
+      output, or a convergence check is failing. The progression rules require
+      the review gate score to meet the rubric threshold before advancing.
+    expected_commands:
+      - "cat <repo>/.autonomous-dev/requests/<REQ-ID>/state.json"
+      - "ls <repo>/.autonomous-dev/requests/<REQ-ID>/versions/"
+      - "tail -50 ~/.autonomous-dev/logs/daemon.log"
+    expected_fix:
+      - "Check the latest review scores in the request directory"
+      - "If reviewers are not producing output, verify reviewer agent definitions exist"
+      - "If the score is below threshold, check the rubric requirements"
+      - "Consider adjusting the rubric or manually advancing the state"
+
+  - id: ts-state-002
+    category: state-machine
+    severity: medium
+    scenario: "A request is stuck in 'paused' state"
+    symptoms:
+      - "Request state.json shows status 'paused'"
+      - "User did not intentionally pause"
+    expected_diagnosis: >
+      The pause-resume handler may have been triggered by a human escalation
+      gateway event, an emergency condition, or the daemon may have paused the
+      request before a shutdown. The state-persistence module writes paused
+      state that survives daemon restarts.
+    expected_commands:
+      - "cat <repo>/.autonomous-dev/requests/<REQ-ID>/state.json"
+      - "cat ~/.autonomous-dev/kill-switch.flag"
+      - "tail -50 ~/.autonomous-dev/logs/daemon.log"
+    expected_fix:
+      - "Check if the kill switch is engaged (it pauses all requests)"
+      - "Review daemon logs for the reason the pause was triggered"
+      - "Resume the request if the underlying issue is resolved"
+
+  - id: ts-state-003
+    category: state-machine
+    severity: high
+    scenario: "Max retries exceeded for a phase and the request cannot proceed"
+    symptoms:
+      - "Daemon logs show 'max retries exceeded for phase <phase>'"
+      - "Request stuck with retry count at max_retries_per_phase (default 3)"
+    expected_diagnosis: >
+      The daemon retries failed phases up to max_retries_per_phase times
+      (default: 3). After exhaustion, the request is parked. The underlying
+      phase error must be resolved before the request can continue.
+    expected_commands:
+      - "cat <repo>/.autonomous-dev/requests/<REQ-ID>/state.json"
+      - "tail -100 ~/.autonomous-dev/logs/daemon.log"
+      - "autonomous-dev config show"
+    expected_fix:
+      - "Review logs to identify why the phase keeps failing"
+      - "Fix the root cause (missing context, agent error, bad input)"
+      - "Reset the retry counter in the request state.json"
+      - "The daemon will pick up the request on the next poll cycle"
+
+# ============================================================================
+# Category 3: Cost / budget issues (3 cases)
+# ============================================================================
+
+  - id: ts-cost-001
+    category: cost-budget
+    severity: high
+    scenario: "Daily cost cap reached and all processing has stopped"
+    symptoms:
+      - "No requests advancing"
+      - "Daemon logs show 'daily cost cap exceeded'"
+      - "'autonomous-dev cost' shows daily spend at or above $50"
+    expected_diagnosis: >
+      The cost governor enforces the daily_cost_cap_usd (default $50). When
+      the daily ledger total meets or exceeds this cap, all new phase
+      executions are blocked until the next UTC day.
+    expected_commands:
+      - "autonomous-dev cost"
+      - "autonomous-dev cost --daily"
+      - "autonomous-dev config show"
+    expected_fix:
+      - "Wait for the next UTC day when the daily counter resets"
+      - "Or increase daily_cost_cap_usd in config if the limit is too low"
+      - "Review cost breakdown to identify expensive requests: autonomous-dev cost --daily"
+
+  - id: ts-cost-002
+    category: cost-budget
+    severity: high
+    scenario: "Monthly cost cap reached mid-month"
+    symptoms:
+      - "No requests advancing"
+      - "Daemon logs show 'monthly cost cap exceeded'"
+      - "'autonomous-dev cost --monthly' shows monthly spend at or above $500"
+    expected_diagnosis: >
+      The monthly_cost_cap_usd (default $500) has been reached. The cost
+      governor will block all processing for the remainder of the month.
+    expected_commands:
+      - "autonomous-dev cost --monthly"
+      - "autonomous-dev cost --daily"
+      - "autonomous-dev config show"
+    expected_fix:
+      - "Increase monthly_cost_cap_usd in config if the limit is appropriate"
+      - "Review per-request costs to find expensive outliers: autonomous-dev cost --request <REQ-ID>"
+      - "Consider reducing max_turns_by_phase for expensive phases like 'code' (default 200)"
+
+  - id: ts-cost-003
+    category: cost-budget
+    severity: low
+    scenario: "Cost report shows $0.00 even though the daemon has been running"
+    symptoms:
+      - "'autonomous-dev cost' shows $0.00 for today and this month"
+      - "Requests have been processed successfully"
+    expected_diagnosis: >
+      The cost ledger file may be missing, empty, or the cost extractor is not
+      recording session costs. The ledger is a JSONL file; if it does not exist
+      or is empty, all cost queries return zero.
+    expected_commands:
+      - "ls -la ~/.autonomous-dev/cost-ledger.jsonl"
+      - "tail -5 ~/.autonomous-dev/cost-ledger.jsonl"
+      - "autonomous-dev config show"
+    expected_fix:
+      - "Check if the cost ledger file exists and contains data"
+      - "Verify the cost extractor is configured and running"
+      - "Check that the COST_LEDGER_PATH matches expectations in the config"
+
+# ============================================================================
+# Category 4: Review gate problems (3 cases)
+# ============================================================================
+
+  - id: ts-review-001
+    category: review-gate
+    severity: medium
+    scenario: "Review gate always returns failing scores"
+    symptoms:
+      - "Every document review scores below the passing threshold"
+      - "Multiple revision cycles without improvement"
+      - "Convergence tracker shows no convergence"
+    expected_diagnosis: >
+      The rubric requirements may be miscalibrated for the project, the
+      reviewer agents may not have sufficient context, or the document being
+      reviewed genuinely has quality issues. The blind scoring context filter
+      may be stripping too much context from the reviewer prompt.
+    expected_commands:
+      - "ls <repo>/.autonomous-dev/requests/<REQ-ID>/versions/"
+      - "cat <repo>/.autonomous-dev/requests/<REQ-ID>/state.json"
+      - "tail -100 ~/.autonomous-dev/logs/daemon.log"
+    expected_fix:
+      - "Review the rubric definitions to ensure thresholds are achievable"
+      - "Check reviewer agent definitions for completeness"
+      - "Review the feedback_formatter output to see what reviewers are flagging"
+      - "If the document is genuinely poor, focus on improving the author agent's prompt"
+
+  - id: ts-review-002
+    category: review-gate
+    severity: medium
+    scenario: "Review gate reviewers produce empty or malformed output"
+    symptoms:
+      - "Reviewer output files are empty or contain parsing errors"
+      - "Score aggregation fails with 'no valid scores'"
+      - "reviewer-output-validator rejects all outputs"
+    expected_diagnosis: >
+      The reviewer agents may be hitting token limits, the reviewer prompt
+      assembler may be producing an overly long prompt, or the reviewer
+      output schema has changed and the validator rejects the new format.
+    expected_commands:
+      - "tail -100 ~/.autonomous-dev/logs/daemon.log"
+      - "ls <repo>/.autonomous-dev/requests/<REQ-ID>/reviews/"
+    expected_fix:
+      - "Check daemon logs for reviewer agent errors"
+      - "Verify reviewer agent definitions exist in the agents/ directory"
+      - "Check if the document being reviewed is too large for the context window"
+      - "Review the reviewer-output-validator error messages"
+
+  - id: ts-review-003
+    category: review-gate
+    severity: high
+    scenario: "Quality regression detected after a previously passing document"
+    symptoms:
+      - "quality-regression-detector flags a score drop"
+      - "Document that previously passed review now fails"
+      - "Revision cycle restarted unexpectedly"
+    expected_diagnosis: >
+      The quality regression detector compares current review scores against
+      historical scores. A significant drop triggers a regression flag and
+      blocks advancement. This can happen when a revision introduces issues or
+      when rubric calibration changes.
+    expected_commands:
+      - "cat <repo>/.autonomous-dev/requests/<REQ-ID>/state.json"
+      - "tail -100 ~/.autonomous-dev/logs/daemon.log"
+    expected_fix:
+      - "Compare the current and previous document versions to find what changed"
+      - "Check if the rubric was recently updated"
+      - "Review the regression detector findings in the logs"
+      - "If the regression is a false positive, the finding-tracker can be updated"
+
+# ============================================================================
+# Category 5: Agent factory issues (2 cases)
+# ============================================================================
+
+  - id: ts-agent-001
+    category: agent-factory
+    severity: medium
+    scenario: "Agent factory refuses to create a new agent"
+    symptoms:
+      - "CLI reports 'rate limit exceeded for agent creations'"
+      - "User wants to create a new domain-specific agent"
+    expected_diagnosis: >
+      The agent factory enforces rate limits: by default 1 agent creation per
+      week and 1 modification per agent per week. These limits prevent runaway
+      agent proliferation and are configured in agent-factory.yaml.
+    expected_commands:
+      - "cat <plugin>/config/agent-factory.yaml"
+      - "ls <plugin>/agents/"
+    expected_fix:
+      - "Wait for the rate limit window to pass"
+      - "Or increase agent-creations-per-week in agent-factory.yaml"
+      - "Verify the current agent count is below max-agents (default 50)"
+
+  - id: ts-agent-002
+    category: agent-factory
+    severity: low
+    scenario: "Agent factory domain matching returns irrelevant agents"
+    symptoms:
+      - "Suggested agents do not match the task domain"
+      - "Domain similarity scores are unexpectedly high for unrelated agents"
+    expected_diagnosis: >
+      The domain-matching similarity-threshold may be too low (default 0.6),
+      causing loose matches. The max-results setting controls how many
+      candidates are returned.
+    expected_commands:
+      - "cat <plugin>/config/agent-factory.yaml"
+    expected_fix:
+      - "Increase similarity-threshold in agent-factory.yaml (e.g., 0.75)"
+      - "Reduce max-results to return fewer, more relevant matches"
+      - "Review agent descriptions to ensure they accurately describe their domain"
+
+# ============================================================================
+# Category 6: Production intelligence issues (2 cases)
+# ============================================================================
+
+  - id: ts-intel-001
+    category: production-intelligence
+    severity: high
+    scenario: "Observation run fails with 'all MCP sources unreachable'"
+    symptoms:
+      - "Running /observe produces a critical error"
+      - "No observation files generated"
+      - "Audit log shows 'CRITICAL: all sources unreachable'"
+    expected_diagnosis: >
+      The observe command requires at least one MCP data source (Prometheus,
+      Grafana, or OpenSearch) to be reachable. If all sources are down, the
+      run aborts with a critical log entry rather than producing empty data.
+    expected_commands:
+      - "cat <repo>/.autonomous-dev/logs/intelligence/"
+      - "autonomous-dev config show"
+    expected_fix:
+      - "Verify MCP server configuration in .mcp.json"
+      - "Check that Prometheus, Grafana, and OpenSearch endpoints are reachable"
+      - "If only some sources are down, the run will proceed with partial data"
+      - "Retry after the infrastructure issue is resolved"
+
+  - id: ts-intel-002
+    category: production-intelligence
+    severity: medium
+    scenario: "Observation lock conflict prevents processing a service"
+    symptoms:
+      - "Daemon logs show 'lock conflict for service <name>'"
+      - "Observation run skips the service after timeout"
+    expected_diagnosis: >
+      The observe command acquires an advisory lock per service to prevent
+      concurrent processing. Lock conflicts wait up to 5 minutes with
+      exponential backoff before skipping. A stale lock from a crashed
+      previous run may be blocking.
+    expected_commands:
+      - "ls -la <repo>/.autonomous-dev/observations/.lock-*"
+      - "tail -50 ~/.autonomous-dev/logs/daemon.log"
+    expected_fix:
+      - "Check if a previous observation run is still in progress"
+      - "If the lock is stale, remove it: rm <repo>/.autonomous-dev/observations/.lock-<service>"
+      - "Retry the observation run"
+
+# ============================================================================
+# Category 7: Emergency scenarios (3 cases)
+# ============================================================================
+
+  - id: ts-emergency-001
+    category: emergency
+    severity: critical
+    scenario: "Autonomous-dev is spending money uncontrollably and I need to stop it immediately"
+    symptoms:
+      - "Costs are rising rapidly"
+      - "Multiple requests running in parallel"
+      - "Need immediate halt"
+    expected_diagnosis: >
+      This is an emergency situation requiring the kill switch. The kill switch
+      immediately halts all daemon processing. It is the fastest way to stop
+      all autonomous activity.
+    expected_commands:
+      - "autonomous-dev kill-switch"
+      - "autonomous-dev daemon status"
+      - "autonomous-dev cost"
+    expected_fix:
+      - "IMMEDIATELY run: autonomous-dev kill-switch"
+      - "Verify the daemon has stopped: autonomous-dev daemon status"
+      - "Review costs: autonomous-dev cost --daily"
+      - "Investigate which requests were consuming excessive resources"
+      - "When ready to resume, run: autonomous-dev kill-switch reset"
+
+  - id: ts-emergency-002
+    category: emergency
+    severity: critical
+    scenario: "Daemon is modifying files in a repository it should not touch"
+    symptoms:
+      - "Unexpected changes in a repository not on the allowlist"
+      - "Git diff shows autonomous-dev modifications"
+    expected_diagnosis: >
+      The repository allowlist in config should restrict which repositories the
+      daemon can operate on. If files are being modified outside the allowlist,
+      there is a potential security boundary violation that should be
+      investigated immediately.
+    expected_commands:
+      - "autonomous-dev kill-switch"
+      - "autonomous-dev config show"
+      - "git -C <repo> diff"
+      - "git -C <repo> log --oneline -10"
+    expected_fix:
+      - "IMMEDIATELY engage the kill switch: autonomous-dev kill-switch"
+      - "Check the repository allowlist in config"
+      - "Revert unauthorized changes: git checkout -- ."
+      - "Review the allowlist configuration and add proper restrictions"
+      - "Audit daemon logs for how the boundary was bypassed"
+
+  - id: ts-emergency-003
+    category: emergency
+    severity: critical
+    scenario: "Daemon is in a crash loop and consuming system resources"
+    symptoms:
+      - "High CPU usage from repeated daemon restarts"
+      - "Circuit breaker should have tripped but has not"
+      - "System becoming unresponsive"
+    expected_diagnosis: >
+      The daemon may be restarting faster than the circuit breaker can detect
+      consecutive crashes, or the crash state file may be corrupted preventing
+      the breaker from tripping. The OS service manager (launchd/systemd) may
+      be aggressively restarting the process.
+    expected_commands:
+      - "autonomous-dev kill-switch"
+      - "autonomous-dev daemon stop"
+      - "cat ~/.autonomous-dev/crash-state.json"
+      - "tail -200 ~/.autonomous-dev/logs/daemon.log"
+    expected_fix:
+      - "IMMEDIATELY stop the daemon: autonomous-dev daemon stop"
+      - "Engage the kill switch as a safeguard: autonomous-dev kill-switch"
+      - "On macOS: launchctl bootout gui/$(id -u)/com.autonomous-dev.daemon"
+      - "On Linux: systemctl --user stop autonomous-dev.service"
+      - "Investigate root cause in daemon logs"
+      - "Fix the issue, reset circuit breaker, then restart"

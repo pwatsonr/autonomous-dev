@@ -1,0 +1,328 @@
+# config-questions.yaml -- Test cases for the config guide skill
+# 15+ cases covering daemon config, cost governance, agent factory, and pipeline settings.
+
+suite: config
+skill: config-guide
+description: >
+  Validates that the config guide skill references the correct parameters,
+  default values, valid ranges, and relevant configuration sections.
+
+cases:
+
+# ============================================================================
+# Daemon configuration (5 cases)
+# ============================================================================
+
+  - id: cfg-daemon-001
+    category: daemon
+    difficulty: easy
+    question: "What is the default poll interval for the daemon?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "poll_interval_seconds"
+    expected_defaults:
+      poll_interval_seconds: 30
+    expected_range:
+      poll_interval_seconds:
+        min: 5
+        max: 3600
+        unit: seconds
+
+  - id: cfg-daemon-002
+    category: daemon
+    difficulty: easy
+    question: "What is the circuit breaker threshold?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "circuit_breaker_threshold"
+    expected_defaults:
+      circuit_breaker_threshold: 3
+    expected_range:
+      circuit_breaker_threshold:
+        min: 1
+        max: 10
+        unit: count
+
+  - id: cfg-daemon-003
+    category: daemon
+    difficulty: medium
+    question: "How do I configure the error backoff behavior?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "error_backoff_base_seconds"
+      - "error_backoff_max_seconds"
+    expected_defaults:
+      error_backoff_base_seconds: 30
+      error_backoff_max_seconds: 900
+    expected_range:
+      error_backoff_base_seconds:
+        min: 1
+        max: 300
+        unit: seconds
+      error_backoff_max_seconds:
+        min: 60
+        max: 3600
+        unit: seconds
+
+  - id: cfg-daemon-004
+    category: daemon
+    difficulty: medium
+    question: "How do I configure the graceful shutdown timeout?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "graceful_shutdown_timeout_seconds"
+    expected_defaults:
+      graceful_shutdown_timeout_seconds: 300
+    expected_range:
+      graceful_shutdown_timeout_seconds:
+        min: 10
+        max: 600
+        unit: seconds
+
+  - id: cfg-daemon-005
+    category: daemon
+    difficulty: medium
+    question: "How many retries per phase does the daemon attempt?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "max_retries_per_phase"
+    expected_defaults:
+      max_retries_per_phase: 3
+    expected_range:
+      max_retries_per_phase:
+        min: 0
+        max: 10
+        unit: count
+
+# ============================================================================
+# Cost governance (4 cases)
+# ============================================================================
+
+  - id: cfg-cost-001
+    category: cost
+    difficulty: easy
+    question: "What is the default daily cost cap?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "daily_cost_cap_usd"
+    expected_defaults:
+      daily_cost_cap_usd: 50.00
+    expected_range:
+      daily_cost_cap_usd:
+        min: 1.00
+        max: 1000.00
+        unit: USD
+
+  - id: cfg-cost-002
+    category: cost
+    difficulty: easy
+    question: "What is the default monthly cost cap?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "monthly_cost_cap_usd"
+    expected_defaults:
+      monthly_cost_cap_usd: 500.00
+    expected_range:
+      monthly_cost_cap_usd:
+        min: 10.00
+        max: 10000.00
+        unit: USD
+
+  - id: cfg-cost-003
+    category: cost
+    difficulty: medium
+    question: "How do I configure log rotation for the daemon?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "log_max_size_mb"
+      - "log_retention_days"
+    expected_defaults:
+      log_max_size_mb: 50
+      log_retention_days: 7
+    expected_range:
+      log_max_size_mb:
+        min: 1
+        max: 500
+        unit: megabytes
+      log_retention_days:
+        min: 1
+        max: 90
+        unit: days
+
+  - id: cfg-cost-004
+    category: cost
+    difficulty: hard
+    question: "How do I set different turn limits for different phases?"
+    expected_section: "daemon.max_turns_by_phase"
+    expected_parameters:
+      - "intake"
+      - "prd"
+      - "tdd"
+      - "plan"
+      - "spec"
+      - "code"
+    expected_defaults:
+      intake: 10
+      prd: 50
+      tdd: 50
+      plan: 50
+      spec: 50
+      code: 200
+      prd_review: 30
+      tdd_review: 30
+      plan_review: 30
+      spec_review: 30
+      code_review: 30
+      integration: 100
+      deploy: 30
+    expected_range:
+      intake:
+        min: 1
+        max: 100
+        unit: turns
+      code:
+        min: 1
+        max: 500
+        unit: turns
+
+# ============================================================================
+# Agent factory configuration (3 cases)
+# ============================================================================
+
+  - id: cfg-agent-001
+    category: agent-factory
+    difficulty: medium
+    question: "What is the maximum number of agents allowed?"
+    expected_section: "registry"
+    expected_parameters:
+      - "max-agents"
+    expected_defaults:
+      max-agents: 50
+    expected_range:
+      max-agents:
+        min: 1
+        max: 200
+        unit: count
+
+  - id: cfg-agent-002
+    category: agent-factory
+    difficulty: medium
+    question: "How do I configure the domain matching similarity threshold?"
+    expected_section: "domain-matching"
+    expected_parameters:
+      - "similarity-threshold"
+      - "max-results"
+    expected_defaults:
+      similarity-threshold: 0.6
+      max-results: 5
+    expected_range:
+      similarity-threshold:
+        min: 0.0
+        max: 1.0
+        unit: ratio
+      max-results:
+        min: 1
+        max: 20
+        unit: count
+
+  - id: cfg-agent-003
+    category: agent-factory
+    difficulty: hard
+    question: "What are the agent factory rate limits and anomaly thresholds?"
+    expected_section: "rate-limits,anomaly-thresholds"
+    expected_parameters:
+      - "modifications-per-agent-per-week"
+      - "agent-creations-per-week"
+      - "approval-rate-drop"
+      - "quality-decline-points"
+      - "quality-decline-window"
+      - "escalation-rate"
+      - "token-budget-multiplier"
+    expected_defaults:
+      modifications-per-agent-per-week: 1
+      agent-creations-per-week: 1
+      approval-rate-drop: 0.70
+      quality-decline-points: 0.5
+      quality-decline-window: 10
+      escalation-rate: 0.30
+      token-budget-multiplier: 2.0
+    expected_range:
+      approval-rate-drop:
+        min: 0.0
+        max: 1.0
+        unit: ratio
+      escalation-rate:
+        min: 0.0
+        max: 1.0
+        unit: ratio
+
+# ============================================================================
+# Repository and general config (3 cases)
+# ============================================================================
+
+  - id: cfg-repo-001
+    category: repositories
+    difficulty: easy
+    question: "How do I add a repository to the allowlist?"
+    expected_section: "repositories"
+    expected_parameters:
+      - "allowlist"
+    expected_defaults:
+      allowlist: "[]"
+    expected_range:
+      allowlist:
+        min: 0
+        max: null
+        unit: "array of absolute paths"
+
+  - id: cfg-repo-002
+    category: general
+    difficulty: medium
+    question: "Where does autonomous-dev store its state files?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "DAEMON_HOME"
+    expected_defaults:
+      DAEMON_HOME: "~/.autonomous-dev"
+    expected_range: {}
+
+  - id: cfg-repo-003
+    category: general
+    difficulty: easy
+    question: "How do I view the current configuration?"
+    expected_section: "commands"
+    expected_parameters:
+      - "config show"
+      - "config validate"
+    expected_defaults: {}
+    expected_range: {}
+
+  - id: cfg-heartbeat-001
+    category: daemon
+    difficulty: medium
+    question: "How often does the daemon send a heartbeat?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "heartbeat_interval_seconds"
+    expected_defaults:
+      heartbeat_interval_seconds: 30
+    expected_range:
+      heartbeat_interval_seconds:
+        min: 5
+        max: 300
+        unit: seconds
+
+  - id: cfg-backoff-001
+    category: daemon
+    difficulty: medium
+    question: "What is the idle backoff maximum?"
+    expected_section: "daemon"
+    expected_parameters:
+      - "idle_backoff_max_seconds"
+    expected_defaults:
+      idle_backoff_max_seconds: 900
+    expected_range:
+      idle_backoff_max_seconds:
+        min: 60
+        max: 3600
+        unit: seconds
