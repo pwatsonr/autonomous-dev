@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "REQ-20260408-0001",
+  "status": "intake",
+  "priority": 5,
+  "title": "V1 fixture: intake state",
+  "description": "Test fixture for a request at intake.",
+  "repository": "/tmp/test-repo",
+  "branch": "autonomous/REQ-20260408-0001",
+  "worktree_path": null,
+  "created_at": "2026-04-08T09:00:00Z",
+  "updated_at": "2026-04-08T09:00:00Z",
+  "cost_accrued_usd": 0,
+  "turn_count": 0,
+  "escalation_count": 0,
+  "blocked_by": [],
+  "phase_history": [
+    {
+      "state": "intake",
+      "entered_at": "2026-04-08T09:00:00Z",
+      "exited_at": null,
+      "session_id": null,
+      "turns_used": 0,
+      "cost_usd": 0,
+      "retry_count": 0,
+      "exit_reason": null
+    }
+  ],
+  "current_phase_metadata": {},
+  "error": null,
+  "last_checkpoint": null,
+  "paused_from": null,
+  "paused_reason": null,
+  "failure_reason": null,
+  "generation": 0,
+  "tags": []
+}

@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "id": "REQ-20260408-0003",
+  "status": "failed",
+  "priority": 3,
+  "title": "V1 fixture: failed state with error",
+  "description": "Test fixture for a request that failed during code phase.",
+  "repository": "/tmp/test-repo",
+  "branch": "autonomous/REQ-20260408-0003",
+  "worktree_path": "/tmp/worktrees/REQ-20260408-0003",
+  "created_at": "2026-04-08T09:00:00Z",
+  "updated_at": "2026-04-08T14:30:00Z",
+  "cost_accrued_usd": 12.35,
+  "turn_count": 185,
+  "escalation_count": 1,
+  "blocked_by": [],
+  "phase_history": [
+    {
+      "state": "intake",
+      "entered_at": "2026-04-08T09:00:00Z",
+      "exited_at": "2026-04-08T09:01:00Z",
+      "session_id": "sess_aaa111",
+      "turns_used": 2,
+      "cost_usd": 0.05,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "prd",
+      "entered_at": "2026-04-08T09:01:00Z",
+      "exited_at": "2026-04-08T09:45:00Z",
+      "session_id": "sess_bbb222",
+      "turns_used": 30,
+      "cost_usd": 1.80,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "prd_review",
+      "entered_at": "2026-04-08T09:45:00Z",
+      "exited_at": "2026-04-08T09:55:00Z",
+      "session_id": "sess_ccc333",
+      "turns_used": 8,
+      "cost_usd": 0.40,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "tdd",
+      "entered_at": "2026-04-08T09:55:00Z",
+      "exited_at": "2026-04-08T10:50:00Z",
+      "session_id": "sess_ddd444",
+      "turns_used": 35,
+      "cost_usd": 2.10,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "tdd_review",
+      "entered_at": "2026-04-08T10:50:00Z",
+      "exited_at": "2026-04-08T11:00:00Z",
+      "session_id": "sess_eee555",
+      "turns_used": 10,
+      "cost_usd": 0.50,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "plan",
+      "entered_at": "2026-04-08T11:00:00Z",
+      "exited_at": "2026-04-08T11:30:00Z",
+      "session_id": "sess_fff666",
+      "turns_used": 20,
+      "cost_usd": 1.20,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "plan_review",
+      "entered_at": "2026-04-08T11:30:00Z",
+      "exited_at": "2026-04-08T11:40:00Z",
+      "session_id": "sess_ggg777",
+      "turns_used": 8,
+      "cost_usd": 0.40,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "spec",
+      "entered_at": "2026-04-08T11:40:00Z",
+      "exited_at": "2026-04-08T12:20:00Z",
+      "session_id": "sess_hhh888",
+      "turns_used": 25,
+      "cost_usd": 1.50,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "spec_review",
+      "entered_at": "2026-04-08T12:20:00Z",
+      "exited_at": "2026-04-08T12:30:00Z",
+      "session_id": "sess_iii999",
+      "turns_used": 7,
+      "cost_usd": 0.35,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "code",
+      "entered_at": "2026-04-08T12:30:00Z",
+      "exited_at": "2026-04-08T14:30:00Z",
+      "session_id": "sess_xyz789",
+      "turns_used": 40,
+      "cost_usd": 4.05,
+      "retry_count": 2,
+      "exit_reason": "error"
+    }
+  ],
+  "current_phase_metadata": {},
+  "error": {
+    "message": "Session crashed with exit code 1",
+    "code": "session_crash",
+    "phase": "code",
+    "timestamp": "2026-04-08T14:30:00Z",
+    "session_id": "sess_xyz789",
+    "details": {
+      "exit_code": 1,
+      "stderr_tail": "Error: out of memory"
+    }
+  },
+  "last_checkpoint": "spec_review",
+  "paused_from": null,
+  "paused_reason": null,
+  "failure_reason": "session_crash_retries_exhausted",
+  "generation": 0,
+  "tags": []
+}

@@ -35,13 +35,13 @@ export const SECRET_PATTERNS: PatternDefinition[] = [
   {
     name: 'stripe_secret',
     type: 'secret',
-    regex: /sk_live_[a-zA-Z0-9]{24,}/g,
+    regex: /sk_(?:live|test|TESTONLY)_[a-zA-Z0-9]{24,}/g,
     replacement: '[SECRET_REDACTED]',
   },
   {
     name: 'stripe_publishable',
     type: 'secret',
-    regex: /pk_live_[a-zA-Z0-9]{24,}/g,
+    regex: /pk_(?:live|test|TESTONLY)_[a-zA-Z0-9]{24,}/g,
     replacement: '[SECRET_REDACTED]',
   },
   {

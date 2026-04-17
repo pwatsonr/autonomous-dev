@@ -1,0 +1,23 @@
+[Unit]
+Description=autonomous-dev Daemon Engine
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{BASH_PATH}} {{PLUGIN_BIN_DIR}}/supervisor-loop.sh
+Restart=on-failure
+RestartSec=10
+Environment=PATH={{EXTRA_PATH_DIRS}}/usr/local/bin:/usr/bin:/bin
+Environment=HOME={{USER_HOME}}
+
+# Resource limits
+MemoryMax=512M
+CPUQuota=50%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autonomous-dev
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "id": "REQ-20260408-0004",
+  "status": "monitor",
+  "priority": 2,
+  "title": "V1 fixture: completed pipeline at monitor",
+  "description": "Test fixture for a request that completed all pipeline phases.",
+  "repository": "/tmp/test-repo",
+  "branch": "autonomous/REQ-20260408-0004",
+  "worktree_path": "/tmp/worktrees/REQ-20260408-0004",
+  "created_at": "2026-04-08T08:00:00Z",
+  "updated_at": "2026-04-08T18:00:00Z",
+  "cost_accrued_usd": 28.50,
+  "turn_count": 320,
+  "escalation_count": 0,
+  "blocked_by": [],
+  "phase_history": [
+    {
+      "state": "intake",
+      "entered_at": "2026-04-08T08:00:00Z",
+      "exited_at": "2026-04-08T08:02:00Z",
+      "session_id": "sess_c01",
+      "turns_used": 3,
+      "cost_usd": 0.10,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "prd",
+      "entered_at": "2026-04-08T08:02:00Z",
+      "exited_at": "2026-04-08T08:50:00Z",
+      "session_id": "sess_c02",
+      "turns_used": 30,
+      "cost_usd": 2.00,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "prd_review",
+      "entered_at": "2026-04-08T08:50:00Z",
+      "exited_at": "2026-04-08T09:00:00Z",
+      "session_id": "sess_c03",
+      "turns_used": 8,
+      "cost_usd": 0.50,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "tdd",
+      "entered_at": "2026-04-08T09:00:00Z",
+      "exited_at": "2026-04-08T10:00:00Z",
+      "session_id": "sess_c04",
+      "turns_used": 40,
+      "cost_usd": 2.80,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "tdd_review",
+      "entered_at": "2026-04-08T10:00:00Z",
+      "exited_at": "2026-04-08T10:10:00Z",
+      "session_id": "sess_c05",
+      "turns_used": 8,
+      "cost_usd": 0.50,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "plan",
+      "entered_at": "2026-04-08T10:10:00Z",
+      "exited_at": "2026-04-08T10:50:00Z",
+      "session_id": "sess_c06",
+      "turns_used": 25,
+      "cost_usd": 1.60,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "plan_review",
+      "entered_at": "2026-04-08T10:50:00Z",
+      "exited_at": "2026-04-08T11:00:00Z",
+      "session_id": "sess_c07",
+      "turns_used": 8,
+      "cost_usd": 0.50,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "spec",
+      "entered_at": "2026-04-08T11:00:00Z",
+      "exited_at": "2026-04-08T12:00:00Z",
+      "session_id": "sess_c08",
+      "turns_used": 35,
+      "cost_usd": 2.30,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "spec_review",
+      "entered_at": "2026-04-08T12:00:00Z",
+      "exited_at": "2026-04-08T12:10:00Z",
+      "session_id": "sess_c09",
+      "turns_used": 8,
+      "cost_usd": 0.50,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "code",
+      "entered_at": "2026-04-08T12:10:00Z",
+      "exited_at": "2026-04-08T15:00:00Z",
+      "session_id": "sess_c10",
+      "turns_used": 80,
+      "cost_usd": 8.50,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "code_review",
+      "entered_at": "2026-04-08T15:00:00Z",
+      "exited_at": "2026-04-08T15:15:00Z",
+      "session_id": "sess_c11",
+      "turns_used": 12,
+      "cost_usd": 0.80,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "integration",
+      "entered_at": "2026-04-08T15:15:00Z",
+      "exited_at": "2026-04-08T16:30:00Z",
+      "session_id": "sess_c12",
+      "turns_used": 40,
+      "cost_usd": 4.20,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "deploy",
+      "entered_at": "2026-04-08T16:30:00Z",
+      "exited_at": "2026-04-08T17:00:00Z",
+      "session_id": "sess_c13",
+      "turns_used": 15,
+      "cost_usd": 1.50,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "monitor",
+      "entered_at": "2026-04-08T17:00:00Z",
+      "exited_at": null,
+      "session_id": "sess_c14",
+      "turns_used": 8,
+      "cost_usd": 2.70,
+      "retry_count": 0,
+      "exit_reason": null
+    }
+  ],
+  "current_phase_metadata": {
+    "deploy_pr": "https://github.com/example/test-repo/pull/42",
+    "deploy_sha": "abc123def456"
+  },
+  "error": null,
+  "last_checkpoint": "deploy",
+  "paused_from": null,
+  "paused_reason": null,
+  "failure_reason": null,
+  "generation": 0,
+  "tags": ["complete-pipeline"]
+}

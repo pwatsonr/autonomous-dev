@@ -1,0 +1,12 @@
+╭──────────────────────────────────────────╮
+│ Session: sess_crash01                    │
+│ Request: REQ-20260408-x9y8              │
+╰──────────────────────────────────────────╯
+
+> Analyzing repository structure...
+> Reading existing documentation...
+> Starting TDD generation...
+
+Error: Connection reset by peer
+Traceback (most recent call last):
+  Process exited with code 137 (SIGKILL)

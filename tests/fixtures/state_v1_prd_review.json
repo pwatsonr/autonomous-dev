@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "id": "REQ-20260408-a3f1",
+  "status": "prd_review",
+  "priority": 1,
+  "title": "Add dark mode support to dashboard",
+  "description": "Users have requested dark mode. Implement a theme switcher and dark color palette across all dashboard components.",
+  "repository": "/Users/pwatson/codebase/dashboard-app",
+  "branch": "autonomous/REQ-20260408-a3f1",
+  "worktree_path": "/Users/pwatson/.autonomous-dev/worktrees/REQ-20260408-a3f1",
+  "created_at": "2026-04-08T09:15:00Z",
+  "updated_at": "2026-04-08T10:42:00Z",
+  "cost_accrued_usd": 2.47,
+  "turn_count": 38,
+  "escalation_count": 0,
+  "blocked_by": [],
+  "phase_history": [
+    {
+      "state": "intake",
+      "entered_at": "2026-04-08T09:15:00Z",
+      "exited_at": "2026-04-08T09:16:12Z",
+      "session_id": "sess_abc123",
+      "turns_used": 3,
+      "cost_usd": 0.12,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "prd",
+      "entered_at": "2026-04-08T09:16:12Z",
+      "exited_at": "2026-04-08T10:05:30Z",
+      "session_id": "sess_def456",
+      "turns_used": 28,
+      "cost_usd": 1.85,
+      "retry_count": 0,
+      "exit_reason": "completed"
+    },
+    {
+      "state": "prd_review",
+      "entered_at": "2026-04-08T10:05:30Z",
+      "exited_at": null,
+      "session_id": "sess_ghi789",
+      "turns_used": 7,
+      "cost_usd": 0.50,
+      "retry_count": 0,
+      "exit_reason": null
+    }
+  ],
+  "current_phase_metadata": {
+    "review_criteria": "completeness, feasibility, clarity",
+    "review_feedback": null,
+    "artifacts": ["docs/prd/PRD-dark-mode.md"]
+  },
+  "error": null,
+  "last_checkpoint": "prd",
+  "paused_from": null,
+  "paused_reason": null,
+  "failure_reason": null,
+  "generation": 0,
+  "tags": ["dashboard", "ux"]
+}
