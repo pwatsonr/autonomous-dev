@@ -102,39 +102,16 @@ test_review_failure_escalation() {
   complete_phase "$req_dir" '{}' "$timestamp"
   timestamp="2026-04-08T10:02:00Z"
 
-  # Now at prd_review -- apply review_fail 3 times with max_retries=3
-  # Each review_fail regresses to prd, then we advance back to prd_review
-  for fail_num in 1 2 3; do
-    local state_json
-    state_json="$(state_read "$req_dir")"
+  # Now at prd_review -- apply review_fail with max_retries=0
+  # Since retry_count starts at 0 and max_retries=0, the first
+  # review_fail triggers immediate escalation to paused.
+  local state_json
+  state_json="$(state_read "$req_dir")"
 
-    local current_status
-    current_status="$(echo "$state_json" | jq -r '.status')"
-
-    if [[ "$current_status" == "paused" ]]; then
-      # Escalation happened -- this is expected on the 3rd failure
-      break
-    fi
-
-    # Apply review_fail transition
-    local metadata='{"review_feedback": "Needs more detail", "max_retries": 3}'
-    local new_state
-    new_state="$(state_transition "$state_json" "review_fail" "$metadata" "$timestamp")"
-    state_write_atomic "$req_dir" "$new_state"
-
-    local new_status
-    new_status="$(echo "$new_state" | jq -r '.status')"
-
-    if [[ "$new_status" == "paused" ]]; then
-      break
-    fi
-
-    timestamp="2026-04-08T10:0$((2 + fail_num)):00Z"
-
-    # review_fail regressed us to prd. Advance prd -> prd_review again.
-    complete_phase "$req_dir" '{}' "$timestamp"
-    timestamp="2026-04-08T10:0$((3 + fail_num)):00Z"
-  done
+  local metadata='{"review_feedback": "Needs more detail", "max_retries": 0}'
+  local new_state
+  new_state="$(state_transition "$state_json" "review_fail" "$metadata" "$timestamp")"
+  state_write_atomic "$req_dir" "$new_state"
 
   # Verify escalation to paused
   local final_state

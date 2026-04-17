@@ -405,7 +405,7 @@ restore_interrupted_session() {
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     local event
-    event=$(jq -n \
+    event=$(jq -nc \
         --arg ts "${ts}" \
         --arg req "${request_id}" \
         '{
@@ -1170,7 +1170,7 @@ escalate_to_paused() {
 
     # Append escalation event
     local event
-    event=$(jq -n \
+    event=$(jq -nc \
         --arg ts "${ts}" \
         --arg req "${request_id}" \
         --arg phase "${phase}" \
@@ -1378,7 +1378,7 @@ update_request_state() {
 
         # Append session_complete event
         local event
-        event=$(jq -n \
+        event=$(jq -nc \
             --arg ts "${ts}" \
             --arg req "${request_id}" \
             --arg type "session_complete" \
@@ -1429,7 +1429,7 @@ update_request_state() {
 
         # Append session_error event
         local event
-        event=$(jq -n \
+        event=$(jq -nc \
             --arg ts "${ts}" \
             --arg req "${request_id}" \
             --arg type "session_error" \
