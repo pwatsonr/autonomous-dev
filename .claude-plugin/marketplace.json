@@ -1,11 +1,37 @@
 {
   "name": "autonomous-dev",
-  "description": "Autonomous AI development system for Claude Code",
+  "owner": {
+    "name": "pwatsonr"
+  },
+  "metadata": {
+    "description": "Autonomous AI development system for Claude Code — self-improving pipeline from product request to production code"
+  },
   "plugins": [
     {
       "name": "autonomous-dev",
-      "path": ".",
-      "version": "0.1.0"
+      "source": ".",
+      "description": "Autonomous AI development system — continuously-running, self-improving development pipeline that receives product requests, decomposes them through PRD→TDD→Plan→Spec→Code, reviews at every gate, monitors production, and generates its own improvement PRDs.",
+      "version": "0.1.0",
+      "author": {
+        "name": "pwatsonr",
+        "url": "https://github.com/pwatsonr"
+      },
+      "homepage": "https://github.com/pwatsonr/autonomous-dev",
+      "repository": "https://github.com/pwatsonr/autonomous-dev",
+      "license": "MIT",
+      "keywords": [
+        "autonomous",
+        "development",
+        "pipeline",
+        "self-improving",
+        "agent-factory",
+        "production-intelligence",
+        "review-gates",
+        "trust-levels",
+        "daemon"
+      ],
+      "category": "development",
+      "tags": ["autonomous", "pipeline", "sdlc", "self-improving", "agent-factory"]
     }
   ]
 }
