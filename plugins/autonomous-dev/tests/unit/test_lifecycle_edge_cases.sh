@@ -440,7 +440,10 @@ test_blocked_by_unknown_dep() {
 # =============================================================================
 test_circular_dependency_detected() {
   local exit_code=0
-  detect_circular_dependencies "REQ-20260408-aaaa" "_mock_state_reader_circular" 10 2>/dev/null || exit_code=$?
+  set +e
+  detect_circular_dependencies "REQ-20260408-aaaa" "_mock_state_reader_circular" 10 2>/dev/null
+  exit_code=$?
+  set -e
   assert_eq "1" "$exit_code" "circular dependency should be detected"
 }
 
