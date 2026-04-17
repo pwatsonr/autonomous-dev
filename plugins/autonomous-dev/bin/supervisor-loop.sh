@@ -410,7 +410,7 @@ restore_interrupted_session() {
         --arg req "${request_id}" \
         '{
             timestamp: $ts,
-            type: "session_interrupted",
+            event_type: "session_interrupted",
             request_id: $req,
             details: {
                 recovery_action: "restored_from_checkpoint"
@@ -1034,7 +1034,7 @@ emit_alert() {
         --arg ts "${ts}" \
         --argjson pid "$$" \
         '{
-            type: $type,
+            event_type: $type,
             message: $msg,
             timestamp: $ts,
             daemon_pid: $pid
@@ -1177,7 +1177,7 @@ escalate_to_paused() {
         --argjson retries "${retry_count}" \
         '{
             timestamp: $ts,
-            type: "retry_exhaustion",
+            event_type: "retry_exhaustion",
             request_id: $req,
             details: {
                 phase: $phase,
@@ -1385,7 +1385,7 @@ update_request_state() {
             --arg cost "${session_cost}" \
             '{
                 timestamp: $ts,
-                type: $type,
+                event_type: $type,
                 request_id: $req,
                 details: {
                     session_cost_usd: ($cost | tonumber),
@@ -1437,7 +1437,7 @@ update_request_state() {
             --arg exit_code "${exit_code}" \
             '{
                 timestamp: $ts,
-                type: $type,
+                event_type: $type,
                 request_id: $req,
                 details: {
                     session_cost_usd: ($cost | tonumber),

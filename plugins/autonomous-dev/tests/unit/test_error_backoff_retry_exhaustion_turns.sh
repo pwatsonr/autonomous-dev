@@ -350,7 +350,7 @@ test_retry_exhaustion_event() {
 
     local events_file="${project}/.autonomous-dev/requests/${request_id}/events.jsonl"
     local last_type
-    last_type=$(tail -1 "${events_file}" | jq -r '.type')
+    last_type=$(tail -1 "${events_file}" | jq -r '.event_type')
     assert_eq "retry_exhaustion" "${last_type}" "Last event type should be retry_exhaustion"
 
     # Verify event details
