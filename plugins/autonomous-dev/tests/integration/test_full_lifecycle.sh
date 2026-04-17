@@ -131,13 +131,9 @@ test_review_failure_escalation() {
 
     timestamp="2026-04-08T10:0$((2 + fail_num)):00Z"
 
-    # Advance prd -> prd_review again
+    # review_fail regressed us to prd. Advance prd -> prd_review again.
     complete_phase "$req_dir" '{}' "$timestamp"
     timestamp="2026-04-08T10:0$((3 + fail_num)):00Z"
-
-    # Re-advance to prd_review
-    complete_phase "$req_dir" '{}' "$timestamp"
-    timestamp="2026-04-08T10:0$((4 + fail_num)):00Z"
   done
 
   # Verify escalation to paused
