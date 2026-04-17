@@ -33,12 +33,17 @@ jobs:
           echo "git: $(git --version)"
           echo "bc: $(bc --version | head -1)"
 
-      - name: Run state machine tests
-        run: |
-          bash tests/unit/test_lifecycle_transitions.sh
-          bash tests/unit/test_lifecycle_edge_cases.sh
-          bash tests/unit/test_lifecycle_properties.sh
-          bash tests/unit/test_backward_meta_invalid_transitions.sh
+      - name: Run lifecycle transition tests
+        run: bash tests/unit/test_lifecycle_transitions.sh
+
+      - name: Run lifecycle edge case tests
+        run: bash tests/unit/test_lifecycle_edge_cases.sh
+
+      - name: Run lifecycle property tests
+        run: bash tests/unit/test_lifecycle_properties.sh
+
+      - name: Run backward/meta transition tests
+        run: bash tests/unit/test_backward_meta_invalid_transitions.sh
 
       - name: Run gate check tests
         run: bash tests/unit/test_gate_checks.sh
