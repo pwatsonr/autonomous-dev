@@ -190,7 +190,7 @@ If the plugin is not installed, walk through these sub-steps:
 
 1. **Add the marketplace source** (if not already present):
    ```bash
-   claude marketplace add autonomous-dev
+   claude plugin marketplace add pwatsonr/autonomous-dev
    ```
 
 2. **Install the plugin**:

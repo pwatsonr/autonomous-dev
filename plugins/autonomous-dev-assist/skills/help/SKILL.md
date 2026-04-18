@@ -111,6 +111,7 @@ The daemon is a long-running background process that powers autonomous-dev. It:
 - **Polls for work** every 30 seconds (configurable, scales to 15 min when idle)
 - **Installs as an OS service** -- macOS LaunchAgent or Linux systemd user service, survives reboots and logouts
 - **Manages request lifecycle** -- picks up submissions, dispatches Claude CLI sessions for each phase, tracks state, handles retries, enforces cost budgets
+- **Uses a PID-based lock file** (`~/.autonomous-dev/daemon.lock`) to prevent two instances running simultaneously. If the daemon crashes without cleaning up, the lock file becomes stale. On restart, the daemon checks whether the PID in the lock file is still alive and removes stale locks automatically
 - **Includes a circuit breaker** -- trips after 3 consecutive crashes (configurable) to prevent runaway failures
 - **Logs everything** -- structured JSONL logging with configurable retention
 
@@ -158,7 +159,7 @@ Review gates enforce quality at every phase transition:
 - **Panel assembly** -- a configurable number of reviewer agents score each artifact (default: 2 reviewers for PRD/TDD/Code, 1 for Plan/Spec)
 - **Blind scoring** -- reviewers evaluate against rubrics without seeing each other's scores to prevent anchoring bias
 - **Score aggregation** -- scores are aggregated (default: mean) and compared against the phase threshold
-- **Disagreement detection** -- when reviewers diverge by more than 15 points (configurable), the system escalates to a human
+- **Disagreement detection** -- when reviewers disagree by more than 15 points (configurable), the system flags the divergence. Convergence tracking monitors whether scores improve across iterations. Persistent disagreement triggers escalation to a human
 - **Iteration loop** -- if a document fails, it is sent back with specific feedback for revision, up to 3 times (configurable)
 - **Escalation** -- after max iterations, the system escalates to a human with the document, scores, and feedback history
 
@@ -177,6 +178,8 @@ The production intelligence loop monitors your deployed services and auto-genera
 7. **Governance** -- prevents fix-revert oscillation with cooldown periods (default: 7 days) and effectiveness comparisons
 
 Observations run on a cron schedule (default: every 4 hours). Reports are stored in `.autonomous-dev/observations/`.
+
+If all MCP sources are unreachable when an observation run starts, the run will abort with a critical log entry. Partial data is still usable — if only some sources fail, the run continues with degraded coverage and notes which sources were unavailable.
 
 ---
 
@@ -269,6 +272,8 @@ The daemon uses state checkpoints to protect in-flight work from crashes:
 - **Crash detection via stale heartbeat.** The daemon writes a heartbeat timestamp every 30 seconds (configurable via `daemon.heartbeat_interval_seconds`). If the daemon crashes mid-pipeline, the supervisor (launchd on macOS, systemd on Linux) detects it on restart by finding a stale heartbeat -- one that is older than 2x the heartbeat interval.
 
 - **In-flight work resumes from the last checkpoint.** When the daemon restarts after a crash, it scans all request `state.json` files, finds any that were in-progress, and resumes each request from the last completed checkpoint. The current phase restarts from the beginning (not mid-session), but no prior phase work is lost.
+
+- **Per-phase retry limits.** Before tripping the circuit breaker, each individual phase is retried up to `max_retries_per_phase` times (default: 3). After exhausting retries for a phase, that request is paused and escalated. The circuit breaker only trips when the *daemon itself* crashes repeatedly (not when individual requests fail).
 
 - **Crash counter tracks consecutive failures.** Each crash increments a consecutive crash counter. After the counter reaches the `circuit_breaker_threshold` (default: 3), the circuit breaker trips and the daemon stops automatically. This prevents a crash loop from burning through your cost budget. Reset with `autonomous-dev circuit-breaker reset` after investigating and fixing the root cause.
 

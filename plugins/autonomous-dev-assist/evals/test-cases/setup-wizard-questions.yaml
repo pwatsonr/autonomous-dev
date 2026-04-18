@@ -21,7 +21,7 @@ cases:
     must_mention:
       - "bash --version"
       - "jq --version"
-      - "which claude"
+      - "claude --version"
       - "brew install bash"
     must_not_mention: []
 

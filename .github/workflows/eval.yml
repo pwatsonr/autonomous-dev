@@ -1,0 +1,29 @@
+name: Skill Evals
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'plugins/autonomous-dev-assist/skills/**'
+      - 'plugins/autonomous-dev-assist/evals/**'
+      - 'plugins/autonomous-dev-assist/instructions/**'
+      - 'plugins/autonomous-dev-assist/agents/**'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/autonomous-dev-assist/skills/**'
+      - 'plugins/autonomous-dev-assist/evals/**'
+
+jobs:
+  skill-evals:
+    name: Skill Content Evals
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/autonomous-dev-assist
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run eval harness (threshold 80%)
+        run: bash evals/ci-eval.sh --threshold 80
