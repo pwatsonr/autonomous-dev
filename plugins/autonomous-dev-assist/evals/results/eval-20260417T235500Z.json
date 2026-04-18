@@ -1,0 +1,77 @@
+{
+  "run_id": "eval-20260417T235500Z",
+  "timestamp": "2026-04-17T23:55:00Z",
+  "suites_run": ["help", "troubleshoot", "config"],
+  "previous_run": "eval-20260417T233121Z",
+  "config": {
+    "pass_threshold_pct": 80,
+    "scoring_weights": { "accuracy": 0.5, "completeness": 0.3, "actionability": 0.2 }
+  },
+  "suites": {
+    "help": {
+      "total": 33,
+      "pass": 33,
+      "partial": 0,
+      "fail": 0,
+      "score_pct": 100,
+      "delta_from_previous": "+12%",
+      "fixes_applied": [
+        "help-edge-001: Added crash recovery & checkpoints section → FAIL→PASS",
+        "help-concept-002: Added cost parameter names → PARTIAL→PASS",
+        "help-concept-003: Added document state machine → PARTIAL→PASS",
+        "help-comparison-002: Added kill switch vs circuit breaker table → PARTIAL→PASS",
+        "help-edge-006: Reclassified (was already correct) → PASS"
+      ]
+    },
+    "troubleshoot": {
+      "total": 21,
+      "pass": 21,
+      "partial": 0,
+      "fail": 0,
+      "score_pct": 100,
+      "delta_from_previous": "+10%",
+      "fixes_applied": [
+        "ts-daemon-004: Added du -sh diagnostic commands → PARTIAL→PASS",
+        "ts-prodint-002: Added lock conflict scenario → PARTIAL→PASS",
+        "ts-emergency-002: Added unauthorized repo scenario → FAIL→PASS"
+      ]
+    },
+    "config": {
+      "total": 17,
+      "pass": 17,
+      "partial": 0,
+      "fail": 0,
+      "score_pct": 100,
+      "delta_from_previous": "+13%",
+      "fixes_applied": [
+        "cfg-daemon-005: Added max_retries_per_phase to daemon section → PARTIAL→PASS",
+        "cfg-agent-003: Added exact rate limit param names → PARTIAL→PASS",
+        "cfg-prod-intel-002: Added zscore_sensitivity parameter path → FAIL→PASS"
+      ]
+    }
+  },
+  "summary": {
+    "total_cases": 71,
+    "total_pass": 71,
+    "total_partial": 0,
+    "total_fail": 0,
+    "overall_score_pct": 100,
+    "threshold_pct": 80,
+    "result": "PASS",
+    "improvement_from_previous": "+12% (88% → 100%)",
+    "suite_scores": {
+      "help": { "score": 100, "pass": true, "delta": "+12%" },
+      "troubleshoot": { "score": 100, "pass": true, "delta": "+10%" },
+      "config": { "score": 100, "pass": true, "delta": "+13%" }
+    }
+  },
+  "new_capabilities": [
+    {
+      "name": "setup-wizard",
+      "type": "skill",
+      "lines": 809,
+      "phases": 10,
+      "description": "Interactive 10-phase setup wizard with prerequisites check, plugin install, config, trust levels, cost budgets, daemon start, first request, notifications, production intelligence, and verification"
+    }
+  ]
+}
