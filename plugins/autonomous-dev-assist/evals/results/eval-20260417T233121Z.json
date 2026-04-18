@@ -1,0 +1,204 @@
+{
+  "run_id": "eval-20260417T233121Z",
+  "timestamp": "2026-04-17T23:31:21Z",
+  "suites_run": ["help", "troubleshoot", "config"],
+  "config": {
+    "pass_threshold_pct": 80,
+    "partial_threshold_pct": 60,
+    "scoring_weights": { "accuracy": 0.5, "completeness": 0.3, "actionability": 0.2 }
+  },
+  "suites": {
+    "help": {
+      "total": 33,
+      "pass": 28,
+      "partial": 3,
+      "fail": 2,
+      "score_pct": 88,
+      "failures": [
+        {
+          "id": "help-cmd-010",
+          "question": "How do I run the observation cycle for a single service?",
+          "expected_mention": "scope=",
+          "issue": "Skill uses '/autonomous-dev:observe scope=api-gateway' which is correct, but the test requires 'scope=' as a standalone token. PASS on review — the skill does contain 'scope='.",
+          "verdict": "PASS",
+          "note": "Reclassified — skill text line 316 contains 'scope=api-gateway'"
+        },
+        {
+          "id": "help-concept-002",
+          "question": "How does the cost governor work?",
+          "expected_mentions": ["daily_cost_cap_usd", "monthly_cost_cap_usd"],
+          "issue": "Help skill uses table labels 'Daily $100' and 'Monthly $2,000' but does not explicitly name the JSON parameter keys daily_cost_cap_usd / monthly_cost_cap_usd. Those are in the config-guide skill.",
+          "verdict": "PARTIAL",
+          "score": 70,
+          "recommendation": "Add parameter name references to the cost section of the help skill"
+        },
+        {
+          "id": "help-concept-003",
+          "question": "How does the document state machine work?",
+          "expected_mentions": ["state", "transition"],
+          "issue": "Help skill mentions 'phases' and 'pipeline states' but does not detail the document state machine transitions (draft → in-review → approved → etc.). The troubleshooter agent has this but the help skill does not.",
+          "verdict": "PARTIAL",
+          "score": 65,
+          "recommendation": "Add document state machine section to help skill"
+        },
+        {
+          "id": "help-comparison-002",
+          "question": "What is the difference between the kill switch and the circuit breaker?",
+          "expected_mentions": ["kill-switch", "circuit-breaker"],
+          "issue": "Help skill covers both separately but the comparison is implicit. A user asking 'what's the difference' would need to read both sections and infer.",
+          "verdict": "PARTIAL",
+          "score": 72,
+          "recommendation": "Add an explicit comparison table or note in the kill switch section"
+        },
+        {
+          "id": "help-edge-001",
+          "question": "What happens if autonomous-dev crashes mid-pipeline?",
+          "expected_topics": ["checkpoint", "recovery", "state file"],
+          "issue": "Help skill does not describe checkpoint recovery behavior. The troubleshooter runbook covers this but the help skill does not mention that in-flight work is saved via checkpoints.",
+          "verdict": "FAIL",
+          "score": 45,
+          "recommendation": "Add crash recovery / checkpoint section to help skill"
+        },
+        {
+          "id": "help-edge-006",
+          "question": "What happens when the daily cost cap is hit mid-phase?",
+          "expected_topics": ["in-flight sessions complete", "new phases paused", "notification"],
+          "issue": "Help skill says 'the daemon pauses new work and sends a notification. In-flight Claude sessions complete but new phases do not start.' This is correct and complete.",
+          "verdict": "PASS",
+          "note": "Reclassified — skill line 194 covers this precisely"
+        }
+      ]
+    },
+    "troubleshoot": {
+      "total": 21,
+      "pass": 18,
+      "partial": 2,
+      "fail": 1,
+      "score_pct": 90,
+      "failures": [
+        {
+          "id": "ts-daemon-004",
+          "question": "Daemon log files are growing very large",
+          "expected_commands": ["du -sh ~/.autonomous-dev/logs/", "autonomous-dev config show"],
+          "issue": "Troubleshoot skill covers log retention config parameters. The `du -sh` command is not explicitly in the skill but is a standard diagnostic. Score docked for missing the exact expected command.",
+          "verdict": "PARTIAL",
+          "score": 75,
+          "recommendation": "Add 'du -sh ~/.autonomous-dev/logs/' to the log management scenario"
+        },
+        {
+          "id": "ts-prodint-002",
+          "question": "Two observation runs are running simultaneously causing lock conflicts",
+          "expected_commands": ["ls ~/.autonomous-dev/observations/.lock-*", "cat ~/.autonomous-dev/observations/.lock-*"],
+          "issue": "Troubleshoot skill covers production intelligence MCP failures and stale observations but does not have a specific scenario for concurrent lock conflicts.",
+          "verdict": "PARTIAL",
+          "score": 68,
+          "recommendation": "Add lock conflict scenario to production intelligence section"
+        },
+        {
+          "id": "ts-emergency-002",
+          "question": "Requests are being submitted to unauthorized repositories",
+          "expected_topics": ["allowlist", "config validate", "repository allowlist"],
+          "issue": "Troubleshoot skill does not have a specific security/unauthorized-access scenario. The help skill covers the allowlist concept but the troubleshoot skill should map this to a remediation runbook.",
+          "verdict": "FAIL",
+          "score": 40,
+          "recommendation": "Add 'unauthorized repository access' to emergency scenarios in troubleshoot skill"
+        }
+      ]
+    },
+    "config": {
+      "total": 17,
+      "pass": 14,
+      "partial": 2,
+      "fail": 1,
+      "score_pct": 87,
+      "failures": [
+        {
+          "id": "cfg-daemon-005",
+          "question": "How many retries per phase does the daemon attempt?",
+          "expected_parameters": ["max_retries_per_phase"],
+          "issue": "Config skill covers retry limits in the state_machine section as 'retry_limits_by_phase' (per-phase object) rather than 'max_retries_per_phase' (single integer). The daemon section has 'max_retries_per_phase' in config_defaults.json but the config-guide skill only lists it under state_machine.",
+          "verdict": "PARTIAL",
+          "score": 70,
+          "recommendation": "Add max_retries_per_phase to the daemon section of the config-guide skill and note it differs from state_machine.retry_limits_by_phase"
+        },
+        {
+          "id": "cfg-agent-003",
+          "question": "What is the weekly rate limit for agent modifications?",
+          "expected_parameters": ["modifications_per_agent_per_week", "new_agents_per_week"],
+          "issue": "Config skill mentions 'at most 1 new agent and 1 modification per agent per week' in the agents section but does not give the exact parameter names. The agent-factory config yaml has these as structured keys.",
+          "verdict": "PARTIAL",
+          "score": 72,
+          "recommendation": "Add exact parameter names from config/agent-factory.yaml to the agents section"
+        },
+        {
+          "id": "cfg-prod-intel-002",
+          "question": "How do I configure the anomaly detection sensitivity?",
+          "expected_parameters": ["anomaly_detection.zscore_sensitivity"],
+          "expected_defaults": {"zscore_sensitivity": 2.5},
+          "issue": "Config skill mentions 'z-score analysis... (sensitivity: 2.5 standard deviations)' in the production_intelligence section but does not give the exact parameter path 'anomaly_detection.zscore_sensitivity'. Parameter name is needed for config overrides.",
+          "verdict": "FAIL",
+          "score": 55,
+          "recommendation": "Add complete parameter path and type to anomaly detection entry in production_intelligence section"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "total_cases": 71,
+    "total_pass": 60,
+    "total_partial": 7,
+    "total_fail": 4,
+    "overall_score_pct": 88,
+    "threshold_pct": 80,
+    "result": "PASS",
+    "suite_scores": {
+      "help": { "score": 88, "pass": true },
+      "troubleshoot": { "score": 90, "pass": true },
+      "config": { "score": 87, "pass": true }
+    }
+  },
+  "recommendations": [
+    {
+      "priority": "high",
+      "skill": "help",
+      "issue": "Missing crash recovery / checkpoint section",
+      "cases_affected": ["help-edge-001"],
+      "fix": "Add a 'Crash Recovery' section explaining that in-flight work is saved via state checkpoints and auto-resumes on daemon restart"
+    },
+    {
+      "priority": "medium",
+      "skill": "help",
+      "issue": "Cost parameter names not mentioned (daily_cost_cap_usd, monthly_cost_cap_usd)",
+      "cases_affected": ["help-concept-002"],
+      "fix": "Add parameter names next to dollar amounts in the cost section"
+    },
+    {
+      "priority": "medium",
+      "skill": "help",
+      "issue": "Document state machine transitions not covered",
+      "cases_affected": ["help-concept-003"],
+      "fix": "Add a brief document state machine section (draft → in-review → approved → changes_requested)"
+    },
+    {
+      "priority": "medium",
+      "skill": "troubleshoot",
+      "issue": "No scenario for unauthorized repository access",
+      "cases_affected": ["ts-emergency-002"],
+      "fix": "Add emergency scenario: 'Requests submitted to unauthorized repos — check allowlist, run config validate, verify repositories.allowlist'"
+    },
+    {
+      "priority": "low",
+      "skill": "config-guide",
+      "issue": "Anomaly detection parameter path missing",
+      "cases_affected": ["cfg-prod-intel-002"],
+      "fix": "Add anomaly_detection.zscore_sensitivity: 2.5 to production_intelligence section with full path and range"
+    },
+    {
+      "priority": "low",
+      "skill": "config-guide",
+      "issue": "Agent modification rate limit parameter names not explicit",
+      "cases_affected": ["cfg-agent-003"],
+      "fix": "Cross-reference config/agent-factory.yaml parameter names in the agents section"
+    }
+  ]
+}
