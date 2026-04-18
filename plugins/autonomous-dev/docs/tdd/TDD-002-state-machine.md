@@ -1,15 +1,15 @@
 # TDD-002: State Machine & Request Lifecycle
 
-| Field          | Value                                                  |
-|----------------|--------------------------------------------------------|
-| **Title**      | State Machine & Request Lifecycle                      |
-| **TDD ID**     | TDD-002                                                |
-| **Version**    | 0.1.0                                                  |
-| **Date**       | 2026-04-08                                             |
-| **Author**     | Paul Watson (Staff Engineer)                           |
-| **Status**     | Draft                                                  |
-| **Parent PRD** | PRD-001: System Core & Daemon Engine                   |
-| **Plugin**     | `autonomous-dev` (Claude Code plugin)                  |
+| Field          | Value                                                                        |
+|----------------|------------------------------------------------------------------------------|
+| **Title**      | State Machine & Request Lifecycle                                            |
+| **TDD ID**     | TDD-002                                                                      |
+| **Version**    | 0.1.0                                                                        |
+| **Date**       | 2026-04-08                                                                   |
+| **Author**     | Patrick Watson                                                               |
+| **Status**     | Draft                                                                        |
+| **Parent PRD** | PRD-001: System Core & Daemon Engine                                         |
+| **Plugin**     | `autonomous-dev` (Claude Code plugin)                                        |
 | **Covers**     | FR-200 through FR-214, FR-300 through FR-310, NFR-01, NFR-02, NFR-07, NFR-09 |
 
 ---

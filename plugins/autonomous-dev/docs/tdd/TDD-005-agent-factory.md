@@ -1,16 +1,16 @@
 # TDD-005: Agent Factory & Self-Improvement
 
-| Field          | Value                                                        |
-|----------------|--------------------------------------------------------------|
-| **Title**      | Agent Factory & Self-Improvement -- Technical Design         |
-| **TDD ID**     | TDD-005                                                      |
-| **Version**    | 0.1.0                                                        |
-| **Date**       | 2026-04-08                                                   |
-| **Author**     | Staff Engineering                                            |
-| **Status**     | Draft                                                        |
-| **Plugin**     | autonomous-dev                                               |
-| **Parent PRD** | PRD-003: Agent Factory & Self-Improvement                    |
-| **Depends On** | TDD-001 (System Core), TDD-002 (Document Pipeline)          |
+| Field          | Value                                                |
+|----------------|------------------------------------------------------|
+| **Title**      | Agent Factory & Self-Improvement -- Technical Design |
+| **TDD ID**     | TDD-005                                              |
+| **Version**    | 0.1.0                                                |
+| **Date**       | 2026-04-08                                           |
+| **Author**     | Patrick Watson                                       |
+| **Status**     | Draft                                                |
+| **Plugin**     | autonomous-dev                                       |
+| **Parent PRD** | PRD-003: Agent Factory & Self-Improvement            |
+| **Depends On** | TDD-001 (System Core), TDD-002 (Document Pipeline)   |
 
 ---
 

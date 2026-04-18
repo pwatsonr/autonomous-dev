@@ -1,14 +1,14 @@
 # PRD-001: System Core & Daemon Engine
 
-| Field       | Value                                      |
-|-------------|--------------------------------------------|
-| **Title**   | System Core & Daemon Engine                |
-| **PRD ID**  | PRD-001                                    |
-| **Version** | 0.1.0                                      |
-| **Date**    | 2026-04-08                                 |
-| **Author**  | Paul Watson (PM Lead)                      |
-| **Status**  | Draft                                      |
-| **Plugin**  | `autonomous-dev` (Claude Code plugin)      |
+| Field       | Value                                 |
+|-------------|---------------------------------------|
+| **Title**   | System Core & Daemon Engine           |
+| **PRD ID**  | PRD-001                               |
+| **Version** | 0.1.0                                 |
+| **Date**    | 2026-04-08                            |
+| **Author**  | Patrick Watson                        |
+| **Status**  | Draft                                 |
+| **Plugin**  | `autonomous-dev` (Claude Code plugin) |
 
 ---
 

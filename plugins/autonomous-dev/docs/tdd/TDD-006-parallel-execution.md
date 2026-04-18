@@ -1,14 +1,14 @@
 # TDD-006: Parallel Execution Engine
 
-| Field          | Value                                                        |
-|----------------|--------------------------------------------------------------|
-| **Title**      | Parallel Execution Engine                                    |
-| **Version**    | 0.1.0                                                        |
-| **Date**       | 2026-04-08                                                   |
-| **Author**     | Staff Engineer                                               |
-| **Status**     | Draft                                                        |
-| **Plugin**     | autonomous-dev                                               |
-| **Parent PRD** | PRD-004 (Parallel Execution Engine)                          |
+| Field          | Value                                                                       |
+|----------------|-----------------------------------------------------------------------------|
+| **Title**      | Parallel Execution Engine                                                   |
+| **Version**    | 0.1.0                                                                       |
+| **Date**       | 2026-04-08                                                                  |
+| **Author**     | Patrick Watson                                                              |
+| **Status**     | Draft                                                                       |
+| **Plugin**     | autonomous-dev                                                              |
+| **Parent PRD** | PRD-004 (Parallel Execution Engine)                                         |
 | **Depends**    | PRD-001 (System Core), PRD-002 (Document Pipeline), PRD-003 (Agent Factory) |
 
 ---

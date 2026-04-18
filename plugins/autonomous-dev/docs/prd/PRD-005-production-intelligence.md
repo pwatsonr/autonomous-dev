@@ -1,13 +1,13 @@
 # PRD-005: Production Intelligence Loop
 
-| Field        | Value                                      |
-|--------------|--------------------------------------------|
-| **Title**    | Production Intelligence Loop               |
-| **Version**  | 1.0                                        |
-| **Date**     | 2026-04-08                                 |
-| **Author**   | PM Lead, autonomous-dev                    |
-| **Status**   | Draft                                      |
-| **Plugin**   | autonomous-dev                             |
+| Field        | Value                                                             |
+|--------------|-------------------------------------------------------------------|
+| **Title**    | Production Intelligence Loop                                      |
+| **Version**  | 1.0                                                               |
+| **Date**     | 2026-04-08                                                        |
+| **Author**   | Patrick Watson                                                    |
+| **Status**   | Draft                                                             |
+| **Plugin**   | autonomous-dev                                                    |
 | **Depends on** | PRD-001 (Pipeline Orchestration), PRD-003 (Deployment & Delivery) |
 
 ---

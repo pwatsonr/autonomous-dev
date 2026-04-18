@@ -1,13 +1,13 @@
 # PRD-004: Parallel Execution Engine
 
-| Field       | Value                                      |
-|-------------|--------------------------------------------|
-| **Title**   | Parallel Execution Engine                  |
-| **Version** | 0.1.0                                      |
-| **Date**    | 2026-04-08                                 |
-| **Author**  | pwatson                                    |
-| **Status**  | Draft                                      |
-| **Plugin**  | autonomous-dev                             |
+| Field       | Value                                                                              |
+|-------------|------------------------------------------------------------------------------------|
+| **Title**   | Parallel Execution Engine                                                          |
+| **Version** | 0.1.0                                                                              |
+| **Date**    | 2026-04-08                                                                         |
+| **Author**  | Patrick Watson                                                                     |
+| **Status**  | Draft                                                                              |
+| **Plugin**  | autonomous-dev                                                                     |
 | **Depends** | PRD-001 (Pipeline Core), PRD-002 (Agent Framework), PRD-003 (Decomposition Engine) |
 
 ---

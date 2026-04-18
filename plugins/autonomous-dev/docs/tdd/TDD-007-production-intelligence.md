@@ -1,13 +1,13 @@
 # TDD-007: Production Intelligence Loop
 
-| Field          | Value                                                        |
-|----------------|--------------------------------------------------------------|
-| **Title**      | Production Intelligence Loop -- Technical Design             |
-| **Version**    | 1.0                                                          |
-| **Date**       | 2026-04-08                                                   |
-| **Author**     | Staff Engineer, autonomous-dev                               |
-| **Status**     | Draft                                                        |
-| **Parent PRD** | PRD-005: Production Intelligence Loop                        |
+| Field          | Value                                                                  |
+|----------------|------------------------------------------------------------------------|
+| **Title**      | Production Intelligence Loop -- Technical Design                       |
+| **Version**    | 1.0                                                                    |
+| **Date**       | 2026-04-08                                                             |
+| **Author**     | Patrick Watson                                                         |
+| **Status**     | Draft                                                                  |
+| **Parent PRD** | PRD-005: Production Intelligence Loop                                  |
 | **Depends on** | TDD-001 (Pipeline Orchestration Core), TDD-003 (Deployment & Delivery) |
 
 ---

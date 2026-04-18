@@ -1,15 +1,15 @@
 # TDD-003: Document Pipeline Architecture
 
-| Field          | Value                                           |
-|----------------|-------------------------------------------------|
-| **Title**      | Document Pipeline Architecture                  |
-| **TDD ID**     | TDD-003                                         |
-| **Version**    | 0.1.0                                           |
-| **Date**       | 2026-04-08                                      |
-| **Status**     | Draft                                           |
-| **Author**     | Staff Engineer                                  |
-| **Parent PRD** | PRD-002 (Document Pipeline & Review Gates)      |
-| **Plugin**     | autonomous-dev                                  |
+| Field          | Value                                      |
+|----------------|--------------------------------------------|
+| **Title**      | Document Pipeline Architecture             |
+| **TDD ID**     | TDD-003                                    |
+| **Version**    | 0.1.0                                      |
+| **Date**       | 2026-04-08                                 |
+| **Status**     | Draft                                      |
+| **Author**     | Patrick Watson                             |
+| **Parent PRD** | PRD-002 (Document Pipeline & Review Gates) |
+| **Plugin**     | autonomous-dev                             |
 
 ---
 
