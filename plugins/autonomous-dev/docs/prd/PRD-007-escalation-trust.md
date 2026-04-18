@@ -1,14 +1,14 @@
 # PRD-007: Escalation & Trust Framework
 
-| Field       | Value                                      |
-|-------------|--------------------------------------------|
-| **Title**   | Escalation & Trust Framework               |
-| **PRD ID**  | PRD-007                                    |
-| **Version** | 1.0                                        |
-| **Date**    | 2026-04-08                                 |
-| **Author**  | PM Lead (autonomous-dev)                   |
-| **Status**  | Draft                                      |
-| **Plugin**  | autonomous-dev                             |
+| Field       | Value                        |
+|-------------|------------------------------|
+| **Title**   | Escalation & Trust Framework |
+| **PRD ID**  | PRD-007                      |
+| **Version** | 1.0                          |
+| **Date**    | 2026-04-08                   |
+| **Author**  | Patrick Watson               |
+| **Status**  | Draft                        |
+| **Plugin**  | autonomous-dev               |
 
 ---
 

@@ -1,15 +1,15 @@
 # TDD-009: Escalation & Trust Framework
 
-| Field           | Value                                                        |
-|-----------------|--------------------------------------------------------------|
-| **Title**       | Escalation & Trust Framework -- Technical Design             |
-| **TDD ID**      | TDD-009                                                      |
-| **Version**     | 1.0                                                          |
-| **Date**        | 2026-04-08                                                   |
-| **Status**      | Draft                                                        |
-| **Author**      | Staff Engineer (autonomous-dev)                              |
+| Field           | Value                                                                       |
+|-----------------|-----------------------------------------------------------------------------|
+| **Title**       | Escalation & Trust Framework -- Technical Design                            |
+| **TDD ID**      | TDD-009                                                                     |
+| **Version**     | 1.0                                                                         |
+| **Date**        | 2026-04-08                                                                  |
+| **Status**      | Draft                                                                       |
+| **Author**      | Patrick Watson                                                              |
 | **Parent PRD**  | [PRD-007: Escalation & Trust Framework](../prd/PRD-007-escalation-trust.md) |
-| **Plugin**      | autonomous-dev                                               |
+| **Plugin**      | autonomous-dev                                                              |
 
 ---
 

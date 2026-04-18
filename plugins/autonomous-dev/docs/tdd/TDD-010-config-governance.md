@@ -1,14 +1,14 @@
 # TDD-010: Configuration & Resource Governance
 
-| Field          | Value                                                              |
-|----------------|--------------------------------------------------------------------|
-| **Title**      | Configuration & Resource Governance                                |
-| **TDD ID**     | TDD-010                                                            |
-| **Version**    | 0.1.0                                                              |
-| **Date**       | 2026-04-08                                                         |
-| **Status**     | Draft                                                              |
-| **Author**     | Staff Engineer                                                     |
-| **Parent PRDs**| PRD-001 (System Core & Daemon Engine), PRD-007 (Escalation & Trust Framework) |
+| Field          | Value                                                                                                                                                   |
+|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Title**      | Configuration & Resource Governance                                                                                                                     |
+| **TDD ID**     | TDD-010                                                                                                                                                 |
+| **Version**    | 0.1.0                                                                                                                                                   |
+| **Date**       | 2026-04-08                                                                                                                                              |
+| **Status**     | Draft                                                                                                                                                   |
+| **Author**     | Patrick Watson                                                                                                                                          |
+| **Parent PRDs**| PRD-001 (System Core & Daemon Engine), PRD-007 (Escalation & Trust Framework)                                                                           |
 | **References** | PRD-002 (Document Pipeline), PRD-003 (Agent Factory), PRD-004 (Parallel Execution), PRD-005 (Production Intelligence), PRD-006 (Intake & Communication) |
 
 ---

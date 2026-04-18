@@ -1,14 +1,14 @@
 # TDD-001: Daemon Engine
 
-| Field          | Value                                          |
-|----------------|------------------------------------------------|
-| **Title**      | Daemon Engine                                  |
-| **TDD ID**     | TDD-001                                        |
-| **Version**    | 0.1.0                                          |
-| **Date**       | 2026-04-08                                     |
-| **Author**     | Paul Watson (Staff Engineer)                   |
-| **Status**     | Draft                                          |
-| **Parent PRD** | PRD-001: System Core & Daemon Engine           |
+| Field          | Value                                                        |
+|----------------|--------------------------------------------------------------|
+| **Title**      | Daemon Engine                                                |
+| **TDD ID**     | TDD-001                                                      |
+| **Version**    | 0.1.0                                                        |
+| **Date**       | 2026-04-08                                                   |
+| **Author**     | Patrick Watson                                               |
+| **Status**     | Draft                                                        |
+| **Parent PRD** | PRD-001: System Core & Daemon Engine                         |
 | **Subsystem**  | Daemon Engine (FR-100 through FR-111, FR-400 through FR-408) |
 
 ---

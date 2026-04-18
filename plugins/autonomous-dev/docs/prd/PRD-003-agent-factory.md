@@ -1,13 +1,13 @@
 # PRD-003: Agent Factory & Self-Improvement
 
-| Field       | Value                                      |
-|-------------|---------------------------------------------|
-| **Title**   | Agent Factory & Self-Improvement            |
-| **Version** | 0.1.0                                       |
-| **Date**    | 2026-04-08                                  |
-| **Author**  | Product Management                          |
-| **Status**  | Draft                                       |
-| **Plugin**  | autonomous-dev                              |
+| Field       | Value                                                           |
+|-------------|-----------------------------------------------------------------|
+| **Title**   | Agent Factory & Self-Improvement                                |
+| **Version** | 0.1.0                                                           |
+| **Date**    | 2026-04-08                                                      |
+| **Author**  | Patrick Watson                                                  |
+| **Status**  | Draft                                                           |
+| **Plugin**  | autonomous-dev                                                  |
 | **Depends** | PRD-001 (Core Architecture), PRD-002 (Pipeline & Orchestration) |
 
 ---

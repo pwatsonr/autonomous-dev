@@ -1,14 +1,14 @@
 # PRD-002: Document Pipeline & Review Gates
 
-| Field       | Value                                      |
-|-------------|--------------------------------------------|
-| **Title**   | Document Pipeline & Review Gates           |
-| **PRD ID**  | PRD-002                                    |
-| **Version** | 0.1.0                                      |
-| **Date**    | 2026-04-08                                 |
-| **Author**  | Product Management                         |
-| **Status**  | Draft                                      |
-| **Plugin**  | autonomous-dev                             |
+| Field       | Value                            |
+|-------------|----------------------------------|
+| **Title**   | Document Pipeline & Review Gates |
+| **PRD ID**  | PRD-002                          |
+| **Version** | 0.1.0                            |
+| **Date**    | 2026-04-08                       |
+| **Author**  | Patrick Watson                   |
+| **Status**  | Draft                            |
+| **Plugin**  | autonomous-dev                   |
 
 ---
 

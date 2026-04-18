@@ -1,14 +1,14 @@
 # TDD-004: Review Gate System
 
-| Field        | Value                                                        |
-|--------------|--------------------------------------------------------------|
-| **Title**    | Review Gate System                                           |
-| **TDD ID**  | TDD-004                                                      |
-| **Version**  | 0.1.0                                                        |
-| **Date**     | 2026-04-08                                                   |
-| **Author**   | Staff Engineering                                            |
-| **Status**   | Draft                                                        |
-| **Plugin**   | autonomous-dev                                               |
+| Field        | Value                                                                            |
+|--------------|----------------------------------------------------------------------------------|
+| **Title**    | Review Gate System                                                               |
+| **TDD ID**  | TDD-004                                                                          |
+| **Version**  | 0.1.0                                                                            |
+| **Date**     | 2026-04-08                                                                       |
+| **Author**   | Patrick Watson                                                                   |
+| **Status**   | Draft                                                                            |
+| **Plugin**   | autonomous-dev                                                                   |
 | **Parent**   | [PRD-002: Document Pipeline & Review Gates](../prd/PRD-002-document-pipeline.md) |
 
 **Traces From**: PRD-002 FR-010 through FR-021, FR-038 through FR-040, NFR-001, NFR-002, NFR-005, NFR-007, NFR-008
