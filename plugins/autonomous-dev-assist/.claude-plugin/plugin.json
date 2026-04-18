@@ -1,6 +1,6 @@
 {
   "name": "autonomous-dev-assist",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Expert assistance, troubleshooting, and eval harness for the autonomous-dev plugin. Answers questions about commands, configuration, agents, pipeline phases, and common issues. Includes an eval framework to validate skill accuracy over time.",
   "author": {
     "name": "pwatsonr",
