@@ -1,0 +1,153 @@
+# setup-wizard-questions.yaml -- Test cases for the setup wizard skill
+# 10 cases, one per phase, validating key commands and concepts are present.
+
+suite: setup-wizard
+skill: setup-wizard
+description: >
+  Validates that the setup wizard skill covers the correct commands,
+  prerequisites, and guidance for each of its 10 phases.
+
+cases:
+
+  - id: wiz-phase-001
+    category: prerequisites
+    difficulty: easy
+    question: "What prerequisites do I need before setting up autonomous-dev?"
+    expected_topics:
+      - bash version
+      - jq
+      - git
+      - claude CLI
+    must_mention:
+      - "bash --version"
+      - "jq --version"
+      - "claude --version"
+      - "brew install bash"
+    must_not_mention: []
+
+  - id: wiz-phase-002
+    category: installation
+    difficulty: easy
+    question: "How do I install the autonomous-dev plugin?"
+    expected_topics:
+      - marketplace
+      - plugin install
+      - verify installation
+    must_mention:
+      - "claude plugin marketplace add"
+      - "claude plugin install"
+    must_not_mention: []
+
+  - id: wiz-phase-003
+    category: configuration
+    difficulty: medium
+    question: "How do I configure autonomous-dev after installing it?"
+    expected_topics:
+      - config init
+      - allowlist
+      - config validate
+      - config layers
+    must_mention:
+      - "autonomous-dev config init --global"
+      - "autonomous-dev config validate"
+      - "repositories"
+      - "allowlist"
+    must_not_mention: []
+
+  - id: wiz-phase-004
+    category: trust-levels
+    difficulty: medium
+    question: "How do I choose a trust level during setup?"
+    expected_topics:
+      - L0 through L3
+      - security review always human
+      - recommendation for new users
+    must_mention:
+      - "L0"
+      - "L1"
+      - "security"
+    must_not_mention: []
+
+  - id: wiz-phase-005
+    category: cost-budgets
+    difficulty: easy
+    question: "How do I set up cost budgets?"
+    expected_topics:
+      - daily cap
+      - monthly cap
+      - per-request cap
+    must_mention:
+      - "daily_cost_cap_usd"
+      - "monthly_cost_cap_usd"
+    must_not_mention: []
+
+  - id: wiz-phase-006
+    category: daemon
+    difficulty: easy
+    question: "How do I start the daemon for the first time?"
+    expected_topics:
+      - install daemon
+      - start daemon
+      - check status
+      - heartbeat
+    must_mention:
+      - "autonomous-dev install-daemon"
+      - "autonomous-dev daemon start"
+      - "autonomous-dev daemon status"
+    must_not_mention: []
+
+  - id: wiz-phase-007
+    category: first-request
+    difficulty: medium
+    question: "How do I submit my first test request?"
+    expected_topics:
+      - submit request
+      - pipeline phases
+      - check status
+    must_mention:
+      - "intake"
+      - "prd"
+    must_not_mention: []
+
+  - id: wiz-phase-008
+    category: notifications
+    difficulty: medium
+    question: "How do I set up Discord or Slack notifications?"
+    expected_topics:
+      - webhook
+      - notification channel
+      - config
+    must_mention:
+      - "discord"
+      - "slack"
+      - "notifications"
+    must_not_mention: []
+
+  - id: wiz-phase-009
+    category: production-intelligence
+    difficulty: hard
+    question: "How do I connect production monitoring during setup?"
+    expected_topics:
+      - Prometheus
+      - Grafana
+      - MCP servers
+      - observe command
+    must_mention:
+      - "prometheus"
+      - "grafana"
+      - ".mcp.json"
+    must_not_mention: []
+
+  - id: wiz-phase-010
+    category: verification
+    difficulty: easy
+    question: "How do I verify everything is working after setup?"
+    expected_topics:
+      - daemon status
+      - config validate
+      - summary
+      - next steps
+    must_mention:
+      - "autonomous-dev daemon status"
+      - "autonomous-dev config validate"
+    must_not_mention: []

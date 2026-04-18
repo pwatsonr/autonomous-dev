@@ -47,7 +47,10 @@ Controls the daemon's core runtime behavior -- polling, heartbeats, circuit brea
 | `log_retention_days` | integer | 30 | 1-365 | How long to keep daemon logs |
 | `idle_backoff_base_seconds` | integer | 30 | 10-120 | Starting interval when no work is available |
 | `idle_backoff_max_seconds` | integer | 900 | 60-3600 | Maximum backoff interval when idle (15 min default) |
+| `max_retries_per_phase` | integer | 3 | 1-10 | Global default for max retries per phase before escalation. Overridden per-phase by `state_machine.retry_limits_by_phase`. |
 | `max_turns_by_phase` | object | see below | per-phase | Maximum Claude turns allowed per phase per session |
+
+**Note:** `max_retries_per_phase` provides a single global default retry limit for all phases. If you also configure `state_machine.retry_limits_by_phase`, the per-phase values in the state_machine section take precedence over this global default.
 
 **`max_turns_by_phase` defaults:**
 
@@ -530,6 +533,18 @@ Controls the Agent Factory -- anomaly detection, modification rate limits, and c
 | `modification_rate_limits.max_modifications_per_agent_per_week` | integer | 1 | 0-5 | Max modifications per agent per week |
 | `canary_period_days` | integer | 7 | 1-30 | Days a new agent version runs in canary before full promotion |
 
+**Corresponding parameter names in `config/agent-factory.yaml`:**
+
+The parameters above map to the following keys in `config/agent-factory.yaml`:
+
+| Config guide parameter | agent-factory.yaml key |
+|---|---|
+| `modification_rate_limits.max_modifications_per_agent_per_week` | `rate_limits.modifications_per_agent_per_week` |
+| `modification_rate_limits.max_new_agents_per_week` | `rate_limits.new_agents_per_week` |
+| `canary_period_days` | `rate_limits.canary_duration_days` |
+
+When using the JSON config (`autonomous-dev.json`), use the `agents.modification_rate_limits.*` and `agents.canary_period_days` paths. When editing `agent-factory.yaml` directly, use the `rate_limits.*` paths shown above.
+
 **Common customization:** More aggressive improvement cycles.
 
 ```json
@@ -560,8 +575,11 @@ Controls the production monitoring and auto-fix system.
 | `error_detection.default_error_rate_percent` | float | 5.0 | 0.1-50 | Error rate that triggers an alert |
 | `error_detection.default_sustained_duration_min` | integer | 10 | 1-60 | Minutes the error rate must be sustained |
 | `anomaly_detection.method` | string | "z_score" | "z_score" | Anomaly detection algorithm |
-| `anomaly_detection.sensitivity` | float | 2.5 | 1.0-5.0 | Z-score standard deviations for anomaly |
+| `anomaly_detection.zscore_sensitivity` | float | 2.5 | 1.0-5.0 | Z-score standard deviations threshold for flagging an anomaly. Lower values are more sensitive (more alerts), higher values are less sensitive (fewer alerts). |
+| `anomaly_detection.sensitivity` | float | 2.5 | 1.0-5.0 | Alias for `anomaly_detection.zscore_sensitivity` (either name is accepted) |
 | `anomaly_detection.baseline_window_days` | integer | 14 | 7-90 | Days of baseline data for comparison |
+| `anomaly_detection.trend_analysis_windows` | integer[] | [7, 14, 30] | 1-365 per value | Windows (in days) over which trend analysis is computed. Maps to the same values as `trend_analysis.windows`. |
+| `anomaly_detection.consecutive_runs_required` | integer | 3 | 1-10 | Number of consecutive anomalous observation runs required before generating an alert. Prevents single-run false positives. |
 | `trend_analysis.enabled` | boolean | true | - | Enable trend detection |
 | `trend_analysis.windows` | integer[] | [7, 14, 30] | 1-365 per value | Analysis windows in days |
 | `trend_analysis.min_slope_threshold` | float | 0.05 | 0.01-1.0 | Minimum slope to flag a trend |

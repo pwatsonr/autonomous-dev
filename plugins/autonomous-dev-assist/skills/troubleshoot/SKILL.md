@@ -159,6 +159,70 @@ journalctl --user -u autonomous-dev --no-pager -n 50
 
 ---
 
+## Scenario 2b: Daemon Log Files Growing Very Large
+
+### Symptoms
+- Disk usage increasing steadily over time
+- `~/.autonomous-dev/logs/` directory consuming significant space
+- Daemon performance degrading due to large log files
+
+### Diagnostic Steps
+
+**Step 1: Check log directory size.**
+
+```bash
+du -sh ~/.autonomous-dev/logs/
+```
+
+**Step 2: Check overall autonomous-dev data directory size.**
+
+```bash
+du -sh ~/.autonomous-dev/
+```
+
+**Step 3: Check current log retention settings.**
+
+```bash
+autonomous-dev config show | jq '.config.daemon.log_retention_days, .config.retention.daemon_log_days'
+```
+
+**Step 4: Check individual log file sizes.**
+
+```bash
+ls -lhS ~/.autonomous-dev/logs/ | head -20
+```
+
+### Resolution Steps
+
+1. **Reduce log retention period:**
+   ```json
+   {
+     "daemon": {
+       "log_retention_days": 7
+     },
+     "retention": {
+       "daemon_log_days": 7
+     }
+   }
+   ```
+
+2. **Run cleanup to apply retention immediately:**
+   ```bash
+   autonomous-dev cleanup --force
+   ```
+
+3. **Check for runaway log verbosity.** If logs are growing unusually fast, check whether high-frequency polling or repeated errors are generating excessive entries:
+   ```bash
+   cat ~/.autonomous-dev/logs/daemon.log | jq '.level' 2>/dev/null | sort | uniq -c | sort -rn
+   ```
+
+### Prevention
+- Set `daemon.log_retention_days` to an appropriate value for your environment (default: 30 days).
+- Schedule regular `autonomous-dev cleanup` runs (the daemon does this automatically every 100 iterations by default).
+- Monitor disk usage with `du -sh ~/.autonomous-dev/` periodically.
+
+---
+
 ## Scenario 3: Request Stuck in a Phase
 
 ### Symptoms
@@ -520,6 +584,86 @@ cat .autonomous-dev/logs/intelligence/RUN-<latest>.log | tail -30
 - Use long-lived read-only tokens with minimal permissions.
 - Set up monitoring for your monitoring tools (ironic but practical).
 - Check observation logs after the first few scheduled runs to confirm everything works.
+
+---
+
+## Scenario 7b: Concurrent Observation Lock Conflicts
+
+### Symptoms
+- Two observation runs are running simultaneously
+- Lock conflict errors in observation logs
+- Observation runs failing or producing incomplete results
+- Stale `.lock-*` files in the observations directory
+
+### Diagnostic Steps
+
+**Step 1: Inspect lock files.**
+
+```bash
+ls ~/.autonomous-dev/observations/.lock-*
+```
+
+If multiple lock files exist, concurrent runs are (or were) active.
+
+**Step 2: Check lock file contents.**
+
+```bash
+cat ~/.autonomous-dev/observations/.lock-*
+```
+
+Each lock file contains the PID and timestamp of the process that created it. Check if the PIDs are still alive:
+
+```bash
+for lock in ~/.autonomous-dev/observations/.lock-*; do
+  pid=$(jq -r '.pid' "$lock" 2>/dev/null || cat "$lock")
+  echo "Lock: $lock, PID: $pid, Alive: $(kill -0 "$pid" 2>/dev/null && echo yes || echo no)"
+done
+```
+
+**Step 3: Check the observation schedule.**
+
+```bash
+autonomous-dev config show | jq '.config.production_intelligence.schedule'
+```
+
+If the cron schedule is too frequent relative to observation run duration, runs may overlap.
+
+**Step 4: Check observation logs for conflicts.**
+
+```bash
+cat ~/.autonomous-dev/logs/intelligence/RUN-*.log | grep -i "lock\|conflict\|concurrent" | tail -20
+```
+
+### Resolution Steps
+
+1. **Clean up stale locks.** If the PIDs are no longer alive, the lock files are stale and safe to remove:
+   ```bash
+   rm ~/.autonomous-dev/observations/.lock-*
+   ```
+
+2. **Space out the observation schedule.** If runs are overlapping because they take longer than the interval, increase the interval:
+   ```json
+   {
+     "production_intelligence": {
+       "schedule": "0 */6 * * *"
+     }
+   }
+   ```
+
+3. **Run a manual observation to verify resolution:**
+   ```
+   /autonomous-dev:observe scope=<one-service>
+   ```
+
+4. **Adjust runner scheduling.** If you have multiple runners or cron jobs triggering observations, ensure only one is active. Check for duplicate crontab entries or multiple daemon instances:
+   ```bash
+   ps aux | grep autonomous-dev | grep -v grep
+   ```
+
+### Prevention
+- Ensure the observation schedule interval is longer than the typical observation run duration.
+- Do not run manual `/autonomous-dev:observe` during a scheduled observation window.
+- Monitor for stale lock files as part of regular `autonomous-dev cleanup` runs.
 
 ---
 
@@ -929,3 +1073,102 @@ cat ~/.autonomous-dev/intake/authz/*.json 2>/dev/null | jq '.'
 - Use long-lived webhook URLs.
 - Monitor the intake log periodically.
 - Set up notifications to confirm when requests are received by the pipeline.
+
+---
+
+## Scenario 13: Unauthorized Repository Access
+
+### Symptoms
+- Requests are appearing for repositories not in the allowlist
+- Pipeline is processing work against unexpected repos
+- Security alerts about unauthorized repository access
+- Intake logs show submissions targeting repos outside the configured scope
+
+### Diagnostic Steps
+
+**Step 1: Check the repository allowlist.**
+
+```bash
+autonomous-dev config show | jq '.repositories.allowlist'
+```
+
+Verify that only intended repositories are listed.
+
+**Step 2: Check intake logs for unauthorized submissions.**
+
+```bash
+cat ~/.autonomous-dev/logs/intake.log | grep -i "repo\|repository\|unauthorized" | tail -20
+```
+
+Look for submissions referencing repositories not in the allowlist.
+
+**Step 3: Check active requests for unexpected repos.**
+
+```bash
+ls ~/.autonomous-dev/requests/*/state.json | while read f; do
+  jq '{request_id: .request_id, repo: .repository, status: .status}' "$f"
+done
+```
+
+**Step 4: Validate the full configuration.**
+
+```bash
+autonomous-dev config validate
+```
+
+Check for configuration errors that might allow repos outside the allowlist.
+
+**Step 5: Check intake channel permissions.**
+
+```bash
+# Check who can submit requests via Discord/Slack
+cat ~/.autonomous-dev/intake/authz/*.json 2>/dev/null | jq '.'
+autonomous-dev config show | jq '.config.intake'
+```
+
+### Resolution Steps
+
+1. **Update the repository allowlist.** Remove unauthorized repos and ensure only intended repos are listed:
+   ```json
+   {
+     "repositories": {
+       "allowlist": [
+         "/Users/you/projects/authorized-repo-1",
+         "/Users/you/projects/authorized-repo-2"
+       ]
+     }
+   }
+   ```
+
+2. **Validate the configuration after updating:**
+   ```bash
+   autonomous-dev config validate
+   ```
+
+3. **Cancel any unauthorized in-flight requests:**
+   ```bash
+   # Via Slack
+   /ad-cancel REQ-XXXXXXXX-XXXX
+
+   # Or clean up directly
+   autonomous-dev cleanup --request REQ-XXXXXXXX-XXXX
+   ```
+
+4. **Restrict intake channel permissions.** Limit who can submit requests through Discord and Slack to prevent unauthorized submissions:
+   ```json
+   {
+     "intake": {
+       "rate_limits": {
+         "submissions_per_hour": 5
+       }
+     }
+   }
+   ```
+   Also restrict Discord/Slack channel access to authorized users only at the platform level.
+
+### Prevention
+- Restrict intake channel permissions so that only authorized users can submit requests through Discord and Slack.
+- Review the repository allowlist regularly and keep it minimal.
+- Run `autonomous-dev config validate` after every configuration change.
+- Monitor intake logs (`~/.autonomous-dev/logs/intake.log`) for unexpected repository references.
+- Use per-repository trust level overrides (set new or unknown repos to L0) for maximum oversight.
