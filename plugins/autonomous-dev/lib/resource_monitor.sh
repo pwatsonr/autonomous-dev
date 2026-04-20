@@ -12,6 +12,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_RESOURCE_MONITOR_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_RESOURCE_MONITOR_LOADED=1
+
 # ---------------------------------------------------------------------------
 # Resolve PLUGIN_ROOT for sourcing sibling libraries
 # ---------------------------------------------------------------------------

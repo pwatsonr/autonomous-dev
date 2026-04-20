@@ -12,6 +12,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_MIGRATION_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_MIGRATION_LOADED=1
+
 _MIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_MIG_DIR}/state_file_manager.sh"
 source "${_MIG_DIR}/event_logger.sh"

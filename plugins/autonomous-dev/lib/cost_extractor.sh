@@ -10,6 +10,10 @@
 
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_COST_EXTRACTOR_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_COST_EXTRACTOR_LOADED=1
+
 # ---------------------------------------------------------------------------
 # Logging helpers (write to stderr so stdout stays clean for data output)
 # ---------------------------------------------------------------------------

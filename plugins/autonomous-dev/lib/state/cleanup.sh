@@ -3,6 +3,10 @@
 # Part of TDD-002: State Machine & Request Lifecycle
 set -euo pipefail
 
+# Source guard
+if [[ -n "${_CLEANUP_LOADED:-}" ]]; then return 0 2>/dev/null || true; fi
+_CLEANUP_LOADED=1
+
 _CL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${_CL_DIR}/state_file_manager.sh"
 source "${_CL_DIR}/event_logger.sh"

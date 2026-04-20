@@ -62,7 +62,11 @@ assert_dir_not_exists() {
 assert_permissions() {
   local path="$1" expected="$2"
   local actual
-  actual="$(stat -f '%Lp' "$path" 2>/dev/null || stat -c '%a' "$path" 2>/dev/null)"
+  if [[ "$(uname)" == "Darwin" ]]; then
+    actual="$(stat -f '%Lp' "$path" 2>/dev/null)" || true
+  else
+    actual="$(stat -c '%a' "$path" 2>/dev/null)" || true
+  fi
   if [[ "$actual" == "$expected" ]]; then return 0; fi
   echo "  ASSERT_PERMISSIONS FAILED: ${path} has ${actual}, expected ${expected}" >&2
   return 1
@@ -86,7 +90,11 @@ run_test() {
   local test_func="$2"
   (( _TESTS_RUN++ )) || true
   setup
-  if "$test_func"; then
+  # Run test in subshell so set -e in the test function
+  # doesn't kill the harness when testing error paths
+  local _rc=0
+  ( set +e; "$test_func" ) || _rc=$?
+  if [[ $_rc -eq 0 ]]; then
     echo "PASS: ${test_name}"
     (( _TESTS_PASSED++ )) || true
   else

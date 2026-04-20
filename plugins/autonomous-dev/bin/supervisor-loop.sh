@@ -12,18 +12,19 @@ set -euo pipefail
 # --- Constants ---------------------------------------------------------------
 # All paths derived from $HOME and the script's own location.
 
-readonly PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-readonly DAEMON_HOME="${HOME}/.autonomous-dev"
-readonly LOCK_FILE="${DAEMON_HOME}/daemon.lock"
-readonly HEARTBEAT_FILE="${DAEMON_HOME}/heartbeat.json"
-readonly CRASH_STATE_FILE="${DAEMON_HOME}/crash-state.json"
-readonly KILL_SWITCH_FILE="${DAEMON_HOME}/kill-switch.flag"
-readonly COST_LEDGER_FILE="${DAEMON_HOME}/cost-ledger.json"
-readonly LOG_DIR="${DAEMON_HOME}/logs"
-readonly LOG_FILE="${LOG_DIR}/daemon.log"
-readonly CONFIG_FILE="${HOME}/.claude/autonomous-dev.json"
-readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
-readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
+# Allow tests to override paths via environment variables
+PLUGIN_DIR="${PLUGIN_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+DAEMON_HOME="${DAEMON_HOME:-${HOME}/.autonomous-dev}"
+LOCK_FILE="${LOCK_FILE:-${DAEMON_HOME}/daemon.lock}"
+HEARTBEAT_FILE="${HEARTBEAT_FILE:-${DAEMON_HOME}/heartbeat.json}"
+CRASH_STATE_FILE="${CRASH_STATE_FILE:-${DAEMON_HOME}/crash-state.json}"
+KILL_SWITCH_FILE="${KILL_SWITCH_FILE:-${DAEMON_HOME}/kill-switch.flag}"
+COST_LEDGER_FILE="${COST_LEDGER_FILE:-${DAEMON_HOME}/cost-ledger.json}"
+LOG_DIR="${LOG_DIR:-${DAEMON_HOME}/logs}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/daemon.log}"
+CONFIG_FILE="${CONFIG_FILE:-${HOME}/.claude/autonomous-dev.json}"
+DEFAULTS_FILE="${DEFAULTS_FILE:-${PLUGIN_DIR}/config/defaults.json}"
+ALERTS_DIR="${ALERTS_DIR:-${DAEMON_HOME}/alerts}"
 
 # --- Runtime State Variables -------------------------------------------------
 
@@ -404,12 +405,12 @@ restore_interrupted_session() {
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     local event
-    event=$(jq -n \
+    event=$(jq -nc \
         --arg ts "${ts}" \
         --arg req "${request_id}" \
         '{
             timestamp: $ts,
-            type: "session_interrupted",
+            event_type: "session_interrupted",
             request_id: $req,
             details: {
                 recovery_action: "restored_from_checkpoint"
@@ -1033,7 +1034,7 @@ emit_alert() {
         --arg ts "${ts}" \
         --argjson pid "$$" \
         '{
-            type: $type,
+            event_type: $type,
             message: $msg,
             timestamp: $ts,
             daemon_pid: $pid
@@ -1169,14 +1170,14 @@ escalate_to_paused() {
 
     # Append escalation event
     local event
-    event=$(jq -n \
+    event=$(jq -nc \
         --arg ts "${ts}" \
         --arg req "${request_id}" \
         --arg phase "${phase}" \
         --argjson retries "${retry_count}" \
         '{
             timestamp: $ts,
-            type: "retry_exhaustion",
+            event_type: "retry_exhaustion",
             request_id: $req,
             details: {
                 phase: $phase,
@@ -1377,14 +1378,14 @@ update_request_state() {
 
         # Append session_complete event
         local event
-        event=$(jq -n \
+        event=$(jq -nc \
             --arg ts "${ts}" \
             --arg req "${request_id}" \
             --arg type "session_complete" \
             --arg cost "${session_cost}" \
             '{
                 timestamp: $ts,
-                type: $type,
+                event_type: $type,
                 request_id: $req,
                 details: {
                     session_cost_usd: ($cost | tonumber),
@@ -1428,7 +1429,7 @@ update_request_state() {
 
         # Append session_error event
         local event
-        event=$(jq -n \
+        event=$(jq -nc \
             --arg ts "${ts}" \
             --arg req "${request_id}" \
             --arg type "session_error" \
@@ -1436,7 +1437,7 @@ update_request_state() {
             --arg exit_code "${exit_code}" \
             '{
                 timestamp: $ts,
-                type: $type,
+                event_type: $type,
                 request_id: $req,
                 details: {
                     session_cost_usd: ($cost | tonumber),

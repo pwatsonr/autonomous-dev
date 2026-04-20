@@ -265,11 +265,11 @@ test_emit_alert_valid_json() {
     jq empty "${alert_file}"
 
     local atype amsg apid
-    atype=$(jq -r '.type' "${alert_file}")
+    atype=$(jq -r '.event_type' "${alert_file}")
     amsg=$(jq -r '.message' "${alert_file}")
     apid=$(jq -r '.daemon_pid' "${alert_file}")
 
-    assert_eq "test_type" "${atype}" ".type should be test_type"
+    assert_eq "test_type" "${atype}" ".event_type should be test_type"
     assert_eq "test message" "${amsg}" ".message should be test message"
     # daemon_pid should be a number
     [[ "${apid}" =~ ^[0-9]+$ ]] || { echo "ASSERT FAILED: .daemon_pid should be numeric, got '${apid}'" >&2; return 1; }
@@ -320,7 +320,7 @@ test_record_crash_with_alert() {
 
     # Verify alert content
     local atype
-    atype=$(jq -r '.type' "${found}")
+    atype=$(jq -r '.event_type' "${found}")
     assert_eq "circuit_breaker" "${atype}" "Alert type should be circuit_breaker"
 }
 
