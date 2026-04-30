@@ -598,6 +598,7 @@ export function mapToCanonicalArgs(
  * Throws by re-throwing -- the caller (main) wraps `MODULE_NOT_FOUND`
  * and `SQLITE_*` errors into typed BridgeErrors.
  */
+/* istanbul ignore next -- production router init; covered by integration tests, not unit tests */
 export async function initRouter(): Promise<IntakeRouter> {
   // Resolve plugin root from this module's compiled location:
   // dist/intake/adapters/claude_command_bridge.js -> ../../../
@@ -893,6 +894,7 @@ function emitError(err: BridgeError): number {
 // Only run main() when this file is executed directly (not when imported
 // for tests).  This guard relies on Node's `require.main === module` idiom,
 // which works with both CommonJS output and ts-jest.
+/* istanbul ignore next -- direct-execution dispatch guard; covered by manual verification */
 if (require.main === module) {
   // process.argv is [node, scriptPath, subcommand, ...args]; slice off the
   // first two entries before passing to main().

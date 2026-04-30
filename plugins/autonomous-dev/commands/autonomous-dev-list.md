@@ -1,6 +1,6 @@
 ---
 name: autonomous-dev-list
-description: List recent autonomous-dev requests (default: active only)
+description: "List recent autonomous-dev requests (default: active only)"
 arguments:
   - name: state
     type: enum
