@@ -1,0 +1,43 @@
+# Argument schemas for the 10 autonomous-dev-* slash commands.
+#
+# Authoritative source: TDD-011 §6.2.
+# Each command's .md frontmatter `arguments` block must match its entry here
+# exactly. Field ordering is stable so the documentation generator in
+# SPEC-011-2-03 can diff against it.
+
+submit:
+  - { name: description, type: string,  required: true,  description: "Free-form request description" }
+  - { name: priority,    type: enum,    required: false, enum: [high, normal, low], default: normal }
+  - { name: repo,        type: string,  required: false, description: "Repository slug, e.g. owner/repo" }
+  - { name: deadline,    type: string,  required: false, description: "ISO-8601 deadline (optional)" }
+
+status:
+  - { name: request_id,  type: string,  required: true,  description: "REQ-NNNNNN identifier" }
+
+list:
+  - { name: state,       type: enum,    required: false, enum: [active, completed, all], default: active }
+  - { name: limit,       type: integer, required: false, default: 20 }
+
+cancel:
+  - { name: request_id,  type: string,  required: true,  description: "REQ-NNNNNN identifier" }
+
+pause:
+  - { name: request_id,  type: string,  required: true,  description: "REQ-NNNNNN identifier" }
+
+resume:
+  - { name: request_id,  type: string,  required: true,  description: "REQ-NNNNNN identifier" }
+
+priority:
+  - { name: request_id,  type: string,  required: true,  description: "REQ-NNNNNN identifier" }
+  - { name: priority,    type: enum,    required: true,  enum: [high, normal, low] }
+
+logs:
+  - { name: request_id,  type: string,  required: true,  description: "REQ-NNNNNN identifier" }
+  - { name: lines,       type: integer, required: false, default: 100 }
+
+feedback:
+  - { name: request_id,  type: string,  required: true,  description: "REQ-NNNNNN identifier" }
+  - { name: message,     type: string,  required: true,  description: "Clarifying feedback message" }
+
+kill:
+  - { name: request_id,  type: string,  required: true,  description: "REQ-NNNNNN identifier" }

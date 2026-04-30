@@ -12,7 +12,7 @@
 // ---------------------------------------------------------------------------
 
 /** Supported intake channel types. */
-export type ChannelType = 'claude_app' | 'discord' | 'slack';
+export type ChannelType = 'claude_app' | 'discord' | 'slack' | 'cli';
 
 /**
  * Core adapter interface that every channel adapter must implement.

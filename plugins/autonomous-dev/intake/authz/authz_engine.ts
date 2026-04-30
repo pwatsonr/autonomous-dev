@@ -87,6 +87,8 @@ export interface AuthConfigUser {
     discord_id?: string;
     slack_id?: string;
     claude_user?: string;
+    // TODO(PLAN-011-1): authz config must define cli_user identity for operators
+    cli_user?: string;
   };
   role: Role;
   repo_permissions?: Record<string, Role>;
@@ -314,11 +316,12 @@ export class AuthzEngine {
   /**
    * Resolve a user's internal ID from a platform identity.
    *
-   * @param platform  One of `'discord_id'`, `'slack_id'`, `'claude_user'`.
+   * @param platform  One of `'discord_id'`, `'slack_id'`, `'claude_user'`,
+   *                  or `'cli_user'`.
    * @param platformId The platform-specific user identifier.
    */
   resolveUserId(
-    platform: 'discord_id' | 'slack_id' | 'claude_user',
+    platform: 'discord_id' | 'slack_id' | 'claude_user' | 'cli_user',
     platformId: string,
   ): string | undefined {
     const user = this.config.users.find(
