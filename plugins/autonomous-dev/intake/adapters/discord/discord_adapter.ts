@@ -237,6 +237,29 @@ export type RegisterCommandsFn = (
   guildId: string,
 ) => Promise<void>;
 
+/**
+ * Structured reply produced by the {@link DiscordService} orchestrator from
+ * a button click or modal submission.  The adapter consumes this via
+ * {@link DiscordAdapter.handleReply} and routes it through the IntakeRouter.
+ *
+ * SPEC-011-3-03.
+ */
+export interface IncomingReply {
+  channel: 'discord';
+  /** What kind of reply this is. */
+  replyType: 'button' | 'clarification';
+  /** Target request, e.g. `REQ-000042`. */
+  requestId?: string;
+  /** Action keyword for buttons (`approve`, `reject`, `pause`, etc.). */
+  action?: 'approve' | 'reject' | 'pause' | 'resume' | 'cancel';
+  /** Free-text response body for clarification modals. */
+  message?: string;
+  /** Discord user who submitted the reply. */
+  user: { id: string; name: string };
+  /** Correlation ID (the Discord interaction ID). */
+  correlationId: string;
+}
+
 // ---------------------------------------------------------------------------
 // Logger (structured JSON to stderr, matching codebase conventions)
 // ---------------------------------------------------------------------------
@@ -503,6 +526,89 @@ export class DiscordAdapter implements IntakeAdapter {
     // Disconnect the gateway
     await this.client.disconnect();
     logger.info('Discord adapter shutdown complete');
+  }
+
+  // -----------------------------------------------------------------------
+  // External dispatch entry points (SPEC-011-3-01..03)
+  // -----------------------------------------------------------------------
+
+  /**
+   * Public entry point for an external orchestrator (e.g. `DiscordService`)
+   * to forward a single Discord interaction through the adapter pipeline.
+   *
+   * This delegates to the existing private slash-command handler when the
+   * interaction is a chat-input command.  Button and modal interactions are
+   * delegated to the {@link ComponentInteractionHandler} the adapter was
+   * constructed with.
+   *
+   * Errors propagate to the caller; the orchestrator is responsible for
+   * logging + ephemeral error replies.
+   */
+  async handleInteraction(interaction: ChatInputCommandInteraction): Promise<void> {
+    if (interaction.isChatInputCommand()) {
+      await this.handleSlashCommand(interaction);
+    } else if (interaction.isMessageComponent()) {
+      await this.componentHandler.handle(
+        interaction as unknown as MessageComponentInteraction,
+      );
+    } else if (interaction.isModalSubmit()) {
+      await this.componentHandler.handleModalSubmit(
+        interaction as unknown as ModalSubmitInteraction,
+      );
+    }
+  }
+
+  /**
+   * Forward a structured reply (button click or modal submission, normalized
+   * by the orchestrator into an {@link IncomingReply}-like shape) into the
+   * router pipeline.
+   *
+   * This is the canonical entry point for SPEC-011-3-03 reply routing.  The
+   * adapter normalizes the reply into an `IncomingCommand` and routes it.
+   */
+  async handleReply(reply: IncomingReply): Promise<CommandResult> {
+    const command: IncomingCommand = {
+      commandName: this.replyTypeToCommand(reply),
+      args: this.replyArgs(reply),
+      flags: {},
+      rawText: reply.message ?? `${reply.replyType}:${reply.requestId ?? ''}:${reply.action ?? ''}`,
+      source: {
+        channelType: 'discord',
+        userId: reply.user.id,
+        timestamp: new Date(),
+      },
+    };
+    return this.router.route(command);
+  }
+
+  /** Map an {@link IncomingReply} to the underlying command name. */
+  private replyTypeToCommand(reply: IncomingReply): string {
+    if (reply.replyType === 'button') {
+      switch (reply.action) {
+        case 'approve':
+          return 'approve_review';
+        case 'reject':
+          return 'cancel';
+        case 'pause':
+          return 'pause';
+        case 'resume':
+          return 'resume';
+        case 'cancel':
+          return 'cancel';
+      }
+    }
+    return 'feedback';
+  }
+
+  /** Build the args array for the {@link replyTypeToCommand} mapping. */
+  private replyArgs(reply: IncomingReply): string[] {
+    if (reply.replyType === 'button' && reply.requestId) {
+      return [reply.requestId];
+    }
+    if (reply.replyType === 'clarification' && reply.requestId && reply.message) {
+      return [reply.requestId, reply.message];
+    }
+    return [];
   }
 
   // -----------------------------------------------------------------------
