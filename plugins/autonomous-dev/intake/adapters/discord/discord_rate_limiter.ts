@@ -175,3 +175,120 @@ export class DiscordRateLimitHandler {
     this.buckets.set(bucketKey, state);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Per-guild interaction-budget bucket (SPEC-011-3-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * Decision returned by {@link consumeGuildBudget}.
+ *
+ * `allowed` is the only field most callers need; `retryAfterMs` is populated
+ * when the bucket is exhausted so the caller can show an actionable message;
+ * `remaining` lets callers do their own backpressure logic.
+ */
+export interface RateLimitDecision {
+  /** True if the request was admitted to the bucket. */
+  allowed: boolean;
+  /** Milliseconds until the bucket has at least one token (only when blocked). */
+  retryAfterMs?: number;
+  /** Tokens remaining in the bucket after this consume call. */
+  remaining: number;
+}
+
+/** Per-guild interaction bucket parameters. */
+const BUCKET_CAPACITY = 30;
+/** Refill window: 30 tokens per 60 seconds = 0.5 tokens/sec. */
+const BUCKET_REFILL_RATE_PER_MS = BUCKET_CAPACITY / 60_000;
+/** Buckets idle longer than this are evicted to bound memory. */
+const BUCKET_IDLE_EVICTION_MS = 10 * 60 * 1_000;
+
+interface GuildBucket {
+  /** Available token count (float for fractional refill). */
+  tokens: number;
+  /** Last consume timestamp (ms epoch).  Used for refill + eviction. */
+  lastConsumeMs: number;
+}
+
+/**
+ * Module-level bucket store.  DMs (no guild) share a single bucket keyed by
+ * the literal string `'__dm__'`.  This is intentional per SPEC-011-3-04: DMs
+ * are far less common than guild interactions, and a shared bucket bounds
+ * memory for them.
+ */
+const guildBuckets: Map<string, GuildBucket> = new Map();
+
+/**
+ * Reset all per-guild buckets.  Test-only: production code never calls this.
+ * @internal
+ */
+export function __resetGuildBuckets(): void {
+  guildBuckets.clear();
+}
+
+/**
+ * Consume one token from the per-guild interaction bucket.
+ *
+ * Token-bucket math:
+ * - Capacity: 30 tokens.
+ * - Refill: 30 / 60s, computed continuously from `lastConsumeMs`.
+ * - Eviction: caller should periodically invoke {@link evictIdleBuckets}.
+ *
+ * @param guildId - Discord guild snowflake, or `null` for DMs.
+ * @param now - Override for the current time (test seam, defaults to Date.now()).
+ * @returns Whether the interaction was admitted plus context for callers.
+ */
+export function consumeGuildBudget(
+  guildId: string | null,
+  now: number = Date.now(),
+): RateLimitDecision {
+  const key = guildId ?? '__dm__';
+  const bucket = guildBuckets.get(key);
+  if (!bucket) {
+    // First request for this guild -- start with a full bucket and consume one.
+    guildBuckets.set(key, { tokens: BUCKET_CAPACITY - 1, lastConsumeMs: now });
+    return { allowed: true, remaining: BUCKET_CAPACITY - 1 };
+  }
+  // Refill since last consume.
+  const elapsedMs = Math.max(0, now - bucket.lastConsumeMs);
+  const refilled = Math.min(
+    BUCKET_CAPACITY,
+    bucket.tokens + elapsedMs * BUCKET_REFILL_RATE_PER_MS,
+  );
+  if (refilled >= 1) {
+    bucket.tokens = refilled - 1;
+    bucket.lastConsumeMs = now;
+    return { allowed: true, remaining: Math.floor(bucket.tokens) };
+  }
+  // Bucket exhausted.  Compute time until at least 1 token regenerates.
+  const tokensShort = 1 - refilled;
+  const retryAfterMs = Math.ceil(tokensShort / BUCKET_REFILL_RATE_PER_MS);
+  bucket.tokens = refilled; // record the refill even though not consumed
+  return { allowed: false, retryAfterMs, remaining: 0 };
+}
+
+/**
+ * Evict per-guild buckets idle longer than 10 minutes.  Call periodically
+ * from a scheduled timer or on a sweep tick.
+ *
+ * @param now - Override for the current time (test seam).
+ * @returns Number of buckets evicted.
+ */
+export function evictIdleBuckets(now: number = Date.now()): number {
+  let evicted = 0;
+  for (const [key, bucket] of guildBuckets.entries()) {
+    if (now - bucket.lastConsumeMs > BUCKET_IDLE_EVICTION_MS) {
+      guildBuckets.delete(key);
+      evicted++;
+    }
+  }
+  return evicted;
+}
+
+/**
+ * Bucket-store size.  Test-only accessor.
+ * @internal
+ */
+export function __guildBucketCount(): number {
+  return guildBuckets.size;
+}
