@@ -21,6 +21,13 @@ import type {
   RequestStatus,
   AuthzDecision,
 } from '../adapters/adapter_interface';
+import {
+  type AdapterMetadata,
+  type RequestSource,
+  isRequestSource,
+  parseAdapterMetadata,
+  ValidationError,
+} from '../types/request_source';
 
 // ---------------------------------------------------------------------------
 // Type alias for better-sqlite3 database (avoids hard dependency at compile time)
@@ -56,6 +63,17 @@ export interface RequestEntity {
   promotion_count: number;
   last_promoted_at: string | null;
   paused_at_phase: string | null;
+  // v2 (002_add_source_metadata.sql):
+  /** Channel/adapter that originated this request. Defaults to 'cli'. */
+  source: RequestSource;
+  /**
+   * Adapter-specific metadata. Always present in the entity (the repository
+   * defends against null/corrupt JSON by returning `{}`). The repository is
+   * the SOLE place where this round-trips through `JSON.parse`/`stringify`;
+   * callers always work in domain types.
+   */
+  adapter_metadata: AdapterMetadata;
+  // end v2
   created_at: string;
   updated_at: string;
 }
@@ -136,6 +154,89 @@ const PRIORITY_CASE = `
   END`;
 
 // ---------------------------------------------------------------------------
+// Row → entity mapping for v2 request rows
+// ---------------------------------------------------------------------------
+
+/**
+ * Raw shape of a `requests` row as returned by `better-sqlite3`. The
+ * `adapter_metadata` column is the on-disk JSON string; v2 rows always
+ * have a non-null value (CHECK constraint enforces JSON validity). v1 rows
+ * predate the column and would be `undefined` on the row object — handled
+ * defensively below.
+ */
+type RequestRow = Omit<RequestEntity, 'adapter_metadata' | 'source'> & {
+  source?: string | null;
+  adapter_metadata?: string | null;
+};
+
+/**
+ * Translate a raw `requests` row into a typed {@link RequestEntity}.
+ *
+ * Defensive parsing for `adapter_metadata`:
+ *   - missing / null   → `{}` (v1 row before migration applied)
+ *   - empty string     → `{}`
+ *   - corrupt JSON     → log + `{}`  (do NOT fail the read)
+ *   - parsed unknown source → log + `{}` (treat as legacy)
+ *   - parsed valid     → typed AdapterMetadata
+ *
+ * `source` defaults to `'cli'` when missing (matches the SQL DEFAULT).
+ */
+function mapRequestRow(row: RequestRow | undefined | null): RequestEntity | null {
+  if (!row) return null;
+
+  let source: RequestSource = 'cli';
+  if (row.source != null) {
+    if (isRequestSource(row.source)) {
+      source = row.source;
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn(
+        JSON.stringify({
+          event: 'repository.unknown_source',
+          request_id: row.request_id,
+          value: row.source,
+        }),
+      );
+    }
+  }
+
+  let metadata: AdapterMetadata = {};
+  const raw = row.adapter_metadata;
+  if (raw != null && raw !== '') {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      metadata = parseAdapterMetadata(parsed);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        JSON.stringify({
+          event: 'repository.adapter_metadata_corrupt',
+          request_id: row.request_id,
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+      metadata = {};
+    }
+  }
+
+  return {
+    ...(row as Omit<RequestEntity, 'adapter_metadata' | 'source'>),
+    source,
+    adapter_metadata: metadata,
+  };
+}
+
+/** Map every row in a list. Filters out the (unreachable) null mapper output. */
+function mapRequestRows(rows: RequestRow[]): RequestEntity[] {
+  const out: RequestEntity[] = [];
+  for (const row of rows) {
+    const mapped = mapRequestRow(row);
+    if (mapped) out.push(mapped);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Repository class
 // ---------------------------------------------------------------------------
 
@@ -154,6 +255,16 @@ export class Repository {
 
   /** Insert a new request row. */
   insertRequest(request: RequestEntity): void {
+    // Defaults for v2 columns: callers that pre-date 002 migration may omit
+    // `source` / `adapter_metadata`. Repository fills in 'cli' / {} which
+    // matches the SQL DEFAULT. Validate the source eagerly so bad values
+    // surface as ValidationError, not a SQLite CHECK error mid-statement.
+    const source: RequestSource = request.source ?? 'cli';
+    if (!isRequestSource(source)) {
+      throw new ValidationError(`unknown request source: ${String(source)}`);
+    }
+    const adapterMetadataJson = JSON.stringify(request.adapter_metadata ?? {});
+
     this.db
       .prepare(
         `INSERT INTO requests (
@@ -161,13 +272,13 @@ export class Repository {
           status, current_phase, phase_progress, requester_id, source_channel,
           notification_config, deadline, related_tickets, technical_constraints,
           acceptance_criteria, blocker, promotion_count, last_promoted_at,
-          paused_at_phase, created_at, updated_at
+          paused_at_phase, source, adapter_metadata, created_at, updated_at
         ) VALUES (
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?, ?
+          ?, ?, ?, ?, ?
         )`,
       )
       .run(
@@ -191,6 +302,8 @@ export class Repository {
         request.promotion_count,
         request.last_promoted_at,
         request.paused_at_phase,
+        source,
+        adapterMetadataJson,
         request.created_at,
         request.updated_at,
       );
@@ -200,8 +313,8 @@ export class Repository {
   getRequest(requestId: string): RequestEntity | null {
     const row = this.db
       .prepare('SELECT * FROM requests WHERE request_id = ?')
-      .get(requestId);
-    return (row as RequestEntity) ?? null;
+      .get(requestId) as RequestRow | undefined;
+    return mapRequestRow(row);
   }
 
   /** Update specific fields on a request. Automatically bumps `updated_at`. */
@@ -226,11 +339,32 @@ export class Repository {
       'promotion_count',
       'last_promoted_at',
       'paused_at_phase',
+      // v2 (002_add_source_metadata.sql):
+      'source',
+      'adapter_metadata',
+      // end v2
     ]);
 
-    const entries = Object.entries(updates).filter(([key]) =>
-      allowedColumns.has(key),
-    );
+    // Eager validation for v2 columns so callers see ValidationError instead
+    // of a SQLite CHECK error mid-statement. `source` is technically
+    // immutable in practice, but operator-driven repairs need an escape
+    // hatch (see SPEC-012-2-03 §Notes).
+    if (updates.source !== undefined && !isRequestSource(updates.source)) {
+      throw new ValidationError(
+        `unknown request source: ${String(updates.source)}`,
+      );
+    }
+
+    const entries: Array<[string, unknown]> = [];
+    for (const [key, val] of Object.entries(updates)) {
+      if (!allowedColumns.has(key)) continue;
+      // Serialize adapter_metadata at the SQL boundary.
+      if (key === 'adapter_metadata') {
+        entries.push([key, JSON.stringify(val ?? {})]);
+      } else {
+        entries.push([key, val]);
+      }
+    }
 
     if (entries.length === 0) return;
 
@@ -596,24 +730,60 @@ export class Repository {
 
   /** Return all requests that have a non-null blocker. */
   getBlockedRequests(): RequestEntity[] {
-    return this.db
+    const rows = this.db
       .prepare(
         `SELECT * FROM requests
          WHERE blocker IS NOT NULL AND status NOT IN ('done', 'cancelled', 'failed')
          ORDER BY created_at ASC`,
       )
-      .all() as RequestEntity[];
+      .all() as RequestRow[];
+    return mapRequestRows(rows);
   }
 
   /** Return requests completed (status = 'done') since `since`. */
   getCompletedSince(since: Date): RequestEntity[] {
-    return this.db
+    const rows = this.db
       .prepare(
         `SELECT * FROM requests
          WHERE status = 'done' AND updated_at >= ?
          ORDER BY updated_at DESC`,
       )
-      .all(since.toISOString()) as RequestEntity[];
+      .all(since.toISOString()) as RequestRow[];
+    return mapRequestRows(rows);
+  }
+
+  /**
+   * List requests by originating source, optionally narrowed to a status.
+   *
+   * Uses `idx_requests_source_status` (composite on
+   * `source, status, created_at`) when `status` is provided; otherwise
+   * uses `idx_requests_source`. Both indexes are created by migration 002.
+   * Used by reconciliation CLI (PLAN-012-3) and per-channel dashboards.
+   */
+  listRequestsBySource(
+    source: RequestSource,
+    status?: RequestStatus,
+  ): RequestEntity[] {
+    if (!isRequestSource(source)) {
+      throw new ValidationError(`unknown request source: ${String(source)}`);
+    }
+    const rows =
+      status === undefined
+        ? (this.db
+            .prepare(
+              `SELECT * FROM requests
+               WHERE source = ?
+               ORDER BY created_at DESC`,
+            )
+            .all(source) as RequestRow[])
+        : (this.db
+            .prepare(
+              `SELECT * FROM requests
+               WHERE source = ? AND status = ?
+               ORDER BY created_at DESC`,
+            )
+            .all(source, status) as RequestRow[]);
+    return mapRequestRows(rows);
   }
 
   /**
