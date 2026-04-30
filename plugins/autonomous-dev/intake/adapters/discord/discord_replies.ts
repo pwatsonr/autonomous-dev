@@ -15,7 +15,7 @@
  */
 
 import type { RepliableInteraction } from 'discord.js';
-import { redactToken } from './main_internals';
+import { redactToken } from './main';
 
 // ---------------------------------------------------------------------------
 // Types
