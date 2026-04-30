@@ -124,16 +124,18 @@ describe('Migrator', () => {
 
     const first = runMigrations(db, MIGRATIONS_DIR);
     expect(first.applied).toContain('001_initial.sql');
+    const firstAppliedCount = first.applied.length;
 
     const second = runMigrations(db, MIGRATIONS_DIR);
     expect(second.applied).toHaveLength(0);
     expect(second.skipped).toContain('001_initial.sql');
+    expect(second.skipped).toHaveLength(firstAppliedCount);
 
-    // Only one row in _migrations
+    // Every migration applied in the first run is recorded in _migrations.
     const rows: Array<{ name: string }> = db
-      .prepare('SELECT name FROM _migrations')
+      .prepare('SELECT name FROM _migrations ORDER BY name')
       .all();
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(firstAppliedCount);
     expect(rows[0].name).toBe('001_initial.sql');
 
     db.close();
