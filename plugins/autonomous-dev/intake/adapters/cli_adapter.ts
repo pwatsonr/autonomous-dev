@@ -446,6 +446,7 @@ export function buildProgram(
  * Default location of the sqlite database used by the intake layer.
  * Mirrors the convention used by the daemon and other adapters.
  */
+/* istanbul ignore next — exercised only by the production entry point */
 function defaultDbPath(): string {
   return path.join(
     process.env.HOME ?? os.homedir(),
@@ -457,6 +458,7 @@ function defaultDbPath(): string {
 /**
  * Default location of the authz YAML config.
  */
+/* istanbul ignore next — exercised only by the production entry point */
 function defaultAuthConfigPath(): string {
   return path.join(
     process.env.HOME ?? os.homedir(),
@@ -477,6 +479,7 @@ function defaultAuthConfigPath(): string {
  * for full submit support. Until then, `submit` will work for code paths
  * that do not require NLP/dedup/sanitization, and fail cleanly otherwise.
  */
+/* istanbul ignore next — pulls in sqlite / yaml / authz; covered by integration tests */
 export async function initRouter(): Promise<IntakeRouterLike> {
   // Dynamic imports keep these heavy modules out of the unit-test path.
   /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
