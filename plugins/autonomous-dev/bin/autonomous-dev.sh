@@ -15,6 +15,9 @@ set -euo pipefail
 #   kill-switch reset        Disengage the kill switch
 #   circuit-breaker reset    Reset the circuit breaker
 #   config init|show|validate  Configuration management
+#   request <subcommand>     Manage autonomous-dev request lifecycle
+#                            (submit, status, list, cancel, pause, resume,
+#                             priority, logs, feedback, kill)
 #   --help, -h               Show this help message
 #   --version                Show version
 ###############################################################################
@@ -46,12 +49,195 @@ Commands:
   config init          Initialize configuration
   config show          Show current configuration
   config validate      Validate configuration
+  request <subcmd>     Manage request lifecycle (run 'request --help' for list)
 
 Options:
   --help, -h           Show this help message
   --version            Show version
 
 EOF
+}
+
+# ---------------------------------------------------------------------------
+# print_request_help() -> void
+#   Prints the request subcommand help text to stdout.
+#   Spec: SPEC-011-1-01 Task 1 (verbatim, ≤80 columns per line).
+# ---------------------------------------------------------------------------
+print_request_help() {
+    cat <<'EOF'
+Usage: autonomous-dev request <subcommand> [args]
+
+Manage autonomous-dev request lifecycle.
+
+Subcommands:
+  submit <description>    Submit a new request (returns REQ-NNNNNN)
+  status <REQ-id>         Show current status of a request
+  list [--state <state>]  List recent requests (default: active only)
+  cancel <REQ-id>         Cancel a request
+  pause <REQ-id>          Pause a request
+  resume <REQ-id>         Resume a paused request
+  priority <REQ-id> <p>   Change priority (high|normal|low)
+  logs <REQ-id>           Tail logs for a request
+  feedback <REQ-id> <msg> Submit clarifying feedback
+  kill <REQ-id>           Force-terminate a request
+
+Run 'autonomous-dev request <subcommand> --help' for subcommand-specific options.
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# validate_request_id(id) -> void
+#   Strict regex check: ^REQ-[0-9]{6}$.
+#   Spec: SPEC-011-1-01 Task 2.
+#   Exits 1 with diagnostic on mismatch; returns 0 on match (no output).
+# ---------------------------------------------------------------------------
+validate_request_id() {
+    local id="${1:-}"
+    if [[ -z "$id" ]]; then
+        echo "ERROR: request ID is required" >&2
+        exit 1
+    fi
+    if [[ ! "$id" =~ ^REQ-[0-9]{6}$ ]]; then
+        echo "ERROR: invalid request ID '$id'. Format: REQ-NNNNNN (6 digits)" >&2
+        exit 1
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# validate_priority(value) -> void
+#   Allowlist membership check against {high, normal, low}.
+#   Spec: SPEC-011-1-01 Task 3.
+#   Exits 1 with diagnostic on mismatch; returns 0 on match (no output).
+# ---------------------------------------------------------------------------
+validate_priority() {
+    local value="${1:-}"
+    if [[ -z "$value" ]]; then
+        echo "ERROR: priority value is required" >&2
+        exit 1
+    fi
+    local valid_priorities="high normal low"
+    if [[ ! " $valid_priorities " == *" $value "* ]]; then
+        echo "ERROR: invalid priority '$value'. Valid: high, normal, low" >&2
+        exit 1
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# detect_color(args...) -> string ("0" or "1")
+#   Decision tree (Unix conventions): NO_COLOR > --no-color > !TTY > TERM > on.
+#   Spec: SPEC-011-1-02 Task 4.
+#   Read-only: does NOT consume the --no-color arg.
+# ---------------------------------------------------------------------------
+detect_color() {
+    # 1. NO_COLOR env var (per https://no-color.org) — any value disables color.
+    if [[ -n "${NO_COLOR:-}" ]]; then
+        echo "0"
+        return 0
+    fi
+    # 2. Explicit --no-color flag in args.
+    local arg
+    for arg in "$@"; do
+        if [[ "$arg" == "--no-color" ]]; then
+            echo "0"
+            return 0
+        fi
+    done
+    # 3. stdout is not a TTY (piped or redirected).
+    if [[ ! -t 1 ]]; then
+        echo "0"
+        return 0
+    fi
+    # 4. TERM is dumb or empty.
+    if [[ -z "${TERM:-}" || "${TERM:-}" == "dumb" ]]; then
+        echo "0"
+        return 0
+    fi
+    # 5. Color enabled.
+    echo "1"
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# exec_node_cli(subcmd, args...) -> exec
+#   Securely invokes the TS CLI adapter via `exec node` with an argv array.
+#   Shell metacharacters in arguments are passed as literal strings.
+#   Spec: SPEC-011-1-02 Task 5.
+#
+#   Exit codes:
+#     0  success
+#     1  user error (validation, not found, etc.) — from node
+#     2  system error (missing file, missing node, etc.)
+# ---------------------------------------------------------------------------
+exec_node_cli() {
+    local subcmd="$1"
+    shift
+    local cli_path="${PLUGIN_DIR}/intake/adapters/cli_adapter.js"
+
+    if [[ ! -f "$cli_path" ]]; then
+        echo "ERROR: CLI adapter not found at $cli_path. Run plugin install or rebuild." >&2
+        exit 2
+    fi
+    if ! command -v node >/dev/null 2>&1; then
+        echo "ERROR: node command not found. Install Node.js 18+ to use request subcommands." >&2
+        exit 2
+    fi
+
+    # exec replaces this bash process with node; child's exit code propagates.
+    # "$@" expands to one quoted token per arg — no shell interpolation.
+    exec node "$cli_path" "$subcmd" "$@"
+}
+
+# ---------------------------------------------------------------------------
+# cmd_request_delegate(args...) -> void
+#   Routes the `request` command: validates the subcommand and ID/priority,
+#   then exec_node_cli's into the TS adapter.
+#   Spec: SPEC-011-1-01 Task 1.
+# ---------------------------------------------------------------------------
+cmd_request_delegate() {
+    if [[ $# -eq 0 ]] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+        print_request_help
+        exit 0
+    fi
+
+    local subcmd="$1"
+    shift
+
+    case "$subcmd" in
+        submit|status|list|cancel|pause|resume|priority|logs|feedback|kill)
+            ;;
+        *)
+            echo "ERROR: Unknown request subcommand: $subcmd. Run 'autonomous-dev request --help'" >&2
+            exit 1
+            ;;
+    esac
+
+    # Subcommands whose first positional arg is a request ID get bash-layer
+    # regex validation BEFORE any subprocess spawn. Also pass-through --help.
+    case "$subcmd" in
+        status|cancel|pause|resume|priority|logs|feedback|kill)
+            if [[ "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+                validate_request_id "${1:-}"
+            fi
+            ;;
+    esac
+
+    # priority also requires a valid level as its second positional arg.
+    if [[ "$subcmd" == "priority" ]]; then
+        if [[ "${1:-}" != "--help" && "${1:-}" != "-h" ]]; then
+            validate_priority "${2:-}"
+        fi
+    fi
+
+    # Detect color preference and export for the Node subprocess. The
+    # --no-color flag is intentionally passed through to node as well so
+    # libraries that read the flag (not the env) also honor it.
+    local color
+    color=$(detect_color "$@")
+    export AUTONOMOUS_DEV_COLOR="$color"
+
+    exec_node_cli "$subcmd" "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -349,6 +535,9 @@ case "${COMMAND}" in
                 exit 1
                 ;;
         esac
+        ;;
+    request)
+        cmd_request_delegate "$@"
         ;;
     --help|-h)
         usage

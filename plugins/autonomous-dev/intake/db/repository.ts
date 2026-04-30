@@ -743,6 +743,8 @@ export class Repository {
       discord: 'discord_id',
       slack: 'slack_id',
       claude_app: 'claude_user',
+      // TODO(PLAN-011-1): add cli_user column to user_identities migration when CLI operator identities are wired through DB rather than YAML config
+      cli: 'cli_user',
     };
 
     const column = columnMap[channelType];

@@ -221,7 +221,7 @@ export class IntakeRouter {
    */
   private channelTypeToPlatformKey(
     channelType: ChannelType,
-  ): 'discord_id' | 'slack_id' | 'claude_user' {
+  ): 'discord_id' | 'slack_id' | 'claude_user' | 'cli_user' {
     switch (channelType) {
       case 'discord':
         return 'discord_id';
@@ -229,6 +229,9 @@ export class IntakeRouter {
         return 'slack_id';
       case 'claude_app':
         return 'claude_user';
+      case 'cli':
+        // TODO(PLAN-011-1): authz config must define cli_user identity for operators
+        return 'cli_user';
     }
   }
 }
