@@ -1,0 +1,23 @@
+# Reference frontmatter template for autonomous-dev-* slash commands.
+#
+# DO NOT include this file directly in a .md file. Use it as a guide when
+# authoring a new autonomous-dev-* command. Each command's frontmatter must
+# follow this structure exactly so that the Claude Code plugin loader and the
+# downstream TypeScript bridge see a consistent shape.
+#
+# Source-of-truth references:
+#   - TDD-011 §6.2 (frontmatter contract)
+#   - SPEC-011-2-01 (this file lives alongside)
+#   - commands/_shared/arg_schemas.yaml (per-command argument shapes)
+
+name: autonomous-dev-{subcommand}
+description: One-sentence imperative description (<= 120 chars)
+arguments:
+  - name: <arg_name>
+    type: string | enum | integer
+    required: true | false
+    description: <arg description>
+    enum: [...]            # only when type == enum
+    default: <value>       # only when required == false
+allowed_tools:
+  - Bash(bash:*)
