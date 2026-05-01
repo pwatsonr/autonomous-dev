@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION_MATRIX: "[18, 20]"
+  CLAUDE_CLI_VERSION: "latest"
+
+jobs:
+  paths-filter:
+    name: Detect changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      typescript: ${{ steps.filter.outputs.typescript }}
+      shell: ${{ steps.filter.outputs.shell }}
+      markdown: ${{ steps.filter.outputs.markdown }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+      plugins: ${{ steps.filter.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            typescript:
+              - 'plugins/autonomous-dev/src/**/*.ts'
+              - 'plugins/autonomous-dev/tests/**/*.ts'
+              - 'plugins/autonomous-dev/tsconfig*.json'
+              - 'plugins/autonomous-dev/package.json'
+              - 'plugins/autonomous-dev/package-lock.json'
+              - 'plugins/autonomous-dev/.eslintrc.js'
+              - 'plugins/autonomous-dev/.prettierrc'
+            shell:
+              - '**/*.sh'
+              - '**/*.bash'
+              - 'plugins/autonomous-dev/bin/**'
+              - 'plugins/autonomous-dev/lib/**/*.sh'
+            markdown:
+              - '**/*.md'
+              - '**/*.markdown'
+            workflows:
+              - '.github/workflows/**'
+              - '.github/actions/**'
+            plugins:
+              - 'plugins/**/.claude-plugin/plugin.json'
+              - 'plugins/**/agents/**'
+              - 'plugins/**/commands/**'
+              - 'plugins/**/hooks/**'
