@@ -1,5 +1,16 @@
 {
   "port": 19280,
   "auth_mode": "localhost",
-  "logging": { "level": "info" }
+  "bind_host": null,
+  "allowed_origins": [],
+  "logging": { "level": "info" },
+  "paths": {
+    "state_dir": "~/.autonomous-dev",
+    "logs_dir": "~/.autonomous-dev/logs",
+    "user_config": "~/.autonomous-dev/config.json"
+  },
+  "shutdown": {
+    "grace_period_ms": 10000,
+    "force_timeout_ms": 15000
+  }
 }

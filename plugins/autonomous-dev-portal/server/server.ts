@@ -14,6 +14,7 @@ import { Hono } from "hono";
 import { loadPortalConfig } from "./lib/config";
 import { resolveBindHostname, validateBindingConfig } from "./lib/binding";
 import { setupGracefulShutdown } from "./lib/shutdown";
+import { validateStartupConditions } from "./lib/startup-checks";
 import { applyMiddlewareChain } from "./middleware";
 
 export interface ServerState {
@@ -49,6 +50,7 @@ export async function startServer(): Promise<Server<unknown>> {
         auth_mode: config.auth_mode,
     });
 
+    await validateStartupConditions(config);
     await validateBindingConfig(config);
     const hostname = resolveBindHostname(config);
 

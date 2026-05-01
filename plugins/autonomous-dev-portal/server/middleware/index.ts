@@ -19,6 +19,7 @@ import { secureHeaders } from "hono/secure-headers";
 import type { Hono } from "hono";
 
 import type { PortalConfig } from "../lib/config";
+import { getOAuthExtension } from "../lib/oauth-extension";
 import { errorHandler } from "./error-handler";
 import { requestIdMiddleware } from "./request-id";
 import { structuredLogger } from "./logging";
@@ -83,6 +84,10 @@ export function applyMiddlewareChain(app: Hono, config: PortalConfig): void {
 
     // EXTENSION POINT: TDD-014 auth + CSRF middleware are inserted here.
     // SPEC-013-2-03 adds the OAuth extension attach hook here.
+    const oauth = getOAuthExtension();
+    if (oauth !== null && config.oauth !== undefined) {
+        oauth.attach(app, config.oauth);
+    }
 
     app.use("*", errorHandler()); // 6. error boundary
 }
