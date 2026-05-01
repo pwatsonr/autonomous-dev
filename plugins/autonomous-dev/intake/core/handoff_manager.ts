@@ -321,6 +321,72 @@ function unlinkIfExists(p: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// Public file-write primitive: writeStateFileAtomic (consumed by reconciliation)
+// ---------------------------------------------------------------------------
+
+/**
+ * Atomically write `state` as the `state.json` inside `requestPath`.
+ *
+ * This is the file-write half of the two-phase commit (Phase A + Phase C
+ * minus the SQLite step), exposed for the operator-driven reconciliation
+ * flow (PLAN-012-3). The reconciliation manager rebuilds `state.json` from
+ * SQLite without going through the producer's submit/transition path; it
+ * still needs the same atomicity guarantee — temp + fsync + atomic rename.
+ *
+ * Steps:
+ *   1. `mkdirSync(requestPath, recursive, mode 0o700)` — idempotent.
+ *   2. Write `state.json.tmp.<pid>.<rand>` with `O_CREAT|O_EXCL`, fsync.
+ *   3. `fs.rename(temp, state.json)` — atomic on POSIX filesystems.
+ *
+ * On any failure during steps 2/3, the temp is best-effort unlinked.
+ *
+ * Spec note: SPEC-012-3-02 references `intake/core/two_phase_commit.ts`
+ * — that filename does not exist in this codebase; the two-phase commit
+ * primitives live here in `handoff_manager.ts` (PLAN-012-1). This helper
+ * is the public seam for reconciliation; callers MUST use it rather than
+ * `fs.writeFileSync` so the same atomic guarantees apply.
+ *
+ * @param requestPath  Absolute path to the request directory
+ *                     (`<repo>/.autonomous-dev/requests/REQ-NNNNNN`).
+ * @param state        Fully-built v1.1 state object to persist.
+ * @param opts.fsync   Defaults to `true`. Set `false` only in tests.
+ * @returns Absolute path to the written `state.json`.
+ * @throws  Whatever `fs` throws on irrecoverable IO (ENOSPC, EACCES, ...).
+ */
+export async function writeStateFileAtomic(
+  requestPath: string,
+  state: StateJsonV11,
+  opts?: { fsync?: boolean },
+): Promise<string> {
+  const fsyncEnabled = opts?.fsync !== false;
+
+  fs.mkdirSync(requestPath, { recursive: true, mode: 0o700 });
+
+  const tmpPath = buildTempPath(requestPath);
+  const finalPath = path.join(requestPath, 'state.json');
+
+  try {
+    writeTempStateSync(tmpPath, state, fsyncEnabled);
+  } catch (err) {
+    unlinkIfExists(tmpPath);
+    throw err;
+  }
+
+  try {
+    fs.renameSync(tmpPath, finalPath);
+  } catch (err) {
+    unlinkIfExists(tmpPath);
+    throw err;
+  }
+
+  return finalPath;
+}
+
+// Re-export the writer helper so reconciliation can build its own
+// state files without using `fs.writeFile` directly.
+export { writeStateJson } from '../state/state_validator';
+
+// ---------------------------------------------------------------------------
 // Internal: shared two-phase write
 // ---------------------------------------------------------------------------
 
