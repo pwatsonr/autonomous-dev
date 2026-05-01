@@ -103,6 +103,50 @@ For fork PRs the composite:
 No further steps run; in particular the Claude invocation is never reached
 on a fork PR.
 
+## Verdict Format
+
+The reviewer agents emit a Markdown response. The parser (`lib/parse-verdict.sh`)
+expects the following conventions:
+
+- **Verdict line** (required): exactly one line matching the case-insensitive
+  regex `^VERDICT:\s*(APPROVE|CONCERNS|REQUEST_CHANGES)\s*$`. The first match
+  wins. The verdict is normalized to uppercase in the output.
+- **Severity tags** (optional, zero or more): occurrences of `**[LOW]**`,
+  `**[MEDIUM]**`, `**[HIGH]**`, or `**[CRITICAL]**` anywhere in the body.
+  Case-insensitive. Only `**[CRITICAL]**` sets `has-critical=true`.
+- **Score line** (optional): `^SCORE:\s*([0-9]{1,3})\s*$`. If absent, the
+  `score` output is empty.
+
+A response missing the `VERDICT:` line is malformed; the parser fails the
+step with `::error::Could not parse verdict from Claude response`. False
+success on a parsing failure would let bad documents merge silently, which
+the TDD-017 risk register explicitly forbids.
+
+## Status-State Mapping
+
+| Verdict | has-critical | Commit Status | Description |
+|---------|--------------|---------------|-------------|
+| `APPROVE` | false | `success` | "approved" |
+| `APPROVE` | true | `failure` | "Critical findings present" |
+| `CONCERNS` | false | `success` | "passed with minor concerns" |
+| `CONCERNS` | true | `failure` | "Critical findings present" |
+| `REQUEST_CHANGES` | false | `failure` | "Reviewer requested changes" |
+| `REQUEST_CHANGES` | true | `failure` | "Critical findings present" |
+
+`CONCERNS` without a critical finding passes by design (TDD-017 §5.2):
+minor concerns are surfaced in the PR comment but do not block merge. Only
+`REQUEST_CHANGES` or any `**[CRITICAL]**` tag blocks.
+
+Description text is truncated to 140 characters (the GitHub commit-status
+API limit).
+
+## Known Limitations
+
+- The sticky-comment search calls `issues.listComments` with the default
+  pagination (30 per page). On a PR with more than 30 comments preceding the
+  sticky one, the search may miss the existing sticky and create a duplicate.
+  If this surfaces in practice, switch to `paginate.iterator()`.
+
 ## Extension Points
 
 - **`verdict-mode` input** (SPEC-017-2-05) will add a `numeric|checklist`

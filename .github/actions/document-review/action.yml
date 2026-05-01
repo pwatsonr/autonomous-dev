@@ -194,3 +194,101 @@ runs:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         prompt: ${{ steps.load-prompt.outputs.prompt }}
         claude_args: '--attach /tmp/review_files --max-turns 3'
+
+    - name: Parse verdict
+      id: parse-verdict
+      if: steps.fork-check.outputs.is-fork != 'true' && steps.stage-payload.outputs.skipped != 'true'
+      shell: bash
+      env:
+        CLAUDE_RESPONSE: ${{ steps.claude.outputs.claude-response }}
+      run: |
+        set -euo pipefail
+        printf '%s' "$CLAUDE_RESPONSE" > /tmp/claude-response.md
+        "${{ github.action_path }}/lib/parse-verdict.sh" /tmp/claude-response.md numeric
+
+    - name: Update sticky comment
+      if: steps.fork-check.outputs.is-fork != 'true' && steps.stage-payload.outputs.skipped != 'true'
+      # actions/github-script@v7.0.1 pinned by SHA
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+      env:
+        CLAUDE_RESPONSE: ${{ steps.claude.outputs.claude-response }}
+        DOCUMENT_TYPE: ${{ inputs.document-type }}
+        VERDICT: ${{ steps.parse-verdict.outputs.verdict }}
+        SCORE: ${{ steps.parse-verdict.outputs.score }}
+        HAS_CRITICAL: ${{ steps.parse-verdict.outputs.has-critical }}
+      with:
+        script: |
+          const documentType = process.env.DOCUMENT_TYPE;
+          const verdict = process.env.VERDICT || '';
+          const score = process.env.SCORE || '';
+          const hasCritical = process.env.HAS_CRITICAL === 'true';
+          const response = process.env.CLAUDE_RESPONSE || '';
+          const marker = `<!-- ${documentType}-review-comment -->`;
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+          const scoreSuffix = score ? ` (score: ${score})` : '';
+          const criticalSuffix = hasCritical ? ' [CRITICAL findings]' : '';
+          const body = [
+            marker,
+            `## ${documentType} Review -- ${verdict}${scoreSuffix}${criticalSuffix}`,
+            '',
+            response,
+            '',
+            '---',
+            `_Posted by [docs/${documentType}-review run](${runUrl})._`,
+          ].join('\n');
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find(c => c.body && c.body.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }
+
+    - name: Set commit status
+      if: steps.fork-check.outputs.is-fork != 'true' && steps.stage-payload.outputs.skipped != 'true'
+      # actions/github-script@v7.0.1 pinned by SHA
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+      env:
+        DOCUMENT_TYPE: ${{ inputs.document-type }}
+        VERDICT: ${{ steps.parse-verdict.outputs.verdict }}
+        HAS_CRITICAL: ${{ steps.parse-verdict.outputs.has-critical }}
+      with:
+        script: |
+          const documentType = process.env.DOCUMENT_TYPE;
+          const verdict = process.env.VERDICT || '';
+          const hasCritical = process.env.HAS_CRITICAL === 'true';
+          const isFailure = verdict === 'REQUEST_CHANGES' || hasCritical;
+          const state = isFailure ? 'failure' : 'success';
+          let description;
+          if (hasCritical) {
+            description = 'Critical findings present';
+          } else if (verdict === 'REQUEST_CHANGES') {
+            description = 'Reviewer requested changes';
+          } else if (verdict === 'CONCERNS') {
+            description = 'passed with minor concerns';
+          } else {
+            description = 'approved';
+          }
+          await github.rest.repos.createCommitStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            sha: context.payload.pull_request.head.sha,
+            state,
+            context: `docs/${documentType}-review`,
+            description: description.slice(0, 140),
+            target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+          });
