@@ -91,3 +91,72 @@ jobs:
 
       - name: Type check
         run: npx tsc --noEmit --incremental
+
+  lint:
+    name: Lint (ESLint + Prettier)
+    needs: paths-filter
+    if: needs.paths-filter.outputs.typescript == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/autonomous-dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'plugins/autonomous-dev/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npx eslint src/ tests/ --ext .ts --format github
+
+      - name: Prettier
+        run: npx prettier --check 'src/**/*.ts' 'tests/**/*.ts' 'package.json' 'tsconfig*.json' --log-level warn
+
+  test:
+    name: Test (${{ matrix.os }}, Node ${{ matrix.node-version }})
+    needs: paths-filter
+    if: needs.paths-filter.outputs.typescript == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [18, 20]
+    defaults:
+      run:
+        working-directory: plugins/autonomous-dev
+    env:
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'plugins/autonomous-dev/package-lock.json'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Jest with coverage
+        run: npm test -- --coverage --coverageReporters=text-lcov --coverageReporters=html
+
+      - name: Upload coverage artifact
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            plugins/autonomous-dev/coverage/lcov.info
+            plugins/autonomous-dev/coverage/lcov-report/
+          retention-days: 30
+          if-no-files-found: error
