@@ -6,12 +6,18 @@
 // page routes so it short-circuits before any page handler runs. The
 // rootDir is anchored to the plugin root so production deployments and
 // in-process tests share one resolution.
+//
+// SPEC-014-1-04 §Task 4.8 adds the optional /auth/* routes (login,
+// callback, logout). They are registered only when `options.authRoutes`
+// is supplied — server.ts derives that from `auth_mode === 'oauth-pkce'`.
 
 import type { Hono } from "hono";
 
 import { staticAssets } from "../middleware/static-assets";
 import { approvalsHandler } from "./approvals";
 import { auditHandler } from "./audit";
+import type { AuthRouteDeps } from "./auth";
+import { registerAuthRoutes } from "./auth";
 import { costsHandler } from "./costs";
 import { dashboardHandler } from "./dashboard";
 import { healthHandler } from "./health";
@@ -26,6 +32,14 @@ export interface RegisterRoutesOptions {
      * Tests may override to point at a fixture directory.
      */
     staticRootDir?: string;
+    /**
+     * SPEC-014-1-04 §Task 4.8 — when present, registers /auth/login,
+     * /auth/callback, /auth/logout. server.ts wires this up only for
+     * `auth_mode === 'oauth-pkce'`; localhost / tailscale builds
+     * intentionally omit the routes so dead OAuth code paths are
+     * unreachable.
+     */
+    authRoutes?: AuthRouteDeps;
 }
 
 export function registerRoutes(
@@ -39,6 +53,10 @@ export function registerRoutes(
         "/static/*",
         staticAssets({ rootDir: staticRootDir, urlPrefix: "/static" }),
     );
+
+    if (options.authRoutes !== undefined) {
+        registerAuthRoutes(app, options.authRoutes);
+    }
 
     app.get("/", dashboardHandler);
     app.get("/repo/:repo/request/:id", requestDetailHandler);
