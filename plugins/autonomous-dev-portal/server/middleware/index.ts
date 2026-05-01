@@ -21,6 +21,7 @@ import type { Hono } from "hono";
 import type { PortalConfig } from "../lib/config";
 import { connectionCounter } from "../lib/connection-tracker";
 import { getOAuthExtension } from "../lib/oauth-extension";
+import { compression } from "./compression";
 import { errorHandler } from "./error-handler";
 import { requestIdMiddleware } from "./request-id";
 import { structuredLogger } from "./logging";
@@ -91,5 +92,9 @@ export function applyMiddlewareChain(app: Hono, config: PortalConfig): void {
         oauth.attach(app, config.oauth);
     }
 
-    app.use("*", errorHandler()); // 6. error boundary
+    // SPEC-013-4-01: compression wraps every response (incl. static
+    // assets). Must come BEFORE the error boundary so error bodies are
+    // also eligible for compression.
+    app.use("*", compression()); // 6. response compression
+    app.use("*", errorHandler()); // 7. error boundary
 }
