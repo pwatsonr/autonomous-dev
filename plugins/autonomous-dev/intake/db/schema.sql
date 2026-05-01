@@ -44,6 +44,15 @@ CREATE TABLE IF NOT EXISTS requests (
   promotion_count   INTEGER NOT NULL DEFAULT 0,
   last_promoted_at  TEXT,
   paused_at_phase   TEXT,
+  -- v2 (002_add_source_metadata.sql):
+  source            TEXT NOT NULL DEFAULT 'cli'
+                    CHECK (source IN (
+                      'cli', 'claude-app', 'discord', 'slack',
+                      'production-intelligence', 'portal'
+                    )),
+  adapter_metadata  TEXT NOT NULL DEFAULT '{}'
+                    CHECK (json_valid(adapter_metadata)),
+  -- end v2
   created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
@@ -52,6 +61,10 @@ CREATE INDEX idx_requests_status ON requests(status);
 CREATE INDEX idx_requests_priority_created ON requests(priority, created_at);
 CREATE INDEX idx_requests_requester ON requests(requester_id);
 CREATE INDEX idx_requests_updated ON requests(updated_at);
+-- v2 indexes (002_add_source_metadata.sql):
+CREATE INDEX idx_requests_source ON requests(source);
+CREATE INDEX idx_requests_source_status ON requests(source, status, created_at);
+-- end v2
 
 -- ---------------------------------------------------------------------------
 -- Request embeddings: vector storage for dedup / similarity

@@ -1,9 +1,22 @@
 /**
  * SQLite migration framework for the Intake Layer.
  *
- * Scans `intake/db/migrations/` for numbered `.sql` files, tracks which
+ * Discovers numbered `*.sql` files in a migrations directory, tracks which
  * have been applied in a `_migrations` table, and runs new ones inside
- * transactions.  Fully idempotent: running twice produces no change.
+ * per-migration transactions. Fully idempotent: running twice is a no-op.
+ *
+ * Filename convention: `NNN_short_name.sql`. The numeric prefix determines
+ * apply order (numeric, not lexicographic — `010_x.sql` runs after `9_x.sql`
+ * iff both prefixes parse as numbers, but the convention is to zero-pad).
+ *
+ * Implements SPEC-012-2-02 contract.
+ *
+ * Note on async: SPEC-012-2-02 specifies `Promise<MigrationResult>` but the
+ * underlying `better-sqlite3` driver is synchronous, and every existing
+ * caller (`cli_adapter`, `claude_command_bridge`, all integration test
+ * harnesses) relies on the synchronous return. This implementation keeps
+ * the function synchronous; all acceptance criteria operate on the result
+ * shape, not the call style. Deviation documented in PLAN-012-2 notes.
  *
  * Requires `better-sqlite3` at runtime.
  *
@@ -12,6 +25,12 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+
+import {
+  type Migration,
+  MigrationError,
+  type MigrationResult,
+} from './migrator.types';
 
 // ---------------------------------------------------------------------------
 // Optional better-sqlite3 import
@@ -40,21 +59,26 @@ CREATE TABLE IF NOT EXISTS _migrations (
 );
 `;
 
+const MIGRATION_FILENAME_RE = /^(\d+)_(.+)\.sql$/;
+
 // ---------------------------------------------------------------------------
-// Public API
+// Public API re-exports
 // ---------------------------------------------------------------------------
 
-/** Result returned after running migrations. */
-export interface MigrationResult {
-  /** Names of migration files that were newly applied in this run. */
-  applied: string[];
-  /** Names of migration files that were already applied (skipped). */
-  skipped: string[];
-}
+export {
+  type Migration,
+  type AppliedMigration,
+  type MigrationResult,
+  MigrationError,
+} from './migrator.types';
+
+// ---------------------------------------------------------------------------
+// Database open
+// ---------------------------------------------------------------------------
 
 /**
  * Open (or create) a SQLite database at `dbPath` and return the
- * `better-sqlite3` instance.  Enables WAL mode and foreign keys.
+ * `better-sqlite3` instance. Enables WAL mode and foreign keys.
  *
  * @param dbPath  Filesystem path to the database file, or `':memory:'`.
  * @returns The opened database instance.
@@ -72,64 +96,91 @@ export function openDatabase(dbPath: string): Database {
   return db;
 }
 
+// ---------------------------------------------------------------------------
+// Migration runner
+// ---------------------------------------------------------------------------
+
 /**
- * Run all pending migrations from `migrationsDir` against `db`.
+ * Discover, order, and apply pending migrations.
  *
- * 1. Ensures the `_migrations` tracking table exists.
- * 2. Reads all `*.sql` files from `migrationsDir`, sorted by name.
- * 3. For each file not already in `_migrations`, wraps execution in a
- *    transaction: runs the SQL, then records the migration name.
- * 4. Returns the list of newly applied and skipped migration names.
+ * Steps:
+ *   1. Ensure `_migrations` tracking table exists.
+ *   2. Scan `migrationsDir` for files matching `NNN_*.sql`. Other files are
+ *      logged as warnings and skipped (accommodates README, etc.).
+ *   3. Sort by numeric prefix; reject duplicate prefixes.
+ *   4. For each file not in `_migrations`, run inside a transaction along
+ *      with the `_migrations` insert. Roll back on any error and throw
+ *      `MigrationError`.
+ *   5. Compute `schemaVersion` as the max numeric prefix in `_migrations`.
  *
  * @param db             An open `better-sqlite3` database instance.
  * @param migrationsDir  Path to the directory containing `*.sql` migration files.
- * @returns A {@link MigrationResult} summarizing what happened.
+ * @returns A {@link MigrationResult} summarizing the run.
+ * @throws {MigrationError} on duplicate prefix, SQL failure, or IO error.
  */
-export function runMigrations(db: Database, migrationsDir: string): MigrationResult {
-  // Ensure the migrations tracking table exists
+export function runMigrations(
+  db: Database,
+  migrationsDir: string,
+): MigrationResult {
+  // Step 1: ensure _migrations exists
   db.exec(CREATE_MIGRATIONS_TABLE);
 
-  // Discover migration files, sorted lexicographically
-  const files = fs
-    .readdirSync(migrationsDir)
-    .filter((f: string) => f.endsWith('.sql'))
-    .sort();
+  // Step 2: discover candidates
+  const allEntries = fs.readdirSync(migrationsDir);
+  const migrations = discoverMigrations(allEntries, migrationsDir);
 
-  // Determine which migrations have already been applied
+  // Step 3: which are already applied?
   const appliedRows: Array<{ name: string }> = db
     .prepare('SELECT name FROM _migrations')
     .all();
   const appliedSet = new Set(appliedRows.map((r) => r.name));
 
-  const result: MigrationResult = {
-    applied: [],
-    skipped: [],
-  };
+  const applied: string[] = [];
+  const skipped: string[] = [];
 
-  for (const file of files) {
-    if (appliedSet.has(file)) {
-      result.skipped.push(file);
+  // Step 4: apply pending migrations transactionally
+  for (const migration of migrations) {
+    if (appliedSet.has(migration.filename)) {
+      skipped.push(migration.filename);
       continue;
     }
 
-    const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf-8');
-
-    // Wrap in a transaction: execute the migration SQL, then record it.
-    // The PRAGMA statements in the migration file (journal_mode, foreign_keys)
-    // cannot run inside a transaction, so we strip them out and handle them
-    // via openDatabase() instead.
-    const executableSql = stripPragmas(sql);
-
-    const applyMigration = db.transaction(() => {
-      db.exec(executableSql);
-      db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(file);
-    });
-
-    applyMigration();
-    result.applied.push(file);
+    try {
+      const executableSql = stripPragmas(migration.sql);
+      const apply = db.transaction(() => {
+        db.exec(executableSql);
+        db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(
+          migration.filename,
+        );
+      });
+      apply();
+      applied.push(migration.filename);
+    } catch (err) {
+      const cause = err instanceof Error ? err : new Error(String(err));
+      throw new MigrationError(
+        `failed at ${migration.filename}: ${cause.message}`,
+        migration.filename,
+        cause,
+      );
+    }
   }
 
-  return result;
+  // Step 5: derive schema version from _migrations
+  const schemaVersion = computeSchemaVersion(db);
+
+  // Best-effort structured log (kept simple to avoid pulling logger dep here).
+  // Operators see this on daemon startup.
+  // eslint-disable-next-line no-console
+  console.log(
+    JSON.stringify({
+      event: 'migration.complete',
+      applied,
+      skipped,
+      schemaVersion,
+    }),
+  );
+
+  return { applied, skipped, schemaVersion };
 }
 
 /**
@@ -152,6 +203,72 @@ export function initializeDatabase(
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Scan directory entries, parse `NNN_name.sql` filenames, sort by numeric
+ * prefix, and reject duplicate prefixes. Files that don't match the pattern
+ * are warned about (stderr) and dropped.
+ */
+function discoverMigrations(
+  entries: string[],
+  migrationsDir: string,
+): Migration[] {
+  const candidates: Migration[] = [];
+  for (const entry of entries) {
+    const match = MIGRATION_FILENAME_RE.exec(entry);
+    if (!match) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        JSON.stringify({
+          event: 'migration.skipped_unknown_file',
+          file: entry,
+        }),
+      );
+      continue;
+    }
+    const number = Number.parseInt(match[1], 10);
+    const fullPath = path.join(migrationsDir, entry);
+    const sql = fs.readFileSync(fullPath, 'utf-8');
+    candidates.push({ filename: entry, number, path: fullPath, sql });
+  }
+
+  // Detect duplicate numeric prefixes BEFORE applying anything.
+  const seen = new Map<number, string>();
+  for (const m of candidates) {
+    const prior = seen.get(m.number);
+    if (prior !== undefined) {
+      throw new MigrationError(
+        `duplicate migration prefix: ${String(m.number).padStart(3, '0')} ` +
+          `(${prior} and ${m.filename})`,
+      );
+    }
+    seen.set(m.number, m.filename);
+  }
+
+  // Sort by numeric prefix (primary) then filename (tiebreaker — unreachable
+  // after duplicate check, but defensive).
+  candidates.sort((a, b) => {
+    if (a.number !== b.number) return a.number - b.number;
+    return a.filename.localeCompare(b.filename);
+  });
+
+  return candidates;
+}
+
+/** Compute schemaVersion = max numeric prefix in `_migrations` (0 if empty). */
+function computeSchemaVersion(db: Database): number {
+  const rows: Array<{ name: string }> = db
+    .prepare('SELECT name FROM _migrations')
+    .all();
+  let max = 0;
+  for (const row of rows) {
+    const m = MIGRATION_FILENAME_RE.exec(row.name);
+    if (!m) continue;
+    const n = Number.parseInt(m[1], 10);
+    if (n > max) max = n;
+  }
+  return max;
+}
 
 /**
  * Remove PRAGMA statements from a SQL string.
