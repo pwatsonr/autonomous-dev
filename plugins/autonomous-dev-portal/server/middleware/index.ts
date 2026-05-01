@@ -19,6 +19,7 @@ import { secureHeaders } from "hono/secure-headers";
 import type { Hono } from "hono";
 
 import type { PortalConfig } from "../lib/config";
+import { connectionCounter } from "../lib/connection-tracker";
 import { getOAuthExtension } from "../lib/oauth-extension";
 import { errorHandler } from "./error-handler";
 import { requestIdMiddleware } from "./request-id";
@@ -51,6 +52,7 @@ function buildCspOptions(): {
 
 export function applyMiddlewareChain(app: Hono, config: PortalConfig): void {
     // Order is contractual; do not reorder.
+    app.use("*", connectionCounter()); // 0. drain tracking (SPEC-013-2-04)
     app.use("*", requestIdMiddleware()); // 1. correlation
     app.use("*", structuredLogger(config.logging.level)); // 2. access logs
     app.use("*", timingMiddleware()); // 3. Server-Timing

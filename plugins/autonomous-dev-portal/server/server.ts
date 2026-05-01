@@ -13,7 +13,10 @@ import { Hono } from "hono";
 
 import { loadPortalConfig } from "./lib/config";
 import { resolveBindHostname, validateBindingConfig } from "./lib/binding";
-import { setupGracefulShutdown } from "./lib/shutdown";
+import {
+    setupGracefulShutdown,
+    setupShutdownPreBoot,
+} from "./lib/shutdown";
 import { validateStartupConditions } from "./lib/startup-checks";
 import { applyMiddlewareChain } from "./middleware";
 
@@ -42,6 +45,9 @@ function phaseLog(phase: string, extra: Record<string, unknown> = {}): void {
 }
 
 export async function startServer(): Promise<Server<unknown>> {
+    // Handle signals received between process start and the real
+    // shutdown wiring. Removed in setupGracefulShutdown.
+    setupShutdownPreBoot();
     phaseLog("server_starting");
 
     const config = await loadPortalConfig();
@@ -76,7 +82,7 @@ export async function startServer(): Promise<Server<unknown>> {
     });
 
     state.server = server;
-    setupGracefulShutdown(server, state);
+    setupGracefulShutdown(server, state, config);
 
     phaseLog("server_listening", {
         hostname,
