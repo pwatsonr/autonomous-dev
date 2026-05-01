@@ -1,56 +1,66 @@
-// SPEC-013-3-01 §Handler Contract — placeholder shim.
+// SPEC-013-3-02 §HTMX Request Detection & RenderPage.
 //
-// This file is intentionally minimal in the Spec 01 commit: it provides the
-// renderPage / notFound surface that route handlers must call. The real
-// HTMX-aware implementation arrives in SPEC-013-3-02 and the actual
-// templates in SPEC-013-3-03.
+// Single point of HTMX detection. All page handlers in `server/routes/`
+// call `renderPage(c, view, props)`; this module decides whether to
+// emit a full HTML document or a fragment based on the `HX-Request`
+// header (with `HX-Boosted` treated identically).
 //
-// Acceptance criteria covered here for Spec 01:
-//   - Page handlers delegate rendering to renderPage(c, view, props)
-//   - Handlers do NOT inspect HX-Request directly (only this module may)
+// The detection contract is intentionally narrow:
+//   - Only the literal string `"true"` (lowercase) counts.
+//   - Header lookup is case-insensitive (handled by Hono).
+//   - Accept headers, query strings, and cookies are NOT consulted.
 //
-// SPEC-013-3-02 will replace the bodies of the helpers below with the real
-// fragment-vs-full-page dispatch based on the HX-Request header.
+// SPEC-013-3-03 owns the templates we delegate to; this file owns only
+// the HTTP/header concerns.
 
 import type { Context } from "hono";
 
+import { renderFragment, renderFullPage } from "../templates";
 import type { RenderProps, ViewName } from "../types/render";
 
-// TODO(SPEC-013-3-02): Replace with the real HTMX-aware implementation
-// dispatching to renderFullPage / renderFragment from SPEC-013-3-03.
+const HX_REQUEST = "HX-Request";
+const HX_BOOSTED = "HX-Boosted";
+
+/**
+ * Returns `true` exactly when HTMX has marked the inbound request as
+ * either an `hx-*` triggered fetch (`HX-Request: true`) or a boosted
+ * navigation (`HX-Boosted: true`). Both produce fragment responses so
+ * HTMX can swap them into the existing DOM without re-emitting layout
+ * chrome.
+ */
+export function isHtmxRequest(c: Context): boolean {
+    return (
+        c.req.header(HX_REQUEST) === "true" ||
+        c.req.header(HX_BOOSTED) === "true"
+    );
+}
+
+/**
+ * Renders `view` with `props` and returns a 200 HTML response. Picks
+ * full-page vs fragment based on `isHtmxRequest`. Caching headers are
+ * intentionally NOT set here; PLAN-014 owns the cache strategy.
+ */
 export async function renderPage<V extends ViewName>(
     c: Context,
     view: V,
     props: RenderProps[V],
 ): Promise<Response> {
-    // Placeholder: emit a tiny HTML document that includes the view name and
-    // a JSON dump of the props so the page is identifiable during the brief
-    // window between Spec 01 and Spec 02 commits.
-    const body =
-        `<!doctype html><html><head><title>${escape(view)}</title></head>` +
-        `<body><h1>${escape(view)}</h1>` +
-        `<pre>${escape(JSON.stringify(props))}</pre></body></html>`;
-    return c.html(body, 200);
+    const html = isHtmxRequest(c)
+        ? await renderFragment(view, props)
+        : await renderFullPage(view, props);
+    return c.html(html, 200);
 }
 
-// TODO(SPEC-013-3-02): Replace with the HTMX-aware 404 helper.
-export function notFound(c: Context): Response | Promise<Response> {
-    const path = c.req.path;
-    const body =
-        `<!doctype html><html><head><title>Not Found</title></head>` +
-        `<body><h1>404 Not Found</h1>` +
-        `<p>No handler for <code>${escape(path)}</code></p></body></html>`;
-    return c.html(body, 404);
-}
-
-// Local escape helper. The real implementation in SPEC-013-3-03 uses Hono
-// JSX which auto-escapes; this placeholder needs its own helper because
-// the strings here are concatenated by hand.
-function escape(s: string): string {
-    return s
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+/**
+ * 404 helper used by both `app.notFound(...)` and individual route
+ * handlers (e.g. request-detail when a stub is missing). Echoes the
+ * requested path so users see what was missing without leaking any
+ * server-side state.
+ */
+export async function notFound(c: Context): Promise<Response> {
+    const props: RenderProps["404"] = { path: c.req.path };
+    const html = isHtmxRequest(c)
+        ? await renderFragment("404", props)
+        : await renderFullPage("404", props);
+    return c.html(html, 404);
 }

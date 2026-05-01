@@ -13,6 +13,7 @@ import { Hono } from "hono";
 
 import { loadPortalConfig } from "./lib/config";
 import { resolveBindHostname, validateBindingConfig } from "./lib/binding";
+import { serverError } from "./lib/error-handlers";
 import { notFound } from "./lib/response-utils";
 import {
     setupGracefulShutdown,
@@ -69,7 +70,12 @@ export async function startServer(): Promise<Server<unknown>> {
     // The legacy inline /health handler is removed in favour of the JSON
     // shape documented in SPEC-013-3-01 §`/health` Handler.
     registerRoutes(app);
+    // SPEC-013-3-02: HTMX-aware 404 / 500. The error-boundary middleware
+    // registered in applyMiddlewareChain catches PortalError-class errors
+    // for API-style consumers (Accept: application/json); app.onError is
+    // the last-line catch for anything that bubbles past it on HTML pages.
     app.notFound(notFound);
+    app.onError(serverError);
 
     const server = serve({
         port: config.port,
