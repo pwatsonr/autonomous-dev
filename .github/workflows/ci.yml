@@ -36,7 +36,7 @@ jobs:
               - 'plugins/autonomous-dev/tsconfig*.json'
               - 'plugins/autonomous-dev/package.json'
               - 'plugins/autonomous-dev/package-lock.json'
-              - 'plugins/autonomous-dev/.eslintrc.js'
+              - 'plugins/autonomous-dev/.eslintrc.cjs'
               - 'plugins/autonomous-dev/.prettierrc'
             shell:
               - '**/*.sh'
