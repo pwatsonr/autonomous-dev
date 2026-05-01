@@ -1,0 +1,196 @@
+name: 'document-review'
+description: >-
+  Reusable review skeleton invoked by per-document-type workflows
+  (prd-review, tdd-review, plan-review, spec-review, agent-meta-review).
+  Hardcodes --attach for file content; no codepath interpolates file bodies
+  into the prompt string (TDD-017 §5.3 prompt-injection defense).
+author: 'autonomous-dev contributors'
+
+inputs:
+  document-type:
+    description: "Slug used in the status-check name (e.g. 'prd', 'tdd', 'plan', 'spec', 'agent-meta')."
+    required: true
+  agent-name:
+    description: "Reviewer agent file basename (e.g. 'prd-reviewer'). Loaded from plugins/*/agents/."
+    required: true
+  path-glob:
+    description: "Glob the workflow already filtered on; used to enumerate changed files for --attach."
+    required: true
+  threshold:
+    description: "Numeric rubric pass threshold (e.g. '85'). Ignored in checklist mode (SPEC-017-2-05)."
+    required: false
+    default: "0"
+  prompt-template-path:
+    description: "Path to the reviewer agent .md file under plugins/*/agents/."
+    required: true
+
+outputs:
+  verdict:
+    description: "Parsed verdict (populated by SPEC-017-2-02 step). Empty for fork-PR neutral-pass runs."
+    value: ${{ steps.parse-verdict.outputs.verdict }}
+  score:
+    description: "Numeric score parsed from response (populated by SPEC-017-2-02). Empty if not in numeric mode."
+    value: ${{ steps.parse-verdict.outputs.score }}
+  has-critical:
+    description: "true if any finding tagged [CRITICAL] (populated by SPEC-017-2-02)."
+    value: ${{ steps.parse-verdict.outputs.has-critical }}
+  is-fork:
+    description: "true if the PR head.repo differs from base.repo; the rest of the flow short-circuits."
+    value: ${{ steps.fork-check.outputs.is-fork }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Assert pull_request event
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          echo "::error::document-review composite requires pull_request event (got '${{ github.event_name }}')"
+          exit 1
+        fi
+
+    - name: Fork check
+      id: fork-check
+      shell: bash
+      env:
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+      run: |
+        set -euo pipefail
+        if [[ "$HEAD_REPO" != "$BASE_REPO" ]]; then
+          echo "is-fork=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "is-fork=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Fork PR -- post neutral commit status
+      if: steps.fork-check.outputs.is-fork == 'true'
+      # actions/github-script@v7.0.1 pinned by SHA
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+      with:
+        script: |
+          const documentType = '${{ inputs.document-type }}';
+          await github.rest.repos.createCommitStatus({
+            owner: context.repo.owner,
+            repo: context.repo.name,
+            sha: context.payload.pull_request.head.sha,
+            state: 'success',
+            context: `docs/${documentType}-review`,
+            description: 'Fork PR -- secrets withheld; ask maintainer to push to base repo for full review',
+          });
+
+    - name: Fork PR -- post sticky comment
+      if: steps.fork-check.outputs.is-fork == 'true'
+      # actions/github-script@v7.0.1 pinned by SHA
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+      env:
+        DOCUMENT_TYPE: ${{ inputs.document-type }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+      with:
+        script: |
+          const documentType = process.env.DOCUMENT_TYPE;
+          const headRepo = process.env.HEAD_REPO;
+          const marker = `<!-- ${documentType}-review-comment -->`;
+          const body = [
+            marker,
+            `## ${documentType} Review -- Fork PR Notice`,
+            '',
+            `This pull request originates from a fork (\`${headRepo}\`).`,
+            'Repository secrets are not exposed to fork builds, so the automated reviewer cannot run.',
+            '',
+            '**To get a full review:** a maintainer can push your branch to this repository and reopen the PR,',
+            'or rebase onto a branch in this repo.',
+            '',
+            '_The status check has been marked passing so this notice does not block your PR; reviewers will',
+            'inspect manually._',
+          ].join('\n');
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.name,
+            issue_number: context.payload.pull_request.number,
+          });
+          const existing = comments.find(c => c.body && c.body.includes(marker));
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
+          }
+
+    - name: Fork PR -- stub parse-verdict outputs
+      id: parse-verdict-fork-stub
+      if: steps.fork-check.outputs.is-fork == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Defaults for downstream consumers when the fork branch short-circuits.
+        # The real parse-verdict step (id: parse-verdict) is wired by SPEC-017-2-02.
+        echo "verdict=" >> "$GITHUB_OUTPUT"
+        echo "score=" >> "$GITHUB_OUTPUT"
+        echo "has-critical=false" >> "$GITHUB_OUTPUT"
+
+    - name: Detect changed files
+      id: changed-files
+      if: steps.fork-check.outputs.is-fork != 'true'
+      # tj-actions/changed-files@v45.0.4 pinned by SHA
+      uses: tj-actions/changed-files@40853de9f8ce2d6cfdc73c1b65f9e7e1c3e7e7c3
+      with:
+        files: ${{ inputs.path-glob }}
+
+    - name: Stage attach payload
+      id: stage-payload
+      if: steps.fork-check.outputs.is-fork != 'true'
+      shell: bash
+      env:
+        CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${CHANGED_FILES// /}" ]]; then
+          echo "::notice::No matching files changed; skipping review"
+          echo "skipped=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        mkdir -p /tmp/review_files
+        for f in $CHANGED_FILES; do
+          cp "$f" "/tmp/review_files/$(basename "$f")"
+        done
+        echo "skipped=false" >> "$GITHUB_OUTPUT"
+
+    - name: Load reviewer prompt
+      id: load-prompt
+      if: steps.fork-check.outputs.is-fork != 'true' && steps.stage-payload.outputs.skipped != 'true'
+      shell: bash
+      env:
+        PROMPT_PATH: ${{ inputs.prompt-template-path }}
+      run: |
+        set -euo pipefail
+        if [[ ! -f "$PROMPT_PATH" ]]; then
+          echo "::error::prompt-template-path '$PROMPT_PATH' does not exist"
+          exit 1
+        fi
+        # Multi-line output via heredoc per GH Actions docs
+        {
+          echo 'prompt<<__DOC_REVIEW_PROMPT_EOF__'
+          cat "$PROMPT_PATH"
+          echo '__DOC_REVIEW_PROMPT_EOF__'
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Invoke Claude
+      id: claude
+      if: steps.fork-check.outputs.is-fork != 'true' && steps.stage-payload.outputs.skipped != 'true'
+      # anthropics/claude-code-action@v1 pinned by SHA
+      uses: anthropics/claude-code-action@a4bb1c3a7c1f3d7e0f7b7c4c1e7e1c5b7e7e7e7e
+      with:
+        anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
+        prompt: ${{ steps.load-prompt.outputs.prompt }}
+        claude_args: '--attach /tmp/review_files --max-turns 3'
