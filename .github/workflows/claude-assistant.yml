@@ -1,0 +1,108 @@
+# ============================================================
+# Claude Assistant Workflow -- Trust Model
+# ============================================================
+# This workflow responds to `@claude` mentions in issue/PR comments
+# via `anthropics/claude-code-action@v1`. The four invariants below
+# are the security boundary; changes to any of them require an
+# explicit security review (see TDD-017 §4 and PRD-010 §FR-4001..FR-4007).
+#
+# 1. SILENT-SKIP for untrusted authors. Comments from anyone outside
+#    the {OWNER, MEMBER, COLLABORATOR} allow-list never produce a
+#    reply or visible error. Attackers learn nothing about the trust
+#    boundary. Enforced by the `claude-trust-gate` composite action.
+#
+# 2. AUTHOR_ASSOCIATION ALLOW-LIST is fixed: OWNER, MEMBER,
+#    COLLABORATOR. Adding CONTRIBUTOR, FIRST_TIMER, or NONE requires
+#    a documented threat-model review.
+#
+# 3. PROMPT IS THE COMMENT BODY VERBATIM. Never concatenate file
+#    content into the prompt string. Future features that need file
+#    context MUST use the action's `--attach` mechanism, not shell
+#    interpolation. `claude_args` is a literal string, never
+#    interpolated from event data.
+#
+# 4. CONCURRENCY KEY is per-issue/per-PR with cancel-in-progress.
+#    Rapid-fire comments produce a single reply (the latest); prior
+#    runs are cancelled. The audit log still records cancelled runs.
+#
+# Cross-reference: TDD-017 §4, PRD-010 §FR-4001..FR-4007.
+# ============================================================
+
+name: claude-assistant
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: claude-assistant-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  trust-check:
+    name: Evaluate author trust
+    runs-on: ubuntu-latest
+    outputs:
+      is-trusted: ${{ steps.gate.outputs.is-trusted }}
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Evaluate author_association
+        id: gate
+        uses: ./.github/actions/claude-trust-gate
+        with:
+          author-association: ${{ github.event.comment.author_association }}
+
+  respond:
+    name: Respond to @claude mention
+    needs: trust-check
+    runs-on: ubuntu-latest
+    if: >-
+      contains(github.event.comment.body, '@claude') &&
+      needs.trust-check.outputs.is-trusted == 'true'
+    steps:
+      - name: Write audit log
+        if: always()
+        run: |
+          set -euo pipefail
+          timestamp_utc="$(date -u +%FT%TZ)"
+          {
+            echo "## Claude assistant invocation"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Actor | ${{ github.event.comment.user.login }} |"
+            echo "| Association | ${{ github.event.comment.author_association }} |"
+            echo "| Comment URL | ${{ github.event.comment.html_url }} |"
+            echo "| UTC timestamp | $timestamp_utc |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Invoke Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ github.event.comment.body }}
+          claude_args: '--max-turns 5'
+
+      - name: Emit spend artifact
+        if: success()
+        env:
+          BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+          GITHUB_ACTOR_LOGIN: ${{ github.event.comment.user.login }}
+        run: ./scripts/ci/emit-spend-artifact.sh
+
+      - name: Upload spend artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spend-estimate-${{ github.run_id }}
+          path: .github/budget/spend-${{ github.run_id }}.json
+          retention-days: 30
+          if-no-files-found: error

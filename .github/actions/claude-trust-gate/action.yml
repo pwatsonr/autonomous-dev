@@ -1,0 +1,33 @@
+name: 'Claude Trust Gate'
+description: >
+  Evaluate a GitHub author_association value against the autonomous-dev
+  trusted-author allow-list (OWNER, MEMBER, COLLABORATOR). Emits
+  is-trusted=true|false. Used by every Claude-powered workflow.
+author: 'autonomous-dev contributors'
+inputs:
+  author-association:
+    description: >
+      The github.event.comment.author_association value (or equivalent for
+      issue/PR events). Case-sensitive; GitHub always emits uppercase.
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Evaluate trust
+      id: evaluate
+      shell: bash
+      run: |
+        set -euo pipefail
+        association="${{ inputs.author-association }}"
+        case "$association" in
+          OWNER|MEMBER|COLLABORATOR)
+            echo "is-trusted=true" >> "$GITHUB_OUTPUT"
+            ;;
+          *)
+            echo "is-trusted=false" >> "$GITHUB_OUTPUT"
+            ;;
+        esac
+outputs:
+  is-trusted:
+    description: '"true" when association is OWNER/MEMBER/COLLABORATOR, else "false".'
+    value: ${{ steps.evaluate.outputs.is-trusted }}
