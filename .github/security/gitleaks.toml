@@ -1,0 +1,60 @@
+title = "autonomous-dev gitleaks config (PRD-007 FR-14)"
+
+[extend]
+useDefault = true
+
+# --- Custom rules (ordered by detection priority) ---
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key (sk-ant-... prefix)"
+regex = '''sk-ant-(?:api|admin)\d{2}-[A-Za-z0-9_\-]{80,}'''
+tags = ["key", "anthropic"]
+
+[[rules]]
+id = "slack-bot-token"
+description = "Slack bot/user/app token"
+regex = '''xox[baprs]-[A-Za-z0-9-]{10,}'''
+tags = ["key", "slack"]
+
+[[rules]]
+id = "discord-bot-token"
+description = "Discord bot token (3-segment base64)"
+regex = '''[MN][A-Za-z0-9]{23}\.[\w-]{6}\.[\w-]{27,}'''
+tags = ["key", "discord"]
+
+[[rules]]
+id = "github-pat"
+description = "GitHub PAT (ghp_) or fine-grained (github_pat_) token"
+regex = '''(?:ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82})'''
+tags = ["key", "github"]
+
+[[rules]]
+id = "aws-access-key"
+description = "AWS access key ID (AKIA prefix)"
+regex = '''\bAKIA[0-9A-Z]{16}\b'''
+tags = ["key", "aws"]
+
+# --- Allowlist (paths + regex placeholders) ---
+
+[allowlist]
+description = "Documentation, fixtures, and known-safe placeholders"
+paths = [
+  '''(?i)\.md$''',
+  '''plugins/autonomous-dev/tests/fixtures/.*''',
+  '''tests/fixtures/security/.*''',
+  '''docs/.*''',
+  '''.*\.example$''',
+  '''.*\.sample$''',
+]
+regexes = [
+  '''(?i)example[_\-]?(api[_\-]?key|token|secret)''',
+  '''(?i)your[_\-]?(api[_\-]?key|token|secret)[_\-]?here''',
+  '''(?i)<replace[_\-]?(me|with[_\-]?your[_\-]?key)>''',
+  '''(?i)dummy[_\-]?(api[_\-]?key|token|secret)''',
+  '''AKIAEXAMPLE[A-Z0-9]+''',
+]
+
+# Reserved for SHA-pinned exemptions; require SECURITY.md review.
+[allowlist.commits]
+commits = []

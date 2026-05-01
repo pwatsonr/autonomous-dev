@@ -1,0 +1,4 @@
+# This file intentionally contains a SYNTHETIC AWS access key for security
+# scanner regression testing. It is NOT a real credential.
+# See: tests/fixtures/security/README.md
+AWS_ACCESS_KEY_ID=AKIAEXAMPLEKEY12345
