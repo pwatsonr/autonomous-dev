@@ -55,6 +55,27 @@ jobs:
               - 'plugins/**/commands/**'
               - 'plugins/**/hooks/**'
 
+  shell:
+    name: shell
+    needs: paths-filter
+    if: needs.paths-filter.outputs.shell == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run shellcheck against bin/*.sh
+        run: |
+          set -euo pipefail
+          find plugins/autonomous-dev/bin -maxdepth 1 -type f -name '*.sh' \
+            -exec shellcheck {} \;
+
+      - name: Run shellcheck against installers/*.sh
+        run: |
+          set -euo pipefail
+          find plugins/autonomous-dev/installers -maxdepth 1 -type f -name '*.sh' \
+            -exec shellcheck {} \;
+
   typecheck:
     name: Typecheck (${{ matrix.os }}, Node ${{ matrix.node-version }})
     needs: paths-filter
