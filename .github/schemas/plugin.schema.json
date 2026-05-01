@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pwatsonr/autonomous-dev/.github/schemas/plugin.schema.json",
+  "title": "Autonomous-Dev Plugin Manifest",
+  "description": "JSON Schema (Draft 2020-12) for autonomous-dev plugin manifests. Vendored; no runtime $ref resolution required. Used by .github/workflows/ci.yml plugin-validate job (ajv-cli fallback path) and tests/ci/test_plugin_schema.bats.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "description", "author"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Plugin identifier in kebab-case; must start with a lowercase letter."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
+      "description": "Plugin version (SemVer 2.0.0)."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 200,
+      "description": "Human-readable plugin description (10-200 characters)."
+    },
+    "author": {
+      "$ref": "#/$defs/author"
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Map of plugin/package dependencies to semver-range strings."
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri",
+      "description": "Public repository URL for the plugin source."
+    },
+    "entrypoint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Relative path to the plugin entrypoint within the plugin directory."
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "Plugin homepage URL."
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "maxItems": 20,
+      "description": "Discoverability keywords."
+    },
+    "license": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9.\\-+]+$",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "SPDX-style license identifier (e.g., MIT, Apache-2.0, BSD-3-Clause)."
+    }
+  },
+  "$defs": {
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    }
+  }
+}
