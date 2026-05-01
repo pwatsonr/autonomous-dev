@@ -55,6 +55,64 @@ jobs:
               - 'plugins/**/commands/**'
               - 'plugins/**/hooks/**'
 
+  shell:
+    name: shell
+    needs: paths-filter
+    if: needs.paths-filter.outputs.shell == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run shellcheck against bin/*.sh
+        run: |
+          set -euo pipefail
+          find plugins/autonomous-dev/bin -maxdepth 1 -type f -name '*.sh' \
+            -exec shellcheck {} \;
+
+      - name: Run shellcheck against installers/*.sh
+        run: |
+          set -euo pipefail
+          find plugins/autonomous-dev/installers -maxdepth 1 -type f -name '*.sh' \
+            -exec shellcheck {} \;
+
+  markdown:
+    name: markdown
+    needs: paths-filter
+    if: needs.paths-filter.outputs.markdown == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Link check
+        uses: lycheeverse/lychee-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >-
+            --verbose
+            --cache
+            --max-cache-age 1d
+            --config lychee.toml
+            "plugins/**/docs/**/*.md"
+            "README.md"
+          fail: true
+
+  actionlint:
+    name: actionlint
+    needs: paths-filter
+    if: needs.paths-filter.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint workflows
+        uses: rhysd/actionlint@v1
+        with:
+          fail-on-error: true
+
   typecheck:
     name: Typecheck (${{ matrix.os }}, Node ${{ matrix.node-version }})
     needs: paths-filter
