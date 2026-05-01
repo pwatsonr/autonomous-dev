@@ -1,0 +1,74 @@
+# TDD Review Workflow
+#
+# Triggers on PRs that modify plugins/*/docs/tdd/TDD-*.md. Runs the
+# document-review composite (see .github/actions/document-review/README.md)
+# which:
+#   1. Enforces the claude-trust-gate (author-association boundary; PLAN-017-1)
+#   2. Detects fork PRs and posts a neutral status (no secrets exposed)
+#   3. Invokes Claude with --attach (file content never inlined; TDD-017 §5.3)
+#   4. Parses VERDICT: APPROVE|CONCERNS|REQUEST_CHANGES
+#   5. Posts a sticky PR comment marked <!-- tdd-review-comment -->
+#   6. Sets commit status docs/tdd-review
+#
+# Status check fails if VERDICT is REQUEST_CHANGES or any finding is **[CRITICAL]**.
+# CONCERNS does NOT block merge per TDD-017 §5.2.
+#
+# Reviews TDDs for requirements traceability against the parent PRD per
+# TDD-017 §5. Threshold: 85. Set in the document-review composite invocation
+# below.
+# Smoke test PRs: <to be filled by SPEC-017-2-05 task 11>
+
+name: TDD Review
+
+on:
+  pull_request:
+    paths:
+      - "plugins/*/docs/tdd/TDD-*.md"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trust-gate:
+    name: Trust gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      allowed: ${{ steps.gate.outputs.is-trusted }}
+    steps:
+      # actions/checkout@v4.2.2 pinned by SHA
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: gate
+        uses: ./.github/actions/claude-trust-gate
+        with:
+          author-association: ${{ github.event.pull_request.author_association }}
+
+  review:
+    name: TDD Review
+    needs: trust-gate
+    if: needs.trust-gate.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      # actions/checkout@v4.2.2 pinned by SHA
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/document-review
+        with:
+          document-type: tdd
+          agent-name: tdd-reviewer
+          path-glob: "plugins/*/docs/tdd/TDD-*.md"
+          threshold: "85"
+          prompt-template-path: plugins/autonomous-dev/agents/tdd-reviewer.md
