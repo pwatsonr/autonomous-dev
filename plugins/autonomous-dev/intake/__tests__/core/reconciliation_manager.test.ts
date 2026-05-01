@@ -494,3 +494,130 @@ describe('detectDivergence — performance', () => {
     expect(elapsed).toBeLessThan(2000);
   }, 10000);
 });
+
+// ---------------------------------------------------------------------------
+// runFullReconciliation composition (SPEC-012-3-03)
+// ---------------------------------------------------------------------------
+
+describe('runFullReconciliation — composition', () => {
+  let ctx: Ctx;
+
+  beforeEach(() => {
+    ctx = setup();
+  });
+
+  afterEach(() => {
+    teardown(ctx);
+  });
+
+  test('detect-only (no flags): returns reports, no repairs, no cleanup', async () => {
+    // Plant a divergence: SQLite row but no state.json on disk.
+    fs.mkdirSync(path.join(ctx.repo, '.autonomous-dev', 'requests'), {
+      recursive: true,
+    });
+    const req = makeRequest(ctx.repo, 200);
+    ctx.repoApi.insertRequest(req);
+
+    const result = await ctx.manager.runFullReconciliation({
+      repoPath: ctx.repo,
+    });
+    expect(result.reports).toHaveLength(1);
+    expect(result.reports[0].category).toBe('missing_file');
+    expect(result.repairs).toBeUndefined();
+    expect(result.cleanup).toBeUndefined();
+  });
+
+  test('repair=true: every divergence is fed through repair()', async () => {
+    // Two missing_file divergences — both should be repaired (rebuild from sqlite).
+    fs.mkdirSync(path.join(ctx.repo, '.autonomous-dev', 'requests'), {
+      recursive: true,
+    });
+    const r1 = makeRequest(ctx.repo, 201);
+    const r2 = makeRequest(ctx.repo, 202);
+    ctx.repoApi.insertRequest(r1);
+    ctx.repoApi.insertRequest(r2);
+
+    const result = await ctx.manager.runFullReconciliation({
+      repoPath: ctx.repo,
+      repair: true,
+      force: true,
+    });
+    expect(result.reports).toHaveLength(2);
+    expect(result.repairs).toBeDefined();
+    expect(result.repairs).toHaveLength(2);
+    expect(result.repairs!.every((r) => r.action === 'auto_repaired')).toBe(true);
+  });
+
+  test('cleanupTemps=true: cleanup phase runs even with zero divergences', async () => {
+    // No SQLite rows, no state.json files — but a stale temp.
+    const requestId = 'REQ-000300';
+    const reqDir = path.join(ctx.repo, '.autonomous-dev', 'requests', requestId);
+    fs.mkdirSync(reqDir, { recursive: true, mode: 0o700 });
+    // Use a PID that's almost certainly dead.
+    const tempName = 'state.json.tmp.999999.deadbeef';
+    const tempPath = path.join(reqDir, tempName);
+    fs.writeFileSync(tempPath, '{}', 'utf-8');
+    // Make the temp very old so the age window doesn't preserve it.
+    const ancientS = (Date.now() - 24 * 60 * 60 * 1000) / 1000;
+    fs.utimesSync(tempPath, ancientS, ancientS);
+
+    const result = await ctx.manager.runFullReconciliation({
+      repoPath: ctx.repo,
+      cleanupTemps: true,
+      force: true,
+    });
+    expect(result.reports).toEqual([]);
+    expect(result.repairs).toBeUndefined();
+    expect(result.cleanup).toBeDefined();
+    expect(result.cleanup!.scanned).toBe(1);
+    expect(result.cleanup!.removed).toContain(tempPath);
+  });
+
+  test('repair + cleanupTemps: repair runs FIRST, cleanup runs AFTER', async () => {
+    // Order verified via the manager's internal logger calls would require
+    // injecting a capturing logger; instead, check that both phases populate
+    // the result envelope when both flags are set.
+    fs.mkdirSync(path.join(ctx.repo, '.autonomous-dev', 'requests'), {
+      recursive: true,
+    });
+    const req = makeRequest(ctx.repo, 400);
+    ctx.repoApi.insertRequest(req);
+
+    const result = await ctx.manager.runFullReconciliation({
+      repoPath: ctx.repo,
+      repair: true,
+      cleanupTemps: true,
+      force: true,
+    });
+    expect(result.reports).toHaveLength(1);
+    expect(result.repairs).toHaveLength(1);
+    expect(result.cleanup).toBeDefined();
+  });
+
+  test('dryRun forwarded through to repair: action=skipped', async () => {
+    fs.mkdirSync(path.join(ctx.repo, '.autonomous-dev', 'requests'), {
+      recursive: true,
+    });
+    const req = makeRequest(ctx.repo, 500);
+    ctx.repoApi.insertRequest(req);
+
+    const result = await ctx.manager.runFullReconciliation({
+      repoPath: ctx.repo,
+      repair: true,
+      dryRun: true,
+      force: true,
+    });
+    expect(result.repairs).toHaveLength(1);
+    expect(result.repairs![0].action).toBe('skipped');
+  });
+
+  test('returns empty reports + no repairs/cleanup when repo has no .autonomous-dev/', async () => {
+    // No requests dir planted — detect returns [] short-circuit.
+    const result = await ctx.manager.runFullReconciliation({
+      repoPath: ctx.repo,
+    });
+    expect(result.reports).toEqual([]);
+    expect(result.repairs).toBeUndefined();
+    expect(result.cleanup).toBeUndefined();
+  });
+});
