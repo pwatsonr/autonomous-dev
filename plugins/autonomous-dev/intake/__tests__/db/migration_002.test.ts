@@ -30,6 +30,10 @@ import {
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../db/migrations');
 const MIGRATION_001 = '001_initial.sql';
 const MIGRATION_002 = '002_add_source_metadata.sql';
+// Forward-compat: PLAN-012-1 added migration 003 for the daemon ack column.
+// The migration_002 invariants below still hold; we just acknowledge that
+// the runner now applies three migrations instead of two on a fresh DB.
+const MIGRATION_003 = '003_add_acknowledgment.sql';
 
 const VALID_SOURCES = [
   'cli',
@@ -159,9 +163,17 @@ describe('Migration 002: schema additions', () => {
   test('applies cleanly to a fresh DB (001 + 002 in order)', () => {
     const result: MigrationResult = runMigrations(db, MIGRATIONS_DIR);
 
-    expect(result.applied).toEqual([MIGRATION_001, MIGRATION_002]);
+    // Migration runner applies every pending migration on a fresh DB; that's
+    // 001 + 002 + 003 since PLAN-012-1 landed (003 = daemon ack column).
+    // The 002-specific invariants are: 001 and 002 are present in order, and
+    // the v2 columns exist on `requests`.
+    expect(result.applied).toEqual([
+      MIGRATION_001,
+      MIGRATION_002,
+      MIGRATION_003,
+    ]);
     expect(result.skipped).toEqual([]);
-    expect(result.schemaVersion).toBe(2);
+    expect(result.schemaVersion).toBe(3);
 
     const cols = columnNames(db, 'requests');
     expect(cols).toContain('source');
@@ -183,7 +195,13 @@ describe('Migration 002: schema additions', () => {
     const rows = db
       .prepare('SELECT name FROM _migrations ORDER BY name')
       .all() as Array<{ name: string }>;
-    expect(rows.map((r) => r.name)).toEqual([MIGRATION_001, MIGRATION_002]);
+    // 003 is also recorded once PLAN-012-1 lands; the 002 invariant is just
+    // that 001 and 002 are present in name-sorted order.
+    expect(rows.map((r) => r.name)).toEqual([
+      MIGRATION_001,
+      MIGRATION_002,
+      MIGRATION_003,
+    ]);
   });
 });
 
@@ -203,15 +221,20 @@ describe('Migration 002: idempotency', () => {
     const result = runMigrations(db, MIGRATIONS_DIR); // second run
 
     expect(result.applied).toEqual([]);
-    expect(result.skipped).toEqual([MIGRATION_001, MIGRATION_002]);
-    expect(result.schemaVersion).toBe(2);
+    // After PLAN-012-1, the skipped list also includes 003.
+    expect(result.skipped).toEqual([
+      MIGRATION_001,
+      MIGRATION_002,
+      MIGRATION_003,
+    ]);
+    expect(result.schemaVersion).toBe(3);
   });
 
-  test('three consecutive runs leave schema_version at 2', () => {
+  test('three consecutive runs leave schema_version stable', () => {
     runMigrations(db, MIGRATIONS_DIR);
     runMigrations(db, MIGRATIONS_DIR);
     const third = runMigrations(db, MIGRATIONS_DIR);
-    expect(third.schemaVersion).toBe(2);
+    expect(third.schemaVersion).toBe(3);
     expect(third.applied).toEqual([]);
   });
 });
@@ -258,9 +281,10 @@ describe('Migration 002: v1 row backfill', () => {
     insertV1Row(db, 'REQ-V1-002');
     insertV1Row(db, 'REQ-V1-003');
 
-    // Apply 002 via the runner — the only pending migration.
+    // Apply 002 (and 003) via the runner — the pending migrations on this
+    // hand-rolled v1 DB.  The 002-specific invariant is the backfill below.
     const result = runMigrations(db, MIGRATIONS_DIR);
-    expect(result.applied).toEqual([MIGRATION_002]);
+    expect(result.applied).toEqual([MIGRATION_002, MIGRATION_003]);
     expect(result.skipped).toEqual([MIGRATION_001]);
 
     const rows = db
