@@ -54,3 +54,40 @@ jobs:
               - 'plugins/**/agents/**'
               - 'plugins/**/commands/**'
               - 'plugins/**/hooks/**'
+
+  typecheck:
+    name: Typecheck (${{ matrix.os }}, Node ${{ matrix.node-version }})
+    needs: paths-filter
+    if: needs.paths-filter.outputs.typescript == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [18, 20]
+    defaults:
+      run:
+        working-directory: plugins/autonomous-dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'plugins/autonomous-dev/package-lock.json'
+
+      - name: Restore tsbuildinfo cache
+        uses: actions/cache@v4
+        with:
+          path: plugins/autonomous-dev/tsconfig.tsbuildinfo
+          key: tsbuildinfo-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('plugins/autonomous-dev/src/**/*.ts', 'plugins/autonomous-dev/tsconfig*.json') }}
+          restore-keys: |
+            tsbuildinfo-${{ runner.os }}-node${{ matrix.node-version }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit --incremental
