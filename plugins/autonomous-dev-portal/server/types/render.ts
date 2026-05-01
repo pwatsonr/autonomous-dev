@@ -97,6 +97,12 @@ export interface AuditRow {
     result: "ok" | "fail";
 }
 
+// SPEC-015-4-02 — view props for the live audit page. Re-exported as
+// distinct names so the view layer never imports from `services/`.
+export type AuditPageResultProp = import("./audit-types").AuditPageResult;
+export type AuditFiltersProp = import("./audit-types").AuditFilters;
+
+
 // ---- RenderProps union -----------------------------------------------------
 
 export interface RenderProps {
@@ -107,7 +113,13 @@ export interface RenderProps {
     costs: { series: CostSeries };
     logs: { lines: LogLine[] };
     ops: { health: OpsHealth };
-    audit: { rows: AuditRow[] };
+    /** SPEC-015-4-02 — `rows` is the legacy stub shape, `page`/`filters`
+     *  is the live HMAC-chained log; AuditView prefers `page` when set. */
+    audit: {
+        rows: AuditRow[];
+        page?: AuditPageResultProp;
+        filters?: AuditFiltersProp;
+    };
     "404": { path: string };
     "500": { message: string };
 }
