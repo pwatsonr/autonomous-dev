@@ -22,8 +22,8 @@
     "description": {
       "type": "string",
       "minLength": 10,
-      "maxLength": 200,
-      "description": "Human-readable plugin description (10-200 characters)."
+      "maxLength": 280,
+      "description": "Human-readable plugin description (10-280 characters). NOTE: SPEC-016-3-01 specified maxLength: 200, but the existing in-repo manifests' descriptions are 241 and 258 characters. The spec also requires those manifests validate unchanged (out-of-scope to edit). Raised to 280 to satisfy both requirements; future spec revision can re-tighten this if the manifests are shortened."
     },
     "author": {
       "$ref": "#/$defs/author"

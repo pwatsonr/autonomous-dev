@@ -273,11 +273,14 @@ jobs:
             echo "::error::No plugin manifests found at plugins/*/.claude-plugin/plugin.json"
             exit 1
           fi
-          npx --yes ajv-cli@8 validate \
-            --spec=draft2020 \
-            --strict=true \
-            -s .github/schemas/plugin.schema.json \
-            -d "plugins/*/.claude-plugin/plugin.json"
+          # Deviation from SPEC-016-3-03: ajv-cli@8 is not published to npm
+          # (latest is 5.0.0) and ajv-cli@5 supports neither --spec=draft2020
+          # nor automatic ajv-formats registration. We invoke the equivalent
+          # logic via .github/schemas/validate-plugin.mjs which wraps Ajv 8 +
+          # the 2020-12 vocabulary + ajv-formats. Same schema, same Ajv core,
+          # same strict-mode semantics — pinned majors via npm install below.
+          npm install --no-save --no-audit --no-fund ajv@8 ajv-formats@2
+          node .github/schemas/validate-plugin.mjs "${manifests[@]}"
 
       - name: Verify plugin version monotonicity (release/tag refs only)
         if: startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/tags/v')

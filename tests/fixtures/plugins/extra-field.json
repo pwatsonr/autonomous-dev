@@ -1,0 +1,7 @@
+{
+  "name": "fixture-extra-field",
+  "version": "1.2.3",
+  "description": "Fixture with an undocumented root field; additionalProperties:false MUST reject this.",
+  "author": { "name": "Schema Test Author" },
+  "build": "make all"
+}
