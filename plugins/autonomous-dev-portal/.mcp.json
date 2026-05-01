@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "autonomous-dev-portal": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/server/server.ts"],
+      "env": {
+        "CLAUDE_PLUGIN_DATA": "${CLAUDE_PLUGIN_DATA}",
+        "CLAUDE_PLUGIN_ROOT": "${CLAUDE_PLUGIN_ROOT}"
+      },
+      "restart": {
+        "onCrash": true,
+        "maxRetries": 3,
+        "backoffSeconds": 2
+      },
+      "shutdown": {
+        "signal": "SIGTERM",
+        "timeoutSeconds": 10,
+        "killAfterTimeout": true
+      }
+    }
+  }
+}
