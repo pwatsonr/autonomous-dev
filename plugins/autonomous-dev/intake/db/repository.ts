@@ -971,6 +971,41 @@ export class Repository {
   }
 
   // =========================================================================
+  // Daemon ack support (SPEC-012-1-03 — requires migration 003)
+  // =========================================================================
+
+  /**
+   * List requests that have not yet been acknowledged by the daemon.
+   * Ordered FIFO by `created_at ASC`; tiebreak by priority desc
+   * (high > normal > low). Used by `pollNewRequests` in
+   * `intake/daemon/state_reader.ts` — see SPEC-012-1-03 §"Poll new requests".
+   *
+   * Schema dep: requires `acknowledged_at` column from migration 003.
+   * On a pre-003 DB this method returns an empty list (the column
+   * doesn't exist; query throws — caller's responsibility to ensure
+   * migrations have run before consulting daemon-side state).
+   */
+  listUnacknowledgedForDaemon(): Array<{
+    request_id: string;
+    created_at: string;
+    priority: 'high' | 'normal' | 'low';
+  }> {
+    return this.db
+      .prepare(
+        `SELECT request_id, created_at, priority
+           FROM requests
+          WHERE acknowledged_at IS NULL
+          ORDER BY created_at ASC,
+                   ${PRIORITY_CASE} ASC`,
+      )
+      .all() as Array<{
+      request_id: string;
+      created_at: string;
+      priority: 'high' | 'normal' | 'low';
+    }>;
+  }
+
+  // =========================================================================
   // Request ID generation (Task 4)
   // =========================================================================
 
