@@ -1,0 +1,43 @@
+name: claude-assistant
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: claude-assistant-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  trust-check:
+    name: Evaluate author trust
+    runs-on: ubuntu-latest
+    outputs:
+      is-trusted: ${{ steps.gate.outputs.is-trusted }}
+    steps:
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Evaluate author_association
+        id: gate
+        uses: ./.github/actions/claude-trust-gate
+        with:
+          author-association: ${{ github.event.comment.author_association }}
+
+  respond:
+    name: Respond to @claude mention
+    needs: trust-check
+    runs-on: ubuntu-latest
+    if: >-
+      contains(github.event.comment.body, '@claude') &&
+      needs.trust-check.outputs.is-trusted == 'true'
+    steps:
+      - name: Placeholder (audit log + Claude invocation added in SPEC-017-1-03)
+        run: |
+          echo "Trust gate passed; downstream specs add audit + Claude steps."
