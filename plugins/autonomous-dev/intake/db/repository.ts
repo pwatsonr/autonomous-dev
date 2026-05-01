@@ -317,6 +317,46 @@ export class Repository {
     return mapRequestRow(row);
   }
 
+  /**
+   * Return every request whose `target_repo` matches `repoPath`.
+   *
+   * Used by reconciliation (PLAN-012-3) to enumerate the SQLite side of the
+   * SQLite ↔ filesystem divergence scan. Ordered by `created_at ASC` so
+   * the divergence report is deterministic across runs.
+   */
+  getAllRequestsForRepo(repoPath: string): RequestEntity[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM requests
+         WHERE target_repo = ?
+         ORDER BY created_at ASC`,
+      )
+      .all(repoPath) as RequestRow[];
+    return mapRequestRows(rows);
+  }
+
+  /**
+   * Update a single field on a request inside an immediate transaction.
+   *
+   * Used by reconciliation's `content_mismatch` repair (PLAN-012-3) to apply
+   * field-by-field newer-wins merges. Bumps `updated_at` to `Date.now()`
+   * inside the same transaction so subsequent mtime comparisons reflect the
+   * update.
+   *
+   * The field name is validated against the same allowlist used by
+   * {@link Repository.updateRequest}; unknown fields throw to surface
+   * programmer error rather than silently no-op.
+   */
+  updateRequestField(
+    requestId: string,
+    field: string,
+    value: unknown,
+  ): void {
+    this.updateRequest(requestId, {
+      [field]: value,
+    } as Partial<RequestEntity>);
+  }
+
   /** Update specific fields on a request. Automatically bumps `updated_at`. */
   updateRequest(requestId: string, updates: Partial<RequestEntity>): void {
     const allowedColumns = new Set<string>([
