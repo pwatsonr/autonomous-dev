@@ -13,12 +13,14 @@ import { Hono } from "hono";
 
 import { loadPortalConfig } from "./lib/config";
 import { resolveBindHostname, validateBindingConfig } from "./lib/binding";
+import { notFound } from "./lib/response-utils";
 import {
     setupGracefulShutdown,
     setupShutdownPreBoot,
 } from "./lib/shutdown";
 import { validateStartupConditions } from "./lib/startup-checks";
 import { applyMiddlewareChain } from "./middleware";
+import { registerRoutes } from "./routes";
 
 export interface ServerState {
     server?: Server<unknown>;
@@ -63,13 +65,11 @@ export async function startServer(): Promise<Server<unknown>> {
     const app = new Hono();
     applyMiddlewareChain(app, config);
 
-    app.get("/health", (c) =>
-        c.json({
-            status: "healthy",
-            uptime_ms: Date.now() - state.startTime,
-            auth_mode: config.auth_mode,
-        }),
-    );
+    // SPEC-013-3-01: register all nine portal routes (incl. JSON /health).
+    // The legacy inline /health handler is removed in favour of the JSON
+    // shape documented in SPEC-013-3-01 §`/health` Handler.
+    registerRoutes(app);
+    app.notFound(notFound);
 
     const server = serve({
         port: config.port,

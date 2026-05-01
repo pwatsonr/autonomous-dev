@@ -27,6 +27,7 @@ const ENV_KEYS = [
     "PORTAL_LOG_LEVEL",
     "PORTAL_BIND_HOST",
     "PORTAL_USER_CONFIG",
+    "AUTONOMOUS_DEV_STATE_DIR",
 ] as const;
 
 let savedEnv: Record<string, string | undefined> = {};
@@ -97,27 +98,49 @@ describe("startServer smoke", () => {
         expect(server.hostname).toBe("127.0.0.1");
     });
 
-    test("GET /health returns 200 with the documented JSON shape", async () => {
+    test("GET /health returns the documented JSON shape (SPEC-013-3-01)", async () => {
         const port = randomPort();
         process.env["PORTAL_PORT"] = String(port);
-        const server = await startServer();
-        activeServer = server;
-        const res = await fetch(`http://127.0.0.1:${String(port)}/health`);
-        expect(res.status).toBe(200);
-        const body = (await res.json()) as {
-            status: string;
-            uptime_ms: number;
-            auth_mode: string;
-        };
-        expect(body.status).toBe("healthy");
-        expect(typeof body.uptime_ms).toBe("number");
-        expect(body.uptime_ms).toBeGreaterThanOrEqual(0);
-        expect(body.auth_mode).toBe("localhost");
+        // SPEC-013-3-01 changed the /health body shape from
+        // {status:"healthy", uptime_ms, auth_mode} to
+        // {status:"ok"|"degraded", daemon, components}. Status code is 200
+        // when the daemon heartbeat is fresh and 503 otherwise. The test
+        // env never writes a heartbeat, so we expect 503/degraded.
+        // Override the state dir to a known-empty tmpdir so we don't read
+        // the developer's real ~/.autonomous-dev/heartbeat.json.
+        const previousStateDir = process.env["AUTONOMOUS_DEV_STATE_DIR"];
+        process.env["AUTONOMOUS_DEV_STATE_DIR"] = tmpDir;
+        try {
+            const server = await startServer();
+            activeServer = server;
+            const res = await fetch(`http://127.0.0.1:${String(port)}/health`);
+            expect([200, 503]).toContain(res.status);
+            const body = (await res.json()) as {
+                status: "ok" | "degraded";
+                daemon: { status: string };
+                components: Record<string, string>;
+            };
+            // Without a heartbeat file the daemon is "dead" → degraded/503.
+            expect(body.status).toBe("degraded");
+            expect(res.status).toBe(503);
+            expect(body.daemon.status).toBe("dead");
+            expect(body.components.http).toBe("ok");
+            expect(body.components.templates).toBe("ok");
+        } finally {
+            if (previousStateDir === undefined) {
+                delete process.env["AUTONOMOUS_DEV_STATE_DIR"];
+            } else {
+                process.env["AUTONOMOUS_DEV_STATE_DIR"] = previousStateDir;
+            }
+        }
     });
 
     test("response carries x-request-id, Server-Timing, and CSP headers", async () => {
         const port = randomPort();
         process.env["PORTAL_PORT"] = String(port);
+        // Isolate /health from the developer's heartbeat file (see test
+        // above for rationale).
+        process.env["AUTONOMOUS_DEV_STATE_DIR"] = tmpDir;
         const server = await startServer();
         activeServer = server;
         const res = await fetch(`http://127.0.0.1:${String(port)}/health`);
