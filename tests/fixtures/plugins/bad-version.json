@@ -1,0 +1,6 @@
+{
+  "name": "fixture-bad-version",
+  "version": "1.0",
+  "description": "Fixture with a non-semver version; the version pattern MUST reject this.",
+  "author": { "name": "Schema Test Author" }
+}

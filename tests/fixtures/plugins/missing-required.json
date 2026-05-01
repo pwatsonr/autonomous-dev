@@ -1,0 +1,5 @@
+{
+  "name": "fixture-missing-required",
+  "description": "Fixture missing the required version field; ajv-cli MUST exit non-zero.",
+  "author": { "name": "Schema Test Author" }
+}

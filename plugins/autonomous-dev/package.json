@@ -8,7 +8,8 @@
     "test": "jest --passWithNoTests",
     "test:slack": "jest tests/adapters/slack-setup.test.ts",
     "test:cli": "jest intake/adapters/cli_adapter.test.ts",
-    "test:bats": "bats tests/bats/"
+    "test:bats": "bats tests/bats/",
+    "test:ci-schema": "bats ../../tests/ci/test_plugin_schema.bats"
   },
   "dependencies": {
     "@slack/socket-mode": "^2.0.0",
