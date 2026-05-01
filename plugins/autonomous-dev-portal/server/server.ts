@@ -20,6 +20,8 @@ import {
     setupShutdownPreBoot,
 } from "./lib/shutdown";
 import { validateStartupConditions } from "./lib/startup-checks";
+import { validateAuthConfig } from "./lib/validation";
+import { enforceBindingWithLogging } from "./auth/security/binding-enforcer";
 import { applyMiddlewareChain } from "./middleware";
 import { registerRoutes } from "./routes";
 
@@ -60,6 +62,12 @@ export async function startServer(): Promise<Server<unknown>> {
     });
 
     await validateStartupConditions(config);
+    // SPEC-014-1-01 §Task 1.3 — auth-mode safety gate (loopback / OAuth /
+    // TLS) runs before any network binding.
+    validateAuthConfig(config);
+    // SPEC-014-1-02 §Task 2.4 — defense-in-depth binding enforcer.
+    // Throws BEFORE the listening socket is opened.
+    enforceBindingWithLogging(config);
     await validateBindingConfig(config);
     const hostname = resolveBindHostname(config);
 

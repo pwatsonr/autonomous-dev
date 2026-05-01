@@ -84,7 +84,7 @@ export async function serverError(err: Error, c: Context): Promise<Response> {
     }
 
     const page = await jsxToString(
-        <BaseLayout activePath="/">
+        <BaseLayout activePath="/" cspNonce={c.get("cspNonce") ?? ""}>
             <ErrorPage {...ctx} />
         </BaseLayout>,
     );

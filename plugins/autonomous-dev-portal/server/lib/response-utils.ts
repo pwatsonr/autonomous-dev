@@ -39,6 +39,9 @@ export function isHtmxRequest(c: Context): boolean {
  * Renders `view` with `props` and returns a 200 HTML response. Picks
  * full-page vs fragment based on `isHtmxRequest`. Caching headers are
  * intentionally NOT set here; PLAN-014 owns the cache strategy.
+ *
+ * SPEC-014-2-04 — the per-request CSP nonce is read off the context and
+ * threaded into the layout so every `<script>` tag carries it.
  */
 export async function renderPage<V extends ViewName>(
     c: Context,
@@ -47,7 +50,7 @@ export async function renderPage<V extends ViewName>(
 ): Promise<Response> {
     const html = isHtmxRequest(c)
         ? await renderFragment(view, props)
-        : await renderFullPage(view, props);
+        : await renderFullPage(view, props, undefined, c.get("cspNonce") ?? "");
     return c.html(html, 200);
 }
 
@@ -61,6 +64,6 @@ export async function notFound(c: Context): Promise<Response> {
     const props: RenderProps["404"] = { path: c.req.path };
     const html = isHtmxRequest(c)
         ? await renderFragment("404", props)
-        : await renderFullPage("404", props);
+        : await renderFullPage("404", props, undefined, c.get("cspNonce") ?? "");
     return c.html(html, 404);
 }

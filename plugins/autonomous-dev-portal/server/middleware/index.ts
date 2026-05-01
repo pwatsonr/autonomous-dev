@@ -5,50 +5,40 @@
 //   1. request-id        (correlation; sets c.var.requestId)
 //   2. structured logger (access-log emission; stores startTimeMs on context)
 //   3. timing            (Server-Timing header)
-//   4. secure-headers    (CSP, Referrer-Policy, X-Frame-Options, etc.)
-//   5. cors              (origin allowlist driven by auth_mode)
-//   6. error boundary    (last; wraps every handler in try/catch)
+//   4. security-headers  (HSTS, X-Frame-Options, Referrer-Policy, etc.)
+//   5. csp-middleware    (per-request nonce + Content-Security-Policy)
+//   6. cors              (origin allowlist driven by auth_mode)
+//   7. error boundary    (last; wraps every handler in try/catch)
 //
 // SPEC-013-2-04 prepends a connection-counter middleware as position 0.
 // SPEC-013-2-03 inserts an OAuth extension attach call at the EXTENSION
 // POINT comment. TDD-014 plans insert auth/CSRF middleware at the same
 // extension point. Do not move the comment.
+//
+// SPEC-014-2-04 swaps Hono's `secureHeaders` for a pair of bespoke
+// middleware (`securityHeaders` + `cspMiddleware`) so we can generate a
+// per-request CSP nonce that templates can read via `c.get('cspNonce')`.
 
 import { cors } from "hono/cors";
-import { secureHeaders } from "hono/secure-headers";
 import type { Hono } from "hono";
 
 import type { PortalConfig } from "../lib/config";
 import { connectionCounter } from "../lib/connection-tracker";
 import { getOAuthExtension } from "../lib/oauth-extension";
+import { cspMiddleware } from "../security/csp-middleware";
+import { defaultCSPConfig, type CSPEnvironment } from "../security/csp-config";
+import { securityHeaders } from "../security/security-headers";
 import { compression } from "./compression";
 import { errorHandler } from "./error-handler";
 import { requestIdMiddleware } from "./request-id";
 import { structuredLogger } from "./logging";
 import { timingMiddleware } from "./timing";
 
-// CSP as Hono's structured options. Resulting header is the documented
-// `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
-// img-src 'self' data:; font-src 'self'; object-src 'none';
-// frame-ancestors 'none'`.
-function buildCspOptions(): {
-    defaultSrc: string[];
-    scriptSrc: string[];
-    styleSrc: string[];
-    imgSrc: string[];
-    fontSrc: string[];
-    objectSrc: string[];
-    frameAncestors: string[];
-} {
-    return {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:"],
-        fontSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-    };
+function resolveCspEnvironment(env: NodeJS.ProcessEnv = process.env): CSPEnvironment {
+    const v = env["NODE_ENV"];
+    if (v === "production") return "production";
+    if (v === "test") return "test";
+    return "development";
 }
 
 export function applyMiddlewareChain(app: Hono, config: PortalConfig): void {
@@ -57,13 +47,11 @@ export function applyMiddlewareChain(app: Hono, config: PortalConfig): void {
     app.use("*", requestIdMiddleware()); // 1. correlation
     app.use("*", structuredLogger(config.logging.level)); // 2. access logs
     app.use("*", timingMiddleware()); // 3. Server-Timing
+    app.use("*", securityHeaders()); // 4. HSTS / X-Frame-Options / etc. (SPEC-014-2-04)
     app.use(
         "*",
-        secureHeaders({
-            contentSecurityPolicy: buildCspOptions(),
-            referrerPolicy: "strict-origin-when-cross-origin",
-        }),
-    ); // 4. security headers
+        cspMiddleware(defaultCSPConfig(resolveCspEnvironment())),
+    ); // 5. CSP w/ per-request nonce (SPEC-014-2-04)
     app.use(
         "*",
         cors({
@@ -83,7 +71,7 @@ export function applyMiddlewareChain(app: Hono, config: PortalConfig): void {
                 "X-CSRF-Token",
             ],
         }),
-    ); // 5. CORS
+    ); // 6. CORS
 
     // EXTENSION POINT: TDD-014 auth + CSRF middleware are inserted here.
     // SPEC-013-2-03 adds the OAuth extension attach hook here.

@@ -123,15 +123,22 @@ function activePathFor(view: ViewName): string {
  * @param props strictly-typed props for that view
  * @param activeOverride optional path override for `<Navigation>` (used
  *   by `notFound` so the nav highlights the page the user attempted)
+ * @param cspNonce SPEC-014-2-04 — per-request CSP nonce; threaded into
+ *   every `<script>` tag in the layout. Defaults to empty string for
+ *   callers without a request context (tests, error pre-render).
  */
 export async function renderFullPage<V extends ViewName>(
     view: V,
     props: RenderProps[V],
     activeOverride?: string,
+    cspNonce: string = "",
 ): Promise<string> {
     const body = renderViewBody(view, props);
     const layout = (
-        <BaseLayout activePath={activeOverride ?? activePathFor(view)}>
+        <BaseLayout
+            activePath={activeOverride ?? activePathFor(view)}
+            cspNonce={cspNonce}
+        >
             {body}
         </BaseLayout>
     );
@@ -170,7 +177,12 @@ export async function renderViewToContext<V extends ViewName>(
 ): Promise<Response> {
     const html = isHtmx
         ? await renderFragment(view, props)
-        : await renderFullPage(view, props);
+        : await renderFullPage(
+              view,
+              props,
+              undefined,
+              c.get("cspNonce") ?? "",
+          );
     // Cast to ContentfulStatusCode-compatible literal union.
     return c.html(
         html,
