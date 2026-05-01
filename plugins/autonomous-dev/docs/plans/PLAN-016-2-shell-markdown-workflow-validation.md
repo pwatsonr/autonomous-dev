@@ -105,3 +105,36 @@ Deliver three lightweight validation jobs in `.github/workflows/ci.yml` that enf
 - [ ] Each job fails as expected when a deliberate error is introduced (shellcheck warning, broken link, workflow typo)
 - [ ] No regressions in the `paths-filter` job from PLAN-016-1
 - [ ] All three jobs complete in under 2 minutes each on a typical PR
+
+## Verification Log
+
+### SPEC-016-2-04 Integration Smoke Test (executed YYYY-MM-DD)
+
+> TODO: This scaffold was created during the implementation commit before the
+> first PR run. The six run URLs and observed outcomes below MUST be filled
+> in by the operator after the first PR for branch `feat/impl-016-2-ci-shell-md-workflow`
+> dispatches CI. Until then, treat every "Observed" cell as pending and the
+> closing assertion as conditional. See SPEC-016-2-04 § Smoke Test Procedure
+> for the full operator workflow.
+
+**Positive runs (gating + green):**
+
+| # | Trigger | Run URL | `paths-filter` outputs | Expected | Observed |
+|---|---------|---------|------------------------|----------|----------|
+| P1 | Shell-only commit on bin/supervisor-loop.sh | TODO: https://github.com/<org>/<repo>/actions/runs/<id> | shell=true, others=false | shell green, others skipped | TODO |
+| P2 | Markdown-only commit on docs/README.md | TODO: https://github.com/<org>/<repo>/actions/runs/<id> | markdown=true, others=false | markdown green, others skipped | TODO |
+| P3 | Workflow-only commit on ci.yml | TODO: https://github.com/<org>/<repo>/actions/runs/<id> | workflows=true, others=false | actionlint green, others skipped | TODO |
+
+**Negative runs (gating + red):**
+
+| # | Trigger | Run URL | Expected failure | Observed failure |
+|---|---------|---------|-------------------|-------------------|
+| N1 | Shell file with SC2154 | TODO: https://github.com/<org>/<repo>/actions/runs/<id> | shell red on SC2154 | TODO |
+| N2 | Markdown file with broken link | TODO: https://github.com/<org>/<repo>/actions/runs/<id> | markdown red on URL invalid | TODO |
+| N3 | Workflow file with `step:` typo | TODO: https://github.com/<org>/<repo>/actions/runs/<id> | actionlint red on syntax | TODO |
+
+> TODO: Once all six rows are populated, replace this paragraph with the
+> closing assertion: "All six runs behaved as expected. Smoke-test branches
+> and PRs cleaned up. No regressions observed in the `paths-filter` job
+> from PLAN-016-1."
+
