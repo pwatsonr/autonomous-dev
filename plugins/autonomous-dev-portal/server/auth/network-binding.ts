@@ -54,6 +54,28 @@ export const FORBIDDEN_HOSTS_FOR_LOCALHOST_MODE: readonly string[] = [
  * weakens the validator, this enforcer still blocks the bind.
  */
 export function enforceBinding(config: PortalConfig): void {
+    if (config.auth_mode === "tailscale") {
+        // SPEC-014-1-03: Tailscale mode never binds to a wildcard. The
+        // operator must either use `auto` (which the bootstrap resolves
+        // via TailscaleClient.getInterfaceIp) or an explicit Tailscale
+        // peer IP that matches the local interface. Anything else risks
+        // binding to a non-Tailscale interface.
+        const bindHost = config.bind_host;
+        if (
+            bindHost !== null &&
+            bindHost !== undefined &&
+            bindHost !== "auto" &&
+            FORBIDDEN_HOSTS_FOR_LOCALHOST_MODE.includes(bindHost)
+        ) {
+            throw new SecurityError(
+                "TAILSCALE_FORBIDDEN_BIND",
+                `auth_mode='tailscale' refuses to bind to '${bindHost}'. ` +
+                    `Use bind_host='auto' or an explicit Tailscale peer IP ` +
+                    `(e.g. 100.64.x.x).`,
+            );
+        }
+        return;
+    }
     if (config.auth_mode !== "localhost") return;
 
     const bindHost = config.bind_host;
@@ -85,4 +107,49 @@ export function enforceBinding(config: PortalConfig): void {
                 `exposure; switch to auth_mode='tailscale' or 'oauth-pkce'.`,
         );
     }
+}
+
+/**
+ * SPEC-014-1-03 §"Bind resolution".
+ *
+ * Resolves the actual bind hostname for tailscale mode by consulting the
+ * TailscaleClient. Used at startup (in the bootstrap path) AFTER the
+ * synchronous {@link enforceBinding} gate has rejected obviously-wrong
+ * configs.
+ *
+ * - `bind_host: 'auto'` → returns the client's interface IP (typically a
+ *   100.x CGNAT address).
+ * - explicit `bind_host` → must equal the client's interface IP, otherwise
+ *   throws TAILSCALE_BIND_MISMATCH (operator typo'd a non-local IP).
+ * - missing client → throws TAILSCALE_BINDING_NO_CLIENT (the boot path
+ *   should always pass a client when auth_mode='tailscale').
+ */
+export async function enforceTailscaleBinding(
+    config: PortalConfig,
+    client: { getInterfaceIp(): Promise<string> } | null,
+): Promise<string> {
+    if (client === null) {
+        throw new SecurityError(
+            "TAILSCALE_BINDING_NO_CLIENT",
+            `auth_mode='tailscale' requires a TailscaleClient at startup ` +
+                `to resolve the local interface IP.`,
+        );
+    }
+
+    const interfaceIp = await client.getInterfaceIp();
+    const bindHost = config.bind_host;
+
+    if (bindHost === null || bindHost === undefined || bindHost === "auto") {
+        return interfaceIp;
+    }
+    if (bindHost === interfaceIp) {
+        return interfaceIp;
+    }
+
+    throw new SecurityError(
+        "TAILSCALE_BIND_MISMATCH",
+        `auth_mode='tailscale' bind_host='${bindHost}' does not match the ` +
+            `Tailscale interface IP '${interfaceIp}'. Use bind_host='auto' ` +
+            `or set bind_host to the local Tailscale peer IP.`,
+    );
 }
