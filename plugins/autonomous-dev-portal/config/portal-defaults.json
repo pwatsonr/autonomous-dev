@@ -2,6 +2,7 @@
   "port": 19280,
   "auth_mode": "localhost",
   "bind_host": null,
+  "trusted_reverse_proxy": false,
   "allowed_origins": [],
   "logging": { "level": "info" },
   "paths": {

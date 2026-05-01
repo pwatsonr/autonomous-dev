@@ -13,8 +13,46 @@ import { sanitizeErrorMessage } from "./sanitize";
 import { validateConfig } from "./validation";
 import type { OAuthConfig } from "./oauth-extension";
 
-export type AuthMode = "localhost" | "tailscale" | "oauth";
+// SPEC-014-1-01 §Task 1.2 — `oauth-pkce` is the canonical literal going
+// forward. The legacy `oauth` value is retained so config files written
+// against PLAN-013-2 keep loading; the validator and providers normalize
+// both to the same code path.
+export type AuthMode = "localhost" | "tailscale" | "oauth-pkce" | "oauth";
 export type LogLevel = "debug" | "info" | "warn" | "error";
+
+/**
+ * SPEC-014-1-01 §Task 1.2 / SPEC-014-1-03 — Tailscale-mode tuning. Both
+ * fields are optional; defaults match the spec (`require_whois_for_writes
+ * = true`, `cli_path = 'tailscale'`).
+ */
+export interface TailscaleAuthConfig {
+    require_whois_for_writes?: boolean;
+    cli_path?: string;
+}
+
+/**
+ * SPEC-014-1-01 §Task 1.2 / SPEC-014-1-04 — OAuth+PKCE configuration.
+ * Secrets are NEVER inlined: `*_env` fields name an environment variable
+ * whose value is the actual secret. Validators check `process.env[name]`
+ * is set before startServer() opens the listening socket.
+ */
+export interface OAuthAuthConfig {
+    provider: "github" | "google";
+    client_id: string;
+    /** Env var name (NOT the secret itself). */
+    client_secret_env: string;
+    /** Must be HTTPS unless bind_host === '127.0.0.1'. */
+    redirect_url: string;
+    /** Env var holding the HMAC key for signed session cookies. */
+    cookie_secret_env: string;
+    /** File-backed session directory; defaults to ${CLAUDE_PLUGIN_DATA}/sessions. */
+    session_dir?: string;
+}
+
+export interface TlsConfig {
+    cert_path: string;
+    key_path: string;
+}
 
 export interface PortalConfig {
     port: number;
@@ -32,13 +70,27 @@ export interface PortalConfig {
         grace_period_ms: number;
         force_timeout_ms: number;
     };
+    /**
+     * Legacy OAuth extension config (PLAN-013-2). Keeping the field name
+     * compatible with existing user configs; SPEC-014-1-04 OAuth provider
+     * uses {@link oauth_auth} for its richer schema.
+     */
     oauth?: OAuthConfig;
+    /** SPEC-014-1-03 Tailscale provider tuning. */
+    tailscale?: TailscaleAuthConfig;
+    /** SPEC-014-1-04 OAuth+PKCE provider configuration. */
+    oauth_auth?: OAuthAuthConfig;
+    /** SPEC-014-1-01 §Task 1.3 — required when bind_host !== '127.0.0.1'. */
+    tls?: TlsConfig;
+    /** SPEC-014-1-01 §Task 1.5 — gates X-Forwarded-For trust. Default: false. */
+    trusted_reverse_proxy?: boolean;
 }
 
 interface DefaultsShape {
     port: number;
     auth_mode: AuthMode;
     bind_host: string | null;
+    trusted_reverse_proxy: boolean;
     allowed_origins: string[];
     logging: { level: LogLevel };
     paths: {
@@ -168,11 +220,12 @@ export function parseEnvOverrides(
         if (
             mode !== "localhost" &&
             mode !== "tailscale" &&
-            mode !== "oauth"
+            mode !== "oauth" &&
+            mode !== "oauth-pkce"
         ) {
             throw new PortalError(
                 "INVALID_ENV_PORTAL_AUTH_MODE",
-                `PORTAL_AUTH_MODE must be one of localhost|tailscale|oauth, got '${sanitizeErrorMessage(mode)}'`,
+                `PORTAL_AUTH_MODE must be one of localhost|tailscale|oauth|oauth-pkce, got '${sanitizeErrorMessage(mode)}'`,
                 500,
             );
         }
