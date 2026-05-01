@@ -218,3 +218,46 @@ jobs:
             plugins/autonomous-dev/coverage/lcov-report/
           retention-days: 30
           if-no-files-found: error
+
+  plugin-validate:
+    name: plugin-validate
+    needs: paths-filter
+    if: needs.paths-filter.outputs.plugins == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # required for version-monotonicity step (SPEC-016-3-03)
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Bootstrap Claude CLI
+        id: claude-bootstrap
+        continue-on-error: true
+        run: |
+          set -e
+          npm install -g "${{ env.CLAUDE_CLI_VERSION }}"
+          claude --version
+          echo "bootstrap-success=true" >> "$GITHUB_OUTPUT"
+
+      - name: Validate plugin manifests (Claude CLI)
+        if: steps.claude-bootstrap.outputs.bootstrap-success == 'true'
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          manifests=(plugins/*/.claude-plugin/plugin.json)
+          if [ ${#manifests[@]} -eq 0 ]; then
+            echo "::error::No plugin manifests found at plugins/*/.claude-plugin/plugin.json"
+            exit 1
+          fi
+          echo "Validating ${#manifests[@]} manifest(s) with Claude CLI..."
+          for manifest in "${manifests[@]}"; do
+            echo "::group::claude plugin validate ${manifest}"
+            claude plugin validate "${manifest}"
+            echo "::endgroup::"
+          done
