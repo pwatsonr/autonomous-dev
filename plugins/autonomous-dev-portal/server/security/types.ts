@@ -72,6 +72,60 @@ export class SecurityError extends PortalError {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SPEC-014-3-01 — PathValidator + ToctouGuard shared types.
+// ---------------------------------------------------------------------------
+
+/**
+ * Configuration for {@link PathValidator}. Each entry in `allowed_roots`
+ * is canonicalized once at construction time and used for prefix-with-
+ * separator containment checks. Empty list throws SecurityError.
+ */
+export interface PathPolicy {
+    allowed_roots: string[];
+}
+
+/**
+ * Cached file-descriptor metadata captured at `openSafe()` time. Re-stat
+ * during `readSafe()` compares `(deviceId, inodeId)` to detect symlink/
+ * inode swaps that bypass canonicalization.
+ */
+export interface FileDescriptorInfo {
+    fd: number;
+    deviceId: number;
+    inodeId: number;
+    path: string;
+    openTime: number;
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-014-3-02 — RegexSandbox worker contract.
+// ---------------------------------------------------------------------------
+
+/**
+ * Inputs carried to the regex worker via `workerData`. The worker has no
+ * filesystem or network access — only this serialized payload.
+ */
+export interface RegexTask {
+    pattern: string;
+    flags: string;
+    input: string;
+}
+
+/**
+ * Outcome surfaced to the main thread. Callers MUST distinguish three
+ * outcomes — match (matches:true), timeout (timedOut:true), and execution
+ * error (error set, matches:false). The sandbox NEVER throws for these
+ * cases; only pre-flight validation errors are thrown as SecurityError.
+ */
+export interface RegexResult {
+    matches: boolean;
+    groups?: string[];
+    error?: string;
+    timedOut?: boolean;
+    executionTime?: number;
+}
+
 declare module "hono" {
     interface ContextVariableMap {
         /** SPEC-014-2-01 — current request's signed CSRF token (raw value). */
