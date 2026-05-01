@@ -38,6 +38,25 @@ jobs:
       contains(github.event.comment.body, '@claude') &&
       needs.trust-check.outputs.is-trusted == 'true'
     steps:
-      - name: Placeholder (audit log + Claude invocation added in SPEC-017-1-03)
+      - name: Write audit log
+        if: always()
         run: |
-          echo "Trust gate passed; downstream specs add audit + Claude steps."
+          set -euo pipefail
+          timestamp_utc="$(date -u +%FT%TZ)"
+          {
+            echo "## Claude assistant invocation"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Actor | ${{ github.event.comment.user.login }} |"
+            echo "| Association | ${{ github.event.comment.author_association }} |"
+            echo "| Comment URL | ${{ github.event.comment.html_url }} |"
+            echo "| UTC timestamp | $timestamp_utc |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Invoke Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ github.event.comment.body }}
+          claude_args: '--max-turns 5'
