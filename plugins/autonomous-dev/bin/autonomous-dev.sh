@@ -18,6 +18,9 @@ set -euo pipefail
 #   request <subcommand>     Manage autonomous-dev request lifecycle
 #                            (submit, status, list, cancel, pause, resume,
 #                             priority, logs, feedback, kill)
+#   reconcile                Detect and (optionally) repair drift between the
+#                            intake-router SQLite store and per-request
+#                            state.json files (SPEC-012-3-03).
 #   --help, -h               Show this help message
 #   --version                Show version
 ###############################################################################
@@ -50,6 +53,7 @@ Commands:
   config show          Show current configuration
   config validate      Validate configuration
   request <subcmd>     Manage request lifecycle (run 'request --help' for list)
+  reconcile            Detect/repair drift (run 'reconcile --help' for options)
 
 Options:
   --help, -h           Show this help message
@@ -238,6 +242,207 @@ cmd_request_delegate() {
     export AUTONOMOUS_DEV_COLOR="$color"
 
     exec_node_cli "$subcmd" "$@"
+}
+
+# ---------------------------------------------------------------------------
+# print_reconcile_help() -> void
+#   Prints the reconcile subcommand help text to stdout.
+#   Spec: SPEC-012-3-03 (verbatim, ≤80 columns per line).
+# ---------------------------------------------------------------------------
+print_reconcile_help() {
+    cat <<'EOF'
+Usage: autonomous-dev reconcile --repo <path> [options]
+
+Detect and (optionally) repair drift between the intake-router SQLite
+store and per-request state.json files. Defaults to detect-only.
+
+Required:
+  --repo <path>        Repository root (must be an existing directory)
+
+Optional:
+  --dry-run            Report what would change without mutating anything
+  --auto-repair        Apply repair strategies for resolvable drift
+  --cleanup-temps      Remove orphaned state.json.tmp.* files after detect
+  --out <path>         Write JSON audit log to <path> (default: stdout)
+  --help, -h           Show this help message
+
+Exit codes:
+  0  no inconsistencies (or all auto-repaired successfully)
+  1  inconsistencies detected (detect-only or partial repair)
+  2  system error (DB open failure, IO error, lock contention, etc.)
+
+Examples:
+  autonomous-dev reconcile --repo /path/to/repo
+  autonomous-dev reconcile --repo /path/to/repo --auto-repair
+  autonomous-dev reconcile --repo /path/to/repo --cleanup-temps --dry-run
+  autonomous-dev reconcile --repo /path/to/repo --out /tmp/audit.json
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# validate_reconcile_repo(path) -> string
+#   Validates that the supplied repo path is non-empty AND points at an
+#   existing directory. On success, prints the realpath-resolved canonical
+#   path on stdout (callers capture via $(...)). On failure, exits 1 with
+#   the documented diagnostic on stderr.
+#   Spec: SPEC-012-3-03 §validate_repo_path.
+# ---------------------------------------------------------------------------
+validate_reconcile_repo() {
+    local repo_path="${1:-}"
+    if [[ -z "$repo_path" ]]; then
+        echo "ERROR: --repo requires a path" >&2
+        exit 1
+    fi
+    if [[ ! -d "$repo_path" ]]; then
+        echo "ERROR: repo path '$repo_path' does not exist or is not a directory" >&2
+        exit 1
+    fi
+    # Resolve to absolute canonical path so the Node child sees a stable
+    # value regardless of how the operator typed the flag.
+    local resolved
+    if ! resolved=$(cd "$repo_path" 2>/dev/null && pwd -P); then
+        echo "ERROR: failed to resolve repo path '$repo_path'" >&2
+        exit 1
+    fi
+    echo "$resolved"
+}
+
+# ---------------------------------------------------------------------------
+# validate_reconcile_out(path) -> void
+#   Validates that the --out path's parent directory exists and is
+#   writable. Returns 0 on success; exits 1 with diagnostic otherwise.
+#   Spec: SPEC-012-3-03 §validate_output_path.
+# ---------------------------------------------------------------------------
+validate_reconcile_out() {
+    local out_path="${1:-}"
+    if [[ -z "$out_path" ]]; then
+        echo "ERROR: --out requires a path" >&2
+        exit 1
+    fi
+    local parent
+    parent=$(dirname "$out_path")
+    if [[ ! -d "$parent" ]]; then
+        echo "ERROR: --out parent dir does not exist: $parent" >&2
+        exit 1
+    fi
+    if [[ ! -w "$parent" ]]; then
+        echo "ERROR: --out parent dir not writable: $parent" >&2
+        exit 1
+    fi
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# exec_node_reconcile_cli(args...) -> exec
+#   Securely invokes the reconcile TS orchestrator via `exec node`.
+#   Mirrors exec_node_cli's pattern but targets intake/cli/reconcile_command.js
+#   instead of the request adapter. Shell metacharacters are passed as
+#   literal strings (argv array, no string interpolation).
+#   Spec: SPEC-012-3-03.
+#
+#   Exit codes (propagated from node):
+#     0  no drift / all repairs succeeded
+#     1  drift detected (detect-only or partial repair)
+#     2  system error
+# ---------------------------------------------------------------------------
+exec_node_reconcile_cli() {
+    local cli_path="${PLUGIN_DIR}/intake/cli/reconcile_command.js"
+
+    if [[ ! -f "$cli_path" ]]; then
+        echo "ERROR: reconcile CLI not found at $cli_path. Run plugin install or rebuild." >&2
+        exit 2
+    fi
+    if ! command -v node >/dev/null 2>&1; then
+        echo "ERROR: node command not found. Install Node.js 18+ to use reconcile." >&2
+        exit 2
+    fi
+
+    # exec replaces this bash process with node; child's exit code propagates.
+    exec node "$cli_path" "$@"
+}
+
+# ---------------------------------------------------------------------------
+# cmd_reconcile_delegate(args...) -> void
+#   Routes the `reconcile` command: parses --repo / --out flags, validates
+#   them in bash BEFORE spawning node, then exec_node_reconcile_cli's into
+#   the TS orchestrator with the canonicalized arg list.
+#   Spec: SPEC-012-3-03.
+#
+#   Unknown flags are rejected here (so the operator gets a fast, well-
+#   localized error rather than commander's terser output).
+# ---------------------------------------------------------------------------
+cmd_reconcile_delegate() {
+    if [[ $# -eq 0 ]] || [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+        print_reconcile_help
+        exit 0
+    fi
+
+    local repo_path=""
+    local out_path=""
+    local pass_args=()
+
+    # Parse known flags. Capture --repo / --out for bash-side validation;
+    # forward boolean flags verbatim. Reject unknown flags up-front.
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                print_reconcile_help
+                exit 0
+                ;;
+            --repo)
+                if [[ $# -lt 2 ]]; then
+                    echo "ERROR: --repo requires a path" >&2
+                    exit 1
+                fi
+                repo_path="$2"
+                shift 2
+                ;;
+            --repo=*)
+                repo_path="${1#--repo=}"
+                shift
+                ;;
+            --out)
+                if [[ $# -lt 2 ]]; then
+                    echo "ERROR: --out requires a path" >&2
+                    exit 1
+                fi
+                out_path="$2"
+                shift 2
+                ;;
+            --out=*)
+                out_path="${1#--out=}"
+                shift
+                ;;
+            --dry-run|--auto-repair|--cleanup-temps)
+                pass_args+=("$1")
+                shift
+                ;;
+            --*)
+                echo "ERROR: unknown flag '$1'. Run 'autonomous-dev reconcile --help'" >&2
+                exit 1
+                ;;
+            *)
+                echo "ERROR: unexpected positional argument '$1'. Run 'autonomous-dev reconcile --help'" >&2
+                exit 1
+                ;;
+        esac
+    done
+
+    # --repo is mandatory; validate + canonicalize.
+    local resolved_repo
+    resolved_repo=$(validate_reconcile_repo "$repo_path")
+
+    # --out (when present) must have a writable parent dir.
+    if [[ -n "$out_path" ]]; then
+        validate_reconcile_out "$out_path"
+        pass_args+=("--out" "$out_path")
+    fi
+
+    # Always pass the canonical --repo to the Node child so it sees the
+    # same path the validator approved (no race on cwd or symlinks).
+    pass_args=("--repo" "$resolved_repo" "${pass_args[@]}")
+
+    exec_node_reconcile_cli "${pass_args[@]}"
 }
 
 # ---------------------------------------------------------------------------
@@ -538,6 +743,9 @@ case "${COMMAND}" in
         ;;
     request)
         cmd_request_delegate "$@"
+        ;;
+    reconcile)
+        cmd_reconcile_delegate "$@"
         ;;
     --help|-h)
         usage
