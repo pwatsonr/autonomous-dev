@@ -261,3 +261,71 @@ jobs:
             claude plugin validate "${manifest}"
             echo "::endgroup::"
           done
+
+      - name: Validate plugin manifests (ajv-cli fallback)
+        if: steps.claude-bootstrap.outputs.bootstrap-success != 'true'
+        run: |
+          set -euo pipefail
+          echo "::warning::Claude CLI bootstrap failed, falling back to JSON schema validation"
+          shopt -s nullglob
+          manifests=(plugins/*/.claude-plugin/plugin.json)
+          if [ ${#manifests[@]} -eq 0 ]; then
+            echo "::error::No plugin manifests found at plugins/*/.claude-plugin/plugin.json"
+            exit 1
+          fi
+          npx --yes ajv-cli@8 validate \
+            --spec=draft2020 \
+            --strict=true \
+            -s .github/schemas/plugin.schema.json \
+            -d "plugins/*/.claude-plugin/plugin.json"
+
+      - name: Verify plugin version monotonicity (release/tag refs only)
+        if: startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-audit --no-fund semver@7
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const cp = require("child_process");
+            const semver = require("semver");
+            let lastTag = "";
+            try {
+              lastTag = cp.execSync(
+                "git describe --tags --abbrev=0 --match=v*",
+                { stdio: ["ignore", "pipe", "ignore"] }
+              ).toString().trim();
+            } catch (_) { lastTag = ""; }
+            const lastVersion = lastTag ? lastTag.replace(/^v/, "") : "0.0.0";
+            if (!semver.valid(lastVersion)) {
+              console.error(`::error::Last tag "${lastTag}" is not valid semver`);
+              process.exit(1);
+            }
+            const manifests = fs.readdirSync("plugins", { withFileTypes: true })
+              .filter((d) => d.isDirectory())
+              .map((d) => path.join("plugins", d.name, ".claude-plugin", "plugin.json"))
+              .filter((p) => fs.existsSync(p));
+            if (manifests.length === 0) {
+              console.error("::error::No plugin manifests found");
+              process.exit(1);
+            }
+            let failed = false;
+            for (const file of manifests) {
+              const m = JSON.parse(fs.readFileSync(file, "utf8"));
+              const v = m.version;
+              if (!semver.valid(v)) {
+                console.error(`::error file=${file}::Manifest version "${v}" is not valid semver`);
+                failed = true;
+                continue;
+              }
+              if (!semver.gt(v, lastVersion)) {
+                console.error(
+                  `::error file=${file}::Plugin "${m.name}" version ${v} is not strictly greater than last tag ${lastVersion}`
+                );
+                failed = true;
+                continue;
+              }
+              console.log(`OK: ${m.name} ${v} > ${lastVersion}`);
+            }
+            if (failed) process.exit(1);
+          '
