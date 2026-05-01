@@ -1,0 +1,46 @@
+{
+  "name": "autonomous-dev-portal",
+  "version": "0.1.0",
+  "description": "Local web portal for monitoring autonomous-dev requests, runs, and audit logs.",
+  "author": "autonomous-dev contributors",
+  "extends": ["autonomous-dev"],
+  "userConfig": {
+    "port": {
+      "type": "integer",
+      "default": 19280,
+      "minimum": 1024,
+      "maximum": 65535,
+      "description": "TCP port the portal binds to (loopback by default)."
+    },
+    "auth_mode": {
+      "type": "string",
+      "enum": ["localhost", "tailscale", "oauth"],
+      "default": "localhost",
+      "description": "Authentication mode for incoming portal connections."
+    },
+    "tailscale_tailnet": {
+      "type": "string",
+      "default": "",
+      "description": "Required when auth_mode=tailscale. Tailnet name (e.g. 'tail-abc123.ts.net')."
+    },
+    "oauth_provider": {
+      "type": "string",
+      "enum": ["", "github", "google"],
+      "default": "",
+      "description": "Required when auth_mode=oauth. OAuth provider identifier."
+    },
+    "sse_update_interval_seconds": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 60,
+      "description": "Server-sent events update cadence."
+    },
+    "portal.path_policy.allowed_roots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Absolute paths the portal is permitted to read. Empty list disables file access."
+    }
+  }
+}

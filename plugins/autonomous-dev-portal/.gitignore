@@ -1,0 +1,12 @@
+node_modules/
+.last-install-hash
+install.log
+*.log
+.env
+.env.local
+data/
+dist/
+bun.lockb
+package-lock.json
+coverage/
+.bun/
