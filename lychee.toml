@@ -1,0 +1,38 @@
+# lychee link-checker configuration for autonomous-dev documentation.
+# Mirrors TDD-016 Section 7 baseline.
+
+# Cache: results valid for 1 day so repeated CI runs reuse them.
+cache = true
+max_cache_age = "1d"
+verbose = true
+
+# Status codes that count as "link OK" (in addition to default 2xx).
+accept = [200, 201, 204, 301, 302, 307, 308, 403, 429]
+
+# Patterns we never want to fail a build over.
+exclude = [
+  # Local development URLs
+  "http://localhost:*",
+  "http://127.0.0.1:*",
+  # Authenticated services that always 401/403 from CI
+  "https://console.anthropic.com/*",
+  "https://app.slack.com/*",
+  "https://discord.com/channels/*",
+  # Documentation placeholders
+  "https://example.com",
+  "http://example.org",
+  # GitHub authenticated routes
+  "https://github.com/*/settings/*"
+]
+
+# Per-request timeout in seconds (network + read).
+timeout = 20
+
+# Identify the bot for upstream sites that gate by user-agent.
+user_agent = "lychee/autonomous-dev-ci"
+
+# Resolve relative links from the repo root.
+base = "."
+
+# Validate fragment (#anchor) targets in markdown files.
+include_fragments = true

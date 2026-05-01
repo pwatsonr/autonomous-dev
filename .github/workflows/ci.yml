@@ -76,6 +76,29 @@ jobs:
           find plugins/autonomous-dev/installers -maxdepth 1 -type f -name '*.sh' \
             -exec shellcheck {} \;
 
+  markdown:
+    name: markdown
+    needs: paths-filter
+    if: needs.paths-filter.outputs.markdown == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Link check
+        uses: lycheeverse/lychee-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: >-
+            --verbose
+            --cache
+            --max-cache-age 1d
+            --config lychee.toml
+            "plugins/**/docs/**/*.md"
+            "README.md"
+          fail: true
+
   typecheck:
     name: Typecheck (${{ matrix.os }}, Node ${{ matrix.node-version }})
     needs: paths-filter
