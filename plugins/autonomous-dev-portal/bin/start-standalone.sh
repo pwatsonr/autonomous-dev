@@ -136,8 +136,12 @@ start_standalone() {
     if [[ ! -x "${runtime_check}" ]]; then
         fail "${runtime_check} not found or not executable"
     fi
-    if ! "${runtime_check}" --quiet; then
-        exit $?
+    # Capture the exit code without losing it to the `if !` boolean
+    # inversion; `|| rc=$?` runs unguarded against `set -e`.
+    local rc=0
+    "${runtime_check}" --quiet || rc=$?
+    if (( rc != 0 )); then
+        exit "${rc}"
     fi
 
     # Conditional userConfig validation.

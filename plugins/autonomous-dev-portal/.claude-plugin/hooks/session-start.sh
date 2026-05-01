@@ -212,8 +212,12 @@ session_start() {
         log "ERROR: ${runtime_check} not found or not executable; install SPEC-013-1-03"
         exit 1
     fi
-    if ! "${runtime_check}" --quiet; then
-        local rc=$?
+    # Capture the runtime check's exit code without letting `set -e` abort
+    # us mid-pipeline. `if ! cmd` consumes the exit code into a boolean, so
+    # we run the check unguarded against `set -e` via a tail-end "|| rc=$?".
+    local rc=0
+    "${runtime_check}" --quiet || rc=$?
+    if (( rc != 0 )); then
         log "ERROR: bin/check-runtime.sh failed with exit ${rc}; aborting session-start"
         exit "${rc}"
     fi
