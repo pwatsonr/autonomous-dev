@@ -1,0 +1,42 @@
+name: security-review
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Mondays 06:00 UTC -- weekly trufflehog scan (SPEC-016-4-03)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # required for SARIF upload (SPEC-016-4-03)
+  pull-requests: write     # required for gitleaks PR comments
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: gitleaks (secret scanning)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # required for gitleaks --redact and historical scanning
+
+      - name: Run gitleaks
+        id: gitleaks
+        uses: gitleaks/gitleaks-action@v2.3.7
+        with:
+          config-path: .github/security/gitleaks.toml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "true"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+
+      # SARIF upload step is added in SPEC-016-4-03; this job exits with the
+      # gitleaks step's status so the aggregate gate (SPEC-016-4-04) can read it.
