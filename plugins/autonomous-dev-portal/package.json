@@ -1,0 +1,22 @@
+{
+  "name": "@autonomous-dev/portal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local web portal for monitoring autonomous-dev requests, runs, and audit logs.",
+  "type": "module",
+  "engines": { "bun": ">=1.0.0" },
+  "scripts": {
+    "start": "bun run server/server.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint server/ tests/",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "hono": "^3.12.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.3.0"
+  }
+}

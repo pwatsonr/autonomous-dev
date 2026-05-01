@@ -1,0 +1,5 @@
+{
+  "port": 19280,
+  "auth_mode": "localhost",
+  "logging": { "level": "info" }
+}
