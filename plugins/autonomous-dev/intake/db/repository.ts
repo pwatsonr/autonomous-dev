@@ -317,6 +317,46 @@ export class Repository {
     return mapRequestRow(row);
   }
 
+  /**
+   * Return every request whose `target_repo` matches `repoPath`.
+   *
+   * Used by reconciliation (PLAN-012-3) to enumerate the SQLite side of the
+   * SQLite ↔ filesystem divergence scan. Ordered by `created_at ASC` so
+   * the divergence report is deterministic across runs.
+   */
+  getAllRequestsForRepo(repoPath: string): RequestEntity[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM requests
+         WHERE target_repo = ?
+         ORDER BY created_at ASC`,
+      )
+      .all(repoPath) as RequestRow[];
+    return mapRequestRows(rows);
+  }
+
+  /**
+   * Update a single field on a request inside an immediate transaction.
+   *
+   * Used by reconciliation's `content_mismatch` repair (PLAN-012-3) to apply
+   * field-by-field newer-wins merges. Bumps `updated_at` to `Date.now()`
+   * inside the same transaction so subsequent mtime comparisons reflect the
+   * update.
+   *
+   * The field name is validated against the same allowlist used by
+   * {@link Repository.updateRequest}; unknown fields throw to surface
+   * programmer error rather than silently no-op.
+   */
+  updateRequestField(
+    requestId: string,
+    field: string,
+    value: unknown,
+  ): void {
+    this.updateRequest(requestId, {
+      [field]: value,
+    } as Partial<RequestEntity>);
+  }
+
   /** Update specific fields on a request. Automatically bumps `updated_at`. */
   updateRequest(requestId: string, updates: Partial<RequestEntity>): void {
     const allowedColumns = new Set<string>([
@@ -968,6 +1008,41 @@ export class Repository {
       .prepare('SELECT COUNT(*) AS cnt FROM user_identities')
       .get() as { cnt: number };
     return row.cnt;
+  }
+
+  // =========================================================================
+  // Daemon ack support (SPEC-012-1-03 — requires migration 003)
+  // =========================================================================
+
+  /**
+   * List requests that have not yet been acknowledged by the daemon.
+   * Ordered FIFO by `created_at ASC`; tiebreak by priority desc
+   * (high > normal > low). Used by `pollNewRequests` in
+   * `intake/daemon/state_reader.ts` — see SPEC-012-1-03 §"Poll new requests".
+   *
+   * Schema dep: requires `acknowledged_at` column from migration 003.
+   * On a pre-003 DB this method returns an empty list (the column
+   * doesn't exist; query throws — caller's responsibility to ensure
+   * migrations have run before consulting daemon-side state).
+   */
+  listUnacknowledgedForDaemon(): Array<{
+    request_id: string;
+    created_at: string;
+    priority: 'high' | 'normal' | 'low';
+  }> {
+    return this.db
+      .prepare(
+        `SELECT request_id, created_at, priority
+           FROM requests
+          WHERE acknowledged_at IS NULL
+          ORDER BY created_at ASC,
+                   ${PRIORITY_CASE} ASC`,
+      )
+      .all() as Array<{
+      request_id: string;
+      created_at: string;
+      priority: 'high' | 'normal' | 'low';
+    }>;
   }
 
   // =========================================================================
