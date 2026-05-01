@@ -99,6 +99,20 @@ jobs:
             "README.md"
           fail: true
 
+  actionlint:
+    name: actionlint
+    needs: paths-filter
+    if: needs.paths-filter.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint workflows
+        uses: rhysd/actionlint@v1
+        with:
+          fail-on-error: true
+
   typecheck:
     name: Typecheck (${{ matrix.os }}, Node ${{ matrix.node-version }})
     needs: paths-filter

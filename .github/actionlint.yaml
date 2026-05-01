@@ -1,0 +1,14 @@
+# actionlint configuration for autonomous-dev workflows.
+# Discovered automatically by actionlint at .github/actionlint.yaml.
+
+# Project does not use self-hosted runners. Empty list silences the
+# "label is not a known runner label" warning that fires when
+# actionlint cannot infer a self-hosted set.
+self-hosted-runner:
+  labels: []
+
+# Disable embedded shellcheck. The `shell` job in ci.yml runs full
+# shellcheck against bin/*.sh and installers/*.sh; running it again
+# inside `run:` blocks is duplicative and produces conflicting noise.
+# Setting the path to "" disables the integration entirely.
+shellcheck: ""
