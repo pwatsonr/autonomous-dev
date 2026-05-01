@@ -1,0 +1,23 @@
+/*! variables — design tokens (SPEC-013-4-02) */
+:root{
+--primary-color:#2563eb;--primary-hover:#1d4ed8;--secondary-color:#64748b;
+--success-color:#16a34a;--success-light:#dcfce7;
+--warning-color:#d97706;--warning-light:#fef3c7;
+--danger-color:#dc2626;--danger-light:#fee2e2;
+--info-color:#0284c7;--info-light:#e0f2fe;
+--bg-primary:#fff;--bg-secondary:#f8fafc;--bg-tertiary:#f1f5f9;
+--text-primary:#0f172a;--text-secondary:#475569;--text-muted:#94a3b8;
+--border-color:#e2e8f0;--border-hover:#cbd5e1;
+--space-xs:.25rem;--space-sm:.5rem;--space-md:1rem;--space-lg:1.5rem;--space-xl:2rem;--space-2xl:3rem;
+--text-xs:.75rem;--text-sm:.875rem;--text-md:1rem;--text-lg:1.125rem;--text-xl:1.25rem;--text-2xl:1.5rem;--text-3xl:1.875rem;
+--radius-sm:.25rem;--radius-md:.5rem;--radius-lg:.75rem;--radius-xl:1rem;
+--shadow-sm:0 1px 2px rgba(0,0,0,.05);--shadow-md:0 4px 6px rgba(0,0,0,.07);--shadow-lg:0 10px 15px rgba(0,0,0,.1);
+--z-dropdown:100;--z-banner:200;--z-modal:300;--z-tooltip:400;
+}
+@media(prefers-color-scheme:dark){:root{
+--bg-primary:#0f172a;--bg-secondary:#1e293b;--bg-tertiary:#334155;
+--text-primary:#f1f5f9;--text-secondary:#cbd5e1;--text-muted:#64748b;
+--border-color:#334155;--border-hover:#475569;
+}}
+@media(prefers-contrast:high){:root{--border-color:#000;--text-secondary:#000;}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}}
