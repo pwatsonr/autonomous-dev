@@ -72,3 +72,29 @@ jobs:
         with:
           sarif_file: results.sarif
           category: trufflehog
+
+  aggregate-security-results:
+    name: security-baseline
+    runs-on: ubuntu-latest
+    needs: [gitleaks]
+    if: always()
+    steps:
+      - name: Evaluate security scanner outcomes
+        env:
+          GITLEAKS_RESULT: ${{ needs.gitleaks.result }}
+        run: |
+          set -euo pipefail
+          echo "::notice::PRD-007 FR-14 :: Security baseline gate"
+          echo "gitleaks result: ${GITLEAKS_RESULT}"
+
+          if [[ "${GITLEAKS_RESULT}" == "failure" ]]; then
+            echo "::error::Security baseline FAILED: gitleaks reported a leak. See PR comment + Security tab. (PRD-007 FR-14)"
+            exit 1
+          fi
+
+          if [[ "${GITLEAKS_RESULT}" == "cancelled" || "${GITLEAKS_RESULT}" == "skipped" ]]; then
+            echo "::error::Security baseline INDETERMINATE: gitleaks did not run to completion (${GITLEAKS_RESULT}). (PRD-007 FR-14)"
+            exit 1
+          fi
+
+          echo "Security baseline PASSED."
