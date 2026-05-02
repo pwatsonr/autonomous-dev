@@ -105,10 +105,100 @@ export class TrustValidator {
     return { trusted: true, requiresMetaReview: false };
   }
 
+  /**
+   * Per-mode trust dispatch (SPEC-019-3-02). Switches over
+   * `config.trust_mode` and delegates to one of three private helpers.
+   * Exhaustiveness is checked at compile time via the `never` cast in
+   * the default branch — adding a new TrustMode without a case here is
+   * a TS error.
+   */
   protected async stepTrustStatus(
-    _manifest: HookManifest,
-    _manifestPath: string,
+    manifest: HookManifest,
+    manifestPath: string,
   ): Promise<TrustVerdict> {
+    switch (this.config.trust_mode) {
+      case 'allowlist':
+        return this.checkAllowlistMode(manifest);
+      case 'permissive':
+        return this.checkPermissiveMode(manifest, manifestPath);
+      case 'strict':
+        return this.checkStrictMode(manifest, manifestPath);
+      default: {
+        const exhaustive: never = this.config.trust_mode;
+        return {
+          trusted: false,
+          reason: `unknown trust_mode: ${String(exhaustive)}`,
+          requiresMetaReview: false,
+        };
+      }
+    }
+  }
+
+  /**
+   * Allowlist mode (SPEC-019-3-02): plugin id MUST appear in
+   * `extensions.allowlist`. Signature is NOT consulted — operator's
+   * manual trust decision is sufficient.
+   */
+  private checkAllowlistMode(manifest: HookManifest): TrustVerdict {
+    if (!this.config.allowlist.includes(manifest.id)) {
+      return {
+        trusted: false,
+        reason: 'not in allowlist',
+        requiresMetaReview: false,
+      };
+    }
+    return { trusted: true, requiresMetaReview: false };
+  }
+
+  /**
+   * Permissive mode (SPEC-019-3-02): trust by default. If
+   * `signature_verification` is on, gate on signature; otherwise
+   * trust everything. Allowlist is advisory.
+   */
+  private async checkPermissiveMode(
+    manifest: HookManifest,
+    manifestPath: string,
+  ): Promise<TrustVerdict> {
+    if (!this.config.signature_verification) {
+      return { trusted: true, requiresMetaReview: false };
+    }
+    const signed = await this.verifySignature(manifest, manifestPath);
+    if (!signed) {
+      return {
+        trusted: false,
+        reason:
+          'permissive mode requires valid signature; none found or invalid',
+        requiresMetaReview: false,
+      };
+    }
+    return { trusted: true, requiresMetaReview: false };
+  }
+
+  /**
+   * Strict mode (SPEC-019-3-02): plugin MUST be on allowlist AND have a
+   * valid signature. The privileged-reviewer check fires in
+   * `stepCapabilityValidation` — see SPEC-019-3-02 §"strict mode" notes
+   * for why the rejection is split across steps (audit attribution).
+   */
+  private async checkStrictMode(
+    manifest: HookManifest,
+    manifestPath: string,
+  ): Promise<TrustVerdict> {
+    if (!this.config.allowlist.includes(manifest.id)) {
+      return {
+        trusted: false,
+        reason: 'strict mode: plugin not in allowlist',
+        requiresMetaReview: false,
+      };
+    }
+    const signed = await this.verifySignature(manifest, manifestPath);
+    if (!signed) {
+      return {
+        trusted: false,
+        reason: 'strict mode: missing or invalid signature',
+        requiresMetaReview: false,
+      };
+    }
     return { trusted: true, requiresMetaReview: false };
   }
 
@@ -119,9 +209,38 @@ export class TrustValidator {
     return { trusted: true, requiresMetaReview: false };
   }
 
+  /**
+   * Capability validation (SPEC-019-3-02 strict-mode arm). In strict mode,
+   * any plugin declaring a `code-review` or `security-review` reviewer slot
+   * MUST also appear on `extensions.privileged_reviewers`. In other modes
+   * the meta-review trigger (SPEC-019-3-03) is the gate; this step is a
+   * no-op so non-strict configs cannot reject here.
+   *
+   * Note: this check is independent of meta-review — even a manually
+   * privileged plugin in strict mode must still pass meta-review when its
+   * trigger conditions match (per PLAN-019-3 risks).
+   */
   protected async stepCapabilityValidation(
-    _manifest: HookManifest,
+    manifest: HookManifest,
   ): Promise<TrustVerdict> {
+    if (this.config.trust_mode !== 'strict') {
+      return { trusted: true, requiresMetaReview: false };
+    }
+    const reviewerSlots = manifest.reviewer_slots ?? [];
+    const declaresPrivilegedReview = reviewerSlots.some(
+      (s) => s === 'code-review' || s === 'security-review',
+    );
+    if (
+      declaresPrivilegedReview &&
+      !this.config.privileged_reviewers.includes(manifest.id)
+    ) {
+      return {
+        trusted: false,
+        reason:
+          'strict mode: privileged reviewer not in privileged_reviewers list',
+        requiresMetaReview: false,
+      };
+    }
     return { trusted: true, requiresMetaReview: false };
   }
 
