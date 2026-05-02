@@ -1,0 +1,27 @@
+{
+  "id": "test-hotfix-001",
+  "type": "hotfix",
+  "expedited_reviews": true,
+  "current_phase": "code",
+  "phase_started_at": 1714435200,
+  "retry_count": 0,
+  "phase_overrides": [
+    "intake",
+    "tdd", "tdd_review",
+    "plan",
+    "spec", "spec_review",
+    "code", "code_review",
+    "test", "test_review",
+    "validate"
+  ],
+  "type_config": {
+    "maxRetries": 5,
+    "phaseTimeouts": {
+      "code": 1800
+    },
+    "enhancedPhases": [],
+    "additionalGates": {}
+  },
+  "phase_history": [],
+  "status_reason": ""
+}

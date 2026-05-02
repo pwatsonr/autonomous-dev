@@ -13,6 +13,7 @@ set -euo pipefail
 # All paths derived from $HOME and the script's own location.
 
 readonly PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+readonly LIB_DIR="${PLUGIN_DIR}/bin/lib"
 readonly DAEMON_HOME="${HOME}/.autonomous-dev"
 readonly LOCK_FILE="${DAEMON_HOME}/daemon.lock"
 readonly HEARTBEAT_FILE="${DAEMON_HOME}/heartbeat.json"
@@ -22,6 +23,10 @@ readonly COST_LEDGER_FILE="${DAEMON_HOME}/cost-ledger.json"
 readonly LOG_DIR="${DAEMON_HOME}/logs"
 readonly LOG_FILE="${LOG_DIR}/daemon.log"
 readonly CONFIG_FILE="${HOME}/.claude/autonomous-dev.json"
+# AUTONOMOUS_DEV_CONFIG is the path expected by lib/typed-limits.sh per
+# SPEC-018-2-02. We export the existing CONFIG_FILE under that name so the
+# helper library can stand alone and be sourced by the bats test harness.
+export AUTONOMOUS_DEV_CONFIG="${CONFIG_FILE}"
 readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
 readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
 
@@ -48,6 +53,14 @@ ITERATION_COUNT=0
 EFFECTIVE_CONFIG=""
 CONSECUTIVE_CRASHES=0
 CIRCUIT_BREAKER_TRIPPED=false
+
+# Per-process dedup table for the legacy phase-fallback warning
+# (SPEC-018-2-01 §Warning Deduplication). Keyed by absolute state file path.
+# Reset only by daemon restart — that is the intentional "re-surface migration
+# debt" cadence per TDD-001's daily restart contract.
+if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+    declare -gA _phase_legacy_warned=()
+fi
 
 ###############################################################################
 # Logging Functions
@@ -721,6 +734,172 @@ select_request() {
 }
 
 ###############################################################################
+# Type-Aware Phase Progression (SPEC-018-2-01)
+###############################################################################
+# These helpers replace the implicit hardcoded 14-phase progression with a
+# v1.1-aware lookup against the state file's phase_overrides[] array. When
+# phase_overrides is absent (legacy v1.0 state), they fall back to the
+# LEGACY_PHASES array sourced from lib/phase-legacy.sh and emit a
+# deduplicated WARN line so operators see the migration debt once per
+# daemon process per request.
+
+# warn_legacy_fallback_once(state_file: string) -> void
+#   Emits a single WARN line per state_file per supervisor process lifetime.
+#   The dedup table is reset on daemon restart, which by TDD-001 is daily —
+#   so an unmigrated state file surfaces the warning at most once per day.
+warn_legacy_fallback_once() {
+    local state_file="$1"
+    if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+        # No associative arrays on bash 3.x: fall back to a per-call warn
+        # rather than maintain a string-keyed file. macOS users with stock
+        # bash hit this path; the validate_dependencies() preamble already
+        # warns on bash < 4 once at startup, so the duplication here is
+        # acceptable for an edge platform.
+        printf 'WARN select_request: state %s lacks phase_overrides, using legacy sequence\n' \
+            "${state_file}" >&2
+        return 0
+    fi
+    if [[ -z "${_phase_legacy_warned[${state_file}]:-}" ]]; then
+        printf 'WARN select_request: state %s lacks phase_overrides, using legacy sequence\n' \
+            "${state_file}" >&2
+        _phase_legacy_warned[${state_file}]=1
+    fi
+}
+
+# next_phase_for_state(state_file: string) -> string
+#   Returns the phase name that should follow .current_phase for the given
+#   state. Lookup order:
+#     1. state.json .phase_overrides[] (v1.1) — find current_phase, return next.
+#     2. LEGACY_PHASES (v1.0 fallback) — same logic, with a WARN emitted once.
+#
+#   Returns empty string when current_phase is the terminal element.
+#   Returns non-zero exit (and emits ERROR to stderr) when current_phase is
+#   not present in the resolved sequence — surfaces a corrupted state file
+#   rather than silently masking it.
+#
+#   Pure: does not modify state.json.
+next_phase_for_state() {
+    local state_file="$1"
+    if [[ ! -f "${state_file}" ]]; then
+        printf 'ERROR next_phase_for_state: state file not found: %s\n' \
+            "${state_file}" >&2
+        return 2
+    fi
+
+    local current_phase
+    current_phase=$(jq -r '.current_phase // empty' "${state_file}" 2>/dev/null || true)
+    if [[ -z "${current_phase}" ]]; then
+        printf 'ERROR next_phase_for_state: .current_phase missing in %s\n' \
+            "${state_file}" >&2
+        return 2
+    fi
+
+    local overrides_len
+    overrides_len=$(jq -r '(.phase_overrides // []) | length' "${state_file}" 2>/dev/null || echo "0")
+
+    local -a phases=()
+    if [[ "${overrides_len}" -gt 0 ]]; then
+        # v1.1 path: read phase_overrides[] in order
+        local phases_raw
+        phases_raw=$(jq -r '.phase_overrides[]' "${state_file}" 2>/dev/null || true)
+        while IFS= read -r p; do
+            [[ -n "${p}" ]] && phases+=("${p}")
+        done <<< "${phases_raw}"
+    else
+        # v1.0 fallback: source legacy sequence and warn once
+        # shellcheck source=lib/phase-legacy.sh
+        source "${LIB_DIR}/phase-legacy.sh"
+        warn_legacy_fallback_once "${state_file}"
+        phases=("${LEGACY_PHASES[@]}")
+    fi
+
+    local idx=-1 i
+    for i in "${!phases[@]}"; do
+        if [[ "${phases[$i]}" == "${current_phase}" ]]; then
+            idx=$i
+            break
+        fi
+    done
+
+    if [[ ${idx} -lt 0 ]]; then
+        printf "ERROR select_request: phase '%s' not in sequence for %s\n" \
+            "${current_phase}" "${state_file}" >&2
+        return 1
+    fi
+
+    local next_idx=$(( idx + 1 ))
+    if [[ ${next_idx} -ge ${#phases[@]} ]]; then
+        # Terminal phase: empty string (success, exit 0)
+        echo ""
+        return 0
+    fi
+
+    echo "${phases[${next_idx}]}"
+    return 0
+}
+
+# is_enhanced_phase(state_file: string, phase: string) -> int
+#   Returns 0 (true) if phase is in .type_config.enhancedPhases for this
+#   state, 1 (false) otherwise. Returns 1 when type_config is absent.
+#   Used by the supervisor to decide whether to pass --strict-mode to the
+#   score-evaluator on review phases.
+is_enhanced_phase() {
+    local state_file="$1" phase="$2"
+    [[ -f "${state_file}" ]] || return 1
+    local enhanced
+    enhanced=$(jq -r --arg p "${phase}" \
+        '(.type_config.enhancedPhases // []) | index($p) // empty' \
+        "${state_file}" 2>/dev/null || true)
+    [[ -n "${enhanced}" ]]
+}
+
+# invoke_score_evaluator(state_file: string, phase: string) -> int
+#   Wires the type-aware --strict-mode flag into the score-evaluator
+#   invocation. Returns the evaluator's exit code.
+invoke_score_evaluator() {
+    local state_file="$1" phase="$2"
+    local -a score_args=()
+    if is_enhanced_phase "${state_file}" "${phase}"; then
+        score_args+=(--strict-mode)
+    fi
+    "${PLUGIN_DIR}/bin/score-evaluator.sh" "${score_args[@]}" "${state_file}"
+}
+
+# check_phase_advancement_blocked(state_file: string) -> int
+#   SPEC-018-2-03 Task 4. Returns 0 (no block) when the current phase has
+#   no required additionalGates or when the gate artifact is present.
+#   Returns 1 (blocked) and idempotently writes status_reason="awaiting
+#   gate: <gate>" into state.json when the artifact is missing.
+#
+#   Called by the lifecycle engine immediately before advancing the phase.
+#   The supervisor itself does not advance phases — the spawned Claude
+#   session does — so this helper exists for future wiring. Wiring it into
+#   the existing main_loop is intentionally deferred until PLAN-018-3 ships
+#   the agent-side phase-advancement contract.
+check_phase_advancement_blocked() {
+    local state_file="$1"
+    [[ -f "${state_file}" ]] || return 0
+
+    local current_phase
+    current_phase=$(jq -r '.current_phase // .status // ""' "${state_file}" 2>/dev/null || true)
+    [[ -n "${current_phase}" ]] || return 0
+
+    if [[ ! -f "${LIB_DIR}/gate-check.sh" ]]; then
+        return 0  # helper not present, nothing to enforce
+    fi
+    # shellcheck source=lib/gate-check.sh
+    source "${LIB_DIR}/gate-check.sh"
+
+    local missing
+    missing=$(check_required_gates "${state_file}" "${current_phase}")
+    if [[ -n "${missing}" ]]; then
+        update_status_reason_awaiting "${state_file}" "${missing}"
+        return 1
+    fi
+    return 0
+}
+
+###############################################################################
 # Phase-Aware Max-Turns Resolution (SPEC-001-2-02 Task 4)
 ###############################################################################
 
@@ -1124,16 +1303,101 @@ check_retry_exhaustion() {
     retry_count=$(jq -r '.current_phase_metadata.retry_count // 0' "${state_file}")
     status=$(jq -r '.status' "${state_file}")
 
-    # Check per-phase max retries from config, with default
+    # SPEC-018-2-02: prefer the type-aware budget from .type_config.maxRetries.
+    # Falls through to the previous .daemon.max_retries_by_phase override and
+    # finally to the typed-limits hard-coded default. The existing per-phase
+    # config override remains the secondary source of truth.
     local max_retries
-    max_retries=$(jq -r ".daemon.max_retries_by_phase.\"${status}\" // .daemon.max_retries_per_phase // 3" "${EFFECTIVE_CONFIG}" 2>/dev/null)
-    if [[ "${max_retries}" == "null" || -z "${max_retries}" ]]; then
-        max_retries="${MAX_RETRIES_PER_PHASE}"
+    if [[ -f "${LIB_DIR}/typed-limits.sh" ]]; then
+        # shellcheck source=lib/typed-limits.sh
+        source "${LIB_DIR}/typed-limits.sh"
+        # Type-aware lookup first
+        local typed_max
+        typed_max=$(resolve_max_retries "${state_file}")
+        # Phase-specific config override wins over the typed default only
+        # when explicitly set (preserves operator escape hatch).
+        local phase_override
+        phase_override=$(jq -r ".daemon.max_retries_by_phase.\"${status}\" // empty" \
+            "${EFFECTIVE_CONFIG}" 2>/dev/null || true)
+        if [[ -n "${phase_override}" && "${phase_override}" != "null" ]]; then
+            max_retries="${phase_override}"
+        else
+            max_retries="${typed_max}"
+        fi
+    else
+        max_retries=$(jq -r ".daemon.max_retries_by_phase.\"${status}\" // .daemon.max_retries_per_phase // 3" "${EFFECTIVE_CONFIG}" 2>/dev/null)
+        if [[ "${max_retries}" == "null" || -z "${max_retries}" ]]; then
+            max_retries="${MAX_RETRIES_PER_PHASE}"
+        fi
     fi
 
     if [[ ${retry_count} -ge ${max_retries} ]]; then
-        log_warn "Request ${request_id} exhausted retries for phase '${status}' (${retry_count}/${max_retries})"
+        local req_type
+        req_type=$(jq -r '.type // "feature"' "${state_file}" 2>/dev/null || echo "feature")
+        # Contract regex (SPEC-018-2-02 §Escalation Message Format):
+        # Phase '[a-z_]+' (exceeded timeout|exhausted retries) \(.*type=...\)
+        log_warn "Phase '${status}' exhausted retries (limit=${max_retries}, type=${req_type})"
         escalate_to_paused "${request_id}" "${project}" "${status}" "${retry_count}"
+        return 1
+    fi
+
+    return 0
+}
+
+###############################################################################
+# Type-Aware Phase-Timeout Enforcement (SPEC-018-2-02)
+###############################################################################
+
+# check_phase_timeout(request_id: string, project: string) -> int
+#   Compares (now - .phase_started_at) against resolve_phase_timeout for
+#   the current phase. If exceeded, raises a contract-format escalation
+#   message and returns 1 (caller should `continue` the supervisor loop).
+#   Returns 0 when the phase is within budget OR when phase_started_at is
+#   absent (no clock to compare against).
+check_phase_timeout() {
+    local request_id="$1"
+    local project="$2"
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+
+    [[ -f "${state_file}" ]] || return 0
+
+    local started
+    started=$(jq -r '.phase_started_at // empty' "${state_file}" 2>/dev/null || true)
+    [[ -n "${started}" && "${started}" != "null" ]] || return 0
+
+    # Allow either an integer epoch second or an ISO-8601 string.
+    local started_epoch
+    if [[ "${started}" =~ ^[0-9]+$ ]]; then
+        started_epoch="${started}"
+    else
+        started_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "${started}" +%s 2>/dev/null \
+                        || date -u -d "${started}" +%s 2>/dev/null \
+                        || echo "")
+        [[ -n "${started_epoch}" ]] || return 0
+    fi
+
+    if [[ ! -f "${LIB_DIR}/typed-limits.sh" ]]; then
+        return 0
+    fi
+    # shellcheck source=lib/typed-limits.sh
+    source "${LIB_DIR}/typed-limits.sh"
+
+    local current_phase
+    current_phase=$(jq -r '.current_phase // .status // ""' "${state_file}" 2>/dev/null || true)
+    [[ -n "${current_phase}" ]] || return 0
+
+    local timeout
+    timeout=$(resolve_phase_timeout "${state_file}" "${current_phase}")
+
+    local now_epoch
+    now_epoch=$(date -u +%s)
+    local elapsed=$(( now_epoch - started_epoch ))
+
+    if (( elapsed > timeout )); then
+        local req_type
+        req_type=$(resolve_request_type "${state_file}")
+        # Contract regex (SPEC-018-2-02 §Escalation Message Format)
+        log_warn "Phase '${current_phase}' exceeded timeout (${timeout} seconds, type=${req_type})"
         return 1
     fi
 

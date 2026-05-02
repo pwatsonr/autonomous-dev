@@ -1,0 +1,1 @@
+env ENHANCED_GATES=security_review,cost_analysis,rollback_plan claude --agent tdd-author --state ${STATE_DIR}/state.json
