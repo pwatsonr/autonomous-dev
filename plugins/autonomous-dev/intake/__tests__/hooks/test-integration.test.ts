@@ -189,7 +189,10 @@ describe('hook engine integration', () => {
     const result = await exec.executeHooks(HookPoint.CodePreWrite, {});
     // 4 hooks total at code-pre-write: bad@200, alpha@100, charlie@75, bravo@50.
     expect(result.invocations).toHaveLength(4);
-    expect(result.invocations[0].status).toBe('error');
+    // Status was renamed 'error' → 'invocation-error' in SPEC-019-2-04
+    // when the executor was extended to distinguish invocation errors
+    // from validation warnings.
+    expect(result.invocations[0].status).toBe('invocation-error');
     expect(result.invocations[0].error).toContain('boom');
     // Subsequent hooks still run.
     expect(result.invocations.slice(1).every((i) => i.status === 'ok')).toBe(true);

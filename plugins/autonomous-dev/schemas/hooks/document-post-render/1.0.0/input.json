@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev/schemas/hooks/document-post-render/1.0.0/input.json",
+  "title": "document-post-render input v1.0.0",
+  "description": "Baseline permissive schema. Business-rule constraints are added by consumer plans.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {}
+}
