@@ -40,3 +40,13 @@ export type { ResolvedStandards } from './resolver';
 
 export { ValidationError, AuthorizationError, LoaderError } from './errors';
 export { isAdminRequest } from './auth';
+
+export {
+  AutoDetectionScanner,
+  writeInferredStandards,
+  CONFIDENCE,
+  ESLINT_RULE_CAP,
+  FRAMEWORK_MAP,
+  README_TOOLS,
+} from './auto-detection';
+export type { DetectedRule, ScanResult, SignalKind } from './auto-detection-types';
