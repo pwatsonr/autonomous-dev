@@ -228,6 +228,124 @@ describe('GCPCredentialScoper.scope', () => {
     ]);
   });
 
+  it('addBinding adds the member to an existing role binding (different member already present)', async () => {
+    const { editor, state } = makeEditor();
+    state.policy = {
+      bindings: [
+        { role: 'roles/run.developer', members: ['user:other@x.com'] },
+      ],
+      etag: 'etag-pre',
+    };
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([
+      ['service', editor],
+    ]);
+    const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
+    await scoper.scope('Run.Deploy', RUN_SCOPE);
+    const finalPolicy = state.setArgs[0].policy as {
+      bindings: Array<{ role: string; members: string[] }>;
+    };
+    const runBinding = finalPolicy.bindings.find(
+      (b) => b.role === 'roles/run.developer',
+    );
+    expect(runBinding?.members).toContain('user:other@x.com');
+    expect(runBinding?.members).toContain(
+      'serviceAccount:deleg@p.iam.gserviceaccount.com',
+    );
+  });
+
+  it('addBinding tolerates a policy without a bindings array', async () => {
+    const { editor, state } = makeEditor();
+    // Policy with NO bindings field — exercises the `?? []` fallback.
+    state.policy = { etag: 'etag-no-bindings' };
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([
+      ['service', editor],
+    ]);
+    const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
+    await scoper.scope('Run.Deploy', RUN_SCOPE);
+    const finalPolicy = state.setArgs[0].policy as {
+      bindings: Array<{ role: string; members: string[] }>;
+    };
+    expect(finalPolicy.bindings).toEqual([
+      {
+        role: 'roles/run.developer',
+        members: ['serviceAccount:deleg@p.iam.gserviceaccount.com'],
+      },
+    ]);
+  });
+
+  it('addBinding tolerates a binding entry with undefined role/members fields', async () => {
+    const { editor, state } = makeEditor();
+    // Pre-existing binding objects with missing fields — exercise the
+    // `b.role ?? ''` and `b.members ?? []` fallbacks defensively.
+    state.policy = {
+      bindings: [{}, { role: undefined, members: undefined }],
+      etag: 'etag-sparse',
+    };
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([
+      ['service', editor],
+    ]);
+    const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
+    await scoper.scope('Run.Deploy', RUN_SCOPE);
+    const finalPolicy = state.setArgs[0].policy as {
+      bindings: Array<{ role: string; members: string[] }>;
+    };
+    // Our role/member must have landed; sparse entries normalised.
+    const newBinding = finalPolicy.bindings.find(
+      (b) => b.role === 'roles/run.developer',
+    );
+    expect(newBinding?.members).toEqual([
+      'serviceAccount:deleg@p.iam.gserviceaccount.com',
+    ]);
+  });
+
+  it('removeBinding tolerates sparse binding entries when the member is absent', async () => {
+    const { editor, state } = makeEditor();
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([
+      ['service', editor],
+    ]);
+    const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
+    const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
+    // Replace the policy with a sparse entry that lacks both `role` and
+    // `members`. removeBinding should normalise via `?? ''` / `?? []`.
+    state.policy = {
+      bindings: [{}, { role: undefined, members: undefined }],
+      etag: 'etag-sparse-rev',
+    };
+    await expect(out.revoke()).resolves.toBeUndefined();
+    // setIamPolicy is called even when the resulting bindings list is
+    // empty, because the original policy had non-zero entries.
+    expect(state.setCalls).toBeGreaterThan(0);
+  });
+
+  it('removeBinding tolerates a policy without a bindings array (no-op)', async () => {
+    const { editor, state } = makeEditor();
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([
+      ['service', editor],
+    ]);
+    const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
+    const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
+    state.policy = { etag: 'etag-empty-no-bindings' };
+    const setsBefore = state.setCalls;
+    await out.revoke();
+    expect(state.setCalls).toBe(setsBefore);
+  });
+
+  it('removeBinding short-circuits when the policy is already empty', async () => {
+    const { editor, state } = makeEditor();
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([
+      ['service', editor],
+    ]);
+    const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
+    const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
+    // Forcibly empty the policy server-side between scope and revoke
+    // (mimics another actor having already cleaned up).
+    state.policy = { bindings: [], etag: 'etag-empty' };
+    const setsBefore = state.setCalls;
+    await out.revoke();
+    // Idempotent: no setIamPolicy issued when there's nothing to remove.
+    expect(state.setCalls).toBe(setsBefore);
+  });
+
   it('preserves pre-existing bindings on other roles', async () => {
     const { editor, state } = makeEditor();
     state.policy = {

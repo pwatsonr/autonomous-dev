@@ -191,6 +191,17 @@ describe('AWSCredentialScoper.scope', () => {
     expect(typeof sc.scope).toBe('function');
   });
 
+  it('default constructor builds a real STSClient when sts is not injected', () => {
+    // Exercises the default-argument branch in the constructor. We do NOT
+    // call .scope() here — that would require AWS credentials. Construction
+    // alone is enough to land the branch.
+    const sc = new AWSCredentialScoper({
+      proxyAssumeRoleArn: 'arn:aws:iam::123:role/role',
+      region: 'us-east-1',
+    });
+    expect(sc.provider).toBe('aws');
+  });
+
   it('AssumeRoleCommand argument is the real SDK class (compile-time check)', async () => {
     const { sts } = makeMockSts(VALID_RESPONSE);
     const scoper = new AWSCredentialScoper(

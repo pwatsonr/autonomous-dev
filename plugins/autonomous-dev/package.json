@@ -10,7 +10,9 @@
     "test:cli": "jest intake/adapters/cli_adapter.test.ts",
     "test:bats": "bats tests/bats/",
     "test:ci-schema": "bats ../../tests/ci/test_plugin_schema.bats",
-    "test:perf": "ts-node --transpile-only --compiler-options '{\"module\":\"commonjs\"}' tests/perf/test-validation-pipeline.bench.ts"
+    "test:perf": "ts-node --transpile-only --compiler-options '{\"module\":\"commonjs\"}' tests/perf/test-validation-pipeline.bench.ts",
+    "test:cred-proxy": "jest tests/cred-proxy",
+    "test:kind": "RUN_KIND_TESTS=1 jest tests/integration/test-cred-proxy-scope.test.ts --runInBand"
   },
   "dependencies": {
     "@aws-sdk/client-sts": "^3.1041.0",

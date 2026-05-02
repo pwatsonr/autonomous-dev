@@ -239,6 +239,57 @@ describe('AzureCredentialScoper.scope', () => {
     ).rejects.toThrow(/missing required scope key 'appName'/);
   });
 
+  it('revoke() treats message-only "404" as success', async () => {
+    const ra = makeRoleAssignments();
+    const cred = makeCred();
+    const scoper = new AzureCredentialScoper(cfg, ra.client, cred.cred);
+    const out = await scoper.scope('ContainerApps.Deploy', VALID);
+    // Neither statusCode nor code, but message matches the regex.
+    ra.state.nextDeleteError = { message: 'request returned 404 from server' };
+    await expect(out.revoke()).resolves.toBeUndefined();
+  });
+
+  it('revoke() treats numeric code 404 as success', async () => {
+    const ra = makeRoleAssignments();
+    const cred = makeCred();
+    const scoper = new AzureCredentialScoper(cfg, ra.client, cred.cred);
+    const out = await scoper.scope('ContainerApps.Deploy', VALID);
+    ra.state.nextDeleteError = { code: 404, message: 'gone' };
+    await expect(out.revoke()).resolves.toBeUndefined();
+  });
+
+  it('revoke() propagates non-object errors as-is', async () => {
+    const ra = makeRoleAssignments();
+    const cred = makeCred();
+    const scoper = new AzureCredentialScoper(cfg, ra.client, cred.cred);
+    const out = await scoper.scope('ContainerApps.Deploy', VALID);
+    // Non-object error: isNotFound() returns false on `typeof !== 'object'`,
+    // so this propagates verbatim.
+    ra.state.nextDeleteError = 'string-error';
+    await expect(out.revoke()).rejects.toBe('string-error');
+  });
+
+  it('revoke() propagates errors with no statusCode/code/message', async () => {
+    const ra = makeRoleAssignments();
+    const cred = makeCred();
+    const scoper = new AzureCredentialScoper(cfg, ra.client, cred.cred);
+    const out = await scoper.scope('ContainerApps.Deploy', VALID);
+    // Object error but no recognised 404 markers — message field absent.
+    ra.state.nextDeleteError = { foo: 'bar' };
+    await expect(out.revoke()).rejects.toEqual({ foo: 'bar' });
+  });
+
+  it('revoke() propagates errors whose message does NOT match the 404 regex', async () => {
+    const ra = makeRoleAssignments();
+    const cred = makeCred();
+    const scoper = new AzureCredentialScoper(cfg, ra.client, cred.cred);
+    const out = await scoper.scope('ContainerApps.Deploy', VALID);
+    ra.state.nextDeleteError = { message: 'unrelated server error' };
+    await expect(out.revoke()).rejects.toMatchObject({
+      message: 'unrelated server error',
+    });
+  });
+
   it('exposes provider="azure" and is structurally a CredentialScoper', () => {
     const ra = makeRoleAssignments();
     const cred = makeCred();
