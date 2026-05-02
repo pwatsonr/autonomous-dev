@@ -1,0 +1,43 @@
+# Small standards fixture (5 rules) for rule-set-enforcement-reviewer tests.
+# See SPEC-020-1-03. Used by both unit tests and the standards eval suite.
+
+rules:
+  - id: max-function-length
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:max-function-length
+    severity: medium
+    category: standards.style
+    title: "Function exceeds maximum length"
+    remediation: "Split the function into smaller, single-responsibility helpers."
+
+  - id: no-console-log
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:forbidden-call
+    severity: low
+    category: standards.style
+    title: "console.log is forbidden in source"
+    remediation: "Use the project logger (src/logging.ts) instead of console.log."
+
+  - id: prefer-const
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:prefer-const
+    severity: low
+    category: standards.style
+    title: "Variable never reassigned should use const"
+    remediation: "Replace `let` with `const` for variables that are never reassigned."
+
+  - id: require-jsdoc
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:require-jsdoc
+    severity: low
+    category: standards.docs
+    title: "Exported function missing JSDoc"
+    remediation: "Add a JSDoc block describing the function's purpose, parameters, and return value."
+
+  - id: no-default-export
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:no-default-export
+    severity: medium
+    category: standards.module-shape
+    title: "Default export is forbidden"
+    remediation: "Use a named export so consumers cannot rename the symbol on import."

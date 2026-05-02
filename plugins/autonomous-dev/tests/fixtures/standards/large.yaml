@@ -1,0 +1,213 @@
+# Large standards fixture (25 rules) for rule-set-enforcement-reviewer tests.
+# See SPEC-020-1-03. Includes the 5 rules from small.yaml plus 20 additional
+# rules covering style, performance, naming, dependency-injection patterns,
+# and the two security-critical rules: no-lodash, no-hardcoded-secrets.
+
+rules:
+  # --- mirrored from small.yaml ---
+  - id: max-function-length
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:max-function-length
+    severity: medium
+    category: standards.style
+    title: "Function exceeds maximum length"
+    remediation: "Split the function into smaller, single-responsibility helpers."
+
+  - id: no-console-log
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:forbidden-call
+    severity: low
+    category: standards.style
+    title: "console.log is forbidden in source"
+    remediation: "Use the project logger (src/logging.ts) instead of console.log."
+
+  - id: prefer-const
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:prefer-const
+    severity: low
+    category: standards.style
+    title: "Variable never reassigned should use const"
+    remediation: "Replace `let` with `const`."
+
+  - id: require-jsdoc
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:require-jsdoc
+    severity: low
+    category: standards.docs
+    title: "Exported function missing JSDoc"
+    remediation: "Add a JSDoc block."
+
+  - id: no-default-export
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:no-default-export
+    severity: medium
+    category: standards.module-shape
+    title: "Default export is forbidden"
+    remediation: "Use a named export."
+
+  # --- security-critical rules ---
+  - id: no-lodash
+    applies_to: ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js"]
+    evaluator: builtin:forbidden-imports
+    severity: high
+    category: standards.forbidden-imports
+    title: "lodash is forbidden"
+    remediation: "Use the standard library or the project's tiny-utils helpers."
+    security_critical: true
+
+  - id: no-hardcoded-secrets
+    applies_to: ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "**/*.env*"]
+    evaluator: builtin:no-hardcoded-secrets
+    severity: critical
+    category: standards.secrets
+    title: "Hardcoded secret detected"
+    remediation: "Move the secret to a managed secrets store (env var or KMS) and reference it at runtime."
+    security_critical: true
+
+  # --- additional style + naming rules ---
+  - id: no-unused-imports
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:no-unused-imports
+    severity: low
+    category: standards.style
+    title: "Unused import"
+    remediation: "Remove the import."
+
+  - id: no-magic-numbers
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:no-magic-numbers
+    severity: low
+    category: standards.style
+    title: "Magic number in expression"
+    remediation: "Promote the number to a named constant."
+
+  - id: no-any
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:no-any
+    severity: medium
+    category: standards.types
+    title: "Avoid the 'any' type"
+    remediation: "Use a specific type, an interface, or 'unknown' if the shape is genuinely unconstrained."
+
+  - id: no-non-null-assertion
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:no-non-null-assertion
+    severity: medium
+    category: standards.types
+    title: "Non-null assertion (!) used"
+    remediation: "Refactor to a real null check; document why the value is guaranteed non-null."
+
+  - id: filename-kebab-case
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:filename-kebab-case
+    severity: low
+    category: standards.naming
+    title: "Filename should be kebab-case"
+    remediation: "Rename the file to kebab-case."
+
+  - id: function-camel-case
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:function-camel-case
+    severity: low
+    category: standards.naming
+    title: "Function name should be camelCase"
+    remediation: "Rename the function to camelCase."
+
+  - id: type-pascal-case
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:type-pascal-case
+    severity: low
+    category: standards.naming
+    title: "Type / interface should be PascalCase"
+    remediation: "Rename the type to PascalCase."
+
+  # --- performance rules ---
+  - id: no-sync-fs-in-handler
+    applies_to: ["src/handlers/**/*.ts", "src/routes/**/*.ts"]
+    evaluator: builtin:no-sync-fs
+    severity: high
+    category: standards.performance
+    title: "Synchronous fs call in request handler"
+    remediation: "Use the async fs/promises API to avoid blocking the event loop."
+
+  - id: avoid-await-in-loop
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:avoid-await-in-loop
+    severity: low
+    category: standards.performance
+    title: "await inside a loop"
+    remediation: "Collect promises and use Promise.all to parallelize."
+
+  - id: no-large-bundle-imports
+    applies_to: ["src/web/**/*.ts", "src/web/**/*.tsx"]
+    evaluator: builtin:no-large-bundle-imports
+    severity: medium
+    category: standards.performance
+    title: "Large dependency imported into bundle"
+    remediation: "Tree-shake or lazy-load the dependency."
+
+  # --- dependency-injection patterns ---
+  - id: prefer-constructor-injection
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:prefer-constructor-injection
+    severity: medium
+    category: standards.di
+    title: "Prefer constructor injection over module-level singletons"
+    remediation: "Pass the dependency through the constructor so it can be substituted in tests."
+
+  - id: no-direct-env-access
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:no-direct-env-access
+    severity: medium
+    category: standards.di
+    title: "process.env accessed outside config module"
+    remediation: "Read environment variables once in src/config.ts and inject the resolved value."
+
+  - id: no-circular-deps
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:no-circular-deps
+    severity: high
+    category: standards.architecture
+    title: "Circular module dependency detected"
+    remediation: "Break the cycle with an interface or a shared types module."
+
+  # --- error handling rules ---
+  - id: catch-with-rethrow-or-log
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:catch-with-rethrow-or-log
+    severity: medium
+    category: standards.errors
+    title: "Empty catch block swallows the error"
+    remediation: "Log the error with the project logger or rethrow."
+
+  - id: no-process-exit
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:no-process-exit
+    severity: high
+    category: standards.errors
+    title: "process.exit called outside the entry-point"
+    remediation: "Throw an error and let the entry-point handle exit codes."
+
+  - id: prefer-async-await
+    applies_to: ["src/**/*.ts", "src/**/*.tsx"]
+    evaluator: builtin:prefer-async-await
+    severity: low
+    category: standards.style
+    title: "Use async/await instead of raw .then chains"
+    remediation: "Refactor to async/await."
+
+  - id: no-eval
+    applies_to: ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js"]
+    evaluator: builtin:no-eval
+    severity: critical
+    category: standards.security
+    title: "eval() is forbidden"
+    remediation: "Refactor to a safe alternative; eval enables RCE if user input ever reaches it."
+
+  - id: require-test-for-new-export
+    applies_to: ["src/**/*.ts"]
+    evaluator: builtin:require-test-for-new-export
+    severity: low
+    category: standards.tests
+    title: "New exported symbol has no test coverage"
+    remediation: "Add a unit test for the exported symbol before merging."
