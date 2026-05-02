@@ -63,6 +63,9 @@ import { loadBugContext } from '../cli/bug-context-loader';
 import { registerStandardsCommand } from './cli_adapter_standards';
 import { registerChainsCommand } from '../cli/chains_command';
 import { registerDeployBackendsCommand } from '../cli/deploy_backends_command';
+import { registerDeployApproveCommand } from '../cli/deploy_approve_command';
+import { registerDeployRejectCommand } from '../cli/deploy_reject_command';
+import { registerDeployPlanCommand } from '../cli/deploy_plan_command';
 import {
   formatErrors,
   runInteractivePrompts,
@@ -771,6 +774,11 @@ export function buildProgram(
 
   // SPEC-023-1-04: deploy backends list / describe subcommands.
   registerDeployBackendsCommand(program);
+
+  // SPEC-023-2-04: deploy approve / reject / plan subcommands.
+  registerDeployApproveCommand(program);
+  registerDeployRejectCommand(program);
+  registerDeployPlanCommand(program);
 
   return program;
 }
