@@ -238,6 +238,98 @@ export class CostCapExceededError extends DeployError {
   }
 }
 
+/** Raised when `HealthMonitor.start()` is invoked after `stop()` (SPEC-023-3-01). */
+export class MonitorAlreadyStoppedError extends DeployError {
+  constructor() {
+    super('HealthMonitor: cannot start() after stop(); construct a new instance');
+    this.name = 'MonitorAlreadyStoppedError';
+  }
+}
+
+/** Raised by `DeployLogger` when methods are called after `close()` (SPEC-023-3-02). */
+export class LoggerClosedError extends DeployError {
+  constructor() {
+    super('DeployLogger: write attempted after close()');
+    this.name = 'LoggerClosedError';
+  }
+}
+
+/** Raised when the daily cost cap is exceeded (SPEC-023-3-03). */
+export class DailyCostCapExceededError extends DeployError {
+  constructor(
+    public readonly projected: number,
+    public readonly cap: number,
+  ) {
+    super(
+      `daily cost cap exceeded: projected USD ${projected.toFixed(2)} >= cap ${cap.toFixed(2)}`,
+    );
+    this.name = 'DailyCostCapExceededError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      projected: this.projected,
+      cap: this.cap,
+    };
+  }
+}
+
+/** Raised when the projected spend crosses the 110% override threshold (SPEC-023-3-03). */
+export class AdminOverrideRequiredError extends DeployError {
+  constructor(
+    public readonly projected: number,
+    public readonly cap: number,
+    public readonly threshold: number,
+  ) {
+    super(
+      `admin override required: projected USD ${projected.toFixed(2)} >= ${(threshold * 100).toFixed(0)}% of cap ${cap.toFixed(2)}`,
+    );
+    this.name = 'AdminOverrideRequiredError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      projected: this.projected,
+      cap: this.cap,
+      threshold: this.threshold,
+    };
+  }
+}
+
+/** Raised when the cost ledger HMAC chain fails verification (SPEC-023-3-03). */
+export class CostLedgerCorruptError extends DeployError {
+  constructor(
+    public readonly lineNumber: number,
+    public readonly reason: string,
+  ) {
+    super(`cost ledger corrupt at line ${lineNumber}: ${reason}`);
+    this.name = 'CostLedgerCorruptError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      lineNumber: this.lineNumber,
+      reason: this.reason,
+    };
+  }
+}
+
+/** Raised when the HMAC key env var is missing at append time (SPEC-023-3-03). */
+export class CostLedgerKeyMissingError extends DeployError {
+  constructor(public readonly envVar: string) {
+    super(
+      `cost ledger HMAC key missing: set environment variable ${envVar} to a 32-byte hex string`,
+    );
+    this.name = 'CostLedgerKeyMissingError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return { name: this.name, message: this.message, envVar: this.envVar };
+  }
+}
+
 /** Raised by external-tool wrappers (`runTool`) on non-zero exit. */
 export class ExternalToolError extends DeployError {
   constructor(

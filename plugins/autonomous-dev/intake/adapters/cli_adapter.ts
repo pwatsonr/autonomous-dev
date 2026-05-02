@@ -66,6 +66,8 @@ import { registerDeployBackendsCommand } from '../cli/deploy_backends_command';
 import { registerDeployApproveCommand } from '../cli/deploy_approve_command';
 import { registerDeployRejectCommand } from '../cli/deploy_reject_command';
 import { registerDeployPlanCommand } from '../cli/deploy_plan_command';
+import { registerDeployCostCommand } from '../cli/deploy_cost_command';
+import { registerDeployLogsCommand } from '../cli/deploy_logs_command';
 import {
   formatErrors,
   runInteractivePrompts,
@@ -779,6 +781,10 @@ export function buildProgram(
   registerDeployApproveCommand(program);
   registerDeployRejectCommand(program);
   registerDeployPlanCommand(program);
+
+  // SPEC-023-3-03: deploy cost / logs subcommands.
+  registerDeployCostCommand(program);
+  registerDeployLogsCommand(program);
 
   return program;
 }
