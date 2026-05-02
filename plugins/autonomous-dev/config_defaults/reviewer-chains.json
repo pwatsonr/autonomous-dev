@@ -8,34 +8,69 @@
         { "name": "qa-edge-case-reviewer", "type": "specialist", "blocking": true, "threshold": 80 },
         { "name": "ux-ui-reviewer", "type": "specialist", "blocking": false, "threshold": 75, "trigger": "frontend" },
         { "name": "accessibility-reviewer", "type": "specialist", "blocking": false, "threshold": 75, "trigger": "frontend" },
-        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 }
+        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 },
+        {
+          "name": "standards-meta-reviewer",
+          "type": "specialist",
+          "blocking": true,
+          "threshold": 0,
+          "trigger": { "kind": "path-filter", "paths": ["**/.autonomous-dev/standards.yaml"] }
+        }
       ]
     },
     "bug": {
       "code_review": [
         { "name": "code-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
         { "name": "qa-edge-case-reviewer", "type": "specialist", "blocking": true, "threshold": 85 },
-        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 }
+        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 },
+        {
+          "name": "standards-meta-reviewer",
+          "type": "specialist",
+          "blocking": true,
+          "threshold": 0,
+          "trigger": { "kind": "path-filter", "paths": ["**/.autonomous-dev/standards.yaml"] }
+        }
       ]
     },
     "infra": {
       "code_review": [
         { "name": "code-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
         { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 95 },
-        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 }
+        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 },
+        {
+          "name": "standards-meta-reviewer",
+          "type": "specialist",
+          "blocking": true,
+          "threshold": 0,
+          "trigger": { "kind": "path-filter", "paths": ["**/.autonomous-dev/standards.yaml"] }
+        }
       ]
     },
     "refactor": {
       "code_review": [
         { "name": "code-reviewer", "type": "built-in", "blocking": true, "threshold": 85 },
         { "name": "qa-edge-case-reviewer", "type": "specialist", "blocking": false, "threshold": 75 },
-        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 }
+        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 },
+        {
+          "name": "standards-meta-reviewer",
+          "type": "specialist",
+          "blocking": true,
+          "threshold": 0,
+          "trigger": { "kind": "path-filter", "paths": ["**/.autonomous-dev/standards.yaml"] }
+        }
       ]
     },
     "hotfix": {
       "code_review": [
         { "name": "code-reviewer", "type": "built-in", "blocking": true, "threshold": 75 },
-        { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 80 }
+        { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
+        {
+          "name": "standards-meta-reviewer",
+          "type": "specialist",
+          "blocking": true,
+          "threshold": 0,
+          "trigger": { "kind": "path-filter", "paths": ["**/.autonomous-dev/standards.yaml"] }
+        }
       ]
     }
   }

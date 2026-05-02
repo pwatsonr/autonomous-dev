@@ -54,8 +54,23 @@
           "description": "Minimum score (0-100) required to satisfy a passing verdict."
         },
         "trigger": {
-          "enum": ["frontend"],
-          "description": "Conditional trigger: only run when the change set matches the trigger. Currently only `frontend` is supported."
+          "description": "Conditional trigger: only run when the change set matches the trigger. Either the legacy string form (`frontend`) or the structured `path-filter` object (SPEC-021-3-02).",
+          "oneOf": [
+            { "type": "string", "enum": ["frontend"] },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "paths"],
+              "properties": {
+                "kind": { "type": "string", "enum": ["path-filter"] },
+                "paths": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 },
+                  "minItems": 1
+                }
+              }
+            }
+          ]
         },
         "enabled": {
           "type": "boolean",

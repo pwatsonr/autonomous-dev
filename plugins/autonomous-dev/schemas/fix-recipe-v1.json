@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/pwatsonr/autonomous-dev/plugins/autonomous-dev/schemas/fix-recipe-v1.json",
+  "title": "Fix Recipe v1",
+  "description": "Machine-applicable fix instruction emitted by the rule-set-enforcement-reviewer when a standards rule is violated. Consumed by TDD-022 code-fixer plugins. Schema source-of-truth for the FixRecipe interface in src/standards/fix-recipe.ts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "violation_id",
+    "rule_id",
+    "file",
+    "line",
+    "fix_type",
+    "before",
+    "after_template",
+    "confidence"
+  ],
+  "properties": {
+    "violation_id": {
+      "type": "string",
+      "pattern": "^VIO-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}$",
+      "description": "Globally unique violation identifier. Format: VIO-<UTC-timestamp>-<8-hex-hash>."
+    },
+    "rule_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+:[a-z0-9-]+$",
+      "description": "Namespaced standards rule ID per PLAN-021-1 (<plugin>:<id>)."
+    },
+    "file": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Repo-relative path of the file the violation occurs in (or, for file-creation, the path the file SHOULD be created at)."
+    },
+    "line": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "1-based line number of the violation; 0 for file-creation recipes (no existing line)."
+    },
+    "fix_type": {
+      "type": "string",
+      "enum": ["code-replacement", "file-creation", "dependency-add"],
+      "description": "Discriminator for the kind of fix. Determines how a downstream code-fixer interprets `before`/`after_template`."
+    },
+    "before": {
+      "type": "string",
+      "description": "The current state. For code-replacement: the offending text snippet. For file-creation: empty string. For dependency-add: the dependency name (used by the fixer to detect already-present)."
+    },
+    "after_template": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The desired state. For code-replacement: the replacement snippet. For file-creation: the full file body. For dependency-add: the dependency declaration (e.g., a package.json/requirements.txt fragment)."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Reviewer-asserted confidence the fix is correct without human review. 1.0 means fully automated; lower values warrant manual review."
+    },
+    "manual_review_required": {
+      "type": "boolean",
+      "description": "Optional explicit override. If true, downstream fixers MUST NOT auto-apply regardless of confidence."
+    }
+  },
+  "examples": [
+    {
+      "violation_id": "VIO-20251101T120000Z-a1b2c3d4",
+      "rule_id": "security:no-sql-injection",
+      "file": "src/db/users.ts",
+      "line": 42,
+      "fix_type": "code-replacement",
+      "before": "db.query(`SELECT * FROM users WHERE id = ${userId}`)",
+      "after_template": "db.query('SELECT * FROM users WHERE id = $1', [userId])",
+      "confidence": 0.95
+    },
+    {
+      "violation_id": "VIO-20251101T120100Z-e5f6a7b8",
+      "rule_id": "operability:exposes-health-endpoint",
+      "file": "src/routes/health.ts",
+      "line": 0,
+      "fix_type": "file-creation",
+      "before": "",
+      "after_template": "import { Router } from 'express';\n\nconst router = Router();\n\nrouter.get('/health', (_req, res) => {\n  res.status(200).json({ status: 'ok' });\n});\n\nexport default router;\n",
+      "confidence": 0.85,
+      "manual_review_required": false
+    },
+    {
+      "violation_id": "VIO-20251101T120200Z-c9d0e1f2",
+      "rule_id": "framework:python-fastapi",
+      "file": "requirements.txt",
+      "line": 0,
+      "fix_type": "dependency-add",
+      "before": "fastapi",
+      "after_template": "fastapi>=0.110,<1.0\n",
+      "confidence": 0.9
+    }
+  ]
+}

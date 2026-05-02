@@ -26,6 +26,10 @@
       "type": "array",
       "description": "Zero or more findings. Empty array is valid (paired with verdict APPROVE).",
       "items": { "$ref": "#/$defs/finding" }
+    },
+    "requires_two_person_approval": {
+      "type": "boolean",
+      "description": "Set true by the standards-meta-reviewer (SPEC-021-3-02) when a PR contains major standards changes (adding/removing immutable rules, adding/modifying framework_match assertions). The aggregator gates the merge until two distinct human approvers have approved the PR. Absence is equivalent to false."
     }
   },
   "$defs": {

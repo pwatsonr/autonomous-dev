@@ -1,0 +1,10 @@
+{
+  "violation_id": "VIO-20251101T120000Z-a1b2c3d4",
+  "rule_id": "security:no-sql-injection",
+  "file": "src/db/users.ts",
+  "line": 42,
+  "fix_type": "code-replacement",
+  "before": "db.query(`SELECT * FROM users WHERE id = ${userId}`)",
+  "after_template": "db.query('SELECT * FROM users WHERE id = $1', [userId])",
+  "confidence": 0.95
+}
