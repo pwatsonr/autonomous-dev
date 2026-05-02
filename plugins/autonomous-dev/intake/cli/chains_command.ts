@@ -31,6 +31,10 @@ import {
   registerChainsReject,
   type ChainsRejectDeps,
 } from './chains_reject_command';
+import {
+  registerChainsAudit,
+  type ChainsAuditDeps,
+} from './chains_audit_command';
 
 /**
  * Stream pair injected for testability — defaults to process.stdout/stderr.
@@ -56,6 +60,13 @@ export interface ChainsCommandDeps extends ChainsCommandStreams {
   approveDepsFactory?: () => ChainsApproveDeps;
   /** SPEC-022-2-04: factory for the `chains reject` subcommand deps. */
   rejectDepsFactory?: () => ChainsRejectDeps;
+  /**
+   * SPEC-022-3-03: optional dependencies for the `chains audit verify` /
+   * `chains audit query` sub-group. When omitted, the subcommands are
+   * still registered but use default key + log path resolution (which
+   * is what production wants 99% of the time).
+   */
+  auditDeps?: ChainsAuditDeps;
 }
 
 /**
@@ -199,4 +210,22 @@ export function registerChainsCommand(
         throw new Error('chains graph failed');
       }
     });
+
+  // SPEC-022-3-03: register `chains audit verify` + `chains audit query`
+  // under the same `chains` group. Production resolves the HMAC key via
+  // the default resolver; tests inject `auditDeps.keyResolver` and
+  // `auditDeps.stdout`.
+  registerChainsAudit(chains, deps.auditDeps ?? {});
+
+  // SPEC-022-2-04: register `chains approve` + `chains reject` when the
+  // caller supplies the relevant deps factories. Without the factories
+  // the executor + state-store wiring isn't available, so the
+  // subcommands are silently elided to preserve existing call sites
+  // that only need `list`/`graph`/`audit`.
+  if (deps.approveDepsFactory) {
+    registerChainsApprove(chains, deps.approveDepsFactory);
+  }
+  if (deps.rejectDepsFactory) {
+    registerChainsReject(chains, deps.rejectDepsFactory);
+  }
 }

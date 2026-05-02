@@ -50,6 +50,11 @@ import {
   type ChainTelemetryEvent,
   type ChainTelemetryOutcome,
 } from './telemetry-emitter';
+import type { ChainAuditWriter } from './audit-writer';
+import type {
+  ChainEventPayloads,
+  ChainEventType,
+} from './audit-events';
 import type {
   ArtifactRef,
   ChainPausedState,
@@ -139,6 +144,23 @@ export interface ChainExecutorOptions {
    * to disable for tests that want to assert the absence of emissions.
    */
   emitTelemetry?: boolean;
+  /**
+   * SPEC-022-3-03: optional chain-audit forensics writer. When provided,
+   * the executor emits one HMAC-chained audit entry per lifecycle event
+   * (`chain_started`, `plugin_invoked`, `plugin_completed`, etc.). When
+   * absent, audit emission is suppressed (back-compat with PLAN-022-1
+   * callers + tests that don't care about forensics).
+   *
+   * Audit emission is fail-OPEN: append failures are logged ERROR and the
+   * chain continues. This is opposite to security failures, which abort.
+   */
+  chainAuditWriter?: ChainAuditWriter;
+  /**
+   * SPEC-022-3-03: stable name (or topology fingerprint) recorded in the
+   * `chain_started` audit entry's `chain_name` field. Defaults to the
+   * triggering plugin id when omitted.
+   */
+  chainName?: string;
 }
 
 /**
@@ -273,6 +295,16 @@ export class ChainExecutor {
   private readonly privilegedChainAllowlist: ReadonlyArray<string> | undefined;
   private readonly privilegedChainResolver: PrivilegedChainResolver;
   private readonly emitTelemetryFlag: boolean;
+  /** SPEC-022-3-03: chain-audit writer (optional). */
+  private readonly chainAuditWriter?: ChainAuditWriter;
+  /** SPEC-022-3-03: chain-name override for the `chain_started` payload. */
+  private readonly chainName?: string;
+  /**
+   * SPEC-022-3-03: per-chain audit entry counter. Reset by `executeChain`
+   * + `resume` so the `chain_completed.entries` payload reports the count
+   * for THIS execution (not the writer's lifetime total).
+   */
+  private auditEntryCount = 0;
   constructor(
     private readonly graph: DependencyGraph,
     private readonly artifacts: ArtifactRegistry,
@@ -292,6 +324,29 @@ export class ChainExecutor {
     this.privilegedChainAllowlist = options.privilegedChainAllowlist;
     this.privilegedChainResolver = new PrivilegedChainResolver();
     this.emitTelemetryFlag = options.emitTelemetry !== false;
+    this.chainAuditWriter = options.chainAuditWriter;
+    this.chainName = options.chainName;
+  }
+
+  /**
+   * SPEC-022-3-03: best-effort audit emission. Increments the local
+   * counter on success; logs ERROR and continues on append failure
+   * (fail-OPEN — chain forensics may be incomplete but the workload
+   * completes). When no writer is injected this is a no-op.
+   */
+  private async emitAudit<T extends ChainEventType>(
+    type: T,
+    payload: ChainEventPayloads[T],
+  ): Promise<void> {
+    if (!this.chainAuditWriter) return;
+    try {
+      await this.chainAuditWriter.append(type, this.chainId, payload);
+      this.auditEntryCount += 1;
+    } catch (err) {
+      this.logger.warn?.(
+        `chain ${this.chainId}: audit emit failed for ${type}: ${(err as Error).message}`,
+      );
+    }
   }
 
   /** Effective resource limits in use. Visible for tests + telemetry. */
@@ -373,6 +428,9 @@ export class ChainExecutor {
     // including for `blocked` (privileged-chain rejection) and
     // `ChainTooLongError` paths that throw before the semaphore.
     const startTime = performance.now();
+    // SPEC-022-3-03: reset per-chain audit counter so chain_completed.entries
+    // reports the count for THIS execution.
+    this.auditEntryCount = 0;
     let result: ChainExecutionResult | undefined;
     let thrown: unknown;
     let semaphoreHeld = false;
@@ -404,6 +462,38 @@ export class ChainExecutor {
     } finally {
       if (semaphoreHeld) {
         ChainExecutor.activeChains -= 1;
+      }
+      // SPEC-022-3-03: chain_completed / chain_failed terminal audit entry.
+      // `paused` is NOT a terminal state — no entry is emitted there
+      // (the `approval_requested` entry already records the pause point;
+      // resume/reject will emit a fresh terminal entry on their own).
+      if (this.chainAuditWriter) {
+        const duration_ms = performance.now() - startTime;
+        if (thrown !== undefined) {
+          const err = thrown as { name?: string };
+          await this.emitAudit('chain_failed', {
+            chain_id: this.chainId,
+            duration_ms,
+            failure_stage: 'preflight',
+            error_code: err?.name ?? 'Error',
+          });
+        } else if (result && result.outcome === 'success') {
+          // entries count is +1 for the `chain_completed` entry itself.
+          await this.emitAudit('chain_completed', {
+            chain_id: this.chainId,
+            duration_ms,
+            entries: this.auditEntryCount + 1,
+          });
+        } else if (result && result.outcome === 'failed') {
+          const errStep = result.steps.find((s) => s.status === 'error');
+          await this.emitAudit('chain_failed', {
+            chain_id: this.chainId,
+            duration_ms,
+            failure_stage: errStep ? 'plugin' : 'unknown',
+            error_code: errStep?.error ?? 'unknown',
+          });
+        }
+        // outcome === 'paused' → no terminal entry; pause is a suspension.
       }
       // SPEC-022-2-04: telemetry emission. Wrapped in try/catch in case
       // result accessor or payload construction fails — must never break
@@ -537,6 +627,17 @@ export class ChainExecutor {
       seedArtifact.artifactType,
     );
 
+    // SPEC-022-3-03: chain_started emission — once per chain execution,
+    // immediately after pre-flights but before any plugin work.
+    await this.emitAudit('chain_started', {
+      chain_id: this.chainId,
+      chain_name: this.chainName ?? triggeringPluginId,
+      trigger: triggeringPluginId,
+      plugins: precomputedOrder.length > 0
+        ? [...precomputedOrder]
+        : [triggeringPluginId],
+    });
+
     // Step 1: validate the seed.
     const validateStart = performance.now();
     const validation = this.artifacts.validate(
@@ -609,6 +710,22 @@ export class ChainExecutor {
     };
     steps.push(seedStep);
     this.logStep(triggeringPluginId, 'ok', seedStep.durationMs);
+    // SPEC-022-3-03: seed artifact emission. The triggering plugin's
+    // produces[].requires_approval flag answers `signed`: a privileged
+    // chain attaches `_chain_signature` so audit consumers can filter
+    // for security-relevant artifacts.
+    {
+      const seedDeclared = (triggerManifest?.produces ?? []).find(
+        (p) => p.artifact_type === seedArtifact.artifactType,
+      );
+      await this.emitAudit('artifact_emitted', {
+        chain_id: this.chainId,
+        producer_plugin_id: triggeringPluginId,
+        artifact_type: seedArtifact.artifactType,
+        artifact_id: seedArtifact.scanId,
+        signed: seedDeclared?.requires_approval === true,
+      });
+    }
 
     // Step 3: walk downstream in topological order.
     const order = precomputedOrder.length > 0
@@ -793,6 +910,16 @@ export class ChainExecutor {
         continue;
       }
 
+      // SPEC-022-3-03: plugin_invoked emission. `step` is the 1-based
+      // index in the downstream walk (the seed is step 0 conceptually).
+      const stepIndex = downstreamIds.indexOf(pid) + 1;
+      await this.emitAudit('plugin_invoked', {
+        chain_id: this.chainId,
+        plugin_id: pid,
+        step: stepIndex,
+        consumes: (manifest.consumes ?? []).map((c) => c.artifact_type),
+      });
+
       // Invoke the plugin's chain hook (SPEC-022-2-01: enforced timeout).
       let outputs: ChainHookOutput[];
       try {
@@ -814,6 +941,14 @@ export class ChainExecutor {
         };
         steps.push(step);
         this.logStep(pid, 'error', step.durationMs, step.error);
+        // SPEC-022-3-03: plugin_failed emission (invocation throw path).
+        await this.emitAudit('plugin_failed', {
+          chain_id: this.chainId,
+          plugin_id: pid,
+          step: stepIndex,
+          error_code: (err as { name?: string })?.name ?? 'Error',
+          error_message: (err as Error).message,
+        });
         if (mode === 'block') {
           chainBlocked = true;
           blockingProducer = pid;
@@ -880,6 +1015,14 @@ export class ChainExecutor {
         };
         steps.push(step);
         this.logStep(pid, 'error', step.durationMs, step.error);
+        // SPEC-022-3-03: plugin_failed emission (validate/persist path).
+        await this.emitAudit('plugin_failed', {
+          chain_id: this.chainId,
+          plugin_id: pid,
+          step: stepIndex,
+          error_code: 'ProducedArtifactError',
+          error_message: producedError,
+        });
         if (mode === 'block') {
           chainBlocked = true;
           blockingProducer = pid;
@@ -896,6 +1039,26 @@ export class ChainExecutor {
       };
       steps.push(step);
       this.logStep(pid, 'ok', step.durationMs);
+
+      // SPEC-022-3-03: plugin_completed + artifact_emitted (per produced).
+      await this.emitAudit('plugin_completed', {
+        chain_id: this.chainId,
+        plugin_id: pid,
+        step: stepIndex,
+        duration_ms: step.durationMs,
+      });
+      for (const p of produced) {
+        const declared = (manifest.produces ?? []).find(
+          (d) => d.artifact_type === p.artifactType,
+        );
+        await this.emitAudit('artifact_emitted', {
+          chain_id: this.chainId,
+          producer_plugin_id: pid,
+          artifact_type: p.artifactType,
+          artifact_id: p.scanId,
+          signed: declared?.requires_approval === true,
+        });
+      }
 
       // SPEC-022-2-03: pause the chain when this plugin produced any
       // `requires_approval: true` artifact. The state file + escalation are
@@ -928,6 +1091,14 @@ export class ChainExecutor {
         };
         const statePath = StateStore.statePathFor(state.requestRoot, this.chainId);
         await this.stateStore.writeState(statePath, pausedState);
+        // SPEC-022-3-03: approval_requested emission. `gate_id` is the
+        // paused-at artifact id (stable handle for operators).
+        await this.emitAudit('approval_requested', {
+          chain_id: this.chainId,
+          gate_id: approvalArtifact.scanId,
+          requested_by: pid,
+          reason: `requires_approval on artifact_type=${approvalArtifact.artifactType}`,
+        });
         if (this.escalationRouter) {
           try {
             await this.escalationRouter.notify({
@@ -1028,11 +1199,59 @@ export class ChainExecutor {
     if (!approved) {
       throw new ChainNotApprovedError(chainId, persisted.paused_at_artifact);
     }
-    const result = await this.runRemaining(persisted);
-    // Cleanup on successful resume (ok or otherwise — the chain has had its
-    // chance to complete; leftover state would be misleading).
-    await this.stateStore.deleteState(statePath);
-    return result;
+    // SPEC-022-3-03: approval_granted emission. Reset the per-chain
+    // entry counter so the resumed chain's `chain_completed.entries` is
+    // computed against this resume run's emissions. The `granted_by`
+    // field is best-effort: the marker is observed via `fileExists` only
+    // (we don't read the marker JSON here to avoid coupling to PRD-009),
+    // so we record the resolved $USER as a structural signal.
+    this.auditEntryCount = 0;
+    const startTime = performance.now();
+    await this.emitAudit('approval_granted', {
+      chain_id: persisted.chain_id,
+      gate_id: persisted.paused_at_artifact,
+      granted_by: process.env.USER ?? 'unknown',
+    });
+    let resumeResult: ChainExecutionResult | undefined;
+    let resumeThrown: unknown;
+    try {
+      resumeResult = await this.runRemaining(persisted);
+      // Cleanup on successful resume (ok or otherwise — the chain has had its
+      // chance to complete; leftover state would be misleading).
+      await this.stateStore.deleteState(statePath);
+      return resumeResult;
+    } catch (err) {
+      resumeThrown = err;
+      throw err;
+    } finally {
+      // SPEC-022-3-03: terminal entry for the resumed chain.
+      if (this.chainAuditWriter) {
+        const duration_ms = performance.now() - startTime;
+        if (resumeThrown !== undefined) {
+          await this.emitAudit('chain_failed', {
+            chain_id: persisted.chain_id,
+            duration_ms,
+            failure_stage: 'resume',
+            error_code:
+              (resumeThrown as { name?: string })?.name ?? 'Error',
+          });
+        } else if (resumeResult && resumeResult.outcome === 'success') {
+          await this.emitAudit('chain_completed', {
+            chain_id: persisted.chain_id,
+            duration_ms,
+            entries: this.auditEntryCount + 1,
+          });
+        } else if (resumeResult && resumeResult.outcome === 'failed') {
+          const errStep = resumeResult.steps.find((s) => s.status === 'error');
+          await this.emitAudit('chain_failed', {
+            chain_id: persisted.chain_id,
+            duration_ms,
+            failure_stage: errStep ? 'plugin' : 'unknown',
+            error_code: errStep?.error ?? 'unknown',
+          });
+        }
+      }
+    }
   }
 
   /**

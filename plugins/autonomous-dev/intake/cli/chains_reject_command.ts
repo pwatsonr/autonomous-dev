@@ -19,6 +19,7 @@
 import { Command } from 'commander';
 
 import { StateStore } from '../chains';
+import type { ChainAuditWriter } from '../chains/audit-writer';
 import type {
   ChainPausedState,
   RejectionMarker,
@@ -35,6 +36,13 @@ export interface ChainsRejectDeps extends ChainsApproveStreams {
   requireAdminAuth: RequireAdminAuth;
   rejectedByResolver?: () => string;
   now?: () => Date;
+  /**
+   * SPEC-022-3-03: optional chain-audit writer. When provided, a single
+   * `approval_rejected` + `chain_failed` pair is emitted on a successful
+   * rejection. Best-effort: append failures are logged to stderr and do
+   * NOT abort the rejection.
+   */
+  chainAuditWriter?: ChainAuditWriter;
 }
 
 export interface ChainsRejectArgs {
@@ -100,6 +108,35 @@ export async function runChainsReject(
   } catch (err) {
     stderr.write(`failed to delete chain state: ${(err as Error).message}\n`);
     return 1;
+  }
+  // SPEC-022-3-03: emit `approval_rejected` + terminal `chain_failed`
+  // best-effort. Append failures are non-fatal — the rejection has
+  // already been persisted to disk above.
+  if (deps.chainAuditWriter) {
+    try {
+      await deps.chainAuditWriter.append('approval_rejected', chainState.chain_id, {
+        chain_id: chainState.chain_id,
+        gate_id: chainState.paused_at_artifact,
+        rejected_by: rejectedBy,
+        reason: args.reason,
+      });
+    } catch (err) {
+      stderr.write(
+        `audit emit failed (approval_rejected): ${(err as Error).message}\n`,
+      );
+    }
+    try {
+      await deps.chainAuditWriter.append('chain_failed', chainState.chain_id, {
+        chain_id: chainState.chain_id,
+        duration_ms: 0,
+        failure_stage: 'rejected',
+        error_code: 'ChainRejected',
+      });
+    } catch (err) {
+      stderr.write(
+        `audit emit failed (chain_failed): ${(err as Error).message}\n`,
+      );
+    }
   }
   stdout.write(
     `Chain ${chainState.chain_id} rejected: reason="${args.reason}"\n`,

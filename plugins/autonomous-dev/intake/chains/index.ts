@@ -14,3 +14,6 @@ export * from './render';
 export * from './state-store';
 export * from './privileged-chain-resolver';
 export * from './telemetry-emitter';
+export * from './audit-events';
+export * from './audit-writer';
+export * from './chains-audit-key';
