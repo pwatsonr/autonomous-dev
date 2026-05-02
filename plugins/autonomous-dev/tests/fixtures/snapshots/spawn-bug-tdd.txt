@@ -1,0 +1,1 @@
+claude --agent tdd-author --bug-context-path ${STATE_DIR}/state.json --state ${STATE_DIR}/state.json

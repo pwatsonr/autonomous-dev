@@ -1,0 +1,26 @@
+{
+  "id": "test-feature-001",
+  "type": "feature",
+  "expedited_reviews": false,
+  "current_phase": "intake",
+  "phase_started_at": 1714435200,
+  "retry_count": 0,
+  "phase_overrides": [
+    "intake",
+    "prd", "prd_review",
+    "tdd", "tdd_review",
+    "plan", "plan_review",
+    "spec", "spec_review",
+    "code", "code_review",
+    "test", "test_review",
+    "validate"
+  ],
+  "type_config": {
+    "maxRetries": 3,
+    "phaseTimeouts": {},
+    "enhancedPhases": [],
+    "additionalGates": {}
+  },
+  "phase_history": [],
+  "status_reason": ""
+}
