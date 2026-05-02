@@ -11,6 +11,15 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  // Co-located tests under intake/, plus the deploy plugin trees, plus the
+  // sibling cloud-deploy plugin packages. Each cloud plugin lives in its
+  // own directory so we extend `roots` rather than dumping their tests
+  // under autonomous-dev/tests/.
+  roots: [
+    '<rootDir>',
+    '<rootDir>/../autonomous-dev-deploy-gcp',
+    '<rootDir>/../autonomous-dev-deploy-aws',
+  ],
   testMatch: ['**/?(*.)+(spec|test).ts'],
   // Ignore node_modules + the not-yet-runnable parallel suite (no source yet).
   testPathIgnorePatterns: ['/node_modules/'],

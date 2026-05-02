@@ -1,0 +1,6 @@
+{
+  "taskDefinition": {
+    "family": "web-svc",
+    "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:8"
+  }
+}

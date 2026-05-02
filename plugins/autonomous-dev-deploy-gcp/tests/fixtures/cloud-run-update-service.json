@@ -1,0 +1,8 @@
+{
+  "name": "projects/test-project/locations/us-central1/services/api",
+  "uri": "https://api-test-project-uc.a.run.app",
+  "latestReadyRevision": "api-00001-def",
+  "traffic": [
+    { "revision": "api-00001-def", "percent": 100 }
+  ]
+}
