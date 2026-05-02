@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/pwatsonr/autonomous-dev/plugins/autonomous-dev/schemas/deploy-config-v1.json",
+  "title": "Autonomous-Dev Deploy Configuration v1",
+  "description": "Validates the YAML at <repo>/.autonomous-dev/deploy.yaml. Cross-reference: TDD-023 §9, SPEC-023-2-01.",
+  "type": "object",
+  "required": ["version", "environments"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "1.0",
+      "description": "Schema version. Only '1.0' is supported by the resolver in PLAN-023-2."
+    },
+    "default_backend": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Backend name used when an environment does not declare its own. Resolver consults this only when env.backend is absent."
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Repo-level parameters merged underneath each environment's parameters (shallow merge)."
+    },
+    "environments": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "Map of environment name to environment config. Names match ^(dev|staging|prod|[a-z][a-z0-9_-]{0,30})$.",
+      "patternProperties": {
+        "^(dev|staging|prod|[a-z][a-z0-9_-]{0,30})$": { "$ref": "#/$defs/environment" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "environment": {
+      "type": "object",
+      "required": ["backend", "approval", "cost_cap_usd"],
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Backend name as registered in BackendRegistry."
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Environment-specific parameters; overrides repo-level parameters key-by-key (shallow merge)."
+        },
+        "approval": {
+          "enum": ["none", "single", "two-person", "admin"],
+          "description": "Required approval level before the deploy phase invokes the backend."
+        },
+        "cost_cap_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Per-deploy daily cost cap in USD. 0 means no cap."
+        },
+        "auto_promote_from": {
+          "type": "string",
+          "description": "Optional source environment name; promotion logic is documented out-of-scope for PLAN-023-2."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": "1.0",
+      "default_backend": "static",
+      "environments": {
+        "dev": { "backend": "local", "parameters": {}, "approval": "none", "cost_cap_usd": 0 },
+        "staging": { "backend": "static", "parameters": { "target_dir": "/var/www/staging" }, "approval": "single", "cost_cap_usd": 5 },
+        "prod": { "backend": "static", "parameters": { "target_dir": "/var/www/prod" }, "approval": "two-person", "cost_cap_usd": 25, "auto_promote_from": "staging" }
+      }
+    }
+  ]
+}
