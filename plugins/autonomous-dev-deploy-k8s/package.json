@@ -1,0 +1,12 @@
+{
+  "name": "@autonomous-dev/deploy-k8s",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@kubernetes/client-node": "^0.21.0"
+  }
+}

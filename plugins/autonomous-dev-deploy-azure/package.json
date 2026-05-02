@@ -1,0 +1,14 @@
+{
+  "name": "@autonomous-dev/deploy-azure",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/arm-appcontainers": "^2.1.0",
+    "@azure/arm-containerregistry": "^11.0.0",
+    "@azure/identity": "^4.2.0"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "autonomous-dev-deploy-azure",
+  "version": "0.1.0",
+  "description": "Azure (ACR + Container Apps) deployment backend for autonomous-dev.",
+  "author": "autonomous-dev contributors",
+  "extends": ["autonomous-dev"],
+  "deployment_backend": {
+    "name": "azure",
+    "regions_supported": [
+      "eastus",
+      "eastus2",
+      "westus",
+      "westus2",
+      "westus3",
+      "northeurope",
+      "westeurope",
+      "japaneast",
+      "southeastasia"
+    ],
+    "services_supported": ["container-apps", "acr", "front-door"],
+    "credential_provider": "credential-proxy"
+  }
+}
