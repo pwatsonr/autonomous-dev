@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev/schemas/reviewer-chains-v1.json",
+  "title": "Reviewer Chains v1",
+  "description": "Declarative reviewer-chain wiring per request type and gate (TDD-020 §6, SPEC-020-2-01).",
+  "type": "object",
+  "required": ["version", "request_types"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "request_types": {
+      "type": "object",
+      "description": "Map of request type (feature|bug|infra|refactor|hotfix) to a per-gate reviewer chain.",
+      "patternProperties": {
+        "^(feature|bug|infra|refactor|hotfix)$": { "$ref": "#/$defs/RequestType" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "RequestType": {
+      "type": "object",
+      "description": "Map of gate name (e.g., code_review, pre_merge, post_deploy) to an ordered reviewer entry list. Gate names are open (^[a-z_]+$) so future gates do not require a schema bump.",
+      "patternProperties": {
+        "^[a-z_]+$": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ReviewerEntry" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReviewerEntry": {
+      "type": "object",
+      "required": ["name", "type", "blocking", "threshold"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reviewer identifier (matches a registered agent or built-in dispatcher)."
+        },
+        "type": {
+          "enum": ["built-in", "specialist"],
+          "description": "Built-in (PRD-004 first-party) vs. specialist (PLAN-020-1 agent)."
+        },
+        "blocking": {
+          "type": "boolean",
+          "description": "If true, below-threshold or errored verdicts fail the gate."
+        },
+        "threshold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Minimum score (0-100) required to satisfy a passing verdict."
+        },
+        "trigger": {
+          "enum": ["frontend"],
+          "description": "Conditional trigger: only run when the change set matches the trigger. Currently only `frontend` is supported."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "If false, the resolver filters this entry out before scheduling. Operator workaround for trusted private forks."
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": 1,
+      "request_types": {
+        "feature": {
+          "code_review": [
+            { "name": "code-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
+            { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 85 },
+            { "name": "qa-edge-case-reviewer", "type": "specialist", "blocking": true, "threshold": 80 },
+            { "name": "ux-ui-reviewer", "type": "specialist", "blocking": false, "threshold": 75, "trigger": "frontend" },
+            { "name": "accessibility-reviewer", "type": "specialist", "blocking": false, "threshold": 75, "trigger": "frontend" },
+            { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 }
+          ]
+        }
+      }
+    }
+  ]
+}
