@@ -1,0 +1,73 @@
+name: kind-integration (cred-proxy)
+
+# Path-filtered: runs only when the K8s scoper, operation catalog,
+# integration tests, or this workflow itself change. Keeps non-K8s PRs
+# fast.
+on:
+  pull_request:
+    paths:
+      - 'plugins/autonomous-dev/intake/cred-proxy/scopers/k8s.ts'
+      - 'plugins/autonomous-dev/intake/cred-proxy/scopers/operation-catalog.ts'
+      - 'plugins/autonomous-dev/tests/integration/**'
+      - '.github/workflows/kind-integration.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/autonomous-dev/intake/cred-proxy/scopers/k8s.ts'
+      - 'plugins/autonomous-dev/intake/cred-proxy/scopers/operation-catalog.ts'
+      - 'plugins/autonomous-dev/tests/integration/**'
+      - '.github/workflows/kind-integration.yml'
+
+concurrency:
+  group: kind-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kind:
+    name: kind scope-enforcement
+    runs-on: ubuntu-latest
+    # Keep the overall job under 5 minutes — kind cluster spin-up is ~60s,
+    # the three-test suite is ~30-60s, and tear-down is ~10s.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install plugin dependencies
+        working-directory: plugins/autonomous-dev
+        run: npm ci
+
+      - name: Install kind
+        uses: helm/kind-action@v1.10.0
+        with:
+          install_only: true
+          version: v0.23.0
+
+      - name: Run kind scope-enforcement test
+        working-directory: plugins/autonomous-dev
+        env:
+          RUN_KIND_TESTS: '1'
+        run: npm run test:kind
+
+      - name: Capture kind cluster logs on failure
+        if: failure()
+        run: |
+          set +e
+          for c in $(docker ps --format '{{.Names}}' | grep -E 'cred-proxy-.*-control-plane' || true); do
+            echo "=== docker logs $c ==="
+            docker logs "$c" > "/tmp/${c}.log" 2>&1
+          done
+          mkdir -p kind-logs
+          mv /tmp/cred-proxy-*.log kind-logs/ 2>/dev/null || true
+
+      - name: Upload kind logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kind-cluster-logs
+          path: kind-logs/
+          if-no-files-found: ignore

@@ -1,0 +1,99 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`awsPolicyFor snapshots CloudWatchLogs:PutLogEvents 1`] = `
+{
+  "Statement": [
+    {
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:logs:us-east-1:123456789012:log-group:/aws/ecs/my-app:log-stream:*",
+    },
+  ],
+  "Version": "2012-10-17",
+}
+`;
+
+exports[`awsPolicyFor snapshots ECR:PushImage 1`] = `
+{
+  "Statement": [
+    {
+      "Action": [
+        "ecr:GetAuthorizationToken",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage",
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:ecr:us-east-1:123456789012:repository/my-app",
+    },
+  ],
+  "Version": "2012-10-17",
+}
+`;
+
+exports[`awsPolicyFor snapshots ECS:UpdateService minimal scope 1`] = `
+{
+  "Statement": [
+    {
+      "Action": [
+        "ecs:UpdateService",
+        "ecs:DescribeServices",
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:ecs:us-east-1:123456789012:service/prod/api",
+    },
+  ],
+  "Version": "2012-10-17",
+}
+`;
+
+exports[`awsPolicyFor snapshots ELBv2:DescribeTargetHealth 1`] = `
+{
+  "Statement": [
+    {
+      "Action": [
+        "elasticloadbalancing:DescribeTargetHealth",
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/my-tg/aaa1111",
+    },
+  ],
+  "Version": "2012-10-17",
+}
+`;
+
+exports[`awsPolicyFor snapshots Lambda:UpdateFunctionCode 1`] = `
+{
+  "Statement": [
+    {
+      "Action": [
+        "lambda:UpdateFunctionCode",
+        "lambda:GetFunction",
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:lambda:us-west-2:123456789012:function:fn1",
+    },
+  ],
+  "Version": "2012-10-17",
+}
+`;
+
+exports[`awsPolicyFor snapshots S3:PutObject 1`] = `
+{
+  "Statement": [
+    {
+      "Action": [
+        "s3:PutObject",
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:s3:::my-bucket/releases/2026/build.tar.gz",
+    },
+  ],
+  "Version": "2012-10-17",
+}
+`;

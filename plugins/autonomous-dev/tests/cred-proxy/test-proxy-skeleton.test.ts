@@ -1,0 +1,184 @@
+/**
+ * CredentialProxy authorisation tests (SPEC-024-2-01 + SPEC-024-2-04).
+ *
+ * Verifies the auth surface that survived from the SPEC-024-2-01 skeleton
+ * after SPEC-024-2-04 replaced the `NotImplemented` throws with the full
+ * implementation:
+ *   - TTL_SECONDS is exactly 900 (compile-time const).
+ *   - Allowlist enforcement throws BEFORE any scoper is called.
+ *   - Missing env identity throws CALLER_UNKNOWN before allowlist.
+ *   - Spoofed socket peer throws CALLER_SPOOFED.
+ *   - Allowlisted caller now SUCCEEDS (returns a ScopedCredential).
+ *   - Missing scoper throws generic Error (not SecurityError).
+ */
+
+import {
+  ActiveTokenRegistry,
+} from '../../intake/cred-proxy/active-tokens';
+import {
+  CredentialAuditEmitter,
+  type AuditSink,
+} from '../../intake/cred-proxy/audit-emitter';
+import {
+  CredentialProxy,
+  TTL_SECONDS,
+} from '../../intake/cred-proxy/proxy';
+import {
+  SecurityError,
+  type CredentialScoper,
+  type Provider,
+} from '../../intake/cred-proxy/types';
+import {
+  __resetLiveBackendsForTests,
+  registerLiveBackend,
+} from '../../intake/cred-proxy/caller-identity';
+
+class SpyScoper implements CredentialScoper {
+  readonly provider: Provider = 'aws';
+  public calls = 0;
+  async scope() {
+    this.calls += 1;
+    return {
+      payload: '{}',
+      expires_at: new Date(Date.now() + 900_000).toISOString(),
+      revoke: async () => {
+        // no-op
+      },
+    };
+  }
+}
+
+function buildProxy(opts: {
+  privileged?: string[];
+  scopers?: ReadonlyMap<Provider, CredentialScoper>;
+} = {}) {
+  const scopers =
+    opts.scopers ??
+    new Map<Provider, CredentialScoper>([['aws', new SpyScoper()]]);
+  const sink: AuditSink = { append: () => undefined };
+  return {
+    proxy: new CredentialProxy({
+      scopers,
+      privilegedBackends: new Set(opts.privileged ?? []),
+      registry: new ActiveTokenRegistry(),
+      audit: new CredentialAuditEmitter(sink),
+    }),
+    scopers,
+  };
+}
+
+describe('TTL_SECONDS', () => {
+  it('is the const value 900', () => {
+    expect(TTL_SECONDS).toBe(900);
+  });
+});
+
+describe('CredentialProxy.acquire allowlist enforcement', () => {
+  const originalEnv = process.env.AUTONOMOUS_DEV_PLUGIN_ID;
+
+  beforeEach(() => {
+    __resetLiveBackendsForTests();
+    delete process.env.AUTONOMOUS_DEV_PLUGIN_ID;
+  });
+
+  afterAll(() => {
+    if (originalEnv === undefined) {
+      delete process.env.AUTONOMOUS_DEV_PLUGIN_ID;
+    } else {
+      process.env.AUTONOMOUS_DEV_PLUGIN_ID = originalEnv;
+    }
+  });
+
+  it('throws CALLER_UNKNOWN when env identity is missing', async () => {
+    const { proxy } = buildProxy({ privileged: ['plugin-a'] });
+    await expect(
+      proxy.acquire('aws', 'op', { region: 'us-east-1' }),
+    ).rejects.toMatchObject({ code: 'CALLER_UNKNOWN' });
+  });
+
+  it('throws NOT_ALLOWLISTED for non-allowlisted caller and never invokes scoper', async () => {
+    process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-evil';
+    const spy = new SpyScoper();
+    const { proxy } = buildProxy({
+      privileged: ['plugin-good'],
+      scopers: new Map<Provider, CredentialScoper>([['aws', spy]]),
+    });
+    await expect(
+      proxy.acquire('aws', 'op', { region: 'us-east-1' }),
+    ).rejects.toMatchObject({ code: 'NOT_ALLOWLISTED' });
+    expect(spy.calls).toBe(0);
+  });
+
+  it('throws CALLER_SPOOFED when env says plugin-a but socket peer is unregistered', async () => {
+    process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-a';
+    const { proxy } = buildProxy({ privileged: ['plugin-a'] });
+    await expect(
+      proxy.acquire(
+        'aws',
+        'op',
+        { region: 'us-east-1' },
+        { socketPeer: { pid: 9999, uid: 1000 } },
+      ),
+    ).rejects.toMatchObject({ code: 'CALLER_SPOOFED' });
+  });
+
+  it('throws CALLER_SPOOFED when env says plugin-a but registry says plugin-b for that pid', async () => {
+    process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-a';
+    registerLiveBackend({ pid: 1234, uid: 1000, pluginId: 'plugin-b' });
+    const { proxy } = buildProxy({ privileged: ['plugin-a', 'plugin-b'] });
+    await expect(
+      proxy.acquire(
+        'aws',
+        'op',
+        { region: 'us-east-1' },
+        { socketPeer: { pid: 1234, uid: 1000 } },
+      ),
+    ).rejects.toMatchObject({ code: 'CALLER_SPOOFED' });
+  });
+
+  it('proceeds past allowlist for valid stdin caller and returns a ScopedCredential', async () => {
+    process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-good';
+    const { proxy } = buildProxy({ privileged: ['plugin-good'] });
+    const cred = await proxy.acquire('aws', 'op', { region: 'us-east-1' });
+    expect(cred.delivery).toBe('stdin');
+    expect(cred.provider).toBe('aws');
+    expect(cred.token_id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('proceeds past allowlist for valid socket caller and returns delivery=socket', async () => {
+    process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-good';
+    registerLiveBackend({ pid: 1234, uid: 1000, pluginId: 'plugin-good' });
+    const { proxy } = buildProxy({ privileged: ['plugin-good'] });
+    const cred = await proxy.acquire(
+      'aws',
+      'op',
+      { region: 'us-east-1' },
+      { socketPeer: { pid: 1234, uid: 1000 } },
+    );
+    expect(cred.delivery).toBe('socket');
+  });
+
+  it('throws generic Error (not SecurityError) when provider has no scoper', async () => {
+    process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-good';
+    const { proxy } = buildProxy({
+      privileged: ['plugin-good'],
+      scopers: new Map<Provider, CredentialScoper>(),
+    });
+    let caught: unknown;
+    try {
+      await proxy.acquire('aws', 'op', { region: 'us-east-1' });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(SecurityError);
+    expect((caught as Error).message).toMatch(/no scoper registered/);
+  });
+});
+
+describe('CredentialProxy.revoke', () => {
+  it('is a no-op for an unknown token (idempotent)', async () => {
+    const { proxy } = buildProxy();
+    await expect(proxy.revoke('does-not-exist')).resolves.toBeUndefined();
+  });
+});
