@@ -1,0 +1,548 @@
+# Accessibility reviewer eval suite (SPEC-020-1-04, Task 9).
+# 30 cases. Distribution per WCAG 2.2 AA criterion:
+#   1.4.3 Contrast      — 4 clean / 2 dirty (1 security-critical: contrast <3:1)
+#   2.1   Keyboard      — 3 clean / 3 dirty (1 security-critical: keyboard trap)
+#   2.4.3 Focus order   — 3 clean / 2 dirty
+#   4.1.2 Name/role/val — 3 clean / 3 dirty
+#   1.1.1 Non-text      — 3 clean / 4 dirty (1 security-critical: missing alt)
+# Totals: 16 clean + 14 dirty = 30. 3 security-critical.
+# Each case's category_under_test embeds the WCAG criterion number.
+
+suite: accessibility-reviewer
+schema_version: 1
+total_cases: 30
+security_critical_pass_rate_required: 1.0
+match_strategy: permissive
+
+cases:
+
+  # === WCAG 1.4.3 Contrast (4 clean + 2 dirty, 1 security-critical) ===
+
+  - id: A11Y-001
+    description: "WCAG 1.4.3 — Body text at #999 on #fff (~2.85:1, fails AA)"
+    security_critical: true
+    category_under_test: "WCAG 2.2 AA 1.4.3 Contrast (Minimum)"
+    input: |
+      diff --git a/src/styles/text.css b/src/styles/text.css
+      --- a/src/styles/text.css
+      +++ b/src/styles/text.css
+      @@ -1,2 +1,4 @@
+      +.body-text { color: #999999; background: #ffffff; font-size: 14px; }
+    expected_findings:
+      - severity: high
+        category: "1.4.3"
+    forbidden_findings: []
+
+  - id: A11Y-002
+    description: "WCAG 1.4.3 — Disabled link uses #cccccc on white (~1.6:1)"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.4.3 Contrast (Minimum)"
+    input: |
+      diff --git a/src/components/Link.tsx b/src/components/Link.tsx
+      --- a/src/components/Link.tsx
+      +++ b/src/components/Link.tsx
+      @@ -1,2 +1,5 @@
+      +export function FooterLink() {
+      +  return <a style={{ color: '#cccccc', background: '#ffffff' }}>Privacy</a>;
+      +}
+    expected_findings:
+      - severity: medium
+        category: "1.4.3"
+    forbidden_findings: []
+
+  - id: A11Y-003
+    description: "WCAG 1.4.3 clean — #222 on #fff (15.9:1, passes AAA)"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.4.3 Contrast (Minimum)"
+    input: |
+      diff --git a/src/styles/text.css b/src/styles/text.css
+      --- a/src/styles/text.css
+      +++ b/src/styles/text.css
+      @@ -1,2 +1,4 @@
+      +.body-text { color: #222222; background: #ffffff; font-size: 16px; }
+    expected_findings: []
+    forbidden_findings:
+      - category: "1.4.3"
+
+  - id: A11Y-004
+    description: "WCAG 1.4.3 clean — White on #1a3a8a (~10:1)"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.4.3 Contrast (Minimum)"
+    input: |
+      diff --git a/src/components/CTA.tsx b/src/components/CTA.tsx
+      --- a/src/components/CTA.tsx
+      +++ b/src/components/CTA.tsx
+      @@ -1,2 +1,5 @@
+      +export function CTA() {
+      +  return <button style={{ color: '#ffffff', background: '#1a3a8a' }}>Buy</button>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "1.4.3"
+
+  - id: A11Y-005
+    description: "WCAG 1.4.3 clean — Large text (24px) at lower contrast still passes (4.9:1)"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.4.3 Contrast (Minimum)"
+    input: |
+      diff --git a/src/components/Hero.tsx b/src/components/Hero.tsx
+      --- a/src/components/Hero.tsx
+      +++ b/src/components/Hero.tsx
+      @@ -1,2 +1,5 @@
+      +export function Hero() {
+      +  return <h1 style={{ fontSize: 24, color: '#767676', background: '#ffffff' }}>Welcome</h1>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "1.4.3"
+
+  - id: A11Y-006
+    description: "WCAG 1.4.3 clean — Dark mode #e5e7eb on #111827 (~14:1)"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.4.3 Contrast (Minimum)"
+    input: |
+      diff --git a/src/styles/dark.css b/src/styles/dark.css
+      --- a/src/styles/dark.css
+      +++ b/src/styles/dark.css
+      @@ -1,2 +1,4 @@
+      +.dark .body { color: #e5e7eb; background: #111827; }
+    expected_findings: []
+    forbidden_findings:
+      - category: "1.4.3"
+
+  # === WCAG 2.1 Keyboard (3 clean + 3 dirty, 1 security-critical) ===
+
+  - id: A11Y-007
+    description: "WCAG 2.1.2 — Keyboard trap: modal captures Tab without escape"
+    security_critical: true
+    category_under_test: "WCAG 2.2 AA 2.1 Keyboard Accessible"
+    input: |
+      diff --git a/src/components/Modal.tsx b/src/components/Modal.tsx
+      --- a/src/components/Modal.tsx
+      +++ b/src/components/Modal.tsx
+      @@ -1,2 +1,12 @@
+      +import { useEffect } from 'react';
+      +export function Modal() {
+      +  useEffect(() => {
+      +    const onKey = (e: KeyboardEvent) => {
+      +      if (e.key === 'Tab') e.preventDefault();
+      +    };
+      +    window.addEventListener('keydown', onKey);
+      +  }, []);
+      +  return <div role="dialog">trapped</div>;
+      +}
+    expected_findings:
+      - severity: critical
+        category: "2.1"
+    forbidden_findings: []
+
+  - id: A11Y-008
+    description: "WCAG 2.1.1 — Click handler on <div> not reachable by keyboard"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.1 Keyboard Accessible"
+    input: |
+      diff --git a/src/components/Toggle.tsx b/src/components/Toggle.tsx
+      --- a/src/components/Toggle.tsx
+      +++ b/src/components/Toggle.tsx
+      @@ -1,2 +1,5 @@
+      +export function Toggle({ onToggle }: { onToggle: () => void }) {
+      +  return <div onClick={onToggle}>Toggle</div>;
+      +}
+    expected_findings:
+      - severity: high
+        category: "2.1"
+    forbidden_findings: []
+
+  - id: A11Y-009
+    description: "WCAG 2.1.1 — Custom dropdown lacks ArrowDown/Escape handling"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.1 Keyboard Accessible"
+    input: |
+      diff --git a/src/components/Dropdown.tsx b/src/components/Dropdown.tsx
+      --- a/src/components/Dropdown.tsx
+      +++ b/src/components/Dropdown.tsx
+      @@ -1,2 +1,7 @@
+      +export function Dropdown({ open }: { open: boolean }) {
+      +  return (
+      +    <div role="listbox">{open ? <ul><li>One</li><li>Two</li></ul> : null}</div>
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: "2.1"
+    forbidden_findings: []
+
+  - id: A11Y-010
+    description: "WCAG 2.1 clean — <button> used for click action (intrinsic keyboard)"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.1 Keyboard Accessible"
+    input: |
+      diff --git a/src/components/Toggle.tsx b/src/components/Toggle.tsx
+      --- a/src/components/Toggle.tsx
+      +++ b/src/components/Toggle.tsx
+      @@ -1,2 +1,5 @@
+      +export function Toggle({ onToggle }: { onToggle: () => void }) {
+      +  return <button type="button" onClick={onToggle}>Toggle</button>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "2.1"
+
+  - id: A11Y-011
+    description: "WCAG 2.1 clean — Modal honors Escape key + restores focus"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.1 Keyboard Accessible"
+    input: |
+      diff --git a/src/components/Modal.tsx b/src/components/Modal.tsx
+      --- a/src/components/Modal.tsx
+      +++ b/src/components/Modal.tsx
+      @@ -1,2 +1,12 @@
+      +import { useEffect } from 'react';
+      +export function Modal({ onClose }: { onClose: () => void }) {
+      +  useEffect(() => {
+      +    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+      +    window.addEventListener('keydown', onKey);
+      +    return () => window.removeEventListener('keydown', onKey);
+      +  }, [onClose]);
+      +  return <div role="dialog" aria-modal="true">ok</div>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "2.1"
+
+  - id: A11Y-012
+    description: "WCAG 2.1 clean — Anchor with href is keyboard reachable"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.1 Keyboard Accessible"
+    input: |
+      diff --git a/src/components/Nav.tsx b/src/components/Nav.tsx
+      --- a/src/components/Nav.tsx
+      +++ b/src/components/Nav.tsx
+      @@ -1,2 +1,5 @@
+      +export function Nav() {
+      +  return <a href="/about">About</a>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "2.1"
+
+  # === WCAG 2.4.3 Focus order (3 clean + 2 dirty) ===
+
+  - id: A11Y-013
+    description: "WCAG 2.4.3 — Positive tabIndex breaks natural focus order"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.4.3 Focus Order"
+    input: |
+      diff --git a/src/components/Form.tsx b/src/components/Form.tsx
+      --- a/src/components/Form.tsx
+      +++ b/src/components/Form.tsx
+      @@ -1,2 +1,8 @@
+      +export function Form() {
+      +  return (
+      +    <form><input tabIndex={3} /><input tabIndex={1} /><input tabIndex={2} /></form>
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: "2.4.3"
+    forbidden_findings: []
+
+  - id: A11Y-014
+    description: "WCAG 2.4.3 — Visually-reordered grid (CSS order) breaks focus path"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.4.3 Focus Order"
+    input: |
+      diff --git a/src/components/Grid.tsx b/src/components/Grid.tsx
+      --- a/src/components/Grid.tsx
+      +++ b/src/components/Grid.tsx
+      @@ -1,2 +1,8 @@
+      +export function Grid() {
+      +  return (
+      +    <div style={{ display: 'flex' }}><button style={{ order: 3 }}>A</button><button style={{ order: 1 }}>B</button><button style={{ order: 2 }}>C</button></div>
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: "2.4.3"
+    forbidden_findings: []
+
+  - id: A11Y-015
+    description: "WCAG 2.4.3 clean — Focus follows DOM order (no tabIndex)"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.4.3 Focus Order"
+    input: |
+      diff --git a/src/components/Form.tsx b/src/components/Form.tsx
+      --- a/src/components/Form.tsx
+      +++ b/src/components/Form.tsx
+      @@ -1,2 +1,9 @@
+      +export function Form() {
+      +  return (
+      +    <form>
+      +      <input id="a" /><input id="b" /><button type="submit">Go</button>
+      +    </form>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "2.4.3"
+
+  - id: A11Y-016
+    description: "WCAG 2.4.3 clean — Skip-to-content link as first focusable element"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.4.3 Focus Order"
+    input: |
+      diff --git a/src/components/Layout.tsx b/src/components/Layout.tsx
+      --- a/src/components/Layout.tsx
+      +++ b/src/components/Layout.tsx
+      @@ -1,2 +1,8 @@
+      +export function Layout({ children }: { children: React.ReactNode }) {
+      +  return (
+      +    <><a href="#main" className="sr-only focus:not-sr-only">Skip to content</a><main id="main">{children}</main></>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "2.4.3"
+
+  - id: A11Y-017
+    description: "WCAG 2.4.3 clean — tabIndex={0} preserves natural order"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 2.4.3 Focus Order"
+    input: |
+      diff --git a/src/components/Card.tsx b/src/components/Card.tsx
+      --- a/src/components/Card.tsx
+      +++ b/src/components/Card.tsx
+      @@ -1,2 +1,5 @@
+      +export function Card({ onClick }: { onClick: () => void }) {
+      +  return <div role="button" tabIndex={0} onClick={onClick}>Open</div>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "2.4.3"
+
+  # === WCAG 4.1.2 Name/role/value (3 clean + 3 dirty) ===
+
+  - id: A11Y-018
+    description: "WCAG 4.1.2 — Custom widget missing role attribute"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 4.1.2 Name, Role, Value"
+    input: |
+      diff --git a/src/components/Tabs.tsx b/src/components/Tabs.tsx
+      --- a/src/components/Tabs.tsx
+      +++ b/src/components/Tabs.tsx
+      @@ -1,2 +1,7 @@
+      +export function Tabs() {
+      +  return (
+      +    <div><div onClick={() => {}}>Tab 1</div><div onClick={() => {}}>Tab 2</div></div>
+      +  );
+      +}
+    expected_findings:
+      - severity: high
+        category: "4.1.2"
+    forbidden_findings: []
+
+  - id: A11Y-019
+    description: "WCAG 4.1.2 — Toggle button missing aria-pressed state"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 4.1.2 Name, Role, Value"
+    input: |
+      diff --git a/src/components/Mute.tsx b/src/components/Mute.tsx
+      --- a/src/components/Mute.tsx
+      +++ b/src/components/Mute.tsx
+      @@ -1,2 +1,5 @@
+      +export function Mute({ muted, onToggle }: { muted: boolean; onToggle: () => void }) {
+      +  return <button onClick={onToggle}>{muted ? 'Unmute' : 'Mute'}</button>;
+      +}
+    expected_findings:
+      - severity: medium
+        category: "4.1.2"
+    forbidden_findings: []
+
+  - id: A11Y-020
+    description: "WCAG 4.1.2 — Form field missing accessible name"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 4.1.2 Name, Role, Value"
+    input: |
+      diff --git a/src/components/Quantity.tsx b/src/components/Quantity.tsx
+      --- a/src/components/Quantity.tsx
+      +++ b/src/components/Quantity.tsx
+      @@ -1,2 +1,5 @@
+      +export function Quantity() {
+      +  return <input type="number" />;
+      +}
+    expected_findings:
+      - severity: high
+        category: "4.1.2"
+    forbidden_findings: []
+
+  - id: A11Y-021
+    description: "WCAG 4.1.2 clean — Tab list with role + aria-selected"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 4.1.2 Name, Role, Value"
+    input: |
+      diff --git a/src/components/Tabs.tsx b/src/components/Tabs.tsx
+      --- a/src/components/Tabs.tsx
+      +++ b/src/components/Tabs.tsx
+      @@ -1,2 +1,8 @@
+      +export function Tabs({ active }: { active: 0 | 1 }) {
+      +  return (
+      +    <div role="tablist"><button role="tab" aria-selected={active === 0}>One</button><button role="tab" aria-selected={active === 1}>Two</button></div>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "4.1.2"
+
+  - id: A11Y-022
+    description: "WCAG 4.1.2 clean — Toggle exposes aria-pressed for state"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 4.1.2 Name, Role, Value"
+    input: |
+      diff --git a/src/components/Mute.tsx b/src/components/Mute.tsx
+      --- a/src/components/Mute.tsx
+      +++ b/src/components/Mute.tsx
+      @@ -1,2 +1,5 @@
+      +export function Mute({ muted, onToggle }: { muted: boolean; onToggle: () => void }) {
+      +  return <button aria-pressed={muted} onClick={onToggle}>Mute</button>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "4.1.2"
+
+  - id: A11Y-023
+    description: "WCAG 4.1.2 clean — Number input has label and accessible name"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 4.1.2 Name, Role, Value"
+    input: |
+      diff --git a/src/components/Quantity.tsx b/src/components/Quantity.tsx
+      --- a/src/components/Quantity.tsx
+      +++ b/src/components/Quantity.tsx
+      @@ -1,2 +1,7 @@
+      +export function Quantity() {
+      +  return (
+      +    <><label htmlFor="qty">Quantity</label><input id="qty" type="number" min={0} /></>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "4.1.2"
+
+  # === WCAG 1.1.1 Non-text content (3 clean + 4 dirty, 1 security-critical) ===
+
+  - id: A11Y-024
+    description: "WCAG 1.1.1 — Image carries information but has no alt text"
+    security_critical: true
+    category_under_test: "WCAG 2.2 AA 1.1.1 Non-text Content"
+    input: |
+      diff --git a/src/components/Banner.tsx b/src/components/Banner.tsx
+      --- a/src/components/Banner.tsx
+      +++ b/src/components/Banner.tsx
+      @@ -1,2 +1,5 @@
+      +export function Banner() {
+      +  return <img src="/promo.png" />;
+      +}
+    expected_findings:
+      - severity: high
+        category: "1.1.1"
+    forbidden_findings: []
+
+  - id: A11Y-025
+    description: "WCAG 1.1.1 — SVG icon button without aria-label or title"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.1.1 Non-text Content"
+    input: |
+      diff --git a/src/components/Trash.tsx b/src/components/Trash.tsx
+      --- a/src/components/Trash.tsx
+      +++ b/src/components/Trash.tsx
+      @@ -1,2 +1,5 @@
+      +export function Trash({ onClick }: { onClick: () => void }) {
+      +  return <button onClick={onClick}><svg viewBox="0 0 16 16"><path d="M0 0h16v16H0z" /></svg></button>;
+      +}
+    expected_findings:
+      - severity: high
+        category: "1.1.1"
+    forbidden_findings: []
+
+  - id: A11Y-026
+    description: "WCAG 1.1.1 — Background-image used as informational graphic"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.1.1 Non-text Content"
+    input: |
+      diff --git a/src/components/HeroBg.tsx b/src/components/HeroBg.tsx
+      --- a/src/components/HeroBg.tsx
+      +++ b/src/components/HeroBg.tsx
+      @@ -1,2 +1,5 @@
+      +export function HeroBg() {
+      +  return <div style={{ backgroundImage: 'url(/chart.png)', height: 240 }} />;
+      +}
+    expected_findings:
+      - severity: medium
+        category: "1.1.1"
+    forbidden_findings: []
+
+  - id: A11Y-027
+    description: "WCAG 1.1.1 — Video without captions or transcript link"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.1.1 Non-text Content"
+    input: |
+      diff --git a/src/components/Demo.tsx b/src/components/Demo.tsx
+      --- a/src/components/Demo.tsx
+      +++ b/src/components/Demo.tsx
+      @@ -1,2 +1,5 @@
+      +export function Demo() {
+      +  return <video src="/demo.mp4" controls />;
+      +}
+    expected_findings:
+      - severity: medium
+        category: "1.1.1"
+    forbidden_findings: []
+
+  - id: A11Y-028
+    description: "WCAG 1.1.1 clean — Informational image with descriptive alt"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.1.1 Non-text Content"
+    input: |
+      diff --git a/src/components/Banner.tsx b/src/components/Banner.tsx
+      --- a/src/components/Banner.tsx
+      +++ b/src/components/Banner.tsx
+      @@ -1,2 +1,5 @@
+      +export function Banner() {
+      +  return <img src="/promo.png" alt="Spring sale: 20% off all books through May 15" />;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "1.1.1"
+
+  - id: A11Y-029
+    description: "WCAG 1.1.1 clean — Decorative icon marked aria-hidden, visible label sibling"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.1.1 Non-text Content"
+    input: |
+      diff --git a/src/components/Trash.tsx b/src/components/Trash.tsx
+      --- a/src/components/Trash.tsx
+      +++ b/src/components/Trash.tsx
+      @@ -1,2 +1,8 @@
+      +export function Trash({ onClick }: { onClick: () => void }) {
+      +  return (
+      +    <button onClick={onClick}><svg aria-hidden="true" viewBox="0 0 16 16" /><span>Delete</span></button>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "1.1.1"
+
+  - id: A11Y-030
+    description: "WCAG 1.1.1 clean — Decorative spacer image with empty alt"
+    security_critical: false
+    category_under_test: "WCAG 2.2 AA 1.1.1 Non-text Content"
+    input: |
+      diff --git a/src/components/Spacer.tsx b/src/components/Spacer.tsx
+      --- a/src/components/Spacer.tsx
+      +++ b/src/components/Spacer.tsx
+      @@ -1,2 +1,5 @@
+      +export function Spacer() {
+      +  return <img src="/dot.png" alt="" />;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: "1.1.1"

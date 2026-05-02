@@ -1,0 +1,495 @@
+# QA edge-case reviewer eval suite (SPEC-020-1-04, Task 7).
+# 25 cases distributed across the six TDD §5.1 categories
+# (input-validation, boundary-conditions, race-conditions, error-paths,
+# null-handling, resource-leaks).
+# 5 cases tagged security_critical: SQL injection, path traversal,
+# null deref in error branch, TOCTOU file open, resource leak on throw.
+# Permissive matching: expected_findings[].category is matched as a
+# case-insensitive substring of the reviewer's finding category.
+
+suite: qa-edge-case-reviewer
+schema_version: 1
+total_cases: 25
+security_critical_pass_rate_required: 1.0
+match_strategy: permissive
+
+cases:
+
+  # === Input validation (4 cases, 2 security-critical) ===
+
+  - id: QA-001
+    description: "SQL injection via string concatenation"
+    security_critical: true
+    category_under_test: input-validation
+    input: |
+      diff --git a/src/db/users.ts b/src/db/users.ts
+      --- a/src/db/users.ts
+      +++ b/src/db/users.ts
+      @@ -1,3 +1,5 @@
+       import { db } from './pool';
+      +export async function findUser(name: string) {
+      +  return db.query(`SELECT * FROM users WHERE name = '${name}'`);
+      +}
+    expected_findings:
+      - severity: critical
+        category: input-validation
+    forbidden_findings:
+      - category: performance
+
+  - id: QA-002
+    description: "Path traversal via unsanitized user input"
+    security_critical: true
+    category_under_test: input-validation
+    input: |
+      diff --git a/src/handlers/download.ts b/src/handlers/download.ts
+      --- a/src/handlers/download.ts
+      +++ b/src/handlers/download.ts
+      @@ -1,3 +1,5 @@
+       import { readFile } from 'node:fs/promises';
+      +export async function download(name: string) {
+      +  return await readFile(`/var/files/${name}`, 'utf8');
+      +}
+    expected_findings:
+      - severity: critical
+        category: input-validation
+    forbidden_findings: []
+
+  - id: QA-003
+    description: "Missing length validation on user-supplied string"
+    security_critical: false
+    category_under_test: input-validation
+    input: |
+      diff --git a/src/handlers/comment.ts b/src/handlers/comment.ts
+      --- a/src/handlers/comment.ts
+      +++ b/src/handlers/comment.ts
+      @@ -1,3 +1,5 @@
+       import { db } from '../db';
+      +export async function addComment(body: string) {
+      +  return db.insert('comments', { body });
+      +}
+    expected_findings:
+      - severity: medium
+        category: input-validation
+    forbidden_findings: []
+
+  - id: QA-004
+    description: "Numeric input parsed without range/NaN check"
+    security_critical: false
+    category_under_test: input-validation
+    input: |
+      diff --git a/src/handlers/page.ts b/src/handlers/page.ts
+      --- a/src/handlers/page.ts
+      +++ b/src/handlers/page.ts
+      @@ -1,3 +1,5 @@
+       import { fetchPage } from '../service';
+      +export async function getPage(raw: string) {
+      +  return fetchPage(parseInt(raw, 10));
+      +}
+    expected_findings:
+      - severity: medium
+        category: input-validation
+    forbidden_findings: []
+
+  # === Boundary conditions (4 cases, 1 security-critical) ===
+
+  - id: QA-005
+    description: "Off-by-one in bounds check (security-critical)"
+    security_critical: true
+    category_under_test: boundary-conditions
+    input: |
+      diff --git a/src/utils/buffer.ts b/src/utils/buffer.ts
+      --- a/src/utils/buffer.ts
+      +++ b/src/utils/buffer.ts
+      @@ -1,4 +1,6 @@
+       export function read(buf: Uint8Array, idx: number): number {
+      -  if (idx > buf.length) throw new Error('oob');
+      +  if (idx >= buf.length + 1) throw new Error('oob');
+         return buf[idx];
+       }
+    expected_findings:
+      - severity: high
+        category: boundary-conditions
+    forbidden_findings: []
+
+  - id: QA-006
+    description: "Loop uses <= length producing extra iteration"
+    security_critical: false
+    category_under_test: boundary-conditions
+    input: |
+      diff --git a/src/utils/sum.ts b/src/utils/sum.ts
+      --- a/src/utils/sum.ts
+      +++ b/src/utils/sum.ts
+      @@ -1,4 +1,6 @@
+      +export function sum(xs: number[]): number {
+      +  let total = 0;
+      +  for (let i = 0; i <= xs.length; i++) total += xs[i];
+      +  return total;
+      +}
+    expected_findings:
+      - severity: high
+        category: boundary-conditions
+    forbidden_findings: []
+
+  - id: QA-007
+    description: "Empty-array branch missing in slice helper"
+    security_critical: false
+    category_under_test: boundary-conditions
+    input: |
+      diff --git a/src/utils/first.ts b/src/utils/first.ts
+      --- a/src/utils/first.ts
+      +++ b/src/utils/first.ts
+      @@ -1,2 +1,4 @@
+      +export function first<T>(xs: T[]): T {
+      +  return xs[0].valueOf() as T;
+      +}
+    expected_findings:
+      - severity: medium
+        category: boundary-conditions
+    forbidden_findings: []
+
+  - id: QA-008
+    description: "Maximum int boundary not handled in counter"
+    security_critical: false
+    category_under_test: boundary-conditions
+    input: |
+      diff --git a/src/services/counter.ts b/src/services/counter.ts
+      --- a/src/services/counter.ts
+      +++ b/src/services/counter.ts
+      @@ -1,3 +1,5 @@
+       let n = 0;
+      +export function next(): number { return ++n; }
+    expected_findings:
+      - severity: low
+        category: boundary-conditions
+    forbidden_findings: []
+
+  # === Race conditions (4 cases, 1 security-critical) ===
+
+  - id: QA-009
+    description: "TOCTOU file open after stat (security-critical)"
+    security_critical: true
+    category_under_test: race-conditions
+    input: |
+      diff --git a/src/handlers/upload.ts b/src/handlers/upload.ts
+      --- a/src/handlers/upload.ts
+      +++ b/src/handlers/upload.ts
+      @@ -1,3 +1,8 @@
+       import { stat, open } from 'node:fs/promises';
+      +export async function ingest(p: string) {
+      +  const s = await stat(p);
+      +  if (s.size > 1024) throw new Error('too big');
+      +  return await open(p, 'r');
+      +}
+    expected_findings:
+      - severity: high
+        category: race-conditions
+    forbidden_findings: []
+
+  - id: QA-010
+    description: "Shared mutable counter without lock"
+    security_critical: false
+    category_under_test: race-conditions
+    input: |
+      diff --git a/src/services/sessions.ts b/src/services/sessions.ts
+      --- a/src/services/sessions.ts
+      +++ b/src/services/sessions.ts
+      @@ -1,3 +1,7 @@
+       let active = 0;
+      +export async function open() { active = active + 1; }
+      +export async function close() { active = active - 1; }
+      +export function get(): number { return active; }
+    expected_findings:
+      - severity: medium
+        category: race-conditions
+    forbidden_findings: []
+
+  - id: QA-011
+    description: "Async double-fetch without dedupe"
+    security_critical: false
+    category_under_test: race-conditions
+    input: |
+      diff --git a/src/services/cache.ts b/src/services/cache.ts
+      --- a/src/services/cache.ts
+      +++ b/src/services/cache.ts
+      @@ -1,3 +1,8 @@
+       const map = new Map<string, unknown>();
+      +export async function get(k: string, load: () => Promise<unknown>) {
+      +  if (map.has(k)) return map.get(k);
+      +  const v = await load();
+      +  map.set(k, v);
+      +  return v;
+      +}
+    expected_findings:
+      - severity: medium
+        category: race-conditions
+    forbidden_findings: []
+
+  - id: QA-012
+    description: "Promise.all without per-promise error isolation"
+    security_critical: false
+    category_under_test: race-conditions
+    input: |
+      diff --git a/src/services/fanout.ts b/src/services/fanout.ts
+      --- a/src/services/fanout.ts
+      +++ b/src/services/fanout.ts
+      @@ -1,3 +1,5 @@
+       import { call } from './rpc';
+      +export async function broadcast(ids: string[]) {
+      +  return Promise.all(ids.map((id) => call(id)));
+      +}
+    expected_findings:
+      - severity: low
+        category: race-conditions
+    forbidden_findings: []
+
+  # === Error paths (4 cases, 1 security-critical) ===
+
+  - id: QA-013
+    description: "Resource leak on throw inside try (security-critical)"
+    security_critical: true
+    category_under_test: error-paths
+    input: |
+      diff --git a/src/handlers/process.ts b/src/handlers/process.ts
+      --- a/src/handlers/process.ts
+      +++ b/src/handlers/process.ts
+      @@ -1,3 +1,9 @@
+       import { open } from 'node:fs/promises';
+      +export async function process(p: string) {
+      +  const fh = await open(p, 'r');
+      +  const buf = Buffer.alloc(1024);
+      +  await fh.read(buf, 0, 1024, 0);
+      +  return buf;
+      +}
+    expected_findings:
+      - severity: high
+        category: error-paths
+    forbidden_findings: []
+
+  - id: QA-014
+    description: "Error swallowed in catch returns success silently"
+    security_critical: false
+    category_under_test: error-paths
+    input: |
+      diff --git a/src/services/notify.ts b/src/services/notify.ts
+      --- a/src/services/notify.ts
+      +++ b/src/services/notify.ts
+      @@ -1,3 +1,7 @@
+       import { send } from './email';
+      +export async function notify(to: string) {
+      +  try { await send(to); } catch (_e) {}
+      +  return { ok: true };
+      +}
+    expected_findings:
+      - severity: high
+        category: error-paths
+    forbidden_findings: []
+
+  - id: QA-015
+    description: "Throwing string instead of Error instance"
+    security_critical: false
+    category_under_test: error-paths
+    input: |
+      diff --git a/src/utils/check.ts b/src/utils/check.ts
+      --- a/src/utils/check.ts
+      +++ b/src/utils/check.ts
+      @@ -1,3 +1,5 @@
+      +export function check(x: unknown): asserts x {
+      +  if (!x) throw 'invalid input';
+      +}
+    expected_findings:
+      - severity: medium
+        category: error-paths
+    forbidden_findings: []
+
+  - id: QA-016
+    description: "Async function returns rejected promise instead of throwing"
+    security_critical: false
+    category_under_test: error-paths
+    input: |
+      diff --git a/src/services/api.ts b/src/services/api.ts
+      --- a/src/services/api.ts
+      +++ b/src/services/api.ts
+      @@ -1,3 +1,7 @@
+       import { fetch } from 'undici';
+      +export async function call(url: string) {
+      +  const r = await fetch(url);
+      +  if (!r.ok) Promise.reject(new Error('bad status'));
+      +  return r;
+      +}
+    expected_findings:
+      - severity: high
+        category: error-paths
+    forbidden_findings: []
+
+  # === Null handling (4 cases, 1 security-critical) ===
+
+  - id: QA-017
+    description: "Null deref in error branch (security-critical)"
+    security_critical: true
+    category_under_test: null-handling
+    input: |
+      diff --git a/src/handlers/payment.ts b/src/handlers/payment.ts
+      --- a/src/handlers/payment.ts
+      +++ b/src/handlers/payment.ts
+      @@ -1,3 +1,8 @@
+       import { logger } from '../logging';
+      +export async function charge(user: { id?: string } | null) {
+      +  try { return await chargeBackend(user!.id!); }
+      +  catch (e) { logger.error('failed', { user: user.id, err: e }); throw e; }
+      +}
+      +declare function chargeBackend(id: string): Promise<unknown>;
+    expected_findings:
+      - severity: critical
+        category: null-handling
+    forbidden_findings: []
+
+  - id: QA-018
+    description: "Optional chained access without coalesce on numeric op"
+    security_critical: false
+    category_under_test: null-handling
+    input: |
+      diff --git a/src/utils/total.ts b/src/utils/total.ts
+      --- a/src/utils/total.ts
+      +++ b/src/utils/total.ts
+      @@ -1,3 +1,5 @@
+      +export function total(order?: { items?: { price: number }[] }): number {
+      +  return order?.items?.reduce((s, i) => s + i.price, 0) + 5;
+      +}
+    expected_findings:
+      - severity: medium
+        category: null-handling
+    forbidden_findings: []
+
+  - id: QA-019
+    description: "Map.get used without checking undefined"
+    security_critical: false
+    category_under_test: null-handling
+    input: |
+      diff --git a/src/services/registry.ts b/src/services/registry.ts
+      --- a/src/services/registry.ts
+      +++ b/src/services/registry.ts
+      @@ -1,3 +1,6 @@
+       const reg = new Map<string, { url: string }>();
+      +export function url(id: string): string {
+      +  return reg.get(id).url;
+      +}
+    expected_findings:
+      - severity: high
+        category: null-handling
+    forbidden_findings: []
+
+  - id: QA-020
+    description: "JSON.parse result accessed without null guard"
+    security_critical: false
+    category_under_test: null-handling
+    input: |
+      diff --git a/src/utils/parse.ts b/src/utils/parse.ts
+      --- a/src/utils/parse.ts
+      +++ b/src/utils/parse.ts
+      @@ -1,3 +1,5 @@
+      +export function name(raw: string): string {
+      +  return JSON.parse(raw).name;
+      +}
+    expected_findings:
+      - severity: medium
+        category: null-handling
+    forbidden_findings: []
+
+  # === Resource leaks (5 cases, none required security-critical) ===
+
+  - id: QA-021
+    description: "setInterval without matching clearInterval"
+    security_critical: false
+    category_under_test: resource-leaks
+    input: |
+      diff --git a/src/services/poller.ts b/src/services/poller.ts
+      --- a/src/services/poller.ts
+      +++ b/src/services/poller.ts
+      @@ -1,3 +1,6 @@
+       import { tick } from './worker';
+      +export function start() {
+      +  setInterval(tick, 1000);
+      +}
+    expected_findings:
+      - severity: medium
+        category: resource-leaks
+    forbidden_findings: []
+
+  - id: QA-022
+    description: "Event listener added without remove on teardown"
+    security_critical: false
+    category_under_test: resource-leaks
+    input: |
+      diff --git a/src/services/bus.ts b/src/services/bus.ts
+      --- a/src/services/bus.ts
+      +++ b/src/services/bus.ts
+      @@ -1,3 +1,6 @@
+       import { emitter } from './shared';
+      +export function attach(handler: (m: string) => void) {
+      +  emitter.on('msg', handler);
+      +}
+    expected_findings:
+      - severity: medium
+        category: resource-leaks
+    forbidden_findings: []
+
+  - id: QA-023
+    description: "Stream piped without error/finish cleanup"
+    security_critical: false
+    category_under_test: resource-leaks
+    input: |
+      diff --git a/src/handlers/transfer.ts b/src/handlers/transfer.ts
+      --- a/src/handlers/transfer.ts
+      +++ b/src/handlers/transfer.ts
+      @@ -1,3 +1,8 @@
+       import { createReadStream, createWriteStream } from 'node:fs';
+      +export function transfer(src: string, dst: string) {
+      +  const r = createReadStream(src);
+      +  const w = createWriteStream(dst);
+      +  r.pipe(w);
+      +}
+    expected_findings:
+      - severity: high
+        category: resource-leaks
+    forbidden_findings: []
+
+  - id: QA-024
+    description: "DB connection acquired but never released on error"
+    security_critical: false
+    category_under_test: resource-leaks
+    input: |
+      diff --git a/src/db/work.ts b/src/db/work.ts
+      --- a/src/db/work.ts
+      +++ b/src/db/work.ts
+      @@ -1,3 +1,8 @@
+       import { pool } from './pool';
+      +export async function work(id: string) {
+      +  const c = await pool.acquire();
+      +  const r = await c.query('SELECT 1 FROM t WHERE id=$1', [id]);
+      +  return r;
+      +}
+    expected_findings:
+      - severity: high
+        category: resource-leaks
+    forbidden_findings: []
+
+  - id: QA-025
+    description: "AbortController never aborted on long-lived fetch loop"
+    security_critical: false
+    category_under_test: resource-leaks
+    input: |
+      diff --git a/src/services/poll.ts b/src/services/poll.ts
+      --- a/src/services/poll.ts
+      +++ b/src/services/poll.ts
+      @@ -1,3 +1,9 @@
+       import { fetch } from 'undici';
+      +export async function loop(url: string) {
+      +  while (true) {
+      +    const c = new AbortController();
+      +    await fetch(url, { signal: c.signal });
+      +  }
+      +}
+    expected_findings:
+      - severity: medium
+        category: resource-leaks
+    forbidden_findings: []
