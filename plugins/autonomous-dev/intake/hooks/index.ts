@@ -11,3 +11,6 @@ export * from './types';
 export * from './discovery';
 export * from './registry';
 export * from './executor';
+export * from './reload-controller';
+export * from './ipc-server';
+export * from './ipc-client';
