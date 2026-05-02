@@ -38,7 +38,15 @@ import {
   PluginTimeoutError,
   ChainTooLongError,
   ConcurrentChainLimitError,
+  ChainNotApprovedError,
+  ChainStateMissingError,
 } from './errors';
+import { StateStore } from './state-store';
+import type {
+  ArtifactRef,
+  ChainPausedState,
+  EscalationRouter,
+} from './types';
 
 /**
  * Resource-limit configuration consumed by ChainExecutor (SPEC-022-2-01,
@@ -89,6 +97,19 @@ export interface ChainExecutorOptions {
   chainId?: string;
   /** Logger. Defaults to console. */
   logger?: { info: (s: string) => void; warn?: (s: string) => void };
+  /**
+   * SPEC-022-2-03: optional state store for paused-chain persistence. When
+   * absent, the approval gate is disabled (artifacts with
+   * `requires_approval: true` are treated as ordinary outputs and the chain
+   * proceeds). Provided by the daemon at construction time.
+   */
+  stateStore?: StateStore;
+  /**
+   * SPEC-022-2-03: optional escalation router. Notified with
+   * `chain-approval-pending` events when a chain pauses. When absent the
+   * pause is silent (state file written but no notification fires).
+   */
+  escalationRouter?: EscalationRouter;
 }
 
 export interface ChainStep {
@@ -103,6 +124,14 @@ export interface ChainStep {
   durationMs: number;
 }
 
+/**
+ * Coarse-grained chain disposition. SPEC-022-2-03 introduces the `paused`
+ * outcome; SPEC-022-2-04 will add `blocked` / `rejected` for trust + reject
+ * paths. PLAN-022-1 callers only checked `ok`; that field is preserved so
+ * existing tests keep passing.
+ */
+export type ChainOutcome = 'success' | 'failed' | 'paused';
+
 export interface ChainExecutionResult {
   triggeringPluginId: string;
   /** Initial scan id of the triggering plugin's emitted artifact. */
@@ -111,6 +140,18 @@ export interface ChainExecutionResult {
   steps: ChainStep[];
   /** True iff every step is 'ok' or 'skipped' (skips are not errors). */
   ok: boolean;
+  /**
+   * SPEC-022-2-03: coarse-grained chain disposition. `success` and `failed`
+   * mirror `ok=true|false`. `paused` indicates a `requires_approval`
+   * artifact halted execution and a state file was written.
+   */
+  outcome: ChainOutcome;
+  /**
+   * SPEC-022-2-03: populated iff `outcome === 'paused'`. Snapshot of the
+   * persisted state, mirroring the on-disk JSON exactly so the caller can
+   * route an escalation without a second read.
+   */
+  pausedState?: ChainPausedState;
 }
 
 export interface RequestState {
@@ -174,6 +215,8 @@ export class ChainExecutor {
 
   private readonly limits: ChainResourceLimits;
   private readonly chainId: string;
+  private readonly stateStore?: StateStore;
+  private readonly escalationRouter?: EscalationRouter;
   constructor(
     private readonly graph: DependencyGraph,
     private readonly artifacts: ArtifactRegistry,
@@ -187,6 +230,8 @@ export class ChainExecutor {
     if (options.logger) {
       this.logger = options.logger;
     }
+    this.stateStore = options.stateStore;
+    this.escalationRouter = options.escalationRouter;
   }
 
   /** Effective resource limits in use. Visible for tests + telemetry. */
@@ -319,6 +364,7 @@ export class ChainExecutor {
         triggerScanId: seedArtifact.scanId,
         steps,
         ok: false,
+        outcome: 'failed',
       };
     }
 
@@ -348,6 +394,7 @@ export class ChainExecutor {
         triggerScanId: seedArtifact.scanId,
         steps,
         ok: false,
+        outcome: 'failed',
       };
     }
 
@@ -616,6 +663,63 @@ export class ChainExecutor {
       };
       steps.push(step);
       this.logStep(pid, 'ok', step.durationMs);
+
+      // SPEC-022-2-03: pause the chain when this plugin produced any
+      // `requires_approval: true` artifact. The state file + escalation are
+      // gated on `stateStore` being injected; without it the gate is a
+      // no-op (back-compat with PLAN-022-1 callers + existing tests).
+      const approvalArtifact = this.findApprovalGate(manifest, produced);
+      if (approvalArtifact && this.stateStore) {
+        const remainingOrder = downstreamIds.slice(
+          downstreamIds.indexOf(pid) + 1,
+        );
+        const artifactsSoFar: ArtifactRef[] = steps
+          .filter((s) => s.status === 'ok' || s.status === 'error')
+          .flatMap((s) =>
+            s.produced.map((p) => ({
+              artifact_type: p.artifactType,
+              scan_id: p.scanId,
+            })),
+          );
+        const pausedState: ChainPausedState = {
+          chain_id: this.chainId,
+          paused_at_plugin: pid,
+          paused_at_artifact: approvalArtifact.scanId,
+          paused_at_artifact_type: approvalArtifact.artifactType,
+          triggering_plugin: triggeringPluginId,
+          remaining_order: remainingOrder,
+          artifacts_so_far: artifactsSoFar,
+          request_id: state.requestId,
+          request_root: state.requestRoot,
+          paused_timestamp_iso: new Date().toISOString(),
+        };
+        const statePath = StateStore.statePathFor(state.requestRoot, this.chainId);
+        await this.stateStore.writeState(statePath, pausedState);
+        if (this.escalationRouter) {
+          try {
+            await this.escalationRouter.notify({
+              kind: 'chain-approval-pending',
+              chain_id: pausedState.chain_id,
+              artifact_id: pausedState.paused_at_artifact,
+              artifact_type: pausedState.paused_at_artifact_type,
+              paused_since: pausedState.paused_timestamp_iso,
+              request_id: pausedState.request_id,
+            });
+          } catch (err) {
+            this.logger.warn?.(
+              `chain ${this.chainId}: escalation notify failed: ${(err as Error).message}`,
+            );
+          }
+        }
+        return {
+          triggeringPluginId,
+          triggerScanId: seedArtifact.scanId,
+          steps,
+          ok: true,
+          outcome: 'paused',
+          pausedState,
+        };
+      }
     }
 
     const ok = !steps.some((s) => s.status === 'error');
@@ -624,6 +728,289 @@ export class ChainExecutor {
       triggerScanId: seedArtifact.scanId,
       steps,
       ok,
+      outcome: ok ? 'success' : 'failed',
+    };
+  }
+
+  /**
+   * SPEC-022-2-03: locate any artifact this plugin just produced that the
+   * manifest declares `requires_approval: true`. Returns the first such
+   * artifact (the executor pauses on the first approval gate it sees).
+   */
+  private findApprovalGate(
+    manifest: HookManifest,
+    produced: ReadonlyArray<{ artifactType: string; scanId: string; filePath: string }>,
+  ): { artifactType: string; scanId: string } | null {
+    if (!manifest.produces || produced.length === 0) return null;
+    for (const out of produced) {
+      const declared = manifest.produces.find(
+        (p) => p.artifact_type === out.artifactType,
+      );
+      if (declared?.requires_approval === true) {
+        return { artifactType: out.artifactType, scanId: out.scanId };
+      }
+    }
+    return null;
+  }
+
+  /**
+   * SPEC-022-2-03: stable accessor exposing the underlying StateStore so
+   * the daemon-startup recovery routine and the `chains approve` CLI can
+   * route state-file reads through the same instance the executor uses.
+   */
+  getStateStore(): StateStore | undefined {
+    return this.stateStore;
+  }
+
+  /**
+   * Resume a paused chain. Reads the persisted state, verifies an approval
+   * marker exists for the paused-at artifact, walks the remaining
+   * topological order, then deletes the state file on success.
+   *
+   * Throws:
+   *   - `ChainStateMissingError` when no state file exists for `chainId`.
+   *   - `ChainNotApprovedError` when the `.approved.json` marker is absent.
+   *
+   * The state file is left intact on `ChainNotApprovedError` so an operator
+   * can subsequently approve and retry.
+   */
+  async resume(
+    chainId: string,
+    requestRoot: string,
+  ): Promise<ChainExecutionResult> {
+    if (!this.stateStore) {
+      throw new ChainStateMissingError(chainId);
+    }
+    const statePath = StateStore.statePathFor(requestRoot, chainId);
+    const persisted = await this.stateStore.readState(statePath);
+    if (!persisted) {
+      throw new ChainStateMissingError(chainId);
+    }
+    const approvedPath = StateStore.approvalMarkerPathFor(
+      persisted.request_root,
+      persisted.paused_at_artifact_type,
+      persisted.paused_at_artifact,
+    );
+    const approved = await this.stateStore.fileExists(approvedPath);
+    if (!approved) {
+      throw new ChainNotApprovedError(chainId, persisted.paused_at_artifact);
+    }
+    const result = await this.runRemaining(persisted);
+    // Cleanup on successful resume (ok or otherwise — the chain has had its
+    // chance to complete; leftover state would be misleading).
+    await this.stateStore.deleteState(statePath);
+    return result;
+  }
+
+  /**
+   * Walk the remaining topological order recorded on a paused-state
+   * snapshot, loading every artifact-so-far from disk and re-using the
+   * same per-step machinery as `runChainBody`. The walk does NOT re-invoke
+   * the plugin that produced the approval-gate artifact — that work is
+   * already persisted.
+   */
+  private async runRemaining(
+    persisted: ChainPausedState,
+  ): Promise<ChainExecutionResult> {
+    const steps: ChainStep[] = [];
+    // Rebuild producedIndex by reading every prior artifact off disk so
+    // downstream consumers can be satisfied identically.
+    const producedIndex = new Map<
+      string,
+      { scanId: string; payload: unknown; pluginId: string; schemaVersion: string }
+    >();
+    for (const ref of persisted.artifacts_so_far) {
+      let payload: unknown;
+      try {
+        payload = await this.artifacts.load(
+          persisted.request_root,
+          ref.artifact_type,
+          ref.scan_id,
+        );
+      } catch (err) {
+        // If a prior artifact has been removed we can't safely resume.
+        const failedStep: ChainStep = {
+          pluginId: persisted.paused_at_plugin,
+          consumed: [],
+          produced: [],
+          status: 'error',
+          error: `resume failed: prior artifact ${ref.artifact_type}/${ref.scan_id} unreadable: ${(err as Error).message}`,
+          durationMs: 0,
+        };
+        steps.push(failedStep);
+        return {
+          triggeringPluginId: persisted.triggering_plugin,
+          steps,
+          ok: false,
+          outcome: 'failed',
+        };
+      }
+      // Schema version is informational on resume; use '?' if the producer
+      // declaration is no longer accessible. Range checks below tolerate it.
+      const producerManifest = this.manifestLookup(persisted.paused_at_plugin);
+      const declaredVersion = this.findProducerVersion(
+        producerManifest,
+        ref.artifact_type,
+      );
+      producedIndex.set(ref.artifact_type, {
+        scanId: ref.scan_id,
+        payload,
+        pluginId: persisted.paused_at_plugin,
+        schemaVersion: declaredVersion ?? '?',
+      });
+    }
+
+    const state: RequestState = {
+      requestRoot: persisted.request_root,
+      requestId: persisted.request_id,
+    };
+
+    for (const pid of persisted.remaining_order) {
+      const stepStart = performance.now();
+      const manifest = this.manifestLookup(pid);
+      if (!manifest) {
+        const step: ChainStep = {
+          pluginId: pid,
+          consumed: [],
+          produced: [],
+          status: 'skipped',
+          error: 'manifest not found',
+          durationMs: performance.now() - stepStart,
+        };
+        steps.push(step);
+        this.logStep(pid, 'skipped', step.durationMs, step.error);
+        continue;
+      }
+
+      const inputs: Record<string, unknown> = {};
+      const consumed: Array<{ artifactType: string; scanId: string }> = [];
+      const consumesList = manifest.consumes ?? [];
+      let satisfied = consumesList.length === 0;
+      let unsatisfiedType: string | null = null;
+      for (const c of consumesList) {
+        const entry = producedIndex.get(c.artifact_type);
+        if (c.optional === true) {
+          if (entry && satisfiesRange(entry.schemaVersion, c.schema_version)) {
+            inputs[c.artifact_type] = entry.payload;
+            consumed.push({ artifactType: c.artifact_type, scanId: entry.scanId });
+          }
+          continue;
+        }
+        if (!entry || !satisfiesRange(entry.schemaVersion, c.schema_version)) {
+          unsatisfiedType = c.artifact_type;
+          break;
+        }
+        inputs[c.artifact_type] = entry.payload;
+        consumed.push({ artifactType: c.artifact_type, scanId: entry.scanId });
+        satisfied = true;
+      }
+      if (!satisfied) {
+        const step: ChainStep = {
+          pluginId: pid,
+          consumed: [],
+          produced: [],
+          status: 'skipped',
+          error: `no upstream producer in this chain run for artifact_type ${unsatisfiedType}`,
+          durationMs: performance.now() - stepStart,
+        };
+        steps.push(step);
+        this.logStep(pid, 'skipped', step.durationMs, step.error);
+        continue;
+      }
+
+      let outputs: ChainHookOutput[];
+      try {
+        outputs = await this.invokeWithTimeout(pid, manifest, {
+          requestState: state,
+          inputs,
+        });
+      } catch (err) {
+        const step: ChainStep = {
+          pluginId: pid,
+          consumed,
+          produced: [],
+          status: 'error',
+          error: `invocation threw: ${(err as Error).message}`,
+          durationMs: performance.now() - stepStart,
+        };
+        steps.push(step);
+        this.logStep(pid, 'error', step.durationMs, step.error);
+        continue;
+      }
+
+      const produced: Array<{ artifactType: string; scanId: string; filePath: string }> = [];
+      let producedError: string | null = null;
+      for (const out of outputs) {
+        const declared = (manifest.produces ?? []).find(
+          (p) => p.artifact_type === out.artifactType,
+        );
+        if (!declared) {
+          producedError = `plugin produced unexpected artifact_type '${out.artifactType}' (not declared in produces[])`;
+          break;
+        }
+        const v = this.artifacts.validate(
+          declared.artifact_type,
+          declared.schema_version,
+          out.payload,
+        );
+        if (!v.isValid) {
+          producedError = `produced ${declared.artifact_type} failed validation: ${v.errors.map((e) => e.message).join('; ')}`;
+          break;
+        }
+        let rec;
+        try {
+          rec = await this.artifacts.persist(
+            state.requestRoot,
+            declared.artifact_type,
+            out.scanId,
+            out.payload,
+          );
+        } catch (err) {
+          producedError = `persist failed for ${declared.artifact_type}: ${(err as Error).message}`;
+          break;
+        }
+        produced.push({
+          artifactType: declared.artifact_type,
+          scanId: out.scanId,
+          filePath: rec.filePath,
+        });
+        producedIndex.set(declared.artifact_type, {
+          scanId: out.scanId,
+          payload: out.payload,
+          pluginId: pid,
+          schemaVersion: declared.schema_version,
+        });
+      }
+      if (producedError) {
+        const step: ChainStep = {
+          pluginId: pid,
+          consumed,
+          produced,
+          status: 'error',
+          error: producedError,
+          durationMs: performance.now() - stepStart,
+        };
+        steps.push(step);
+        this.logStep(pid, 'error', step.durationMs, step.error);
+        continue;
+      }
+      const step: ChainStep = {
+        pluginId: pid,
+        consumed,
+        produced,
+        status: 'ok',
+        durationMs: performance.now() - stepStart,
+      };
+      steps.push(step);
+      this.logStep(pid, 'ok', step.durationMs);
+    }
+
+    const ok = !steps.some((s) => s.status === 'error');
+    return {
+      triggeringPluginId: persisted.triggering_plugin,
+      steps,
+      ok,
+      outcome: ok ? 'success' : 'failed',
     };
   }
 

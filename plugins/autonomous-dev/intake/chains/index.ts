@@ -11,3 +11,4 @@ export * from './cycle-error';
 export * from './errors';
 export * from './executor';
 export * from './render';
+export * from './state-store';

@@ -1,12 +1,12 @@
 {
   "id": "code-fixer",
-  "name": "Code Fixer",
-  "version": "1.0.0",
+  "name": "Code Fixer (fixture)",
+  "version": "0.0.1",
   "hooks": [
     {
       "id": "fix",
       "hook_point": "review-post-score",
-      "entry_point": "./fix.js",
+      "entry_point": "./code-fixer.js",
       "priority": 50,
       "failure_mode": "warn"
     }
@@ -15,13 +15,18 @@
     {
       "artifact_type": "code-patches",
       "schema_version": "1.0",
-      "format": "json"
+      "format": "json",
+      "requires_approval": true,
+      "on_failure": "block",
+      "description": "FIXTURE: emits one placeholder patch per finding. SPEC-022-2-03."
     }
   ],
   "consumes": [
     {
       "artifact_type": "security-findings",
-      "schema_version": "^1.0"
+      "schema_version": "^1.0",
+      "on_failure": "warn",
+      "description": "FIXTURE: consumes security-findings; warns if upstream fails."
     }
   ]
 }
