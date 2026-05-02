@@ -114,7 +114,9 @@ describe('pattern-grep', () => {
     }
   });
 
-  it('stub emits exactly one console.warn across the process', async () => {
+  // SPEC-021-2-04 replaced the pattern-grep stub with a real implementation
+  // that routes through the ReDoS sandbox.  The "stub" warn no longer fires.
+  it.skip('stub emits exactly one console.warn across the process (obsolete after SPEC-021-2-04)', async () => {
     __resetWarnLatchForTests();
     const w = ws();
     try {
