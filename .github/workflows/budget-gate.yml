@@ -102,10 +102,74 @@ jobs:
               });
             }
 
-      # TODO(SPEC-017-4-03): fail step (100%) + override consumption
-      # TODO(SPEC-017-4-03): critical step (110%) + two-admin verification
-      # TODO(SPEC-017-4-03): revoke override labels (single-run validity)
-      # TODO(PLAN-017-4 risk row 2): default to advisory mode for first 30 days post-launch.
+      - name: Check for cost override label (100%)
+        id: check-100
+        if: >-
+          github.event_name == 'pull_request' &&
+          fromJSON(steps.aggregate.outputs.percentage) >= 100 &&
+          fromJSON(steps.aggregate.outputs.percentage) < 110
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          PERCENTAGE: ${{ steps.aggregate.outputs.percentage }}
+          BUDGET_GATE_ADVISORY_MODE: ${{ vars.BUDGET_GATE_ADVISORY_MODE }}
+        run: |
+          set -euo pipefail
+          if [ "${BUDGET_GATE_ADVISORY_MODE:-false}" = "true" ]; then
+            echo "advisory_mode=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Budget exceeded (${PERCENTAGE}%) but advisory mode enabled. Promote to required check after baseline data."
+            exit 0
+          fi
+          labels=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name')
+          if echo "$labels" | grep -qx "cost:override"; then
+            echo "override_consumed=cost:override" >> "$GITHUB_OUTPUT"
+            actor="${GITHUB_ACTOR}"
+            echo "::notice::cost:override consumed by ${actor} at $(date -u +%FT%TZ)"
+            echo "Override consumed: \`cost:override\` by \`${actor}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Monthly budget exceeded (${PERCENTAGE}%). Apply 'cost:override' label to proceed."
+            exit 1
+          fi
+
+      - name: Verify critical override (110%)
+        id: check-110
+        if: >-
+          github.event_name == 'pull_request' &&
+          fromJSON(steps.aggregate.outputs.percentage) >= 110
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+          CRITICAL_LABEL: cost:override-critical
+          PERCENTAGE: ${{ steps.aggregate.outputs.percentage }}
+        run: |
+          set -euo pipefail
+          labels=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name')
+          if ! echo "$labels" | grep -qx "${CRITICAL_LABEL}"; then
+            echo "::error::Critical budget threshold (${PERCENTAGE}%) reached. Apply '${CRITICAL_LABEL}' label and obtain a second org admin approval to proceed."
+            exit 1
+          fi
+          node scripts/ci/verify-two-admin-override.js
+          echo "override_consumed=cost:override-critical" >> "$GITHUB_OUTPUT"
+
+      - name: Revoke override labels (single-run validity)
+        if: >-
+          success() &&
+          github.event_name == 'pull_request' &&
+          (steps.check-100.outputs.override_consumed != '' ||
+           steps.check-110.outputs.override_consumed != '')
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+          LABEL_100: ${{ steps.check-100.outputs.override_consumed }}
+          LABEL_110: ${{ steps.check-110.outputs.override_consumed }}
+        run: |
+          set -euo pipefail
+          for label in "$LABEL_100" "$LABEL_110"; do
+            [ -z "$label" ] && continue
+            gh pr edit "$PR_NUMBER" --remove-label "$label" --repo "$GITHUB_REPOSITORY"
+            echo "Removed label \`$label\` (single-run validity)" >> "$GITHUB_STEP_SUMMARY"
+          done
 
       - name: Record gate invocation
         env:
