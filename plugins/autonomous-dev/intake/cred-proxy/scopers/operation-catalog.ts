@@ -116,8 +116,17 @@ export interface AzureOperationSpec {
   readonly requiredScopeKeys: readonly string[];
 }
 
-export const AZURE_OPERATIONS: Readonly<Record<string, AzureOperationSpec>> =
-  {};
+export const AZURE_OPERATIONS: Readonly<Record<string, AzureOperationSpec>> = {
+  'ContainerApps.Deploy': {
+    // Built-in "Contributor" role; production deployments should replace
+    // this with a custom role definition limited to ContainerApps verbs.
+    roleDefinitionId:
+      '/providers/Microsoft.Authorization/roleDefinitions/b24988ac-6180-42a0-ab88-20f7382dd24c',
+    resourceScope: (s) =>
+      `/subscriptions/${s.subscriptionId}/resourceGroups/${s.resourceGroup}/providers/Microsoft.App/containerApps/${s.appName}`,
+    requiredScopeKeys: ['subscriptionId', 'resourceGroup', 'appName'],
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Kubernetes (SPEC-024-2-03 fills this in)
@@ -138,4 +147,25 @@ export interface K8sOperationSpec {
   readonly requiredScopeKeys: readonly string[];
 }
 
-export const K8S_OPERATIONS: Readonly<Record<string, K8sOperationSpec>> = {};
+export const K8S_OPERATIONS: Readonly<Record<string, K8sOperationSpec>> = {
+  deploy: {
+    rules: [
+      {
+        apiGroups: ['apps'],
+        resources: ['deployments'],
+        verbs: ['get', 'list', 'watch', 'create', 'update', 'patch'],
+      },
+      {
+        apiGroups: [''],
+        resources: ['services', 'configmaps'],
+        verbs: ['get', 'list', 'watch', 'create', 'update', 'patch'],
+      },
+      {
+        apiGroups: [''],
+        resources: ['pods'],
+        verbs: ['get', 'list', 'watch'],
+      },
+    ],
+    requiredScopeKeys: ['cluster', 'namespace'],
+  },
+};

@@ -14,7 +14,10 @@
   },
   "dependencies": {
     "@aws-sdk/client-sts": "^3.1041.0",
+    "@azure/arm-authorization": "^9.0.0",
+    "@azure/identity": "^4.13.1",
     "@google-cloud/iam-credentials": "^4.2.2",
+    "@kubernetes/client-node": "^1.4.0",
     "@slack/socket-mode": "^2.0.0",
     "@slack/web-api": "^7.0.0",
     "ajv": "^8.20.0",
