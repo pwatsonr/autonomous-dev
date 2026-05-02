@@ -1,16 +1,24 @@
 /**
- * CredentialProxy skeleton tests (SPEC-024-2-01).
+ * CredentialProxy authorisation tests (SPEC-024-2-01 + SPEC-024-2-04).
  *
- * Verifies:
+ * Verifies the auth surface that survived from the SPEC-024-2-01 skeleton
+ * after SPEC-024-2-04 replaced the `NotImplemented` throws with the full
+ * implementation:
  *   - TTL_SECONDS is exactly 900 (compile-time const).
  *   - Allowlist enforcement throws BEFORE any scoper is called.
  *   - Missing env identity throws CALLER_UNKNOWN before allowlist.
  *   - Spoofed socket peer throws CALLER_SPOOFED.
- *   - Allowlisted caller proceeds past auth → throws NotImplemented (the
- *     SPEC-024-2-04 placeholder; the throw is the success signal here).
+ *   - Allowlisted caller now SUCCEEDS (returns a ScopedCredential).
  *   - Missing scoper throws generic Error (not SecurityError).
  */
 
+import {
+  ActiveTokenRegistry,
+} from '../../intake/cred-proxy/active-tokens';
+import {
+  CredentialAuditEmitter,
+  type AuditSink,
+} from '../../intake/cred-proxy/audit-emitter';
 import {
   CredentialProxy,
   TTL_SECONDS,
@@ -47,10 +55,13 @@ function buildProxy(opts: {
   const scopers =
     opts.scopers ??
     new Map<Provider, CredentialScoper>([['aws', new SpyScoper()]]);
+  const sink: AuditSink = { append: () => undefined };
   return {
     proxy: new CredentialProxy({
       scopers,
       privilegedBackends: new Set(opts.privileged ?? []),
+      registry: new ActiveTokenRegistry(),
+      audit: new CredentialAuditEmitter(sink),
     }),
     scopers,
   };
@@ -125,26 +136,26 @@ describe('CredentialProxy.acquire allowlist enforcement', () => {
     ).rejects.toMatchObject({ code: 'CALLER_SPOOFED' });
   });
 
-  it('proceeds past allowlist for valid stdin caller (NotImplemented signals success)', async () => {
+  it('proceeds past allowlist for valid stdin caller and returns a ScopedCredential', async () => {
     process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-good';
     const { proxy } = buildProxy({ privileged: ['plugin-good'] });
-    await expect(
-      proxy.acquire('aws', 'op', { region: 'us-east-1' }),
-    ).rejects.toThrow(/NotImplemented/);
+    const cred = await proxy.acquire('aws', 'op', { region: 'us-east-1' });
+    expect(cred.delivery).toBe('stdin');
+    expect(cred.provider).toBe('aws');
+    expect(cred.token_id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('proceeds past allowlist for valid socket caller', async () => {
+  it('proceeds past allowlist for valid socket caller and returns delivery=socket', async () => {
     process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-good';
     registerLiveBackend({ pid: 1234, uid: 1000, pluginId: 'plugin-good' });
     const { proxy } = buildProxy({ privileged: ['plugin-good'] });
-    await expect(
-      proxy.acquire(
-        'aws',
-        'op',
-        { region: 'us-east-1' },
-        { socketPeer: { pid: 1234, uid: 1000 } },
-      ),
-    ).rejects.toThrow(/NotImplemented/);
+    const cred = await proxy.acquire(
+      'aws',
+      'op',
+      { region: 'us-east-1' },
+      { socketPeer: { pid: 1234, uid: 1000 } },
+    );
+    expect(cred.delivery).toBe('socket');
   });
 
   it('throws generic Error (not SecurityError) when provider has no scoper', async () => {
@@ -165,9 +176,9 @@ describe('CredentialProxy.acquire allowlist enforcement', () => {
   });
 });
 
-describe('CredentialProxy.revoke skeleton', () => {
-  it('throws NotImplemented (placeholder for SPEC-024-2-04)', async () => {
+describe('CredentialProxy.revoke', () => {
+  it('is a no-op for an unknown token (idempotent)', async () => {
     const { proxy } = buildProxy();
-    await expect(proxy.revoke('any-id')).rejects.toThrow(/NotImplemented/);
+    await expect(proxy.revoke('does-not-exist')).resolves.toBeUndefined();
   });
 });
