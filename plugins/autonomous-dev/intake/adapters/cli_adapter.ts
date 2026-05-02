@@ -59,6 +59,15 @@ import type {
   IncomingCommand,
   CommandResult,
 } from './adapter_interface';
+import { loadBugContext } from '../cli/bug-context-loader';
+import {
+  formatErrors,
+  runInteractivePrompts,
+  validateBugReport,
+  defaultPromptIO,
+  type PromptIO,
+} from '../cli/bug-prompts';
+import type { BugReport, Severity } from '../types/bug-report';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -192,6 +201,108 @@ export function parseListState(value: string): string {
     );
   }
   return value;
+}
+
+/**
+ * Commander collector for repeatable flags (e.g. `--repro-step a --repro-step b`).
+ * Appends each occurrence onto the accumulated array and returns it.
+ */
+export function collectArray(value: string, prev: string[]): string[] {
+  return [...(prev ?? []), value];
+}
+
+/**
+ * Build a {@link BugReport} from CLI inputs for the `submit-bug`
+ * subcommand. Three input modes, in priority order:
+ *
+ *   1. `--bug-context-path` — load + validate JSON file, ignore other flags.
+ *   2. Non-TTY stdin or `--non-interactive` — assemble from flags only.
+ *   3. TTY stdin — drive {@link runInteractivePrompts}.
+ *
+ * On validation or load failure this writes to stderr and throws an
+ * {@link InvalidArgumentError} so commander's top-level handler exits 1.
+ *
+ * Exported for unit testing. The optional `io` arg lets tests inject a
+ * fake {@link PromptIO} for the interactive path.
+ */
+export async function collectBugReport(
+  opts: Record<string, unknown>,
+  io?: PromptIO,
+): Promise<BugReport | null> {
+  // Mode 1: path-supplied JSON
+  if (opts.bugContextPath) {
+    const result = loadBugContext(String(opts.bugContextPath));
+    if (!result.ok) {
+      process.stderr.write(`Error: ${result.error}\n`);
+      throw new InvalidArgumentError(result.error);
+    }
+    return result.report;
+  }
+
+  const isInteractive = process.stdin.isTTY === true && !opts.nonInteractive;
+  let report: Partial<BugReport>;
+
+  if (isInteractive) {
+    // Mode 3: interactive prompts (re-prompt inline on per-field failures).
+    const handle = (): void => {
+      process.stderr.write('\nCancelled — no request submitted.\n');
+      process.exit(130);
+    };
+    process.once('SIGINT', handle);
+    try {
+      report = await runInteractivePrompts(io ?? defaultPromptIO());
+    } finally {
+      process.removeListener('SIGINT', handle);
+    }
+  } else {
+    // Mode 2: build directly from flags. Missing-required-field detection
+    // happens in validateBugReport below — this assembly stays mechanical.
+    const reproSteps = (opts.reproStep as string[] | undefined) ?? [];
+    const errMessages = (opts.errorMessage as string[] | undefined) ?? [];
+    const components = (opts.component as string[] | undefined) ?? [];
+    const labels = (opts.label as string[] | undefined) ?? [];
+
+    const partial: Partial<BugReport> = {};
+    if (opts.title !== undefined) partial.title = String(opts.title);
+    if (opts.description !== undefined) partial.description = String(opts.description);
+    if (reproSteps.length > 0) partial.reproduction_steps = reproSteps;
+    if (opts.expected !== undefined) partial.expected_behavior = String(opts.expected);
+    if (opts.actual !== undefined) partial.actual_behavior = String(opts.actual);
+    // error_messages is required in the schema (≥0 items) — always present.
+    partial.error_messages = errMessages;
+    // environment block — always assemble; missing fields surface as errors.
+    partial.environment = {
+      os: opts.os !== undefined ? String(opts.os) : '',
+      runtime: opts.runtime !== undefined ? String(opts.runtime) : '',
+      version: opts.version !== undefined ? String(opts.version) : '',
+    };
+    if (opts.severity !== undefined) partial.severity = opts.severity as Severity;
+    if (components.length > 0) partial.affected_components = components;
+    if (labels.length > 0) partial.labels = labels;
+    if (opts.userImpact !== undefined) partial.user_impact = String(opts.userImpact);
+
+    // Strip the empty environment block if the user supplied nothing —
+    // that surfaces as a single missing-property error rather than three
+    // empty-string errors.
+    if (
+      partial.environment &&
+      partial.environment.os === '' &&
+      partial.environment.runtime === '' &&
+      partial.environment.version === ''
+    ) {
+      delete partial.environment;
+    }
+
+    report = partial;
+  }
+
+  const errors = validateBugReport(report);
+  if (errors.length > 0) {
+    const msg = `bug report validation failed:\n${formatErrors(errors)}`;
+    process.stderr.write(`Error: ${msg}\n`);
+    throw new InvalidArgumentError(msg);
+  }
+  return report as BugReport;
 }
 
 // ---------------------------------------------------------------------------
@@ -335,13 +446,112 @@ export function buildProgram(
         .argParser(parseType)
         .default('feature'),
     )
+    .option(
+      '--bug-context-path <file>',
+      'Path to a JSON BugReport (required when --type bug, unless using submit-bug)',
+    )
     .action(async (description: string, opts: Record<string, unknown>) => {
+      // SPEC-018-3-02: bug-typed requests must carry a populated bug_context.
+      // Either supply a pre-built JSON file via --bug-context-path or use
+      // the dedicated `submit-bug` subcommand.
+      let bugContext: BugReport | undefined;
+      if (opts.type === 'bug') {
+        if (opts.bugContextPath) {
+          const result = loadBugContext(String(opts.bugContextPath));
+          if (!result.ok) {
+            process.stderr.write(`Error: ${result.error}\n`);
+            throw new InvalidArgumentError(result.error);
+          }
+          bugContext = result.report;
+        } else {
+          const msg =
+            "bug-typed requests require bug context. " +
+            "Use 'autonomous-dev request submit-bug' or pass --bug-context-path <file>";
+          process.stderr.write(`Error: ${msg}\n`);
+          throw new InvalidArgumentError(msg);
+        }
+      }
+
       await dispatch('submit', {
         description,
         repo: opts.repo,
         priority: opts.priority,
         deadline: opts.deadline,
         type: opts.type,
+        bug_context: bugContext ? JSON.stringify(bugContext) : undefined,
+      });
+    });
+
+  // -- submit-bug ---------------------------------------------------------
+  // SPEC-018-3-02: dedicated interactive (or scripted) bug-report intake.
+  program
+    .command('submit-bug')
+    .description(
+      'Submit a bug report (interactive when stdin is a TTY; flag-driven otherwise)',
+    )
+    .addOption(
+      new Option('--repo <repo>', 'Target repository (org/repo or absolute path)').argParser(parseRepo),
+    )
+    .addOption(
+      new Option('--priority <priority>', 'Priority: high|normal|low')
+        .choices(['high', 'normal', 'low'])
+        .default('normal'),
+    )
+    .option('--non-interactive', 'Force flag-only mode even on a TTY', false)
+    .option(
+      '--bug-context-path <file>',
+      'Path to a pre-built JSON BugReport (skips prompts/flags)',
+    )
+    // Scalar flags
+    .option('--title <s>', 'Bug title (1-200 chars)')
+    .option('--description <s>', 'Bug description (1-4000 chars)')
+    .option('--expected <s>', 'Expected behavior (1-2000 chars)')
+    .option('--actual <s>', 'Actual behavior (1-2000 chars)')
+    .option('--os <s>', 'environment.os override')
+    .option('--runtime <s>', 'environment.runtime override')
+    .option('--version <s>', 'environment.version override')
+    .option(
+      '--severity <s>',
+      'Severity: low|medium|high|critical',
+    )
+    .option('--user-impact <s>', 'User impact (1-1000 chars)')
+    // Repeatable array flags — commander's variadic via collector
+    .option(
+      '--repro-step <s>',
+      'A reproduction step (repeatable; ≥1 required)',
+      collectArray,
+      [] as string[],
+    )
+    .option(
+      '--error-message <s>',
+      'Verbatim error message (repeatable)',
+      collectArray,
+      [] as string[],
+    )
+    .option(
+      '--component <s>',
+      'Affected component (repeatable)',
+      collectArray,
+      [] as string[],
+    )
+    .option(
+      '--label <s>',
+      'Free-form label (repeatable)',
+      collectArray,
+      [] as string[],
+    )
+    .action(async (opts: Record<string, unknown>) => {
+      const report = await collectBugReport(opts);
+      if (!report) return; // collector already wrote stderr + threw OR exited
+
+      // Bash already sets the request type implicitly to 'bug' for this
+      // subcommand; the daemon needs both fields present.
+      await dispatch('submit', {
+        description: report.title, // short summary doubles as description
+        repo: opts.repo,
+        priority: opts.priority,
+        type: 'bug',
+        bug_context: JSON.stringify(report),
       });
     });
 
