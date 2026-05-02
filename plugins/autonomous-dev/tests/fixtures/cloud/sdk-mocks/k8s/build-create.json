@@ -1,0 +1,4 @@
+{
+  "kind": "k8s-manifest-ref",
+  "note": "K8sBackend.build is a no-op; this fixture is illustrative only."
+}

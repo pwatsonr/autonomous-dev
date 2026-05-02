@@ -1,0 +1,7 @@
+{
+  "Id": "sha256:imageid",
+  "Size": 1234,
+  "RepoDigests": [
+    "123456789012.dkr.ecr.us-east-1.amazonaws.com/web@sha256:abcd1234"
+  ]
+}

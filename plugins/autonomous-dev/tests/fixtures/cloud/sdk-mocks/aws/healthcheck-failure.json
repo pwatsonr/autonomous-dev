@@ -1,0 +1,5 @@
+{
+  "TargetHealthDescriptions": [
+    { "Target": { "Id": "10.0.0.1", "Port": 8080 }, "TargetHealth": { "State": "unhealthy", "Reason": "Target.FailedHealthChecks" } }
+  ]
+}

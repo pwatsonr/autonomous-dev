@@ -1,0 +1,5 @@
+{
+  "name": "projects/test-project/locations/us-central1/services/api",
+  "uri": "https://api-test-project.a.run.app",
+  "latestReadyRevision": "api-00002-abc"
+}

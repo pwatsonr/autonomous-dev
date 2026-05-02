@@ -1,0 +1,12 @@
+{
+  "name": "web-app",
+  "properties": {
+    "configuration": {
+      "ingress": {
+        "traffic": [
+          { "revisionName": "web-app--rev1", "weight": 100 }
+        ]
+      }
+    }
+  }
+}

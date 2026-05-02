@@ -1,0 +1,4 @@
+{
+  "previousRevisionName": "api-00001-xyz",
+  "previousImageUri": "gcr.io/test-project/api:prevsha"
+}

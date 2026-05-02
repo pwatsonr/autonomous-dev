@@ -1,0 +1,6 @@
+{
+  "service": {
+    "serviceArn": "arn:aws:ecs:us-east-1:123456789012:service/web-cluster/web-svc",
+    "taskDefinition": "arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:7"
+  }
+}
