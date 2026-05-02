@@ -6,3 +6,5 @@
 
 export * from './types';
 export * from './artifact-registry';
+export * from './dependency-graph';
+export * from './cycle-error';
