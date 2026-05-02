@@ -1,0 +1,30 @@
+{
+  "patch_id": "req-001-fix-1",
+  "produced_by": "code-fixer",
+  "produced_at": "2026-05-02T12:01:00Z",
+  "source_artifact": {
+    "artifact_type": "security-findings",
+    "scan_id": "req-001-scan-1"
+  },
+  "patches": [
+    {
+      "id": "p-001",
+      "file": "src/auth.ts",
+      "before": "const KEY = 'sk-abc123';",
+      "after": "const KEY = process.env.API_KEY ?? '';",
+      "confidence": 0.9,
+      "requires_approval": false,
+      "rationale": "Move secret to env var",
+      "fixes_finding_id": "f-001"
+    },
+    {
+      "id": "p-002",
+      "file": "src/util.ts",
+      "before": "function trim(s) { return s.slice(0, 1024); }",
+      "after": "function trim(s) { if (s.length > 1024) throw new Error('input too long'); return s; }",
+      "confidence": 0.6,
+      "requires_approval": true,
+      "fixes_finding_id": "f-002"
+    }
+  ]
+}
