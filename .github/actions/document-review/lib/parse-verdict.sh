@@ -66,8 +66,29 @@ if [[ "$mode" == "numeric" ]]; then
 fi
 
 if [[ "$mode" == "checklist" ]]; then
-  echo "::error::checklist mode not implemented in SPEC-017-2-02; see SPEC-017-2-05" >&2
-  exit 1
+  result="$(printf '%s\n' "$body" \
+    | grep -iE '^CHECKLIST_RESULT:[[:space:]]*(PASS|FAIL)' \
+    | head -n1 \
+    | sed -E 's/^[Cc][Hh][Ee][Cc][Kk][Ll][Ii][Ss][Tt]_[Rr][Ee][Ss][Uu][Ll][Tt]:[[:space:]]*([A-Za-z]+).*/\1/' \
+    | tr '[:lower:]' '[:upper:]' || true)"
+  if [[ -z "$result" ]]; then
+    echo "::error::Could not parse CHECKLIST_RESULT from Claude response" >&2
+    exit 1
+  fi
+  if [[ "$result" == "PASS" ]]; then
+    verdict="APPROVE"
+    has_critical="false"
+  elif [[ "$result" == "FAIL" ]]; then
+    verdict="REQUEST_CHANGES"
+    has_critical="true"
+  else
+    echo "::error::Invalid CHECKLIST_RESULT value: $result" >&2
+    exit 1
+  fi
+  emit "verdict=${verdict}"
+  emit "score="
+  emit "has-critical=${has_critical}"
+  exit 0
 fi
 
 echo "::error::Unknown mode '$mode'; expected 'numeric' or 'checklist'" >&2

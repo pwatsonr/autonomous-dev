@@ -89,3 +89,35 @@ teardown() {
   run bash "$PARSER" "$TMP_RESPONSE" numeric
   [ "$status" -ne 0 ]
 }
+
+# --- SPEC-017-2-05: checklist verdict mode -----------------------------------
+
+@test "checklist parser: CHECKLIST_RESULT: PASS => verdict=APPROVE, has-critical=false" {
+  echo "CHECKLIST_RESULT: PASS" > "$TMP_RESPONSE"
+  run bash "$PARSER" "$TMP_RESPONSE" checklist
+  [ "$status" -eq 0 ]
+  grep -q "verdict=APPROVE" "$TMP_OUTPUT"
+  grep -q "has-critical=false" "$TMP_OUTPUT"
+}
+
+@test "checklist parser: CHECKLIST_RESULT: FAIL => verdict=REQUEST_CHANGES, has-critical=true" {
+  echo "CHECKLIST_RESULT: FAIL" > "$TMP_RESPONSE"
+  run bash "$PARSER" "$TMP_RESPONSE" checklist
+  [ "$status" -eq 0 ]
+  grep -q "verdict=REQUEST_CHANGES" "$TMP_OUTPUT"
+  grep -q "has-critical=true" "$TMP_OUTPUT"
+}
+
+@test "checklist parser: case-insensitive accepted" {
+  echo "checklist_result: pass" > "$TMP_RESPONSE"
+  run bash "$PARSER" "$TMP_RESPONSE" checklist
+  [ "$status" -eq 0 ]
+  grep -q "verdict=APPROVE" "$TMP_OUTPUT"
+}
+
+@test "checklist parser: missing CHECKLIST_RESULT line fails" {
+  echo "no result here" > "$TMP_RESPONSE"
+  run bash "$PARSER" "$TMP_RESPONSE" checklist
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"::error::"* ]]
+}

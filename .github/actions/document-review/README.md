@@ -140,6 +140,48 @@ minor concerns are surfaced in the PR comment but do not block merge. Only
 Description text is truncated to 140 characters (the GitHub commit-status
 API limit).
 
+## Checklist Mode
+
+Set `verdict-mode: checklist` (default is `numeric`) to switch the parser to
+binary `CHECKLIST_RESULT: PASS|FAIL` semantics. This is used by the
+`agent-meta-review` workflow to enforce a 6-point security checklist on
+agent definition files.
+
+| Response line | Resulting outputs |
+|---------------|-------------------|
+| `CHECKLIST_RESULT: PASS` | `verdict=APPROVE`, `has-critical=false`, `score=` |
+| `CHECKLIST_RESULT: FAIL` | `verdict=REQUEST_CHANGES`, `has-critical=true`, `score=` |
+| (line missing) | parser fails with `::error::Could not parse CHECKLIST_RESULT from Claude response` |
+
+The mapping intentionally reuses the numeric-mode commit-status logic:
+PASS becomes `success`; FAIL becomes `failure` (and is also flagged as
+critical so any future branch-protection policy that filters on critical
+findings treats agent-meta failures with maximum severity).
+
+## 6-Point Security Checklist
+
+The `agent-meta-reviewer` agent at
+`plugins/autonomous-dev/agents/agent-meta-reviewer.md` is the source of
+truth, but the checklist is reproduced here for reviewer convenience:
+
+1. **No new shell-execution permissions added** -- diff must not introduce
+   `Bash(...)` permission entries not already present.
+2. **No filesystem-write permissions outside the plugin's own directory** --
+   `Write(...)`, `Edit(...)`, etc. must scope to `plugins/<this-plugin>/...`.
+3. **No new network-egress capabilities** -- no new `WebFetch(...)`,
+   `WebSearch`, or arbitrary URL access without justification.
+4. **No new MCP server bindings** -- adding an MCP server to an agent's
+   tool list requires explicit reviewer comment justifying scope.
+5. **System-prompt instructions remain bounded** -- no "ignore previous
+   instructions", no jailbreak phrases, no instructions to bypass other
+   agents.
+6. **Identity and scope unchanged** -- agent name, description, and
+   high-level role are not redefined to subvert the original purpose.
+
+A FAIL on any single point fails the checklist. There is no partial
+credit; this is the explicit choice that distinguishes checklist mode
+from numeric mode.
+
 ## Known Limitations
 
 - The sticky-comment search calls `issues.listComments` with the default

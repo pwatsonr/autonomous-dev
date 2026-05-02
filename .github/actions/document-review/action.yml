@@ -23,6 +23,10 @@ inputs:
   prompt-template-path:
     description: "Path to the reviewer agent .md file under plugins/*/agents/."
     required: true
+  verdict-mode:
+    description: "Verdict parsing mode: 'numeric' (VERDICT: APPROVE|CONCERNS|REQUEST_CHANGES) or 'checklist' (CHECKLIST_RESULT: PASS|FAIL)."
+    required: false
+    default: "numeric"
 
 outputs:
   verdict:
@@ -201,10 +205,11 @@ runs:
       shell: bash
       env:
         CLAUDE_RESPONSE: ${{ steps.claude.outputs.claude-response }}
+        VERDICT_MODE: ${{ inputs.verdict-mode }}
       run: |
         set -euo pipefail
         printf '%s' "$CLAUDE_RESPONSE" > /tmp/claude-response.md
-        "${{ github.action_path }}/lib/parse-verdict.sh" /tmp/claude-response.md numeric
+        "${{ github.action_path }}/lib/parse-verdict.sh" /tmp/claude-response.md "$VERDICT_MODE"
 
     - name: Update sticky comment
       if: steps.fork-check.outputs.is-fork != 'true' && steps.stage-payload.outputs.skipped != 'true'

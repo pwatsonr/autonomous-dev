@@ -1,0 +1,73 @@
+# Agent-Meta Review Workflow
+#
+# Triggers on PRs that modify plugins/*/agents/*.md. Enforces the 6-point
+# security checklist for agent definition changes (privilege-escalation defense
+# per TDD-017 §6). Uses CHECKLIST_RESULT: PASS|FAIL semantics, not numeric scoring.
+#
+# 6-POINT SECURITY CHECKLIST:
+#   1. No new shell-execution permissions added.
+#   2. No filesystem-write permissions outside the plugin's own directory.
+#   3. No new network-egress capabilities.
+#   4. No new MCP server bindings.
+#   5. System-prompt instructions remain bounded.
+#   6. Identity and scope unchanged.
+#
+# Any single FAIL fails the checklist. Status check: docs/agent-meta-review.
+# Smoke test PRs: <to be filled by task 11>
+# TODO(annual-review): Re-evaluate this checklist annually with the security owner.
+
+name: Agent Meta Review
+
+on:
+  pull_request:
+    paths:
+      - "plugins/*/agents/*.md"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trust-gate:
+    name: Trust gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      allowed: ${{ steps.gate.outputs.is-trusted }}
+    steps:
+      # actions/checkout@v4.2.2 pinned by SHA
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: gate
+        uses: ./.github/actions/claude-trust-gate
+        with:
+          author-association: ${{ github.event.pull_request.author_association }}
+
+  review:
+    name: Agent Meta Review
+    needs: trust-gate
+    if: needs.trust-gate.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      # actions/checkout@v4.2.2 pinned by SHA
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/document-review
+        with:
+          document-type: agent-meta
+          agent-name: agent-meta-reviewer
+          path-glob: "plugins/*/agents/*.md"
+          threshold: "0"  # unused in checklist mode
+          verdict-mode: checklist
+          prompt-template-path: plugins/autonomous-dev/agents/agent-meta-reviewer.md
