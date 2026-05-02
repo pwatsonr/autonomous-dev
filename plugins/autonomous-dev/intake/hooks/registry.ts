@@ -11,7 +11,13 @@
  */
 
 import * as path from 'node:path';
-import { HookPoint, type HookEntry, type HookManifest } from './types';
+import {
+  HookPoint,
+  isReviewerSlotObject,
+  type HookEntry,
+  type HookManifest,
+  type ReviewGate,
+} from './types';
 
 /** A registered hook resolved against its plugin. */
 export interface RegisteredHook {
@@ -29,12 +35,46 @@ export class HookRegistry {
   private byPoint: Map<HookPoint, RegisteredHook[]> = new Map();
 
   /**
+   * Secondary index: ReviewGate → reviewer-slot hooks declared for that gate.
+   *
+   * Maintained in lockstep with `byPoint` by `register()`/`unregister()`.
+   * Only hooks whose `reviewer_slot` is an object form (rich `ReviewerSlot`
+   * declaration per SPEC-019-4-01) populate this index; the legacy string
+   * form is treated as opaque and not gate-routable.
+   *
+   * O(1) lookup; preserves registration order within a gate.
+   */
+  private reviewerIndex: Map<ReviewGate, RegisteredHook[]> = new Map();
+
+  /**
    * Register every hook in the manifest under its declared HookPoint.
    *
    * Stable sort: hooks at equal priority preserve registration order.
    * See PLAN-019-1 risk register for rationale.
+   *
+   * SPEC-019-4-01: hooks carrying a `ReviewerSlot` object are additionally
+   * indexed under each declared `review_gates` entry. A `(plugin_id, gate)`
+   * pair already in the reviewer index causes the registration to throw —
+   * this protects against duplicate gate registration leaking through
+   * repeated `register()` calls.
    */
   register(plugin: HookManifest, pluginRoot: string): void {
+    // Pre-flight reviewer-slot duplicate check across all hooks in the
+    // manifest. We do this before mutating any state so a partial
+    // registration cannot leave the registry in a half-applied state.
+    for (const hook of plugin.hooks) {
+      const slot = hook.reviewer_slot;
+      if (!isReviewerSlotObject(slot)) continue;
+      for (const gate of slot.review_gates) {
+        const existing = this.reviewerIndex.get(gate) ?? [];
+        if (existing.some((h) => h.pluginId === plugin.id)) {
+          throw new Error(
+            `HookRegistry: duplicate reviewer-slot registration for plugin '${plugin.id}' on gate '${gate}'`,
+          );
+        }
+      }
+    }
+
     for (const hook of plugin.hooks) {
       const resolved: RegisteredHook = {
         pluginId: plugin.id,
@@ -49,13 +89,25 @@ export class HookRegistry {
       list.push(resolved);
       list.sort((a, b) => b.hook.priority - a.hook.priority);
       this.byPoint.set(hook.hook_point, list);
+
+      const slot = hook.reviewer_slot;
+      if (isReviewerSlotObject(slot)) {
+        for (const gate of slot.review_gates) {
+          const reviewers = this.reviewerIndex.get(gate) ?? [];
+          reviewers.push(resolved);
+          this.reviewerIndex.set(gate, reviewers);
+        }
+      }
     }
   }
 
   /**
    * Remove every hook whose `pluginId` matches.
    *
-   * Returns the total count removed. O(n) over all registered hooks.
+   * Returns the total count removed. O(n) over all registered hooks. Also
+   * cleans up the reviewer-slot index: any gate whose entry list becomes
+   * empty after the filter is removed from the map entirely (no zombie
+   * empty arrays).
    */
   unregister(pluginId: string): number {
     let removed = 0;
@@ -69,7 +121,29 @@ export class HookRegistry {
         this.byPoint.set(point, next);
       }
     }
+
+    for (const [gate, reviewers] of this.reviewerIndex.entries()) {
+      const next = reviewers.filter((h) => h.pluginId !== pluginId);
+      if (next.length === 0) {
+        this.reviewerIndex.delete(gate);
+      } else if (next.length !== reviewers.length) {
+        this.reviewerIndex.set(gate, next);
+      }
+    }
+
     return removed;
+  }
+
+  /**
+   * Return all reviewer slots registered for a given review gate, in
+   * registration order. Empty array if no plugins registered for that gate.
+   *
+   * O(1) lookup; the index is maintained on `register()`/`unregister()`.
+   * Returns a defensive copy so callers cannot mutate the registry's
+   * internal state.
+   */
+  getReviewersForGate(gate: ReviewGate): RegisteredHook[] {
+    return [...(this.reviewerIndex.get(gate) ?? [])];
   }
 
   /**
@@ -82,9 +156,10 @@ export class HookRegistry {
     return this.byPoint.get(point) ?? [];
   }
 
-  /** Empty the registry. */
+  /** Empty the registry, including the reviewer-slot index. */
   clear(): void {
     this.byPoint.clear();
+    this.reviewerIndex.clear();
   }
 
   /** Total registered hooks across all points. */
@@ -116,5 +191,6 @@ export class HookRegistry {
    */
   _replaceInternal(other: HookRegistry): void {
     this.byPoint = other.byPoint;
+    this.reviewerIndex = other.reviewerIndex;
   }
 }

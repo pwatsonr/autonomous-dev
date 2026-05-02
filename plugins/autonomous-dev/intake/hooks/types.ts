@@ -114,8 +114,18 @@ export interface HookEntry {
   priority: number;
   /** Behavior on hook failure. */
   failure_mode: FailureMode;
-  /** Optional reviewer-slot binding (semantics in PLAN-019-4). */
-  reviewer_slot?: string;
+  /**
+   * Optional reviewer-slot binding.
+   *
+   * - String form (back-compat with PLAN-019-1 manifests): names a slot.
+   *   Treated as opaque by the registry's reviewer-slot index — it does
+   *   NOT map to a `ReviewGate` and is ignored by `getReviewersForGate`.
+   * - Object form (SPEC-019-4-01): rich `ReviewerSlot` declaration listing
+   *   one or more `review_gates`. Hooks declared with this form ARE indexed
+   *   under each declared gate and discoverable via
+   *   `HookRegistry.getReviewersForGate(gate)`.
+   */
+  reviewer_slot?: string | ReviewerSlot;
   /** Other plugin ids this hook depends on. Resolved by PLAN-019-3/4. */
   dependencies?: string[];
   /** Capabilities the hook requests; sandbox enforces in a future plan. */
@@ -302,4 +312,197 @@ export interface ExecutorWarning {
   direction: 'input' | 'output';
   /** Human-readable message. */
   message: string;
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-019-4-01: Reviewer-slot type system
+// ---------------------------------------------------------------------------
+
+/**
+ * Review gates a `ReviewerSlot` may participate in.
+ *
+ * - `code-review`, `security-review`: PRD-004 review pipeline.
+ * - `document-review-prd`, `document-review-tdd`, `document-review-plan`,
+ *   `document-review-spec`: PLAN-017-2 document-cascade gates (declared
+ *   here ahead of consumers to avoid a follow-up type-system bump).
+ *
+ * Cross-reference: TDD-019 §11.1.
+ *
+ * NB: intentionally a string union (not a TypeScript `enum`) so it is
+ * JSON-serializable in plugin manifests with no runtime conversion.
+ */
+export type ReviewGate =
+  | 'code-review'
+  | 'security-review'
+  | 'document-review-prd'
+  | 'document-review-tdd'
+  | 'document-review-plan'
+  | 'document-review-spec';
+
+/** All ReviewGate string values, in declaration order. */
+export const REVIEW_GATES: readonly ReviewGate[] = [
+  'code-review',
+  'security-review',
+  'document-review-prd',
+  'document-review-tdd',
+  'document-review-plan',
+  'document-review-spec',
+] as const;
+
+/** Type guard for ReviewGate string values. */
+export function isReviewGate(value: string): value is ReviewGate {
+  return (REVIEW_GATES as readonly string[]).includes(value);
+}
+
+/** Verdict outcome categories used by reviewer slots. Cross-reference: TDD-019 §11.2. */
+export type VerdictKind = 'APPROVE' | 'CONCERNS' | 'REQUEST_CHANGES';
+
+/**
+ * One finding produced by a reviewer slot. Cross-reference: TDD-019 §11.2.
+ *
+ * `id` is intended for de-duplication of identical findings reported by
+ * different reviewers in the same gate aggregation.
+ */
+export interface Finding {
+  /** Stable identifier for de-duplication across reviewers. */
+  id: string;
+  severity: 'info' | 'warn' | 'error' | 'critical';
+  message: string;
+  /** Optional file:line pointer for code/document review surfaces. */
+  location?: string;
+}
+
+/**
+ * Single reviewer's verdict on a review-gate input.
+ *
+ * Cross-reference: TDD-019 §11.3 (fingerprinting) and §11.4 (audit metadata).
+ *
+ * The `fingerprint` field is populated by SPEC-019-4-02 / `fingerprint.ts`;
+ * pre-fingerprint construction sites set it to the empty string and the
+ * aggregator stamps the canonical SHA-256 value before the verdict escapes.
+ */
+export interface Verdict {
+  verdict: VerdictKind;
+  /** Score in [0, 100]; the gate aggregator weights/thresholds these. */
+  score: number;
+  findings: Finding[];
+  /** SHA-256 fingerprint per TDD §11.3. Empty string before fingerprinting. */
+  fingerprint: string;
+  /** Plugin identity stamped per TDD §11.4. */
+  plugin_id: string;
+  plugin_version: string;
+  agent_name: string;
+}
+
+/**
+ * Reviewer-slot declaration on a hook entry.
+ *
+ * When present (object form on `HookEntry.reviewer_slot`), the hook is also
+ * indexed by review gate in the registry and discoverable via
+ * `HookRegistry.getReviewersForGate(gate)`.
+ *
+ * Cross-reference: TDD-019 §11.1 (verbatim shape).
+ */
+export interface ReviewerSlot {
+  /** Name of the agent registered via PLAN-005 to perform the review. */
+  agent_name: string;
+  /** Gates this reviewer participates in (must contain ≥1 entry). */
+  review_gates: ReviewGate[];
+  /** Free-form domain tags (e.g. 'rust', 'k8s-yaml') for routing. */
+  expertise_domains: string[];
+  /**
+   * Per-reviewer minimum score to count as an APPROVE. The gate aggregator
+   * may use this in addition to the gate-level minimum threshold.
+   */
+  minimum_threshold: number;
+  /**
+   * Optional fingerprint format hint. SPEC-019-4-02 currently ignores this
+   * and uses the canonical SHA-256 format from TDD §11.3.
+   */
+  fingerprint_format?: 'sha256-canonical-json';
+}
+
+/** Type guard: returns true when the value is a `ReviewerSlot` object (not the string back-compat form). */
+export function isReviewerSlotObject(value: unknown): value is ReviewerSlot {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as ReviewerSlot).review_gates) &&
+    typeof (value as ReviewerSlot).agent_name === 'string'
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-019-4-03: Sequential execution with chained context + failure modes
+// ---------------------------------------------------------------------------
+
+/**
+ * String-literal alias for the `FailureMode` enum values.
+ *
+ * Manifest authors and audit serializers use the bare string form; the enum
+ * is preserved for in-engine call sites that prefer the symbolic constants.
+ *
+ * Cross-reference: SPEC-019-4-03 Type Additions.
+ */
+export type FailureModeStr = 'block' | 'warn' | 'ignore';
+
+/**
+ * Per-invocation context handed to a chained hook entry-point as its
+ * SECOND argument (the first remains the raw, sanitized input for
+ * back-compat with PLAN-019-1 hook authors that accept `(input)` only).
+ *
+ * Hooks observe the cumulative `previousResults` for every prior hook at
+ * the same hook point — including warn/ignore failures — in execution
+ * order. The collection is provided as a `ReadonlyArray`; mutating it is
+ * a contract violation. The executor passes a defensive copy on each
+ * iteration so attempted mutations cannot leak between hook invocations.
+ *
+ * Cross-reference: SPEC-019-4-03 Type Additions; TDD-019 §12.1.
+ */
+export interface HookContext<I = unknown> {
+  /** The original input passed to executeHooks(). Read-only. */
+  readonly originalContext: I;
+  /** Results from all prior hooks at this hook point, in execution order. */
+  readonly previousResults: ReadonlyArray<HookResult>;
+}
+
+/**
+ * What a single hook returned (or recorded as a non-blocking failure).
+ *
+ * One of `output` (success) or `error` (failure under `warn`/`ignore`/`block`)
+ * is populated. `block`-mode failures additionally short-circuit the executor
+ * via `HookBlockedError`; the failing `HookResult` is carried on the error.
+ *
+ * Cross-reference: SPEC-019-4-03 Type Additions.
+ */
+export interface HookResult<O = unknown> {
+  plugin_id: string;
+  plugin_version: string;
+  /** Stable identifier from manifest (matches `HookEntry.id`). */
+  hook_id: string;
+  priority: number;
+  /** Set on success. */
+  output?: O;
+  /** Set on failure under any failure mode. */
+  error?: { message: string; stack?: string; failure_mode: FailureModeStr };
+  /** Wall-clock duration, milliseconds. Always non-negative. */
+  duration_ms: number;
+}
+
+/**
+ * Aggregated outcome from the chained-context executor variant
+ * (`HookExecutor.executeHooksChained`).
+ *
+ * `failures` is the subset of `results` whose `error` is set under a
+ * non-blocking mode (`warn` or `ignore`). `aborted` is `true` only when a
+ * `block`-mode failure threw `HookBlockedError` during the run; the catching
+ * caller assembles the partial result manually.
+ *
+ * Cross-reference: SPEC-019-4-03 Type Additions.
+ */
+export interface ChainedHookExecutionResult<O = unknown> {
+  hook_point: string;
+  results: HookResult<O>[];
+  failures: HookResult<O>[];
+  aborted: boolean;
 }

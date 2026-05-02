@@ -23,12 +23,22 @@
  */
 
 import { performance } from 'node:perf_hooks';
-import type { HookPoint, ExecutorWarning, ValidationError } from './types';
+import type {
+  HookPoint,
+  ExecutorWarning,
+  ValidationError,
+  HookContext,
+  HookResult,
+  ChainedHookExecutionResult,
+  FailureModeStr,
+} from './types';
+import { FailureMode } from './types';
 import type { RegisteredHook, RegistrySnapshot } from './registry';
 import type { ValidationPipeline } from './validation-pipeline';
 import { SchemaNotFoundError } from './validation-pipeline';
 import type { TrustValidator } from './trust-validator';
 import type { TrustAuditEmitter } from './audit-emitter';
+import { HookBlockedError } from './errors';
 
 /** Per-invocation status. SPEC-019-2-04 §"HookExecutionResult Shape". */
 export type HookInvocationStatus =
@@ -302,5 +312,150 @@ export class HookExecutor {
    */
   private resolveSchemaVersion(_hook: RegisteredHook): string {
     return DEFAULT_SCHEMA_VERSION;
+  }
+
+  // ---------------------------------------------------------------------------
+  // SPEC-019-4-03: Sequential execution with chained context + failure modes
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Execute every hook for `point` in priority order, threading the
+   * cumulative `previousResults` through each invocation as a `HookContext`.
+   *
+   * Differences vs. `executeHooks`:
+   *
+   *   - Hooks receive a SECOND argument of shape `{originalContext,
+   *     previousResults}`. The first argument is still the raw input for
+   *     PLAN-019-1 hook author back-compat.
+   *   - The hook entry's `failure_mode` selects the failure policy:
+   *       `block`  — throws `HookBlockedError`; subsequent hooks are NOT run.
+   *       `warn`   — logs at WARN level via `log`; iteration continues.
+   *       `ignore` — silently skipped; iteration continues.
+   *   - The aggregated return shape is `{hook_point, results, failures,
+   *     aborted}` with `failures = results.filter(r => r.error !== undefined)`.
+   *
+   * The `block` branch is the ONLY branch that throws. Callers (the daemon)
+   * MUST wrap this method in try/catch and translate `HookBlockedError` into
+   * a request-level escalation per TDD-009. The executor never catches its
+   * own throws once raised — propagation is the daemon's contract.
+   *
+   * Cross-reference: SPEC-019-4-03 algorithm; TDD-019 §12.1.
+   */
+  async executeHooksChained<O = unknown, I = unknown>(
+    point: HookPoint,
+    originalContext: I,
+    log?: (
+      level: 'warn' | 'info',
+      msg: string,
+      meta: Record<string, unknown>,
+    ) => void,
+  ): Promise<ChainedHookExecutionResult<O>> {
+    const snapshot = this.snapshotProvider();
+    // The registry already keeps lists sorted descending by priority with
+    // stable insertion-order tiebreaks; respect that ordering verbatim.
+    const hooks = snapshot.get(point) ?? [];
+
+    if (hooks.length === 0) {
+      return { hook_point: point, results: [], failures: [], aborted: false };
+    }
+
+    const results: HookResult<O>[] = [];
+    const failures: HookResult<O>[] = [];
+
+    for (const hook of hooks) {
+      // Defensive copy on EACH iteration so a hook's attempt to mutate the
+      // array (e.g. `(ctx.previousResults as any[]).push(...)`) cannot leak
+      // into the next iteration's view.
+      const context: HookContext<I> = {
+        originalContext,
+        previousResults: [...results] as ReadonlyArray<HookResult>,
+      };
+
+      const failureMode = this.resolveFailureMode(hook);
+      const start = performance.now();
+      let output: O | undefined;
+      let caught: unknown;
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
+        const mod = require(hook.resolvedEntryPoint);
+        const fn = typeof mod === 'function' ? mod : (mod && mod.default) ?? mod;
+        if (typeof fn !== 'function') {
+          throw new Error(`entry-point is not a function: ${hook.resolvedEntryPoint}`);
+        }
+        // First arg: raw originalContext for back-compat with PLAN-019-1
+        // hooks (they expect the bare input). Second arg: HookContext for
+        // chained-aware hook authors (PLAN-019-4+).
+        output = (await Promise.resolve(fn(originalContext, context))) as O;
+      } catch (err) {
+        caught = err;
+      }
+
+      const duration_ms = performance.now() - start;
+
+      if (caught === undefined) {
+        results.push({
+          plugin_id: hook.pluginId,
+          plugin_version: hook.pluginVersion,
+          hook_id: hook.hook.id,
+          priority: hook.hook.priority,
+          output,
+          duration_ms,
+        });
+        continue;
+      }
+
+      const err = caught as Error;
+      const failingResult: HookResult<O> = {
+        plugin_id: hook.pluginId,
+        plugin_version: hook.pluginVersion,
+        hook_id: hook.hook.id,
+        priority: hook.hook.priority,
+        error: {
+          message: err.message ?? String(err),
+          stack: err.stack,
+          failure_mode: failureMode,
+        },
+        duration_ms,
+      };
+
+      if (failureMode === 'block') {
+        // Record the failing result so callers tracing logs see it, then
+        // throw. Subsequent hooks are NOT invoked.
+        results.push(failingResult);
+        throw new HookBlockedError(failingResult);
+      }
+
+      // warn / ignore: continue iteration; record in both results and failures.
+      results.push(failingResult);
+      failures.push(failingResult);
+
+      if (failureMode === 'warn' && log) {
+        log('warn', 'hook-failure', {
+          plugin_id: hook.pluginId,
+          hook_id: hook.hook.id,
+          error: failingResult.error,
+        });
+      }
+      // 'ignore' is intentionally silent — no log emission.
+    }
+
+    return { hook_point: point, results, failures, aborted: false };
+  }
+
+  /**
+   * Coerce the manifest `failure_mode` (which may be the `FailureMode` enum
+   * value or its bare string form) into the canonical string-literal type
+   * used by `HookResult.error.failure_mode`.
+   */
+  private resolveFailureMode(hook: RegisteredHook): FailureModeStr {
+    const mode = hook.hook.failure_mode as FailureMode | FailureModeStr | undefined;
+    if (mode === FailureMode.Block || mode === 'block') return 'block';
+    if (mode === FailureMode.Warn || mode === 'warn') return 'warn';
+    if (mode === FailureMode.Ignore || mode === 'ignore') return 'ignore';
+    // PLAN-019-4 manifests are required to declare failure_mode; if missing
+    // we default to 'warn' (the safest non-aborting choice) rather than
+    // silently 'ignore' which would suppress operator-visible failures.
+    return 'warn';
   }
 }
