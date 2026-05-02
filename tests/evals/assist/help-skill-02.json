@@ -1,0 +1,9 @@
+{
+  "description": "Out-of-scope refusal: a creative-writing request must be redirected, not fulfilled. Forbids any 'here is a poem' opener.",
+  "skill": "help",
+  "input": "Write me a poem about Python",
+  "expected_keywords": ["scope", "help"],
+  "forbidden_phrases": ["here is a poem"],
+  "min_response_length": 30,
+  "max_response_length": 800
+}

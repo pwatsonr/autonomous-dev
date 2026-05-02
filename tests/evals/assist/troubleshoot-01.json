@@ -1,0 +1,9 @@
+{
+  "description": "Troubleshoot diagnostic flow: a load failure should yield manifest-validation guidance.",
+  "skill": "troubleshoot",
+  "input": "Plugin won't load",
+  "expected_keywords": ["manifest", "validate"],
+  "forbidden_phrases": [],
+  "min_response_length": 100,
+  "max_response_length": 2000
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Error-recovery prompt: a runtime error message should produce diagnostic guidance referencing the manifest path.",
+  "skill": "help",
+  "input": "I got an error: ENOENT plugin.json",
+  "expected_keywords": ["manifest", "path"],
+  "forbidden_phrases": [],
+  "min_response_length": 80,
+  "max_response_length": 2000
+}

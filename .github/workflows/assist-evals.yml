@@ -1,0 +1,142 @@
+# ============================================================
+# Assist Evals Workflow
+# ============================================================
+# Runs the autonomous-dev-assist eval suite against the seed
+# scenarios in `tests/evals/assist/`. Triggers:
+#
+#   - PRs touching assist code or eval scaffolding
+#   - Nightly cron at 06:00 UTC
+#
+# This file is the SPEC-017-3-03 scaffold. SPEC-017-3-04 appends
+# threshold-check + cron-only baseline-update steps.
+#
+# Operator runbook: docs/operators/assist-evals.md (added by SPEC-017-3-04)
+# ============================================================
+
+name: assist-evals
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/autonomous-dev-assist/skills/**'
+      - 'plugins/autonomous-dev-assist/agents/**'
+      - 'tests/evals/assist/**'
+      - 'scripts/ci/run-assist-evals.sh'
+      - 'scripts/ci/score-eval-response.js'
+  schedule:
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+  pull-requests: write   # for results comment in SPEC-017-3-04
+
+concurrency:
+  group: assist-evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-evals:
+    name: Run assist eval scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      pass-rate: ${{ steps.summary.outputs.pass-rate }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run eval suite
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: bash scripts/ci/run-assist-evals.sh
+
+      - name: Summarize results
+        id: summary
+        run: |
+          set -euo pipefail
+          PASS_RATE="$(jq -r '.pass_rate' eval-results.json)"
+          TOTAL="$(jq -r '.total' eval-results.json)"
+          PASSED="$(jq -r '.passed' eval-results.json)"
+          echo "Pass rate: $PASS_RATE  ($PASSED / $TOTAL)"
+          echo "pass-rate=${PASS_RATE}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Assist Evals"
+            echo ""
+            echo "- Total scenarios: ${TOTAL}"
+            echo "- Passed: ${PASSED}"
+            echo "- Pass rate: ${PASS_RATE}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.run_id }}
+          path: eval-results.json
+          retention-days: 90
+
+      # ----------------------------------------------------------
+      # Threshold + regression gate (SPEC-017-3-04)
+      # ----------------------------------------------------------
+      # Operator runbook: docs/operators/assist-evals.md
+      - name: Fetch baseline
+        id: baseline
+        if: always() && steps.summary.outputs.pass-rate != ''
+        run: bash scripts/ci/fetch-eval-baseline.sh
+
+      - name: Check threshold + regression
+        if: always() && steps.summary.outputs.pass-rate != ''
+        env:
+          THRESHOLD: ${{ vars.ASSIST_EVAL_THRESHOLD || '0.85' }}
+          PASS_RATE: ${{ steps.summary.outputs.pass-rate }}
+          BASELINE_RATE: ${{ steps.baseline.outputs.baseline-rate }}
+        run: bash scripts/ci/check-eval-threshold.sh
+
+      # ----------------------------------------------------------
+      # Baseline update (cron-only; main only)
+      # ----------------------------------------------------------
+      # PRs MUST NOT update the baseline -- a regression PR could
+      # otherwise lower the bar for itself.
+      - name: Update baseline (cron only)
+        if: success() && github.event_name == 'schedule' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Create or update _eval-baseline branch as an orphan branch
+          # containing only baseline.json (no main-history files).
+          git fetch origin _eval-baseline 2>/dev/null || true
+          if git show-ref --verify --quiet refs/remotes/origin/_eval-baseline; then
+            git checkout -B _eval-baseline origin/_eval-baseline
+          else
+            git checkout --orphan _eval-baseline
+            git rm -rf . 2>/dev/null || true
+          fi
+
+          cp eval-results.json baseline.json
+          git add baseline.json
+          git commit -m "chore(evals): update baseline pass_rate from run ${GITHUB_RUN_ID}"
+          git push origin _eval-baseline
+
+      - name: Emit spend estimate
+        if: always()
+        env:
+          BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+          ESTIMATED_COST_USD: "0.30"   # ~10 scenarios * ~$0.03 per Claude call
+          SPEND_WORKFLOW_NAME: assist-evals
+        run: bash scripts/ci/emit-spend-estimate.sh
+
+      - name: Upload spend artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spend-estimate-${{ github.run_id }}
+          path: .github/budget/spend-${{ github.run_id }}.json
+          retention-days: 90

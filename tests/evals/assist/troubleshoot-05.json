@@ -1,0 +1,9 @@
+{
+  "description": "Ambiguous-symptom triage: silent wrong-output should produce verification / expected-vs-actual guidance.",
+  "skill": "troubleshoot",
+  "input": "Output looks wrong but no error",
+  "expected_keywords": ["verify", "expected"],
+  "forbidden_phrases": [],
+  "min_response_length": 80,
+  "max_response_length": 2000
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Troubleshoot with missing context: a vague 'it's broken' should elicit clarifying questions, not a hallucinated diagnosis.",
+  "skill": "troubleshoot",
+  "input": "It's broken",
+  "expected_keywords": ["what", "which"],
+  "forbidden_phrases": ["i don't know", "i cannot help"],
+  "min_response_length": 50,
+  "max_response_length": 1500
+}

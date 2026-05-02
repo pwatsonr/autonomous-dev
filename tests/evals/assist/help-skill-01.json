@@ -1,0 +1,9 @@
+{
+  "description": "General help-skill query: asks the help skill to describe itself; expects it to mention help/assist/skill terminology.",
+  "skill": "help",
+  "input": "What does the help skill do?",
+  "expected_keywords": ["help", "skill", "assist"],
+  "forbidden_phrases": [],
+  "min_response_length": 80,
+  "max_response_length": 2000
+}
