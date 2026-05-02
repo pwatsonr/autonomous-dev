@@ -1,0 +1,184 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`diff snapshots diff output for PRD v1.0 to v1.1 matches snapshot 1`] = `
+{
+  "fromVersion": "1.0",
+  "frontmatterChanges": [
+    {
+      "field": "version",
+      "newValue": 1.1,
+      "oldValue": 1,
+    },
+    {
+      "field": "status",
+      "newValue": "review",
+      "oldValue": "draft",
+    },
+  ],
+  "sectionDiffs": [
+    {
+      "changeType": "unchanged",
+      "newContent": "Users need a secure way to authenticate with the system.
+Currently there is no authentication mechanism in place.
+",
+      "newWordCount": 18,
+      "oldContent": "Users need a secure way to authenticate with the system.
+Currently there is no authentication mechanism in place.
+",
+      "oldWordCount": 18,
+      "sectionId": "problem-statement",
+      "wordCountDelta": 0,
+    },
+    {
+      "changeType": "modified",
+      "newContent": "- Support email/password login
+- Support OAuth providers (Google, GitHub, Microsoft)
+- Session management with JWT tokens
+- Multi-factor authentication via TOTP
+",
+      "newWordCount": 22,
+      "oldContent": "- Support email/password login
+- Support OAuth providers
+- Session management with JWT tokens
+",
+      "oldWordCount": 14,
+      "sectionId": "functional-requirements",
+      "wordCountDelta": 8,
+    },
+    {
+      "changeType": "unchanged",
+      "newContent": "- Response time under 200ms for login
+- Support 10,000 concurrent sessions
+",
+      "newWordCount": 12,
+      "oldContent": "- Response time under 200ms for login
+- Support 10,000 concurrent sessions
+",
+      "oldWordCount": 12,
+      "sectionId": "non-functional-requirements",
+      "wordCountDelta": 0,
+    },
+    {
+      "changeType": "unchanged",
+      "newContent": "- 99.9% uptime for auth service
+- Less than 1% failed login rate
+",
+      "newWordCount": 13,
+      "oldContent": "- 99.9% uptime for auth service
+- Less than 1% failed login rate",
+      "oldWordCount": 13,
+      "sectionId": "success-metrics",
+      "wordCountDelta": 0,
+    },
+    {
+      "changeType": "added",
+      "newContent": "- Rate limiting on login endpoints
+- Account lockout after 5 failed attempts",
+      "newWordCount": 13,
+      "oldContent": null,
+      "oldWordCount": 0,
+      "sectionId": "security-considerations",
+      "wordCountDelta": 13,
+    },
+  ],
+  "summary": {
+    "sectionsAdded": 1,
+    "sectionsModified": 1,
+    "sectionsRemoved": 0,
+    "sectionsUnchanged": 3,
+    "totalWordCountDelta": 21,
+  },
+  "toVersion": "1.1",
+}
+`;
+
+exports[`diff snapshots diff output for TDD with added section matches snapshot 1`] = `
+{
+  "fromVersion": "1.0",
+  "frontmatterChanges": [
+    {
+      "field": "version",
+      "newValue": 1.1,
+      "oldValue": 1,
+    },
+  ],
+  "sectionDiffs": [
+    {
+      "changeType": "unchanged",
+      "newContent": "The auth service uses a microservice architecture with
+a dedicated database for credential storage.
+",
+      "newWordCount": 14,
+      "oldContent": "The auth service uses a microservice architecture with
+a dedicated database for credential storage.
+",
+      "oldWordCount": 14,
+      "sectionId": "architecture-overview",
+      "wordCountDelta": 0,
+    },
+    {
+      "changeType": "modified",
+      "newContent": "RESTful API with the following endpoints:
+- POST /auth/login
+- POST /auth/register
+- POST /auth/logout
+- POST /auth/refresh
+",
+      "newWordCount": 18,
+      "oldContent": "RESTful API with the following endpoints:
+- POST /auth/login
+- POST /auth/register
+- POST /auth/logout
+",
+      "oldWordCount": 15,
+      "sectionId": "api-design",
+      "wordCountDelta": 3,
+    },
+    {
+      "changeType": "unchanged",
+      "newContent": "Each endpoint accepts JSON payloads and returns
+standard response objects with appropriate HTTP status codes.
+",
+      "newWordCount": 15,
+      "oldContent": "Each endpoint accepts JSON payloads and returns
+standard response objects with appropriate HTTP status codes.",
+      "oldWordCount": 15,
+      "sectionId": "endpoint-details",
+      "wordCountDelta": 0,
+    },
+    {
+      "changeType": "added",
+      "newContent": "Standardized error codes for all auth endpoints:
+- AUTH_001: Invalid credentials
+- AUTH_002: Account locked
+- AUTH_003: Token expired
+",
+      "newWordCount": 19,
+      "oldContent": null,
+      "oldWordCount": 0,
+      "sectionId": "error-codes",
+      "wordCountDelta": 19,
+    },
+    {
+      "changeType": "added",
+      "newContent": "The following tables are required:
+- users: Core user records
+- sessions: Active session tracking
+- audit_log: Login attempt history",
+      "newWordCount": 20,
+      "oldContent": null,
+      "oldWordCount": 0,
+      "sectionId": "data-model",
+      "wordCountDelta": 20,
+    },
+  ],
+  "summary": {
+    "sectionsAdded": 2,
+    "sectionsModified": 1,
+    "sectionsRemoved": 0,
+    "sectionsUnchanged": 2,
+    "totalWordCountDelta": 42,
+  },
+  "toVersion": "1.1",
+}
+`;

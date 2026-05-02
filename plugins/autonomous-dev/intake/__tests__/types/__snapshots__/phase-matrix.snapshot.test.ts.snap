@@ -1,0 +1,94 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`PHASE_OVERRIDE_MATRIX matches TDD-018 §5.2 1`] = `
+{
+  "bug": {
+    "additionalGates": [
+      "regression_test_validation",
+    ],
+    "enhancedPhases": [
+      "code",
+      "code_review",
+    ],
+    "expeditedReviews": true,
+    "maxRetries": 5,
+    "phaseTimeouts": {
+      "code": 60,
+      "tdd": 30,
+    },
+    "skippedPhases": [
+      "prd",
+      "prd_review",
+    ],
+  },
+  "feature": {
+    "additionalGates": [],
+    "enhancedPhases": [],
+    "expeditedReviews": false,
+    "maxRetries": 3,
+    "phaseTimeouts": {},
+    "skippedPhases": [],
+  },
+  "hotfix": {
+    "additionalGates": [
+      "incident_correlation",
+      "rollback_validation",
+    ],
+    "enhancedPhases": [
+      "tdd",
+      "code",
+    ],
+    "expeditedReviews": true,
+    "maxRetries": 5,
+    "phaseTimeouts": {
+      "code": 30,
+      "deploy": 10,
+      "tdd": 15,
+    },
+    "skippedPhases": [
+      "prd",
+      "prd_review",
+      "plan_review",
+    ],
+  },
+  "infra": {
+    "additionalGates": [
+      "security_review",
+      "cost_analysis",
+      "rollback_plan",
+    ],
+    "enhancedPhases": [
+      "tdd",
+      "tdd_review",
+      "plan",
+      "plan_review",
+    ],
+    "expeditedReviews": false,
+    "maxRetries": 2,
+    "phaseTimeouts": {
+      "plan": 90,
+      "tdd": 120,
+    },
+    "skippedPhases": [],
+  },
+  "refactor": {
+    "additionalGates": [
+      "code_quality_metrics",
+      "performance_benchmarks",
+    ],
+    "enhancedPhases": [
+      "code",
+      "code_review",
+    ],
+    "expeditedReviews": true,
+    "maxRetries": 3,
+    "phaseTimeouts": {
+      "code": 90,
+    },
+    "skippedPhases": [
+      "prd",
+      "prd_review",
+    ],
+  },
+}
+`;
