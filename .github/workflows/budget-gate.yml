@@ -57,8 +57,51 @@ jobs:
         with:
           node-version: '20'
 
-      # TODO(SPEC-017-4-02): aggregate step
-      # TODO(SPEC-017-4-02): warn step (80%)
+      - name: Aggregate month-to-date spend
+        id: aggregate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+          BUDGET_HMAC_KEY_PREVIOUS: ${{ secrets.BUDGET_HMAC_KEY_PREVIOUS }}
+          CLAUDE_MONTHLY_BUDGET_USD: ${{ secrets.CLAUDE_MONTHLY_BUDGET_USD }}
+        run: node scripts/ci/aggregate-spend.js
+
+      - name: Post 80% warning comment
+        if: >-
+          github.event_name == 'pull_request' &&
+          fromJSON(steps.aggregate.outputs.percentage) >= 80 &&
+          fromJSON(steps.aggregate.outputs.percentage) < 100
+        uses: actions/github-script@v7
+        env:
+          PERCENTAGE: ${{ steps.aggregate.outputs.percentage }}
+          TOTAL: ${{ steps.aggregate.outputs.total_spend }}
+          LIMIT: ${{ steps.aggregate.outputs.budget_limit }}
+        with:
+          script: |
+            const marker = '<!-- budget-gate-comment -->';
+            const body = `${marker}\n` +
+              `## Budget Warning\n\n` +
+              `Monthly Claude spend is at **${process.env.PERCENTAGE}%** ` +
+              `($${process.env.TOTAL} of $${process.env.LIMIT}).\n\n` +
+              `_This is an advisory notice. The gate will fail at 100%._`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.body && c.body.startsWith(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body,
+              });
+            }
+
       # TODO(SPEC-017-4-03): fail step (100%) + override consumption
       # TODO(SPEC-017-4-03): critical step (110%) + two-admin verification
       # TODO(SPEC-017-4-03): revoke override labels (single-run validity)
@@ -67,10 +110,13 @@ jobs:
       - name: Record gate invocation
         env:
           TRIGGERING_WORKFLOW: ${{ inputs.triggering_workflow }}
+          PERCENTAGE: ${{ steps.aggregate.outputs.percentage }}
+          TOTAL: ${{ steps.aggregate.outputs.total_spend }}
+          LIMIT: ${{ steps.aggregate.outputs.budget_limit }}
         run: |
           {
             echo "## Budget Gate"
             echo ""
             echo "Triggered by: \`${TRIGGERING_WORKFLOW}\`"
-            echo "Mode: scaffold (thresholds not yet wired — SPEC-017-4-02/03)"
+            echo "Month-to-date: \$${TOTAL} / \$${LIMIT} (${PERCENTAGE}%)"
           } >> "$GITHUB_STEP_SUMMARY"
