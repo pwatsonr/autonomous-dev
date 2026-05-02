@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev.dev/schemas/reviewer-finding-v1.json",
+  "title": "Reviewer Finding v1",
+  "description": "Shared output envelope for the specialist reviewer suite (TDD-020 §5.5). Every reviewer agent (qa-edge-case, ux-ui, accessibility, rule-set-enforcement) emits JSON validating against this schema. Downstream consumers: PLAN-020-2 score aggregator, PLAN-017-3 eval runner.",
+  "type": "object",
+  "required": ["reviewer", "verdict", "score", "findings"],
+  "properties": {
+    "reviewer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable reviewer identifier (matches the agent frontmatter `name`)."
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["APPROVE", "CONCERNS", "REQUEST_CHANGES"],
+      "description": "Aggregate verdict derived from finding severities. APPROVE: no findings. CONCERNS: only low/medium findings. REQUEST_CHANGES: any high/critical finding."
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Numeric score 0-100. Computed as 100 - sum(severity_weight) where critical=25, high=15, medium=8, low=3, floored at 0."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Zero or more findings. Empty array is valid (paired with verdict APPROVE).",
+      "items": { "$ref": "#/$defs/finding" }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "required": ["file", "line", "severity", "category", "title", "description", "suggested_fix"],
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repo-relative path of the file the finding applies to."
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "1-based line number. Use 0 for whole-file findings (e.g. missing newline at EOF)."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "description": "Severity tier; drives verdict mapping and score weighting."
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reviewer-specific category label (e.g. 'input-validation', 'WCAG 2.2 AA 1.4.3 Contrast')."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Short headline for the finding (≤200 chars)."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full description of the issue and why it matters."
+        },
+        "suggested_fix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Concrete, implementable remediation guidance."
+        },
+        "rule_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional. Set only by the rule-set-enforcement reviewer (SPEC-020-1-03) to attribute the finding back to a project standards rule."
+        }
+      }
+    }
+  }
+}

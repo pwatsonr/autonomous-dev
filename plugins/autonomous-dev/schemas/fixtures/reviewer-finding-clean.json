@@ -1,0 +1,25 @@
+{
+  "reviewer": "qa-edge-case-reviewer",
+  "verdict": "CONCERNS",
+  "score": 89,
+  "findings": [
+    {
+      "file": "src/db/users.ts",
+      "line": 42,
+      "severity": "medium",
+      "category": "null-handling",
+      "title": "Possible undefined access on user lookup result",
+      "description": "findUser() returns User | undefined but the caller dereferences .email without a null check, throwing TypeError when the lookup misses.",
+      "suggested_fix": "Guard with `if (!user) return null;` before accessing user.email, or use optional chaining: user?.email."
+    },
+    {
+      "file": "src/services/cache.ts",
+      "line": 0,
+      "severity": "low",
+      "category": "resource-leaks",
+      "title": "Timer not cleared on module reload",
+      "description": "setInterval handle is stored at module scope but no clearInterval is called on hot-reload, leaking timers in dev.",
+      "suggested_fix": "Export a disposeCache() that calls clearInterval(handle) and wire it into the dev hot-reload teardown."
+    }
+  ]
+}

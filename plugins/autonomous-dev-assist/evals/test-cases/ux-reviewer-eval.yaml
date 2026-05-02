@@ -1,0 +1,390 @@
+# UX/UI reviewer eval suite (SPEC-020-1-04, Task 8).
+# 20 cases. ~50/50 clean (10) vs dirty (10).
+# Per TDD §9: NO security_critical cases in this suite.
+# Dirty cases cover the six UX heuristics from SPEC-020-1-02.
+# Clean cases include backend-only short-circuit + well-formed UI examples.
+
+suite: ux-ui-reviewer
+schema_version: 1
+total_cases: 20
+security_critical_pass_rate_required: 1.0
+match_strategy: permissive
+
+cases:
+
+  # === DIRTY cases (10 total, distributed across 6 heuristics) ===
+
+  - id: UX-001
+    description: "Dense unstructured form: no grouping, no spacing, no hierarchy"
+    security_critical: false
+    category_under_test: information-density
+    input: |
+      diff --git a/src/components/Settings.tsx b/src/components/Settings.tsx
+      --- a/src/components/Settings.tsx
+      +++ b/src/components/Settings.tsx
+      @@ -1,2 +1,12 @@
+      +export function Settings() {
+      +  return (
+      +    <div>
+      +      <input /><input /><input /><input /><input />
+      +      <input /><input /><input /><input /><input />
+      +      <button>Save</button>
+      +    </div>
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: information-density
+    forbidden_findings: []
+
+  - id: UX-002
+    description: "Error state shown by red text only (color-only signal)"
+    security_critical: false
+    category_under_test: color-only-signaling
+    input: |
+      diff --git a/src/components/Field.tsx b/src/components/Field.tsx
+      --- a/src/components/Field.tsx
+      +++ b/src/components/Field.tsx
+      @@ -1,2 +1,7 @@
+      +export function Field({ hasError, value }: { hasError: boolean; value: string }) {
+      +  return (
+      +    <input className={hasError ? 'text-red-600' : ''} value={value} readOnly />
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: color-only
+    forbidden_findings: []
+
+  - id: UX-003
+    description: "Status indicator uses green/red dot only"
+    security_critical: false
+    category_under_test: color-only-signaling
+    input: |
+      diff --git a/src/components/Status.tsx b/src/components/Status.tsx
+      --- a/src/components/Status.tsx
+      +++ b/src/components/Status.tsx
+      @@ -1,2 +1,7 @@
+      +export function Status({ ok }: { ok: boolean }) {
+      +  return (
+      +    <span className={ok ? 'bg-green-500' : 'bg-red-500'} style={{ width: 8, height: 8, borderRadius: 4 }} />
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: color-only
+    forbidden_findings: []
+
+  - id: UX-004
+    description: "List view missing empty state — renders nothing when empty"
+    security_critical: false
+    category_under_test: state-coverage
+    input: |
+      diff --git a/src/components/Inbox.tsx b/src/components/Inbox.tsx
+      --- a/src/components/Inbox.tsx
+      +++ b/src/components/Inbox.tsx
+      @@ -1,2 +1,7 @@
+      +export function Inbox({ messages }: { messages: { id: string; text: string }[] }) {
+      +  return (
+      +    <ul>{messages.map((m) => <li key={m.id}>{m.text}</li>)}</ul>
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: state-coverage
+    forbidden_findings: []
+
+  - id: UX-005
+    description: "Async data fetch missing loading state"
+    security_critical: false
+    category_under_test: state-coverage
+    input: |
+      diff --git a/src/components/Profile.tsx b/src/components/Profile.tsx
+      --- a/src/components/Profile.tsx
+      +++ b/src/components/Profile.tsx
+      @@ -1,2 +1,9 @@
+      +import { useUser } from '../hooks/useUser';
+      +export function Profile() {
+      +  const user = useUser();
+      +  return (
+      +    <div>{user?.name}</div>
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: state-coverage
+    forbidden_findings: []
+
+  - id: UX-006
+    description: "Fixed-width 1200px layout — not responsive"
+    security_critical: false
+    category_under_test: mobile-responsiveness
+    input: |
+      diff --git a/src/components/Hero.tsx b/src/components/Hero.tsx
+      --- a/src/components/Hero.tsx
+      +++ b/src/components/Hero.tsx
+      @@ -1,2 +1,5 @@
+      +export function Hero() {
+      +  return <section style={{ width: 1200 }}>Welcome</section>;
+      +}
+    expected_findings:
+      - severity: medium
+        category: mobile
+    forbidden_findings: []
+
+  - id: UX-007
+    description: "Form input missing associated label"
+    security_critical: false
+    category_under_test: form-labels
+    input: |
+      diff --git a/src/components/Search.tsx b/src/components/Search.tsx
+      --- a/src/components/Search.tsx
+      +++ b/src/components/Search.tsx
+      @@ -1,2 +1,7 @@
+      +export function Search() {
+      +  return (
+      +    <input type="text" placeholder="Search" />
+      +  );
+      +}
+    expected_findings:
+      - severity: high
+        category: form-labels
+    forbidden_findings: []
+
+  - id: UX-008
+    description: "Label paired by proximity only (no htmlFor / id link)"
+    security_critical: false
+    category_under_test: form-labels
+    input: |
+      diff --git a/src/components/Login.tsx b/src/components/Login.tsx
+      --- a/src/components/Login.tsx
+      +++ b/src/components/Login.tsx
+      @@ -1,2 +1,8 @@
+      +export function Login() {
+      +  return (
+      +    <div><label>Email</label><input type="email" /></div>
+      +  );
+      +}
+    expected_findings:
+      - severity: medium
+        category: form-labels
+    forbidden_findings: []
+
+  - id: UX-009
+    description: "Icon-only button without aria-label or visible text"
+    security_critical: false
+    category_under_test: button-labels
+    input: |
+      diff --git a/src/components/Toolbar.tsx b/src/components/Toolbar.tsx
+      --- a/src/components/Toolbar.tsx
+      +++ b/src/components/Toolbar.tsx
+      @@ -1,2 +1,7 @@
+      +export function Toolbar() {
+      +  return (
+      +    <button onClick={() => {}}><svg width="16" height="16" /></button>
+      +  );
+      +}
+    expected_findings:
+      - severity: high
+        category: button-labels
+    forbidden_findings: []
+
+  - id: UX-010
+    description: "Button labelled 'Submit' offers no context"
+    security_critical: false
+    category_under_test: button-labels
+    input: |
+      diff --git a/src/components/Reset.tsx b/src/components/Reset.tsx
+      --- a/src/components/Reset.tsx
+      +++ b/src/components/Reset.tsx
+      @@ -1,2 +1,5 @@
+      +export function Reset() {
+      +  return <button type="submit">Submit</button>;
+      +}
+    expected_findings:
+      - severity: low
+        category: button-labels
+    forbidden_findings: []
+
+  # === CLEAN cases (10 total, expected_findings: []) ===
+
+  - id: UX-011
+    description: "Backend-only diff: must short-circuit to APPROVE"
+    security_critical: false
+    category_under_test: non-frontend-guard
+    input: |
+      diff --git a/src/services/billing.ts b/src/services/billing.ts
+      --- a/src/services/billing.ts
+      +++ b/src/services/billing.ts
+      @@ -1,2 +1,5 @@
+      +export function rate(plan: string): number {
+      +  return plan === 'pro' ? 99 : 9;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: form-labels
+      - category: button-labels
+      - category: color-only
+
+  - id: UX-012
+    description: "Well-formed React form: labels htmlFor, ARIA, error text+icon"
+    security_critical: false
+    category_under_test: form-labels
+    input: |
+      diff --git a/src/components/Signup.tsx b/src/components/Signup.tsx
+      --- a/src/components/Signup.tsx
+      +++ b/src/components/Signup.tsx
+      @@ -1,2 +1,14 @@
+      +export function Signup({ error }: { error?: string }) {
+      +  return (
+      +    <form>
+      +      <label htmlFor="email">Email</label>
+      +      <input id="email" type="email" aria-describedby="email-err" />
+      +      {error && (
+      +        <p id="email-err" role="alert"><span aria-hidden>!</span> {error}</p>
+      +      )}
+      +      <button type="submit">Create account</button>
+      +    </form>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: form-labels
+      - category: button-labels
+
+  - id: UX-013
+    description: "Error state with both icon and text (not color-only)"
+    security_critical: false
+    category_under_test: color-only-signaling
+    input: |
+      diff --git a/src/components/ErrorBanner.tsx b/src/components/ErrorBanner.tsx
+      --- a/src/components/ErrorBanner.tsx
+      +++ b/src/components/ErrorBanner.tsx
+      @@ -1,2 +1,8 @@
+      +export function ErrorBanner({ msg }: { msg: string }) {
+      +  return (
+      +    <div role="alert" className="bg-red-50 text-red-900"><span aria-hidden>!</span> Error: {msg}</div>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: color-only
+
+  - id: UX-014
+    description: "Icon-only button with explicit aria-label"
+    security_critical: false
+    category_under_test: button-labels
+    input: |
+      diff --git a/src/components/CloseButton.tsx b/src/components/CloseButton.tsx
+      --- a/src/components/CloseButton.tsx
+      +++ b/src/components/CloseButton.tsx
+      @@ -1,2 +1,7 @@
+      +export function CloseButton({ onClick }: { onClick: () => void }) {
+      +  return (
+      +    <button aria-label="Close dialog" onClick={onClick}><svg width="16" height="16" /></button>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: button-labels
+
+  - id: UX-015
+    description: "Responsive layout using fluid units"
+    security_critical: false
+    category_under_test: mobile-responsiveness
+    input: |
+      diff --git a/src/components/Card.tsx b/src/components/Card.tsx
+      --- a/src/components/Card.tsx
+      +++ b/src/components/Card.tsx
+      @@ -1,2 +1,5 @@
+      +export function Card({ children }: { children: React.ReactNode }) {
+      +  return <div className="w-full max-w-md p-4">{children}</div>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: mobile
+
+  - id: UX-016
+    description: "All four states present: loading, empty, error, success"
+    security_critical: false
+    category_under_test: state-coverage
+    input: |
+      diff --git a/src/components/List.tsx b/src/components/List.tsx
+      --- a/src/components/List.tsx
+      +++ b/src/components/List.tsx
+      @@ -1,2 +1,15 @@
+      +type S = { state: 'loading' } | { state: 'empty' } | { state: 'error'; msg: string } | { state: 'ok'; items: string[] };
+      +export function List(p: S) {
+      +  if (p.state === 'loading') return <p>Loading…</p>;
+      +  if (p.state === 'empty') return <p>No items yet.</p>;
+      +  if (p.state === 'error') return <p role="alert">Failed: {p.msg}</p>;
+      +  return <ul>{p.items.map((i) => <li key={i}>{i}</li>)}</ul>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: state-coverage
+
+  - id: UX-017
+    description: "Server-only utility module change (no UI surface)"
+    security_critical: false
+    category_under_test: non-frontend-guard
+    input: |
+      diff --git a/src/utils/hash.ts b/src/utils/hash.ts
+      --- a/src/utils/hash.ts
+      +++ b/src/utils/hash.ts
+      @@ -1,2 +1,4 @@
+      +import { createHash } from 'node:crypto';
+      +export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
+    expected_findings: []
+    forbidden_findings: []
+
+  - id: UX-018
+    description: "Hierarchical settings page: grouped sections with headings"
+    security_critical: false
+    category_under_test: information-density
+    input: |
+      diff --git a/src/components/PrefsPage.tsx b/src/components/PrefsPage.tsx
+      --- a/src/components/PrefsPage.tsx
+      +++ b/src/components/PrefsPage.tsx
+      @@ -1,2 +1,15 @@
+      +export function PrefsPage() {
+      +  return (
+      +    <main>
+      +      <section aria-labelledby="acct"><h2 id="acct">Account</h2><div className="p-4 space-y-3"><label htmlFor="name">Name</label><input id="name" /></div></section>
+      +      <section aria-labelledby="notif"><h2 id="notif">Notifications</h2><div className="p-4 space-y-3"><label htmlFor="em">Email</label><input id="em" type="checkbox" /></div></section>
+      +    </main>
+      +  );
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: information-density
+
+  - id: UX-019
+    description: "CLI-only script change with no DOM"
+    security_critical: false
+    category_under_test: non-frontend-guard
+    input: |
+      diff --git a/src/scripts/migrate.ts b/src/scripts/migrate.ts
+      --- a/src/scripts/migrate.ts
+      +++ b/src/scripts/migrate.ts
+      @@ -1,2 +1,4 @@
+      +import { db } from '../db';
+      +export async function up() { await db.query('ALTER TABLE users ADD COLUMN tz text'); }
+    expected_findings: []
+    forbidden_findings: []
+
+  - id: UX-020
+    description: "Descriptive button label with action verb + object"
+    security_critical: false
+    category_under_test: button-labels
+    input: |
+      diff --git a/src/components/SaveBtn.tsx b/src/components/SaveBtn.tsx
+      --- a/src/components/SaveBtn.tsx
+      +++ b/src/components/SaveBtn.tsx
+      @@ -1,2 +1,5 @@
+      +export function SaveBtn({ onSave }: { onSave: () => void }) {
+      +  return <button onClick={onSave}>Save changes</button>;
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - category: button-labels

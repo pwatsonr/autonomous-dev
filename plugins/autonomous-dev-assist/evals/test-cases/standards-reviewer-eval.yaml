@@ -1,0 +1,283 @@
+# Standards reviewer eval suite (SPEC-020-1-03).
+# 15 cases. 2+ security-critical (no-lodash, no-hardcoded-secrets).
+# 6+ "clean" cases that match applies_to but produce no violations.
+# Cases reference fixtures at plugins/autonomous-dev/tests/fixtures/standards/.
+
+suite: standards-reviewer
+schema_version: 1
+total_cases: 15
+security_critical_pass_rate_required: 1.0
+match_strategy: permissive
+
+cases:
+
+  # === DIRTY cases (small.yaml, 3 cases) ===
+
+  - id: SR-001
+    description: "console.log left in source (no-console-log)"
+    security_critical: false
+    category_under_test: standards.style
+    fixture_standards: tests/fixtures/standards/small.yaml
+    input: |
+      diff --git a/src/handlers/api.ts b/src/handlers/api.ts
+      --- a/src/handlers/api.ts
+      +++ b/src/handlers/api.ts
+      @@ -1,3 +1,4 @@
+       export function handle(req: Request) {
+      +  console.log('debug', req);
+         return new Response('ok');
+       }
+    expected_findings:
+      - rule_id: no-console-log
+        severity: low
+        category: standards.style
+    forbidden_findings: []
+
+  - id: SR-002
+    description: "Default export forbidden (no-default-export)"
+    security_critical: false
+    category_under_test: standards.module-shape
+    fixture_standards: tests/fixtures/standards/small.yaml
+    input: |
+      diff --git a/src/utils/format.ts b/src/utils/format.ts
+      --- a/src/utils/format.ts
+      +++ b/src/utils/format.ts
+      @@ -1,2 +1,3 @@
+      +export default function format(x: number) { return x.toFixed(2); }
+    expected_findings:
+      - rule_id: no-default-export
+        severity: medium
+        category: standards.module-shape
+    forbidden_findings: []
+
+  - id: SR-003
+    description: "let used for never-reassigned variable (prefer-const)"
+    security_critical: false
+    category_under_test: standards.style
+    fixture_standards: tests/fixtures/standards/small.yaml
+    input: |
+      diff --git a/src/services/cache.ts b/src/services/cache.ts
+      --- a/src/services/cache.ts
+      +++ b/src/services/cache.ts
+      @@ -1,3 +1,4 @@
+      +let TTL = 300;
+       export function ttl() { return TTL; }
+    expected_findings:
+      - rule_id: prefer-const
+        severity: low
+        category: standards.style
+    forbidden_findings: []
+
+  # === CLEAN cases against small.yaml (2 cases, no findings expected) ===
+
+  - id: SR-004
+    description: "Clean: const used correctly, no console, named export"
+    security_critical: false
+    category_under_test: standards.style
+    fixture_standards: tests/fixtures/standards/small.yaml
+    input: |
+      diff --git a/src/services/clock.ts b/src/services/clock.ts
+      --- a/src/services/clock.ts
+      +++ b/src/services/clock.ts
+      @@ -1,3 +1,4 @@
+      +/** Returns the current epoch milliseconds. */
+      +export function now(): number { return Date.now(); }
+    expected_findings: []
+    forbidden_findings:
+      - rule_id: no-console-log
+      - rule_id: no-default-export
+      - rule_id: prefer-const
+
+  - id: SR-005
+    description: "Clean: applies_to does not match (markdown change)"
+    security_critical: false
+    category_under_test: standards.style
+    fixture_standards: tests/fixtures/standards/small.yaml
+    input: |
+      diff --git a/docs/README.md b/docs/README.md
+      --- a/docs/README.md
+      +++ b/docs/README.md
+      @@ -1,1 +1,2 @@
+      +# Hello
+    expected_findings: []
+    forbidden_findings: []
+
+  # === DIRTY cases (large.yaml, 5 cases incl. 2 security-critical) ===
+
+  - id: SR-006
+    description: "Forbidden import: lodash (no-lodash) - SECURITY CRITICAL"
+    security_critical: true
+    category_under_test: standards.forbidden-imports
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/utils/strings.ts b/src/utils/strings.ts
+      --- a/src/utils/strings.ts
+      +++ b/src/utils/strings.ts
+      @@ -1,2 +1,3 @@
+      +import _ from 'lodash';
+      +export const cap = (s: string) => _.capitalize(s);
+    expected_findings:
+      - rule_id: no-lodash
+        severity: high
+        category: standards.forbidden-imports
+    forbidden_findings: []
+
+  - id: SR-007
+    description: "Hardcoded secret in source (no-hardcoded-secrets) - SECURITY CRITICAL"
+    security_critical: true
+    category_under_test: standards.secrets
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/config/auth.ts b/src/config/auth.ts
+      --- a/src/config/auth.ts
+      +++ b/src/config/auth.ts
+      @@ -1,2 +1,3 @@
+      +export const api_key = "sk_live_abcdef0123456789";
+    expected_findings:
+      - rule_id: no-hardcoded-secrets
+        severity: critical
+        category: standards.secrets
+    forbidden_findings: []
+
+  - id: SR-008
+    description: "eval() in source (no-eval)"
+    security_critical: false
+    category_under_test: standards.security
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/utils/dynamic.ts b/src/utils/dynamic.ts
+      --- a/src/utils/dynamic.ts
+      +++ b/src/utils/dynamic.ts
+      @@ -1,2 +1,3 @@
+      +export function run(code: string) { return eval(code); }
+    expected_findings:
+      - rule_id: no-eval
+        severity: critical
+        category: standards.security
+    forbidden_findings: []
+
+  - id: SR-009
+    description: "Synchronous fs in handler (no-sync-fs-in-handler)"
+    security_critical: false
+    category_under_test: standards.performance
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/handlers/upload.ts b/src/handlers/upload.ts
+      --- a/src/handlers/upload.ts
+      +++ b/src/handlers/upload.ts
+      @@ -1,3 +1,4 @@
+       import { readFileSync } from 'node:fs';
+      +export function handle() { return readFileSync('/etc/config.json', 'utf8'); }
+    expected_findings:
+      - rule_id: no-sync-fs-in-handler
+        severity: high
+        category: standards.performance
+    forbidden_findings: []
+
+  - id: SR-010
+    description: "Empty catch block (catch-with-rethrow-or-log)"
+    security_critical: false
+    category_under_test: standards.errors
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/services/sync.ts b/src/services/sync.ts
+      --- a/src/services/sync.ts
+      +++ b/src/services/sync.ts
+      @@ -1,3 +1,6 @@
+      +export async function sync() {
+      +  try { await doWork(); } catch (e) {}
+      +}
+    expected_findings:
+      - rule_id: catch-with-rethrow-or-log
+        severity: medium
+        category: standards.errors
+    forbidden_findings: []
+
+  # === CLEAN cases against large.yaml (4 cases, no findings expected) ===
+
+  - id: SR-011
+    description: "Clean: lodash-free import, no secrets, no eval"
+    security_critical: false
+    category_under_test: standards.style
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/utils/strings.ts b/src/utils/strings.ts
+      --- a/src/utils/strings.ts
+      +++ b/src/utils/strings.ts
+      @@ -1,2 +1,4 @@
+      +/** Capitalize a string. */
+      +export function cap(s: string): string { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+    expected_findings: []
+    forbidden_findings:
+      - rule_id: no-lodash
+      - rule_id: no-hardcoded-secrets
+      - rule_id: no-eval
+
+  - id: SR-012
+    description: "Clean: handler uses async fs/promises (no sync-fs violation)"
+    security_critical: false
+    category_under_test: standards.performance
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/handlers/upload.ts b/src/handlers/upload.ts
+      --- a/src/handlers/upload.ts
+      +++ b/src/handlers/upload.ts
+      @@ -1,3 +1,5 @@
+       import { readFile } from 'node:fs/promises';
+      +/** Read the upload config asynchronously. */
+      +export async function handle() { return await readFile('/etc/config.json', 'utf8'); }
+    expected_findings: []
+    forbidden_findings:
+      - rule_id: no-sync-fs-in-handler
+
+  - id: SR-013
+    description: "Clean: try/catch logs the error properly"
+    security_critical: false
+    category_under_test: standards.errors
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/services/sync.ts b/src/services/sync.ts
+      --- a/src/services/sync.ts
+      +++ b/src/services/sync.ts
+      @@ -1,3 +1,7 @@
+       import { logger } from '../logging';
+      +/** Run a sync operation, logging failures. */
+      +export async function sync() {
+      +  try { await doWork(); } catch (e) { logger.error('sync failed', { err: e }); throw e; }
+      +}
+    expected_findings: []
+    forbidden_findings:
+      - rule_id: catch-with-rethrow-or-log
+
+  - id: SR-014
+    description: "Clean: docs-only diff, no rule applies"
+    security_critical: false
+    category_under_test: standards.style
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/docs/architecture.md b/docs/architecture.md
+      --- a/docs/architecture.md
+      +++ b/docs/architecture.md
+      @@ -1,1 +1,2 @@
+      +Updated module map.
+    expected_findings: []
+    forbidden_findings: []
+
+  # === DIRTY case: catches a unique rule (no-direct-env-access) ===
+
+  - id: SR-015
+    description: "process.env accessed outside config module (no-direct-env-access)"
+    security_critical: false
+    category_under_test: standards.di
+    fixture_standards: tests/fixtures/standards/large.yaml
+    input: |
+      diff --git a/src/services/auth.ts b/src/services/auth.ts
+      --- a/src/services/auth.ts
+      +++ b/src/services/auth.ts
+      @@ -1,2 +1,3 @@
+      +export const secret = process.env.AUTH_SECRET;
+    expected_findings:
+      - rule_id: no-direct-env-access
+        severity: medium
+        category: standards.di
+    forbidden_findings: []
