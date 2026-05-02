@@ -302,6 +302,12 @@ export interface ExtensionsConfig {
     max_concurrent_executions: number;
     max_execution_time_seconds: number;
   };
+  /**
+   * Plugin IDs allowed to call `CredentialProxy.acquire` (SPEC-024-2-01).
+   * Optional in TS for backwards compatibility with configs written
+   * before PLAN-024-2 — the JSON schema applies a `default: []`.
+   */
+  privileged_backends?: string[];
 }
 
 /**

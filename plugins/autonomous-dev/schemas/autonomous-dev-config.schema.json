@@ -53,6 +53,12 @@
           "items": { "type": "string", "pattern": "^[^:]+:[^@]+@.+$" },
           "default": [],
           "description": "Allowlist of privileged chain pairs (producer:consumer@version-glob). SPEC-022-2-04."
+        },
+        "privileged_backends": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$" },
+          "default": [],
+          "description": "Plugin IDs allowed to call CredentialProxy.acquire (SPEC-024-2-01)."
         }
       },
       "default": {
@@ -67,7 +73,8 @@
           "max_concurrent_executions": 8,
           "max_execution_time_seconds": 30
         },
-        "privileged_chains": []
+        "privileged_chains": [],
+        "privileged_backends": []
       }
     },
     "chains": {
