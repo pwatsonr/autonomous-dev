@@ -27,6 +27,8 @@ import type { HookPoint, ExecutorWarning, ValidationError } from './types';
 import type { RegisteredHook, RegistrySnapshot } from './registry';
 import type { ValidationPipeline } from './validation-pipeline';
 import { SchemaNotFoundError } from './validation-pipeline';
+import type { TrustValidator } from './trust-validator';
+import type { TrustAuditEmitter } from './audit-emitter';
 
 /** Per-invocation status. SPEC-019-2-04 §"HookExecutionResult Shape". */
 export type HookInvocationStatus =
@@ -34,6 +36,7 @@ export type HookInvocationStatus =
   | 'success'                  // ran cleanly, output validated
   | 'success-with-warnings'    // ran, output had to be sanitized
   | 'skipped-invalid-input'    // input failed validation, hook never ran
+  | 'skipped-trust-revoked'    // SPEC-019-3-04: trust revoked since last reload
   | 'invocation-error'         // hook threw at runtime
   | 'error';                   // back-compat alias for 'invocation-error'
 
@@ -78,10 +81,19 @@ export class HookExecutor {
    * @param pipeline optional ValidationPipeline. When omitted, hooks run
    *   with no input/output validation (SPEC-019-1 back-compat). When
    *   provided, every invocation is gated per SPEC-019-2-04.
+   * @param trustValidator optional TrustValidator. When provided, every
+   *   invocation calls `isTrusted(pluginId)` (SPEC-019-3-04). A `false`
+   *   result skips the hook with status `skipped-trust-revoked` and emits
+   *   a `runtime-revoked` audit entry (when an emitter is wired). When
+   *   omitted, no runtime trust check is performed (SPEC-019-1/2 back-compat).
+   * @param auditEmitter optional TrustAuditEmitter for `runtime-revoked`
+   *   entries. Only used when `trustValidator` is also provided.
    */
   constructor(
     private readonly snapshotProvider: SnapshotProvider,
     private readonly pipeline?: ValidationPipeline,
+    private readonly trustValidator?: TrustValidator,
+    private readonly auditEmitter?: TrustAuditEmitter,
   ) {}
 
   /**
@@ -117,6 +129,11 @@ export class HookExecutor {
         console.warn(
           `executor: ${point} ${hook.pluginId}/${hook.hook.id} skipped — input validation failed: ${JSON.stringify(outcome.validationErrors)}`,
         );
+      } else if (outcome.status === 'skipped-trust-revoked') {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `executor: ${point} ${hook.pluginId}/${hook.hook.id} skipped — trust revoked since last reload`,
+        );
       } else if (outcome.status === 'success-with-warnings') {
         // eslint-disable-next-line no-console
         console.warn(
@@ -141,6 +158,31 @@ export class HookExecutor {
     const start = performance.now();
     const warnings: ExecutorWarning[] = [];
     const schemaVersion = this.resolveSchemaVersion(hook);
+
+    // --- 0. Runtime trust check (SPEC-019-3-04) ---
+    // O(1) set lookup; runs before any validation or invocation. Catches
+    // operator revocations between SIGUSR1 reloads. The audit emission
+    // happens here (not in TrustValidator) because the executor is the
+    // only layer that knows the hook point.
+    if (this.trustValidator && !this.trustValidator.isTrusted(hook.pluginId)) {
+      if (this.auditEmitter) {
+        this.auditEmitter.emit({
+          decision: 'runtime-revoked',
+          pluginId: hook.pluginId,
+          pluginVersion: hook.pluginVersion,
+          hookPoint: point,
+          reason: 'trust revoked since last reload',
+          timestamp: new Date().toISOString(),
+        });
+      }
+      return {
+        pluginId: hook.pluginId,
+        hookId: hook.hook.id,
+        status: 'skipped-trust-revoked',
+        warnings,
+        durationMs: performance.now() - start,
+      };
+    }
 
     // --- 1. Input validation (gates execution) ---
     let invokeInput: unknown = context;

@@ -29,6 +29,11 @@ import type {
 import type { ValidationPipeline } from './validation-pipeline';
 import type { MetaReviewCache, MetaReviewVerdict } from './meta-review-cache';
 import { SignatureVerifier } from './signature-verifier';
+import type {
+  AuditDecision,
+  TrustAuditEmitter,
+  TrustAuditEntry,
+} from './audit-emitter';
 
 /**
  * Pluggable spawner contract for invoking the `agent-meta-reviewer` agent
@@ -55,6 +60,8 @@ export interface TrustValidatorDeps {
   metaReviewCache?: MetaReviewCache;
   /** Agent spawner used for `agent-meta-reviewer` invocation; SPEC-019-3-03. */
   agentSpawner?: AgentSpawner;
+  /** Audit emitter for trust decisions; SPEC-019-3-04. */
+  auditEmitter?: TrustAuditEmitter;
 }
 
 /**
@@ -71,6 +78,14 @@ export class TrustValidator {
   protected readonly signatureVerifier?: SignatureVerifier;
   protected readonly metaReviewCache?: MetaReviewCache;
   protected readonly agentSpawner?: AgentSpawner;
+  protected readonly auditEmitter?: TrustAuditEmitter;
+  /**
+   * O(1) trust set rebuilt by `reloadTrustedSet()`. Lookup beats a
+   * linear scan over `config.allowlist` once the allowlist grows past
+   * a few entries, and is required by the executor's per-call check
+   * (SPEC-019-3-04 isTrusted benchmark: <2µs at 10k entries).
+   */
+  protected trustedSet: Set<string> = new Set();
 
   /**
    * @param config the `extensions` section of the active autonomous-dev
@@ -98,6 +113,18 @@ export class TrustValidator {
       deps.signatureVerifier ?? new SignatureVerifier(trustedKeysDir);
     this.metaReviewCache = deps.metaReviewCache;
     this.agentSpawner = deps.agentSpawner;
+    this.auditEmitter = deps.auditEmitter;
+    this.reloadTrustedSet();
+  }
+
+  /**
+   * Rebuild the trusted-id Set from the active config's allowlist.
+   * Called by the constructor and by the SIGUSR1 reload handler
+   * (PLAN-019-1) after the new config is loaded so revocations
+   * propagate to the executor without recreating the validator.
+   */
+  reloadTrustedSet(): void {
+    this.trustedSet = new Set(this.config.allowlist);
   }
 
   /**
@@ -126,9 +153,28 @@ export class TrustValidator {
     for (const step of steps) {
       const result = await step();
       if (result.requiresMetaReview) aggregateRequiresMetaReview = true;
-      if (result.metaReviewVerdict) aggregateVerdict = result.metaReviewVerdict;
-      if (!result.trusted) return result;
+      if (result.metaReviewVerdict) {
+        aggregateVerdict = result.metaReviewVerdict;
+        // Per SPEC-019-3-04: meta-review invocations always emit a
+        // dedicated entry in addition to the registered/rejected entry.
+        this.emitAudit(
+          'meta-review-verdict',
+          manifest,
+          undefined,
+          result.metaReviewVerdict,
+        );
+      }
+      if (!result.trusted) {
+        this.emitAudit('rejected', manifest, result.reason);
+        return result;
+      }
     }
+    this.emitAudit(
+      'registered',
+      manifest,
+      undefined,
+      aggregateVerdict,
+    );
     return {
       trusted: true,
       requiresMetaReview: aggregateRequiresMetaReview,
@@ -137,14 +183,36 @@ export class TrustValidator {
   }
 
   /**
-   * O(1) runtime trust check. Used by `HookExecutor` before each
-   * invocation so revocations propagate without waiting for SIGUSR1.
-   *
-   * SPEC-019-3-04 swaps this for a `Set`-backed lookup with audit
-   * emission. The skeleton returns the allowlist-membership boolean.
+   * Emit a single trust-decision audit entry. No-op when no audit
+   * emitter is wired (the skeleton fallback used in tests that do not
+   * exercise audit assertions).
+   */
+  protected emitAudit(
+    decision: AuditDecision,
+    manifest: HookManifest,
+    reason?: string,
+    metaReviewVerdict?: { pass: boolean; findings: string[] },
+  ): void {
+    if (!this.auditEmitter) return;
+    const entry: TrustAuditEntry = {
+      decision,
+      pluginId: manifest.id,
+      pluginVersion: manifest.version,
+      timestamp: new Date().toISOString(),
+      ...(reason !== undefined ? { reason } : {}),
+      ...(metaReviewVerdict ? { metaReviewVerdict } : {}),
+    };
+    this.auditEmitter.emit(entry);
+  }
+
+  /**
+   * O(1) runtime trust check (SPEC-019-3-04). Backed by `trustedSet`
+   * so the executor's per-call lookup is constant-time regardless of
+   * allowlist size. The audit entry for a runtime revocation is
+   * emitted by the executor (which knows the hook point), not here.
    */
   isTrusted(pluginId: string): boolean {
-    return this.config.allowlist.includes(pluginId);
+    return this.trustedSet.has(pluginId);
   }
 
   // ------------------------------------------------------------------
