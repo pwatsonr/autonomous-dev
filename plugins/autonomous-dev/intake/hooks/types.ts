@@ -138,3 +138,91 @@ export interface HookManifest {
   /** Hooks declared by this plugin. May be empty. */
   hooks: HookEntry[];
 }
+
+// ---------------------------------------------------------------------------
+// SPEC-019-2-01: Validation pipeline types
+// ---------------------------------------------------------------------------
+
+/**
+ * Single AJV error entry, normalized to the shape the pipeline emits.
+ *
+ * Mirrors AJV's ErrorObject minus the dialect-specific fields the pipeline
+ * does not surface. `params` is preserved (post-redaction) so structured
+ * downstream consumers can still introspect what failed.
+ */
+export interface ValidationError {
+  /** JSON Pointer–style path into the validated payload. */
+  instancePath: string;
+  /** Human-readable failure message (post-redaction). */
+  message: string;
+  /** Schema-keyword–specific parameters (post-redaction). */
+  params?: Record<string, unknown>;
+}
+
+/**
+ * Result of one `validateHookInput` / `validateHookOutput` call.
+ *
+ * SPEC-019-2-01 acceptance: every field is populated for both success and
+ * failure paths. `sanitizedOutput` equals the deep-copied (and possibly
+ * defaults-filled / extras-stripped) payload on success; on failure it is
+ * the same deep copy in whatever state AJV left it.
+ */
+export interface ValidationResult<T = unknown> {
+  /** True iff the payload satisfied the schema. */
+  isValid: boolean;
+  /** Sanitized payload (extras stripped via removeAdditional). */
+  sanitizedOutput: T;
+  /** Structured AJV errors, or [] on success. */
+  errors: ValidationError[];
+  /** Non-fatal warnings (e.g., schema version fallback). */
+  warnings: string[];
+  /** Wall-clock duration of the validate call in milliseconds. */
+  validationTime: number;
+  /** Hook point this validation was for (echoed back for audit logging). */
+  hookPoint: string;
+  /** Resolved schema version actually used (may differ from requested if fallback occurred). */
+  schemaVersion: string;
+  /** Direction: 'input' or 'output'. */
+  direction: 'input' | 'output';
+}
+
+/** Logger contract used by ValidationPipeline. Mirrors the console subset we need. */
+export interface ValidationLogger {
+  info: (msg: string) => void;
+  warn: (msg: string) => void;
+  error: (msg: string) => void;
+}
+
+/** Constructor options for ValidationPipeline. */
+export interface ValidationPipelineOptions {
+  /** Absolute path to the schemas root. Default: `${pluginRoot}/schemas/hooks`. */
+  schemasRoot: string;
+  /** Optional logger; defaults to console. */
+  logger?: ValidationLogger;
+  /** Stats rolling-window size (SPEC-019-2-03). Default: 1000. */
+  statsWindowSize?: number;
+}
+
+/** Cache key shape used internally by ValidationPipeline. */
+export type SchemaCacheKey = `${string}:${string}:${'input' | 'output'}`;
+
+// ---------------------------------------------------------------------------
+// SPEC-019-2-04: Executor wiring types
+// ---------------------------------------------------------------------------
+
+/**
+ * Non-fatal warning surfaced from the executor when a hook's input/output
+ * validation produced advisory messages (e.g., schema version fallback).
+ */
+export interface ExecutorWarning {
+  /** Plugin owning the hook. */
+  pluginId: string;
+  /** Hook id within the plugin. */
+  hookId: string;
+  /** Lifecycle point. */
+  point: string;
+  /** Direction the warning came from. */
+  direction: 'input' | 'output';
+  /** Human-readable message. */
+  message: string;
+}
