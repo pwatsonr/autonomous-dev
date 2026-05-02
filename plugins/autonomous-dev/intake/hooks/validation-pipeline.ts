@@ -37,6 +37,8 @@ import type {
   ValidationResult,
   SchemaCacheKey,
 } from './types';
+import { registerCustomFormats } from './formats';
+import { registerCustomKeywords, redactErrors, getRedactPathsFromSchema } from './keywords';
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -108,6 +110,11 @@ export class ValidationPipeline {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const addFormatsFn: any = (addFormats as any).default ?? addFormats;
     addFormatsFn(this.ajv);
+
+    // Custom autonomous-dev vocabulary (SPEC-019-2-02). Both helpers are
+    // idempotent so subclasses can safely re-register.
+    registerCustomFormats(this.ajv as unknown as import('ajv').default);
+    registerCustomKeywords(this.ajv as unknown as import('ajv').default);
   }
 
   /**
@@ -246,15 +253,20 @@ export class ValidationPipeline {
   }
 
   /**
-   * Hook for SPEC-019-2-02 to apply x-redact-on-failure scrubbing. Default
-   * implementation is a passthrough.
+   * Apply x-redact-on-failure scrubbing (SPEC-019-2-02).
+   *
+   * Walks the validator's compiled schema for `x-redact-on-failure` arrays
+   * and ORs them with the auto-redact floor (handled inside `redactErrors`).
+   * Returns the redacted error list.
    */
   protected postProcessErrors(
     errors: ValidationError[],
-    _payload: unknown,
-    _validator: ValidateFunction,
+    payload: unknown,
+    validator: ValidateFunction,
   ): ValidationError[] {
-    return errors;
+    if (errors.length === 0) return errors;
+    const declaredPaths = getRedactPathsFromSchema(validator.schema);
+    return redactErrors(errors, payload, declaredPaths);
   }
 
   /**
