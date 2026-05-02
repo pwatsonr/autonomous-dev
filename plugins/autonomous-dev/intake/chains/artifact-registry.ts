@@ -69,8 +69,17 @@ export class ArtifactRegistry {
   async loadSchemas(
     schemaRoot: string,
   ): Promise<{ loaded: string[]; errors: string[] }> {
-    // Replace cache atomically — clear first.
+    // Replace cache atomically — clear first. AJV retains compiled schemas
+    // keyed by `$id`, so we also need a fresh AJV instance to allow the
+    // same schema files to be re-compiled on a second loadSchemas call
+    // (per SPEC-022-1-05's idempotent-reload contract).
     this.validators.clear();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this as { ajv: Ajv2020 }).ajv = new Ajv2020({
+      allErrors: true,
+      strict: true,
+    });
+    addFormats(this.ajv);
 
     const loaded: string[] = [];
     const errors: string[] = [];
