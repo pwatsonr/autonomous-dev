@@ -1,0 +1,14 @@
+{
+  "id": "simple",
+  "name": "Simple Test Plugin",
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "id": "echo",
+      "hook_point": "intake-pre-validate",
+      "entry_point": "./hook.js",
+      "priority": 100,
+      "failure_mode": "warn"
+    }
+  ]
+}

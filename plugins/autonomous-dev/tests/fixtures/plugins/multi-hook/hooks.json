@@ -1,0 +1,28 @@
+{
+  "id": "multi-hook",
+  "name": "Multi-Hook Test Plugin",
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "id": "alpha",
+      "hook_point": "code-pre-write",
+      "entry_point": "./hooks/a.js",
+      "priority": 100,
+      "failure_mode": "warn"
+    },
+    {
+      "id": "bravo",
+      "hook_point": "code-pre-write",
+      "entry_point": "./hooks/b.js",
+      "priority": 50,
+      "failure_mode": "warn"
+    },
+    {
+      "id": "charlie",
+      "hook_point": "code-pre-write",
+      "entry_point": "./hooks/c.js",
+      "priority": 75,
+      "failure_mode": "warn"
+    }
+  ]
+}
