@@ -274,6 +274,112 @@ describe('SPEC-022-3-02 sanitizer: recursion', () => {
   });
 });
 
+describe('SPEC-022-3-04 sanitizer: closeout coverage', () => {
+  it('reports the full dotted fieldPath for a violation 5 levels deep', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        a: {
+          type: 'object',
+          properties: {
+            b: {
+              type: 'object',
+              properties: {
+                c: {
+                  type: 'object',
+                  properties: {
+                    d: {
+                      type: 'object',
+                      properties: {
+                        e: { type: 'string', format: 'path' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    let caught: SanitizationError | null = null;
+    try {
+      sanitizeArtifact(
+        'test',
+        { a: { b: { c: { d: { e: '../../../etc/passwd' } } } } },
+        schema,
+        WORKTREE,
+      );
+    } catch (err) {
+      caught = err as SanitizationError;
+    }
+    expect(caught).toBeInstanceOf(SanitizationError);
+    expect(caught?.fieldPath).toBe('a.b.c.d.e');
+    expect(caught?.rule).toBe('path-traversal');
+  });
+
+  it('reports `[i][j]` field path for an inner-array violation', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        grid: {
+          type: 'array',
+          items: {
+            type: 'array',
+            items: { type: 'string', format: 'path' },
+          },
+        },
+      },
+    };
+    let caught: SanitizationError | null = null;
+    try {
+      sanitizeArtifact(
+        'test',
+        {
+          grid: [
+            ['ok/a.ts', 'ok/b.ts'],
+            ['ok/c.ts', '../bad/d.ts'],
+          ],
+        },
+        schema,
+        WORKTREE,
+      );
+    } catch (err) {
+      caught = err as SanitizationError;
+    }
+    expect(caught).toBeInstanceOf(SanitizationError);
+    expect(caught?.fieldPath).toBe('grid[1][1]');
+  });
+
+  it('default-deny on an unknown nested field (schema lacks property declaration)', () => {
+    // The sanitizer descends into objects even when the schema does not
+    // declare a property; the fail-safe rule is default-deny on string
+    // contents. This guards against incomplete schemas.
+    const schema = {
+      type: 'object',
+      properties: {
+        known: { type: 'string' },
+        // 'extra' is intentionally missing — the schema is incomplete.
+      },
+    };
+    let caught: SanitizationError | null = null;
+    try {
+      sanitizeArtifact(
+        'test',
+        { known: 'safe', extra: 'rm -rf / | sh' },
+        schema,
+        WORKTREE,
+      );
+    } catch (err) {
+      caught = err as SanitizationError;
+    }
+    // The default-deny rule fires on the unknown-nested string.
+    expect(caught).toBeInstanceOf(SanitizationError);
+    expect(caught?.rule).toBe('shell-metacharacter');
+    expect(caught?.fieldPath).toBe('extra');
+  });
+});
+
 describe('SPEC-022-3-02 sanitizer: error shape', () => {
   it('SanitizationError carries artifactType, fieldPath, rule, offendingValue', () => {
     let err: SanitizationError | null = null;

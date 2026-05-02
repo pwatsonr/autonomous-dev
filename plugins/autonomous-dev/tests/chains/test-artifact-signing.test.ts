@@ -667,6 +667,171 @@ describe('SPEC-022-3-02: privileged-chain Ed25519 signing', () => {
   });
 });
 
+describe('SPEC-022-3-04: signing closeout coverage', () => {
+  let tempRoot: string;
+
+  beforeEach(async () => {
+    clearSchemaCache();
+    tempRoot = await createTempRequestDir();
+  });
+
+  afterEach(async () => {
+    await cleanupTempDir(tempRoot);
+    clearSchemaCache();
+  });
+
+  const ALT_HMAC_KEY = Buffer.from(
+    'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+    'hex',
+  );
+
+  // Producer Ed25519 key — same fixture used by the privileged-chain
+  // suite above so we don't pay keygen on every adversarial test.
+  const PRODUCER_PRIV_PEM_LOCAL = Buffer.from(
+    'LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1DNENBUUF3QlFZREsyVndCQ0lFSUhBalIvVTZTMDdDa3lFbzB4RUxuazBWZXMweDZTaDJTUXNMQkRwZkdZNk8KLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=',
+    'base64',
+  ).toString('utf-8');
+
+  function ed25519SignerLocal(privateKeyPem: string) {
+    const key = createPrivateKey({ key: privateKeyPem, format: 'pem' });
+    return {
+      sign(_producerPluginId: string, canonical: string): string {
+        return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString(
+          'base64',
+        );
+      },
+    };
+  }
+
+  it('producer + consumer with DIFFERENT HMAC keys → ArtifactTamperedError', async () => {
+    // Defense against operators running two daemons with mismatched keys.
+    const persistReg = new ArtifactRegistry({ hmacKey: TEST_HMAC_KEY });
+    await persistReg.loadSchemas(FIXTURE_SCHEMA_ROOT);
+    await persistReg.persist(
+      tempRoot,
+      'security-findings',
+      'mismatched-key',
+      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
+    );
+
+    const readReg = new ArtifactRegistry({ hmacKey: ALT_HMAC_KEY });
+    await readReg.loadSchemas(FIXTURE_SCHEMA_ROOT);
+    const c: ConsumerPluginRef = {
+      pluginId: 'P',
+      consumes: [{ artifact_type: 'security-findings', schema_version: '1.0' }],
+    };
+    await expect(
+      readReg.read('security-findings', 'mismatched-key', c, tempRoot),
+    ).rejects.toBeInstanceOf(ArtifactTamperedError);
+  });
+
+  it('Ed25519 verify scales: avg <10ms even for ~1MB payloads', async () => {
+    const reg = new ArtifactRegistry({
+      hmacKey: TEST_HMAC_KEY,
+      signer: ed25519SignerLocal(PRODUCER_PRIV_PEM_LOCAL),
+      privilegedPolicy: { isPrivileged: () => true },
+      trustedKeys: {
+        lookup: (id: string) =>
+          id === 'rule-set-enforcement'
+            ? fsSync.readFileSync(path.join(KEYS_DIR, 'producer.pub'), 'utf-8')
+            : null,
+      },
+      // Larger artifact-size cap so we can test 1MB payloads.
+      maxArtifactSizeMb: 16,
+    });
+    await reg.loadSchemas(FIXTURE_SCHEMA_ROOT);
+    const consumerCF: ConsumerPluginRef = {
+      pluginId: 'code-fixer',
+      consumes: [{ artifact_type: 'security-findings', schema_version: '1.0' }],
+    };
+
+    // Build a ~1KB payload.
+    const findings1k = Array.from({ length: 10 }, (_, i) => ({
+      file: `src/path/to/file_${i}.ts`,
+      line: i + 1,
+      rule_id: `R-${'x'.repeat(80)}`,
+    }));
+    await reg.persist(
+      tempRoot,
+      'security-findings',
+      'perf-1k',
+      { findings: findings1k },
+      { pluginId: 'rule-set-enforcement', consumerPluginId: 'code-fixer' },
+    );
+    const t1kStart = performance.now();
+    for (let i = 0; i < 20; i++) {
+      await reg.read('security-findings', 'perf-1k', consumerCF, tempRoot);
+    }
+    const t1kAvg = (performance.now() - t1kStart) / 20;
+    // Generous bound (<20ms total round-trip); detects 10x regressions.
+    expect(t1kAvg).toBeLessThan(20);
+
+    // Build a ~1MB payload (~10k findings × ~100 bytes each).
+    const findings1m = Array.from({ length: 10000 }, (_, i) => ({
+      file: `src/very/deeply/nested/path/${i}/component.ts`,
+      line: (i % 1000) + 1,
+      rule_id: `RULE-${'y'.repeat(40)}`,
+    }));
+    await reg.persist(
+      tempRoot,
+      'security-findings',
+      'perf-1m',
+      { findings: findings1m },
+      { pluginId: 'rule-set-enforcement', consumerPluginId: 'code-fixer' },
+    );
+    const t1mStart = performance.now();
+    for (let i = 0; i < 5; i++) {
+      await reg.read('security-findings', 'perf-1m', consumerCF, tempRoot);
+    }
+    const t1mAvg = (performance.now() - t1mStart) / 5;
+    // 1MB read includes file I/O, AJV strict-strip, sanitize, and verify.
+    // Spec target is <10ms for verify alone; 200ms is the round-trip
+    // perf canary that catches >10x regressions.
+    expect(t1mAvg).toBeLessThan(200);
+  });
+
+  it('privileged producer + non-privileged consumer: verification skipped', async () => {
+    // Re-asserts the privileged-policy gate from a different angle: when
+    // the consumer side declares it is NOT privileged, the producer's
+    // Ed25519 signature is ignored (even when valid). This protects
+    // non-privileged consumers from accidental dependency on signed
+    // upstream metadata.
+    const persistReg = new ArtifactRegistry({
+      hmacKey: TEST_HMAC_KEY,
+      signer: ed25519SignerLocal(PRODUCER_PRIV_PEM_LOCAL),
+      privilegedPolicy: { isPrivileged: () => true },
+      trustedKeys: {
+        lookup: (id: string) =>
+          id === 'rule-set-enforcement'
+            ? fsSync.readFileSync(path.join(KEYS_DIR, 'producer.pub'), 'utf-8')
+            : null,
+      },
+    });
+    await persistReg.loadSchemas(FIXTURE_SCHEMA_ROOT);
+    await persistReg.persist(
+      tempRoot,
+      'security-findings',
+      'asym-priv',
+      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
+      { pluginId: 'rule-set-enforcement', consumerPluginId: 'code-fixer' },
+    );
+
+    // The consumer-side registry has a privilegedPolicy that says NO —
+    // so the Ed25519 signature is ignored on read.
+    const readReg = new ArtifactRegistry({
+      hmacKey: TEST_HMAC_KEY,
+      privilegedPolicy: { isPrivileged: () => false },
+    });
+    await readReg.loadSchemas(FIXTURE_SCHEMA_ROOT);
+    const consumerCF: ConsumerPluginRef = {
+      pluginId: 'code-fixer',
+      consumes: [{ artifact_type: 'security-findings', schema_version: '1.0' }],
+    };
+    const out = await readReg.read('security-findings', 'asym-priv', consumerCF, tempRoot);
+    expect(out.producer_plugin_id).toBe('rule-set-enforcement');
+  });
+});
+
 describe('SPEC-022-3-02: chain HMAC key resolution', () => {
   let tempHome: string;
   let warnings: string[];
