@@ -1,0 +1,8 @@
+{
+  "_comment": "Mock GitHub API responses for verify-two-admin-override.js — happy path. Two distinct admin logins, distinct verified emails. Loaded by tests/ci/test_two_admin_override.bats.",
+  "admins": [
+    {"login": "alice", "email": "alice@example.com"},
+    {"login": "bob",   "email": "bob@example.com"}
+  ],
+  "labelers": ["alice", "bob"]
+}

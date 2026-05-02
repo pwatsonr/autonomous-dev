@@ -35,8 +35,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  budget-gate:
+    uses: ./.github/workflows/budget-gate.yml
+    with:
+      triggering_workflow: assist-evals
+    secrets:
+      BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+      BUDGET_HMAC_KEY_PREVIOUS: ${{ secrets.BUDGET_HMAC_KEY_PREVIOUS }}
+      CLAUDE_MONTHLY_BUDGET_USD: ${{ secrets.CLAUDE_MONTHLY_BUDGET_USD }}
+
   run-evals:
     name: Run assist eval scenarios
+    needs: [budget-gate]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:

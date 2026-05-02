@@ -44,6 +44,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  budget-gate:
+    uses: ./.github/workflows/budget-gate.yml
+    with:
+      triggering_workflow: claude-assistant
+    secrets:
+      BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+      BUDGET_HMAC_KEY_PREVIOUS: ${{ secrets.BUDGET_HMAC_KEY_PREVIOUS }}
+      CLAUDE_MONTHLY_BUDGET_USD: ${{ secrets.CLAUDE_MONTHLY_BUDGET_USD }}
+
   trust-check:
     name: Evaluate author trust
     runs-on: ubuntu-latest
@@ -62,7 +71,7 @@ jobs:
 
   respond:
     name: Respond to @claude mention
-    needs: trust-check
+    needs: [budget-gate, trust-check]
     runs-on: ubuntu-latest
     if: >-
       contains(github.event.comment.body, '@claude') &&

@@ -1,0 +1,186 @@
+# ============================================================
+# Reusable budget gate (SPEC-017-4-01 scaffold).
+# ============================================================
+# Invoked by Claude-powered workflows via:
+#
+#     uses: ./.github/workflows/budget-gate.yml
+#
+# This file scaffolds the workflow_call interface, the permissions,
+# the timeout, and the concurrency group. Threshold tiers (warn at
+# 80%, fail at 100%, critical at 110%) are layered on by
+# SPEC-017-4-02 and SPEC-017-4-03.
+#
+# Trust model: this workflow runs as the calling repo's GITHUB_TOKEN.
+# It MUST NOT escalate beyond `contents: read` and `pull-requests:
+# write`. Override-label removal needs `pull-requests: write`; nothing
+# else.
+# ============================================================
+
+name: budget-gate
+
+on:
+  workflow_call:
+    inputs:
+      triggering_workflow:
+        description: 'Name of the workflow that invoked the gate (for telemetry + summary).'
+        required: true
+        type: string
+    secrets:
+      BUDGET_HMAC_KEY:
+        required: true
+      BUDGET_HMAC_KEY_PREVIOUS:
+        required: false
+      CLAUDE_MONTHLY_BUDGET_USD:
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: budget-gate-${{ github.event.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Evaluate monthly budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Aggregate month-to-date spend
+        id: aggregate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+          BUDGET_HMAC_KEY_PREVIOUS: ${{ secrets.BUDGET_HMAC_KEY_PREVIOUS }}
+          CLAUDE_MONTHLY_BUDGET_USD: ${{ secrets.CLAUDE_MONTHLY_BUDGET_USD }}
+        run: node scripts/ci/aggregate-spend.js
+
+      - name: Post 80% warning comment
+        if: >-
+          github.event_name == 'pull_request' &&
+          fromJSON(steps.aggregate.outputs.percentage) >= 80 &&
+          fromJSON(steps.aggregate.outputs.percentage) < 100
+        uses: actions/github-script@v7
+        env:
+          PERCENTAGE: ${{ steps.aggregate.outputs.percentage }}
+          TOTAL: ${{ steps.aggregate.outputs.total_spend }}
+          LIMIT: ${{ steps.aggregate.outputs.budget_limit }}
+        with:
+          script: |
+            const marker = '<!-- budget-gate-comment -->';
+            const body = `${marker}\n` +
+              `## Budget Warning\n\n` +
+              `Monthly Claude spend is at **${process.env.PERCENTAGE}%** ` +
+              `($${process.env.TOTAL} of $${process.env.LIMIT}).\n\n` +
+              `_This is an advisory notice. The gate will fail at 100%._`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => c.body && c.body.startsWith(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body,
+              });
+            }
+
+      - name: Check for cost override label (100%)
+        id: check-100
+        if: >-
+          github.event_name == 'pull_request' &&
+          fromJSON(steps.aggregate.outputs.percentage) >= 100 &&
+          fromJSON(steps.aggregate.outputs.percentage) < 110
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          PERCENTAGE: ${{ steps.aggregate.outputs.percentage }}
+          BUDGET_GATE_ADVISORY_MODE: ${{ vars.BUDGET_GATE_ADVISORY_MODE }}
+        run: |
+          set -euo pipefail
+          if [ "${BUDGET_GATE_ADVISORY_MODE:-false}" = "true" ]; then
+            echo "advisory_mode=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Budget exceeded (${PERCENTAGE}%) but advisory mode enabled. Promote to required check after baseline data."
+            exit 0
+          fi
+          labels=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name')
+          if echo "$labels" | grep -qx "cost:override"; then
+            echo "override_consumed=cost:override" >> "$GITHUB_OUTPUT"
+            actor="${GITHUB_ACTOR}"
+            echo "::notice::cost:override consumed by ${actor} at $(date -u +%FT%TZ)"
+            echo "Override consumed: \`cost:override\` by \`${actor}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::Monthly budget exceeded (${PERCENTAGE}%). Apply 'cost:override' label to proceed."
+            exit 1
+          fi
+
+      - name: Verify critical override (110%)
+        id: check-110
+        if: >-
+          github.event_name == 'pull_request' &&
+          fromJSON(steps.aggregate.outputs.percentage) >= 110
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+          CRITICAL_LABEL: cost:override-critical
+          PERCENTAGE: ${{ steps.aggregate.outputs.percentage }}
+        run: |
+          set -euo pipefail
+          labels=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/labels" --jq '.[].name')
+          if ! echo "$labels" | grep -qx "${CRITICAL_LABEL}"; then
+            echo "::error::Critical budget threshold (${PERCENTAGE}%) reached. Apply '${CRITICAL_LABEL}' label and obtain a second org admin approval to proceed."
+            exit 1
+          fi
+          node scripts/ci/verify-two-admin-override.js
+          echo "override_consumed=cost:override-critical" >> "$GITHUB_OUTPUT"
+
+      - name: Revoke override labels (single-run validity)
+        if: >-
+          success() &&
+          github.event_name == 'pull_request' &&
+          (steps.check-100.outputs.override_consumed != '' ||
+           steps.check-110.outputs.override_consumed != '')
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+          LABEL_100: ${{ steps.check-100.outputs.override_consumed }}
+          LABEL_110: ${{ steps.check-110.outputs.override_consumed }}
+        run: |
+          set -euo pipefail
+          for label in "$LABEL_100" "$LABEL_110"; do
+            [ -z "$label" ] && continue
+            gh pr edit "$PR_NUMBER" --remove-label "$label" --repo "$GITHUB_REPOSITORY"
+            echo "Removed label \`$label\` (single-run validity)" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Record gate invocation
+        env:
+          TRIGGERING_WORKFLOW: ${{ inputs.triggering_workflow }}
+          PERCENTAGE: ${{ steps.aggregate.outputs.percentage }}
+          TOTAL: ${{ steps.aggregate.outputs.total_spend }}
+          LIMIT: ${{ steps.aggregate.outputs.budget_limit }}
+        run: |
+          {
+            echo "## Budget Gate"
+            echo ""
+            echo "Triggered by: \`${TRIGGERING_WORKFLOW}\`"
+            echo "Month-to-date: \$${TOTAL} / \$${LIMIT} (${PERCENTAGE}%)"
+          } >> "$GITHUB_STEP_SUMMARY"

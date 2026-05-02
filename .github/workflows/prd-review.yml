@@ -32,6 +32,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  budget-gate:
+    uses: ./.github/workflows/budget-gate.yml
+    with:
+      triggering_workflow: prd-review
+    secrets:
+      BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+      BUDGET_HMAC_KEY_PREVIOUS: ${{ secrets.BUDGET_HMAC_KEY_PREVIOUS }}
+      CLAUDE_MONTHLY_BUDGET_USD: ${{ secrets.CLAUDE_MONTHLY_BUDGET_USD }}
+
   trust-gate:
     name: Trust gate
     runs-on: ubuntu-latest
@@ -51,7 +60,7 @@ jobs:
 
   review:
     name: PRD Review
-    needs: trust-gate
+    needs: [budget-gate, trust-gate]
     if: needs.trust-gate.outputs.allowed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10

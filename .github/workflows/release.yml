@@ -40,6 +40,15 @@ concurrency:
   cancel-in-progress: false   # releases must complete
 
 jobs:
+  budget-gate:
+    uses: ./.github/workflows/budget-gate.yml
+    with:
+      triggering_workflow: release
+    secrets:
+      BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+      BUDGET_HMAC_KEY_PREVIOUS: ${{ secrets.BUDGET_HMAC_KEY_PREVIOUS }}
+      CLAUDE_MONTHLY_BUDGET_USD: ${{ secrets.CLAUDE_MONTHLY_BUDGET_USD }}
+
   verify-version:
     name: Verify tag matches plugin manifest
     runs-on: ubuntu-latest
@@ -133,7 +142,7 @@ jobs:
   # both jobs are declared in the same workflow file.
   generate-changelog:
     name: Generate changelog with Claude
-    needs: [verify-version, verify-evals]
+    needs: [budget-gate, verify-version, verify-evals]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:

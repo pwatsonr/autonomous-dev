@@ -1,0 +1,8 @@
+{
+  "_comment": "One admin labeling twice — deduplicated to a single labeler. Must be rejected.",
+  "admins": [
+    {"login": "alice", "email": "alice@example.com"},
+    {"login": "bob",   "email": "bob@example.com"}
+  ],
+  "labelers": ["alice"]
+}

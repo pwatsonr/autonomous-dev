@@ -1,0 +1,9 @@
+{
+  "workflow": "claude-assistant",
+  "run_id": "100003",
+  "actor": "alice",
+  "month": "2026-04",
+  "estimated_cost_usd": 5,
+  "timestamp": "2026-04-15T12:00:00Z",
+  "hmac": "2e68989eeae090b3be966f18cc7d9372e26a1e55a51887698bdb9db7935e4a05"
+}
