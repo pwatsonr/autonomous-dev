@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev/schemas/hook-manifest-v1.json",
+  "title": "HookManifest v1",
+  "description": "Plugin manifest (hooks.json) for the autonomous-dev hook engine. See TDD-019 §13.1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "hooks"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Globally unique plugin id (kebab-case, no leading digit, no underscores)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[\\w.-]+)?(?:\\+[\\w.-]+)?$",
+      "description": "Semver string."
+    },
+    "hooks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/hookEntry" }
+    }
+  },
+  "$defs": {
+    "hookEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "hook_point", "entry_point", "priority", "failure_mode"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Stable identifier within the plugin (kebab-case)."
+        },
+        "hook_point": {
+          "type": "string",
+          "enum": [
+            "intake-pre-validate",
+            "prd-pre-author",
+            "tdd-pre-author",
+            "code-pre-write",
+            "code-post-write",
+            "review-pre-score",
+            "review-post-score",
+            "deploy-pre",
+            "deploy-post",
+            "rule-evaluation"
+          ]
+        },
+        "entry_point": {
+          "type": "string",
+          "pattern": "^\\./.+\\.(js|cjs|mjs)$",
+          "description": "Relative path to JS entry-point file."
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "failure_mode": {
+          "type": "string",
+          "enum": ["block", "warn", "ignore"]
+        },
+        "reviewer_slot": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "filesystem-write",
+              "network",
+              "child-processes",
+              "privileged-env"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "example-validator",
+      "name": "Example Validator Plugin",
+      "version": "1.0.0",
+      "hooks": [
+        {
+          "id": "validate-input",
+          "hook_point": "intake-pre-validate",
+          "entry_point": "./hooks/validate.js",
+          "priority": 100,
+          "failure_mode": "warn"
+        }
+      ]
+    }
+  ]
+}
