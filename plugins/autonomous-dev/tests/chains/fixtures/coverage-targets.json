@@ -1,0 +1,29 @@
+{
+  "_comment": "SPEC-022-3-04 (Task 10 / closeout). Per-module coverage thresholds enforced by the CI gate. New PLAN-022-3 modules MUST land at or above these floors; values below them fail the test gate. The 95% line / 90% branch numbers are floors — new code SHOULD achieve >98% lines.",
+  "thresholds": {
+    "plugins/autonomous-dev/intake/chains/artifact-registry.ts": {
+      "lines": 95,
+      "branches": 90
+    },
+    "plugins/autonomous-dev/intake/chains/sanitizer.ts": {
+      "lines": 95,
+      "branches": 90
+    },
+    "plugins/autonomous-dev/intake/chains/canonical-json.ts": {
+      "lines": 95,
+      "branches": 90
+    },
+    "plugins/autonomous-dev/intake/chains/audit-writer.ts": {
+      "lines": 95,
+      "branches": 90
+    },
+    "plugins/autonomous-dev/intake/chains/schema-cache.ts": {
+      "lines": 95,
+      "branches": 90
+    },
+    "plugins/autonomous-dev/intake/cli/chains_audit_command.ts": {
+      "lines": 90,
+      "branches": 85
+    }
+  }
+}
