@@ -71,6 +71,37 @@ export class SignatureVerifier {
   }
 
   /**
+   * SPEC-022-3-02: verify an Ed25519 signature over the canonical bytes
+   * of a chain artifact envelope. Reuses Node's built-in `verify` so the
+   * crypto surface matches the manifest path above.
+   *
+   * @param canonicalPayload deterministic JSON of the artifact envelope.
+   * @param base64Signature  the producer's Ed25519 signature.
+   * @param publicKeyPem     the producer's PEM-encoded Ed25519 public key
+   *                         (loaded from `~/.claude/trusted-keys/`).
+   * @returns true iff the signature was produced over `canonicalPayload`
+   *          by the private key matching `publicKeyPem`. Returns false on
+   *          ANY failure (parse, mismatched algo, decode error, …) — the
+   *          read pipeline maps that into `PrivilegedSignatureError`.
+   */
+  static verifyArtifact(
+    canonicalPayload: string,
+    base64Signature: string,
+    publicKeyPem: string,
+  ): boolean {
+    try {
+      const publicKey = createPublicKey({ key: publicKeyPem, format: 'pem' });
+      const sig = Buffer.from(base64Signature, 'base64');
+      // Ed25519 wants algorithm=null. Other algorithms are NOT accepted
+      // here — the privileged-chain contract is Ed25519-only.
+      if (publicKey.asymmetricKeyType !== 'ed25519') return false;
+      return verify(null, Buffer.from(canonicalPayload, 'utf8'), publicKey, sig);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * List `*.pub` files in the trusted-keys dir. Returns `[]` if the dir
    * does not exist or its permissions are unsafe.
    */

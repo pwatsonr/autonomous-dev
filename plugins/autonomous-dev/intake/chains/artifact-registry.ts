@@ -15,6 +15,7 @@
  * @module intake/chains/artifact-registry
  */
 
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import Ajv2020, { type ValidateFunction } from 'ajv/dist/2020';
@@ -27,11 +28,18 @@ import type {
   ValidatedArtifact,
 } from './types';
 import {
+  ArtifactTamperedError,
+  ArtifactUnsignedError,
   CapabilityError,
+  PrivilegedSignatureError,
   SchemaValidationError,
 } from './types';
 import { ArtifactTooLargeError } from './errors';
 import { getValidator, type SchemaResolver } from './schema-cache';
+import { canonicalJSON } from './canonical-json';
+import { getChainHmacKey } from './chain-key';
+import { sanitizeArtifact } from './sanitizer';
+import { SignatureVerifier } from '../hooks/signature-verifier';
 
 const VERSION_FILE_RE = /^(\d+\.\d+)\.json$/;
 const ARTIFACT_DIR_NAME_RE = /^[a-z][a-z0-9-]*$/;
@@ -43,6 +51,57 @@ const SCAN_ID_RE = /^[a-zA-Z0-9_-]+$/;
  */
 export const DEFAULT_MAX_ARTIFACT_SIZE_MB = 10;
 
+/**
+ * SPEC-022-3-02: Ed25519 producer-signing pluggable interface. The signer
+ * is invoked at `persist()` time when both producer and consumer are in
+ * the privileged-chain allowlist. When omitted, no `_chain_signature`
+ * field is written — non-privileged chains rely on HMAC alone.
+ */
+export interface ChainArtifactSigner {
+  /**
+   * Produce a base64 Ed25519 signature for `canonical` using the producer
+   * plugin's private key. May throw if the plugin has no signing key
+   * registered; callers should treat that as a privileged-chain
+   * configuration failure.
+   */
+  sign(producerPluginId: string, canonical: string): string;
+}
+
+/**
+ * SPEC-022-3-02: privileged-chain policy. Returns true iff BOTH endpoints
+ * (producer + consumer plugin ids) are in `extensions.privileged_chains[]`
+ * for the running chain. The registry uses this at persist (to decide
+ * whether to add `_chain_signature`) and at read (to decide whether to
+ * require + verify it).
+ */
+export interface ChainPrivilegedPolicy {
+  isPrivileged(producerPluginId: string, consumerPluginId: string): boolean;
+}
+
+/**
+ * SPEC-022-3-02: trusted-key lookup for Ed25519 verification. Maps a
+ * plugin id to the producer's PEM-encoded public key (the same key
+ * shipped under `~/.claude/trusted-keys/<plugin>.pub` in PLAN-019-3).
+ */
+export interface ChainTrustedKeyStore {
+  lookup(producerPluginId: string): string | null;
+}
+
+/**
+ * SPEC-022-3-02: producer-side context for `persist()`. Optional so
+ * pre-PLAN-022-3 callers (and tests) keep working with the original
+ * 4-arg signature; when supplied, drives envelope metadata + privileged-
+ * chain signing.
+ */
+export interface ProducerContext {
+  /** Identity of the producing plugin; written to envelope.producer_plugin_id. */
+  pluginId: string;
+  /** Consumer the artifact is destined for; gates privileged-chain signing. */
+  consumerPluginId?: string;
+  /** Override `produced_at` for deterministic tests. Defaults to ISO now. */
+  producedAt?: string;
+}
+
 /** Public so callers can pre-build an Ajv instance with shared config. */
 export interface ArtifactRegistryOptions {
   ajv?: Ajv2020;
@@ -52,6 +111,25 @@ export interface ArtifactRegistryOptions {
    * {@link DEFAULT_MAX_ARTIFACT_SIZE_MB}.
    */
   maxArtifactSizeMb?: number;
+  /**
+   * SPEC-022-3-02: override the chain HMAC key resolver. Defaults to
+   * `getChainHmacKey()` (env → file → first-run generation). Tests
+   * inject a fixed Buffer for determinism.
+   */
+  hmacKey?: Buffer;
+  /** SPEC-022-3-02: optional Ed25519 signer (privileged chains). */
+  signer?: ChainArtifactSigner;
+  /** SPEC-022-3-02: optional privileged-chain policy. */
+  privilegedPolicy?: ChainPrivilegedPolicy;
+  /** SPEC-022-3-02: optional trusted-key store for Ed25519 verify. */
+  trustedKeys?: ChainTrustedKeyStore;
+  /**
+   * SPEC-022-3-02: whether to enable HMAC sign/verify on persist+read.
+   * Defaults to `true`. Set false to opt out for legacy callers that
+   * persist non-envelope payloads. The new `read()` pipeline always
+   * enforces signing when this is on.
+   */
+  hmacEnabled?: boolean;
 }
 
 /**
@@ -75,6 +153,12 @@ export class ArtifactRegistry {
   private readonly validators = new Map<string, CacheEntry>();
   /** SPEC-022-2-02: artifact-size cap in BYTES (mb * 1024 * 1024). */
   private readonly maxArtifactSizeBytes: number;
+  /** SPEC-022-3-02: HMAC key (lazily fetched on first persist/read). */
+  private hmacKey: Buffer | null;
+  private readonly hmacEnabled: boolean;
+  private readonly signer?: ChainArtifactSigner;
+  private readonly privilegedPolicy?: ChainPrivilegedPolicy;
+  private readonly trustedKeys?: ChainTrustedKeyStore;
 
   constructor(opts: ArtifactRegistryOptions = {}) {
     this.ajv =
@@ -86,6 +170,19 @@ export class ArtifactRegistry {
     addFormats(this.ajv);
     const mb = opts.maxArtifactSizeMb ?? DEFAULT_MAX_ARTIFACT_SIZE_MB;
     this.maxArtifactSizeBytes = mb * 1024 * 1024;
+    this.hmacKey = opts.hmacKey ?? null;
+    this.hmacEnabled = opts.hmacEnabled !== false;
+    this.signer = opts.signer;
+    this.privilegedPolicy = opts.privilegedPolicy;
+    this.trustedKeys = opts.trustedKeys;
+  }
+
+  /** Lazy-load the chain HMAC key (env → file → first-run). */
+  private getHmacKey(): Buffer {
+    if (!this.hmacKey) {
+      this.hmacKey = getChainHmacKey();
+    }
+    return this.hmacKey;
   }
 
   /** Effective artifact-size cap in bytes. Visible for tests + telemetry. */
@@ -236,12 +333,22 @@ export class ArtifactRegistry {
    * - On any error after the temp write, the temp file is unlinked.
    *
    * Path-traversal defense: rejects `scanId` containing `/`, `..`, or NUL.
+   *
+   * SPEC-022-3-02: when HMAC is enabled (default) the on-disk shape is an
+   * envelope `{artifact_type, schema_version, producer_plugin_id,
+   * produced_at, payload, _chain_hmac, [_chain_signature]}`. The HMAC is
+   * computed over the canonical JSON of all envelope fields EXCEPT itself
+   * and `_chain_signature`. When privileged-chain policy applies AND a
+   * signer is configured, an Ed25519 signature is added under
+   * `_chain_signature`. The legacy `load()` continues to surface the
+   * inner `payload` unchanged so executor + tests round-trip correctly.
    */
   async persist(
     requestRoot: string,
     artifactType: string,
     scanId: string,
     payload: unknown,
+    producerCtx?: ProducerContext,
   ): Promise<ArtifactRecord> {
     if (
       !SCAN_ID_RE.test(scanId) ||
@@ -254,19 +361,71 @@ export class ArtifactRegistry {
     if (!ARTIFACT_DIR_NAME_RE.test(artifactType)) {
       throw new Error(`invalid artifactType for persist: '${artifactType}'`);
     }
-    const data = JSON.stringify(payload, null, 2);
-    // SPEC-022-2-02: enforce artifact-size cap on the JSON byte length.
+    // Resolve schema version from validator cache (informational only).
+    const matching = Array.from(this.validators.entries()).find(
+      ([k]) => k.split('@')[0] === artifactType,
+    );
+    const schemaVersion = matching?.[1].schemaVersion ?? '?';
+
+    // SPEC-022-2-02: enforce artifact-size cap on the JSON byte length of
+    // the user's PAYLOAD ONLY — the cap is meant to bound user-facing data,
+    // not the HMAC/Ed25519 envelope metadata that PLAN-022-3 added on top.
+    // Sizing the bare payload keeps the cap stable across signing changes
+    // and matches the `chains.max_artifact_size_mb` operator-facing intent.
     // Boundary inclusive: a payload of EXACTLY maxArtifactSizeBytes is OK;
     // strictly greater is rejected. Throws BEFORE any disk I/O so the
     // executor records a clean producer-side failure.
-    const sizeBytes = Buffer.byteLength(data, 'utf-8');
-    if (sizeBytes > this.maxArtifactSizeBytes) {
+    const payloadSerialized = JSON.stringify(payload, null, 2);
+    const payloadBytes = Buffer.byteLength(payloadSerialized, 'utf-8');
+    if (payloadBytes > this.maxArtifactSizeBytes) {
       throw new ArtifactTooLargeError(
         scanId,
         artifactType,
-        sizeBytes,
+        payloadBytes,
         this.maxArtifactSizeBytes,
       );
+    }
+
+    // Build the on-disk shape. When HMAC is on (the default in PLAN-022-3),
+    // we wrap the payload in a signed envelope. When off, we keep the
+    // pre-PLAN-022-3 bare-payload shape for backward compatibility.
+    let serialized: string;
+    if (this.hmacEnabled) {
+      const envelope = {
+        artifact_type: artifactType,
+        schema_version: schemaVersion,
+        producer_plugin_id: producerCtx?.pluginId ?? 'unknown',
+        produced_at: producerCtx?.producedAt ?? new Date().toISOString(),
+        payload,
+      };
+      const canonical = canonicalJSON(envelope);
+      const hmac = createHmac('sha256', this.getHmacKey())
+        .update(canonical)
+        .digest('base64');
+      // Optional Ed25519 signature for privileged chains. The signer is
+      // only invoked when policy says BOTH endpoints are privileged AND
+      // a signer is configured; otherwise the field is omitted entirely
+      // (NOT set to null — the read pipeline checks for presence).
+      let signature: string | undefined;
+      if (
+        this.signer &&
+        this.privilegedPolicy &&
+        producerCtx?.consumerPluginId &&
+        this.privilegedPolicy.isPrivileged(
+          envelope.producer_plugin_id,
+          producerCtx.consumerPluginId,
+        )
+      ) {
+        signature = this.signer.sign(envelope.producer_plugin_id, canonical);
+      }
+      const final: Record<string, unknown> = {
+        ...envelope,
+        _chain_hmac: hmac,
+      };
+      if (signature) final._chain_signature = signature;
+      serialized = JSON.stringify(final, null, 2);
+    } else {
+      serialized = payloadSerialized;
     }
     const targetDir = path.join(
       requestRoot,
@@ -277,7 +436,7 @@ export class ArtifactRegistry {
     await fs.mkdir(targetDir, { recursive: true, mode: 0o700 });
     const targetPath = path.join(targetDir, `${scanId}.json`);
     const tempPath = `${targetPath}.tmp.${process.pid}.${Date.now()}`;
-    await fs.writeFile(tempPath, data, { encoding: 'utf-8', mode: 0o600 });
+    await fs.writeFile(tempPath, serialized, { encoding: 'utf-8', mode: 0o600 });
     try {
       await fs.rename(tempPath, targetPath);
     } catch (err) {
@@ -293,18 +452,19 @@ export class ArtifactRegistry {
     } catch {
       /* best-effort */
     }
-    // Look up the producer's schemaVersion if known; informational only.
-    const matching = Array.from(this.validators.entries()).find(
-      ([k]) => k.split('@')[0] === artifactType,
-    );
-    const schemaVersion = matching?.[1].schemaVersion ?? '?';
     return { artifactType, schemaVersion, filePath: targetPath, payload };
   }
 
   /**
-   * Read a previously-persisted artifact.
+   * Read a previously-persisted artifact (legacy unsigned API).
    *
    * Throws an Error containing 'artifact not found' on ENOENT.
+   *
+   * SPEC-022-3-02: when the on-disk file is an envelope (`_chain_hmac`
+   * present), this returns the INNER payload so executor + tests
+   * round-trip with the producer's payload as before. The envelope-aware
+   * `read()` API is the one consumers should use; `load()` is preserved
+   * for the executor's internal seed-and-resume paths.
    */
   async load(
     requestRoot: string,
@@ -338,7 +498,16 @@ export class ArtifactRegistry {
       }
       throw err;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof (parsed as Record<string, unknown>)._chain_hmac === 'string' &&
+      'payload' in (parsed as Record<string, unknown>)
+    ) {
+      return (parsed as Record<string, unknown>).payload;
+    }
+    return parsed;
   }
 
   /**
@@ -384,18 +553,43 @@ export class ArtifactRegistry {
     }
     const consumerSchemaVersion = consumesEntry.schema_version;
 
-    // 2. Load the raw artifact off disk. Reuses the legacy `load()` so
-    //    error-handling (ENOENT → 'artifact not found') matches PLAN-022-1.
-    const raw = (await this.load(requestRoot, artifactType, artifactId)) as
-      | Record<string, unknown>
-      | unknown;
+    // 2. Load the raw artifact JSON directly (NOT through legacy load(),
+    //    which strips the envelope wrapper). We need the full envelope
+    //    bytes to verify the HMAC.
+    const filePath = path.join(
+      requestRoot,
+      '.autonomous-dev',
+      'artifacts',
+      artifactType,
+      `${artifactId}.json`,
+    );
+    let rawText: string;
+    try {
+      rawText = await fs.readFile(filePath, 'utf-8');
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === 'ENOENT') {
+        throw new Error(`artifact not found: ${filePath}`);
+      }
+      throw err;
+    }
+    const onDisk = JSON.parse(rawText) as Record<string, unknown>;
 
-    // The on-disk shape MAY include envelope fields (`producer_plugin_id`,
-    // `produced_at`, `payload`, `_chain_hmac`, …) once SPEC-022-3-02 lands.
-    // Today, persist() writes the bare payload, so we tolerate both shapes.
-    const envelope = extractEnvelope(raw);
+    // 3. SPEC-022-3-02: HMAC + (privileged) Ed25519 verification.
+    if (this.hmacEnabled) {
+      this.verifyHmac(artifactType, artifactId, onDisk);
+      this.verifyPrivilegedSignature(
+        artifactType,
+        artifactId,
+        onDisk,
+        consumerPlugin.pluginId,
+      );
+    }
 
-    // 3. Strict-schema validation against the CONSUMER's version.
+    // 4. Extract the inner payload + envelope metadata.
+    const envelope = extractEnvelope(onDisk);
+
+    // 5. Strict-schema validation against the CONSUMER's version.
     //    Deep-clone before validation so the on-disk payload cannot be
     //    mutated by `removeAdditional: 'all'`.
     const validator = getValidator(
@@ -413,6 +607,16 @@ export class ArtifactRegistry {
       );
     }
 
+    // 6. SPEC-022-3-02: content-level sanitization. Runs AFTER schema
+    //    validation so the walker only sees fields the consumer actually
+    //    declared (additional properties already stripped).
+    const cacheEntry = this.validators.get(
+      `${artifactType}@${consumerSchemaVersion}`,
+    );
+    if (cacheEntry) {
+      sanitizeArtifact(artifactType, cloned, cacheEntry.rawSchema, requestRoot);
+    }
+
     return {
       artifact_type: artifactType,
       schema_version: consumerSchemaVersion,
@@ -420,6 +624,78 @@ export class ArtifactRegistry {
       producer_plugin_id: envelope.producer_plugin_id,
       produced_at: envelope.produced_at,
     };
+  }
+
+  /**
+   * SPEC-022-3-02: verify the chain HMAC over the artifact envelope.
+   * Throws `ArtifactUnsignedError` when no HMAC is present and
+   * `ArtifactTamperedError` when the recomputed HMAC does not match.
+   */
+  private verifyHmac(
+    artifactType: string,
+    artifactId: string,
+    onDisk: Record<string, unknown>,
+  ): void {
+    const storedHmac = onDisk._chain_hmac;
+    if (typeof storedHmac !== 'string' || storedHmac.length === 0) {
+      throw new ArtifactUnsignedError(artifactType, artifactId);
+    }
+    // Strip `_chain_hmac` and `_chain_signature` before computing — the
+    // signing input excludes both auxiliary fields by construction.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _chain_hmac, _chain_signature, ...envelope } = onDisk;
+    const canonical = canonicalJSON(envelope);
+    const expected = createHmac('sha256', this.getHmacKey())
+      .update(canonical)
+      .digest('base64');
+    const a = Buffer.from(storedHmac, 'base64');
+    const b = Buffer.from(expected, 'base64');
+    // `timingSafeEqual` requires equal-length inputs; mismatched length
+    // is itself a tamper signal (truncated/extended HMAC).
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      throw new ArtifactTamperedError(artifactType, artifactId);
+    }
+  }
+
+  /**
+   * SPEC-022-3-02: verify the producer's Ed25519 signature when both
+   * endpoints are in the privileged-chain allowlist. No-op when the
+   * privileged policy is undefined (non-privileged chain) OR when the
+   * registry was not configured with a `trustedKeys` lookup.
+   */
+  private verifyPrivilegedSignature(
+    artifactType: string,
+    artifactId: string,
+    onDisk: Record<string, unknown>,
+    consumerPluginId: string,
+  ): void {
+    if (!this.privilegedPolicy) return;
+    const producerPluginId =
+      typeof onDisk.producer_plugin_id === 'string'
+        ? onDisk.producer_plugin_id
+        : 'unknown';
+    if (!this.privilegedPolicy.isPrivileged(producerPluginId, consumerPluginId)) {
+      return; // non-privileged: signature is ignored even if present.
+    }
+    const sig = onDisk._chain_signature;
+    if (typeof sig !== 'string' || sig.length === 0) {
+      throw new PrivilegedSignatureError(artifactType, artifactId, 'missing');
+    }
+    const pem = this.trustedKeys?.lookup(producerPluginId);
+    if (!pem) {
+      throw new PrivilegedSignatureError(
+        artifactType,
+        artifactId,
+        'unknown_producer',
+      );
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { _chain_hmac, _chain_signature, ...envelope } = onDisk;
+    const canonical = canonicalJSON(envelope);
+    const ok = SignatureVerifier.verifyArtifact(canonical, sig, pem);
+    if (!ok) {
+      throw new PrivilegedSignatureError(artifactType, artifactId, 'invalid');
+    }
   }
 
   /**

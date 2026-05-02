@@ -78,7 +78,10 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
     expect((out.payload as { findings: unknown[] }).findings).toHaveLength(1);
     // The schema_version returned is the CONSUMER's, not the producer's.
     expect(out.schema_version).toBe('1.0');
-    // On-disk file is untouched.
+    // On-disk file is untouched. SPEC-022-3-02: the producer's bytes live
+    // inside the HMAC-sealed `payload` field of the envelope, so the
+    // leaked extra is preserved there (the strict-strip happens on a deep
+    // clone surfaced to the consumer).
     const onDisk = JSON.parse(
       await fs.readFile(
         path.join(
@@ -91,7 +94,7 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
         'utf-8',
       ),
     );
-    expect(onDisk.extra_data).toBe('leaked secret');
+    expect(onDisk.payload.extra_data).toBe('leaked secret');
   });
 
   it('narrows a 1.1 producer payload to a 1.0 consumer (drops severity)', async () => {
@@ -125,23 +128,13 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
   });
 
   it('throws SchemaValidationError when payload violates the consumer schema', async () => {
-    // Missing required `rule_id` triggers AJV failure. Persist via raw
-    // file write because persist() does not enforce strict-schema (the
-    // producer side intentionally preserves extras for the new validator
-    // to strip).
-    const dir = path.join(
-      tempRoot,
-      '.autonomous-dev',
-      'artifacts',
-      'security-findings',
-    );
-    await fs.mkdir(dir, { recursive: true });
+    // Missing required `rule_id` triggers AJV failure. SPEC-022-3-02:
+    // persist() now seals an HMAC envelope, so we route through it (it
+    // does NOT enforce strict-schema; the producer side intentionally
+    // preserves extras and structural shape for the consumer's strict
+    // validator to evaluate).
     const bad = { findings: [{ file: 'src/z.ts', line: 1 }] };
-    await fs.writeFile(
-      path.join(dir, 'scan-bad.json'),
-      JSON.stringify(bad),
-      { mode: 0o600 },
-    );
+    await registry.persist(tempRoot, 'security-findings', 'scan-bad', bad);
 
     await expect(
       registry.read(
@@ -219,6 +212,7 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
         'utf-8',
       ),
     );
-    expect(onDisk.extra_data).toBe('still-here');
+    // SPEC-022-3-02: extras live inside the envelope's `payload`.
+    expect(onDisk.payload.extra_data).toBe('still-here');
   });
 });

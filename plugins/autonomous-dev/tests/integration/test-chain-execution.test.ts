@@ -120,7 +120,12 @@ describe('chain execution integration', () => {
       'patches-1.json',
     );
     const findingsRaw = await fs.readFile(findingsPath, 'utf-8');
-    expect(JSON.parse(findingsRaw)).toEqual(securityExample);
+    // SPEC-022-3-02: persist() now seals payloads inside an HMAC envelope.
+    // The producer's bytes live under `.payload`; envelope metadata lives
+    // alongside.
+    const onDiskFindings = JSON.parse(findingsRaw);
+    expect(onDiskFindings.payload).toEqual(securityExample);
+    expect(typeof onDiskFindings._chain_hmac).toBe('string');
     await expect(fs.stat(patchesPath)).resolves.toBeDefined();
     await expect(fs.stat(sentinelPath)).resolves.toBeDefined();
   });

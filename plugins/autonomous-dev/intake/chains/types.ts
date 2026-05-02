@@ -225,3 +225,86 @@ export class SchemaNotFoundError extends Error {
     this.name = 'SchemaNotFoundError';
   }
 }
+
+// ---------------------------------------------------------------------------
+// SPEC-022-3-02: HMAC + Ed25519 signing + sanitization errors
+// ---------------------------------------------------------------------------
+
+/**
+ * Raised when an artifact on disk has no `_chain_hmac` field. Either the
+ * artifact pre-dates SPEC-022-3-02 or it was written by a producer that
+ * bypassed `ArtifactRegistry.persist()`.
+ */
+export class ArtifactUnsignedError extends Error {
+  readonly code = 'ARTIFACT_UNSIGNED';
+  constructor(
+    public readonly artifactType: string,
+    public readonly artifactId: string,
+  ) {
+    super(`Artifact ${artifactType}/${artifactId} has no _chain_hmac (unsigned)`);
+    this.name = 'ArtifactUnsignedError';
+  }
+}
+
+/**
+ * Raised when the HMAC over the artifact envelope does not match the
+ * stored `_chain_hmac`. Indicates tampering at rest or in transit.
+ */
+export class ArtifactTamperedError extends Error {
+  readonly code = 'ARTIFACT_TAMPERED';
+  constructor(
+    public readonly artifactType: string,
+    public readonly artifactId: string,
+  ) {
+    super(
+      `Artifact ${artifactType}/${artifactId} HMAC mismatch (tampered or wrong key)`,
+    );
+    this.name = 'ArtifactTamperedError';
+  }
+}
+
+/**
+ * Privileged-chain Ed25519 verification failures. The `reason` field
+ * distinguishes the three failure modes a privileged consumer may see.
+ */
+export class PrivilegedSignatureError extends Error {
+  readonly code = 'PRIVILEGED_SIGNATURE_FAILED';
+  constructor(
+    public readonly artifactType: string,
+    public readonly artifactId: string,
+    public readonly reason: 'missing' | 'invalid' | 'unknown_producer',
+  ) {
+    super(
+      `Artifact ${artifactType}/${artifactId} privileged signature ${reason}`,
+    );
+    this.name = 'PrivilegedSignatureError';
+  }
+}
+
+/**
+ * Raised by the artifact sanitizer when a string field violates a
+ * format-driven content rule (path traversal, non-https URI, shell
+ * metacharacter in a default-deny field).
+ */
+export class SanitizationError extends Error {
+  readonly code = 'SANITIZATION_FAILED';
+  constructor(
+    public readonly artifactType: string,
+    public readonly fieldPath: string,
+    public readonly rule:
+      | 'path-traversal'
+      | 'absolute-path-outside-worktree'
+      | 'non-https-uri'
+      | 'shell-metacharacter',
+    public readonly offendingValue: string,
+  ) {
+    super(
+      `Artifact ${artifactType} field '${fieldPath}' violated ${rule}: ${truncate(offendingValue, 80)}`,
+    );
+    this.name = 'SanitizationError';
+  }
+}
+
+function truncate(s: string, max: number): string {
+  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
+}
