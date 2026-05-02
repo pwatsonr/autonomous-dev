@@ -60,6 +60,7 @@ import type {
   CommandResult,
 } from './adapter_interface';
 import { loadBugContext } from '../cli/bug-context-loader';
+import { registerStandardsCommand } from './cli_adapter_standards';
 import {
   formatErrors,
   runInteractivePrompts,
@@ -759,6 +760,9 @@ export function buildProgram(
     .action(async (requestId: string) => {
       await dispatch('kill', {}, requestId);
     });
+
+  // SPEC-021-1-04: standards subcommand family.
+  registerStandardsCommand(program);
 
   return program;
 }
