@@ -1,0 +1,10 @@
+{
+  "violation_id": "VIO-20251101T120200Z-c9d0e1f2",
+  "rule_id": "framework:python-fastapi",
+  "file": "requirements.txt",
+  "line": 0,
+  "fix_type": "dependency-add",
+  "before": "fastapi",
+  "after_template": "fastapi>=0.110,<1.0\n",
+  "confidence": 0.9
+}

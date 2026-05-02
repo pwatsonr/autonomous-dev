@@ -1,0 +1,11 @@
+{
+  "violation_id": "VIO-20251101T120100Z-e5f6a7b8",
+  "rule_id": "operability:exposes-health-endpoint",
+  "file": "src/routes/health.ts",
+  "line": 0,
+  "fix_type": "file-creation",
+  "before": "",
+  "after_template": "import { Router } from 'express';\n\nconst router = Router();\n\nrouter.get('/health', (_req, res) => {\n  res.status(200).json({ status: 'ok' });\n});\n\nexport default router;\n",
+  "confidence": 0.85,
+  "manual_review_required": false
+}
