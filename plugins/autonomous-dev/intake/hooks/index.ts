@@ -9,3 +9,5 @@
 
 export * from './types';
 export * from './discovery';
+export * from './registry';
+export * from './executor';
