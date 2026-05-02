@@ -1,0 +1,15 @@
+{
+  "reviewer": "qa-edge-case-reviewer",
+  "verdict": "CONCERNS",
+  "score": 92,
+  "findings": [
+    {
+      "line": 12,
+      "severity": "medium",
+      "category": "null-handling",
+      "title": "Missing file field is a schema violation",
+      "description": "This finding intentionally omits the required `file` property to exercise schema validation.",
+      "suggested_fix": "Add a `file` property whose value is the repo-relative path."
+    }
+  ]
+}

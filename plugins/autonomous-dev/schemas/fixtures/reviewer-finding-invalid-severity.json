@@ -1,0 +1,16 @@
+{
+  "reviewer": "qa-edge-case-reviewer",
+  "verdict": "CONCERNS",
+  "score": 88,
+  "findings": [
+    {
+      "file": "src/handlers/api.ts",
+      "line": 7,
+      "severity": "urgent",
+      "category": "input-validation",
+      "title": "Invalid severity tier",
+      "description": "This finding uses `severity: \"urgent\"`, which is not a permitted enum value. Schema validation must reject the document.",
+      "suggested_fix": "Use one of: low, medium, high, critical."
+    }
+  ]
+}
