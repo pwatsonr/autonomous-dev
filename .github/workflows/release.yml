@@ -81,3 +81,158 @@ jobs:
           name: spend-estimate-${{ github.run_id }}
           path: .github/budget/spend-${{ github.run_id }}.json
           retention-days: 90
+
+  # ----------------------------------------------------------------
+  # generate-changelog (SPEC-017-3-02)
+  # ----------------------------------------------------------------
+  # Generates a CHANGELOG.md entry via Claude using the commit log
+  # between the previous tag and this one. The commit log is passed
+  # via `--attach` ONLY -- never interpolated into the prompt string
+  # (see release.yml header invariants and SPEC-017-3-02 §Trust-Gate Note).
+  #
+  # `verify-evals` is added by SPEC-017-3-04; if that spec lands
+  # after this one, the `needs:` reference still resolves because
+  # both jobs are declared in the same workflow file.
+  generate-changelog:
+    name: Generate changelog with Claude
+    needs: [verify-version, verify-evals]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      changelog-path: ${{ steps.locate.outputs.path }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # required for git describe --tags and git log <prev>..HEAD
+
+      - name: Determine previous tag
+        id: prev
+        run: |
+          set -euo pipefail
+          PREV_TAG="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || echo '')"
+          echo "previous=$PREV_TAG" >> "$GITHUB_OUTPUT"
+          echo "Previous tag: ${PREV_TAG:-<none, first release>}"
+
+      - name: Collect commit log
+        run: |
+          set -euo pipefail
+          if [ -n "${{ steps.prev.outputs.previous }}" ]; then
+            git log "${{ steps.prev.outputs.previous }}..${GITHUB_REF_NAME}" \
+              --pretty=format:"%h %s" > /tmp/commits.txt
+          else
+            git log --pretty=format:"%h %s" > /tmp/commits.txt
+          fi
+          wc -l /tmp/commits.txt
+
+      - name: Trust gate (composite)
+        id: trust
+        uses: ./.github/actions/claude-trust-gate
+        with:
+          # Tag pushes have no comment author. Pushing a tag requires
+          # `contents: write` (or admin), which by definition means a
+          # trusted maintainer. See SPEC-017-3-02 §Trust-Gate Note.
+          author-association: OWNER
+
+      - name: Generate changelog with Claude
+        if: steps.trust.outputs.is-trusted == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--attach /tmp/commits.txt --max-turns 5"
+          prompt: |
+            Generate a CHANGELOG.md entry for release ${{ github.ref_name }}.
+
+            The attached file contains every commit in this release as
+            "<sha> <subject>" lines.  Use ONLY the attached content; do not
+            invent features or guess at scope.  For every line in the
+            changelog you produce, include the commit SHA in parentheses,
+            e.g. "- Added retry logic for token refresh (a1b2c3d)".
+
+            Output strictly the following Markdown structure (omit any
+            section that has no entries):
+
+            ## ${{ github.ref_name }} — $(date -u +%Y-%m-%d)
+
+            ### Added
+            ### Changed
+            ### Deprecated
+            ### Removed
+            ### Fixed
+            ### Security
+
+            Write the result to /tmp/changelog.md.  Do not write anything else.
+
+      - name: Verify changelog produced
+        id: locate
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/changelog.md ]; then
+            echo "::error::Claude changelog generation produced no output at /tmp/changelog.md"
+            exit 1
+          fi
+          echo "path=/tmp/changelog.md" >> "$GITHUB_OUTPUT"
+          echo "Changelog preview:"
+          head -40 /tmp/changelog.md
+
+      - name: Emit spend estimate
+        if: always()
+        env:
+          BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+          ESTIMATED_COST_USD: "0.15"   # changelog generation, --max-turns 5
+          SPEND_WORKFLOW_NAME: release
+        run: bash scripts/ci/emit-spend-estimate.sh
+
+      - name: Upload spend artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spend-estimate-${{ github.run_id }}-changelog
+          path: .github/budget/spend-${{ github.run_id }}.json
+          retention-days: 90
+
+      - name: Upload changelog artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-${{ github.ref_name }}
+          path: /tmp/changelog.md
+          retention-days: 90
+
+  # ----------------------------------------------------------------
+  # create-release (SPEC-017-3-02)
+  # ----------------------------------------------------------------
+  # Publishes the GitHub Release using the Claude-generated changelog
+  # as the body. `generate_release_notes: false` is critical -- without
+  # it, GitHub appends its own auto-changelog and produces a confusing
+  # duplicate body.
+  create-release:
+    name: Publish GitHub Release
+    needs: [generate-changelog]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download changelog
+        uses: actions/download-artifact@v4
+        with:
+          name: changelog-${{ github.ref_name }}
+          path: /tmp
+
+      - name: Detect prebuilt artifacts
+        id: artifacts
+        run: |
+          set -euo pipefail
+          if [ -d dist ] && [ -n "$(ls -A dist 2>/dev/null)" ]; then
+            echo "files=dist/*" >> "$GITHUB_OUTPUT"
+          else
+            echo "files=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          body_path: /tmp/changelog.md
+          generate_release_notes: false
+          files: ${{ steps.artifacts.outputs.files }}
+          fail_on_unmatched_files: false
