@@ -293,7 +293,16 @@
       "max_total_memory_mb": 256,
       "max_concurrent_executions": 8,
       "max_execution_time_seconds": 30
-    }
+    },
+    "privileged_chains": []
+  },
+
+  "chains": {
+    "max_length": 10,
+    "per_plugin_timeout_seconds": 120,
+    "per_chain_timeout_seconds": 600,
+    "max_artifact_size_mb": 10,
+    "max_concurrent_chains": 3
   },
 
   "emergency": {

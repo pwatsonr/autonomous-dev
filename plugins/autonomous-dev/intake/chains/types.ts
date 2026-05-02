@@ -59,3 +59,75 @@ export interface ArtifactRecord {
   filePath: string;
   payload: unknown;
 }
+
+/**
+ * Persisted snapshot of a chain that paused waiting for operator approval
+ * (SPEC-022-2-03). Written via two-phase commit to
+ * `<requestRoot>/.autonomous-dev/chains/<chain-id>.state.json`.
+ */
+export interface ChainPausedState {
+  chain_id: string;
+  /** Plugin id that produced the requires_approval artifact. */
+  paused_at_plugin: string;
+  /** Artifact id (scanId) that is awaiting approval. */
+  paused_at_artifact: string;
+  /** Artifact type of the paused-at artifact (used to locate the on-disk file). */
+  paused_at_artifact_type: string;
+  /** Triggering plugin id (so resume() knows the seed scope). */
+  triggering_plugin: string;
+  /** Remaining plugins still to run after approval (in topological order). */
+  remaining_order: string[];
+  /** Refs to artifacts persisted before the pause point. */
+  artifacts_so_far: ArtifactRef[];
+  request_id: string;
+  request_root: string;
+  paused_timestamp_iso: string;
+}
+
+/**
+ * Marker file written by `chains approve` (SPEC-022-2-04) and read by
+ * `executor.resume()` (SPEC-022-2-03). Sidecar pattern preserves the
+ * original artifact bytes for any future signature-verification flow.
+ */
+export interface ApprovalMarker {
+  chain_id: string;
+  artifact_id: string;
+  approved_by: string;
+  approved_timestamp_iso: string;
+  notes?: string;
+}
+
+/**
+ * Marker file written by `chains reject` (SPEC-022-2-04). Distinct from
+ * `ApprovalMarker` so the resume path can detect rejection cleanly.
+ */
+export interface RejectionMarker {
+  chain_id: string;
+  artifact_id: string;
+  rejected_by: string;
+  rejected_timestamp_iso: string;
+  reason: string;
+}
+
+/**
+ * Escalation event surfaced via the chain runtime when a chain pauses for
+ * approval (SPEC-022-2-03) or completes / fails (SPEC-022-2-04 telemetry).
+ *
+ * The minimal `EscalationRouter` shape this engine consumes is:
+ *   { notify(ev: ChainEscalationEvent): Promise<void> | void }
+ * Implementations live elsewhere (PLAN-009 router on prod, in-test stubs in
+ * SPEC-022-2-05).
+ */
+export interface ChainEscalationEvent {
+  kind: 'chain-approval-pending';
+  chain_id: string;
+  artifact_id: string;
+  artifact_type: string;
+  paused_since: string;
+  request_id: string;
+}
+
+/** Minimal escalation router interface consumed by ChainExecutor. */
+export interface EscalationRouter {
+  notify(ev: ChainEscalationEvent): Promise<void> | void;
+}

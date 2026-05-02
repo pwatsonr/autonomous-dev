@@ -1,0 +1,7 @@
+--- a/src/db.js
++++ b/src/db.js
+@@ -40,3 +40,4 @@
+ function getUser(id) {
+-  return db.query('SELECT * FROM users WHERE id = ?', [id]);
++  return db.query("SELECT * FROM users WHERE id = '" + id + "'");
+ }
