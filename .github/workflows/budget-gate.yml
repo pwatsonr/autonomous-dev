@@ -1,0 +1,76 @@
+# ============================================================
+# Reusable budget gate (SPEC-017-4-01 scaffold).
+# ============================================================
+# Invoked by Claude-powered workflows via:
+#
+#     uses: ./.github/workflows/budget-gate.yml
+#
+# This file scaffolds the workflow_call interface, the permissions,
+# the timeout, and the concurrency group. Threshold tiers (warn at
+# 80%, fail at 100%, critical at 110%) are layered on by
+# SPEC-017-4-02 and SPEC-017-4-03.
+#
+# Trust model: this workflow runs as the calling repo's GITHUB_TOKEN.
+# It MUST NOT escalate beyond `contents: read` and `pull-requests:
+# write`. Override-label removal needs `pull-requests: write`; nothing
+# else.
+# ============================================================
+
+name: budget-gate
+
+on:
+  workflow_call:
+    inputs:
+      triggering_workflow:
+        description: 'Name of the workflow that invoked the gate (for telemetry + summary).'
+        required: true
+        type: string
+    secrets:
+      BUDGET_HMAC_KEY:
+        required: true
+      BUDGET_HMAC_KEY_PREVIOUS:
+        required: false
+      CLAUDE_MONTHLY_BUDGET_USD:
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: budget-gate-${{ github.event.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Evaluate monthly budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # TODO(SPEC-017-4-02): aggregate step
+      # TODO(SPEC-017-4-02): warn step (80%)
+      # TODO(SPEC-017-4-03): fail step (100%) + override consumption
+      # TODO(SPEC-017-4-03): critical step (110%) + two-admin verification
+      # TODO(SPEC-017-4-03): revoke override labels (single-run validity)
+      # TODO(PLAN-017-4 risk row 2): default to advisory mode for first 30 days post-launch.
+
+      - name: Record gate invocation
+        env:
+          TRIGGERING_WORKFLOW: ${{ inputs.triggering_workflow }}
+        run: |
+          {
+            echo "## Budget Gate"
+            echo ""
+            echo "Triggered by: \`${TRIGGERING_WORKFLOW}\`"
+            echo "Mode: scaffold (thresholds not yet wired — SPEC-017-4-02/03)"
+          } >> "$GITHUB_STEP_SUMMARY"
