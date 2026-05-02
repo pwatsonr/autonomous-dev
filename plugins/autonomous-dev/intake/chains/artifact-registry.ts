@@ -24,14 +24,27 @@ import type {
   ChainValidationError,
   ChainValidationResult,
 } from './types';
+import { ArtifactTooLargeError } from './errors';
 
 const VERSION_FILE_RE = /^(\d+\.\d+)\.json$/;
 const ARTIFACT_DIR_NAME_RE = /^[a-z][a-z0-9-]*$/;
 const SCAN_ID_RE = /^[a-zA-Z0-9_-]+$/;
 
+/**
+ * Default artifact-size cap in MB (SPEC-022-2-02). Mirrors
+ * `chains.max_artifact_size_mb` in `config_defaults.json`.
+ */
+export const DEFAULT_MAX_ARTIFACT_SIZE_MB = 10;
+
 /** Public so callers can pre-build an Ajv instance with shared config. */
 export interface ArtifactRegistryOptions {
   ajv?: Ajv2020;
+  /**
+   * SPEC-022-2-02: per-artifact size cap in megabytes. JSON-serialized byte
+   * length is checked at `persist()` time. Defaults to
+   * {@link DEFAULT_MAX_ARTIFACT_SIZE_MB}.
+   */
+  maxArtifactSizeMb?: number;
 }
 
 /**
@@ -47,6 +60,8 @@ export class ArtifactRegistry {
   private readonly ajv: Ajv2020;
   /** key = `${artifactType}@${schemaVersion}` */
   private readonly validators = new Map<string, CacheEntry>();
+  /** SPEC-022-2-02: artifact-size cap in BYTES (mb * 1024 * 1024). */
+  private readonly maxArtifactSizeBytes: number;
 
   constructor(opts: ArtifactRegistryOptions = {}) {
     this.ajv =
@@ -56,6 +71,13 @@ export class ArtifactRegistry {
         strict: true,
       });
     addFormats(this.ajv);
+    const mb = opts.maxArtifactSizeMb ?? DEFAULT_MAX_ARTIFACT_SIZE_MB;
+    this.maxArtifactSizeBytes = mb * 1024 * 1024;
+  }
+
+  /** Effective artifact-size cap in bytes. Visible for tests + telemetry. */
+  getMaxArtifactSizeBytes(): number {
+    return this.maxArtifactSizeBytes;
   }
 
   /**
@@ -215,6 +237,20 @@ export class ArtifactRegistry {
     if (!ARTIFACT_DIR_NAME_RE.test(artifactType)) {
       throw new Error(`invalid artifactType for persist: '${artifactType}'`);
     }
+    const data = JSON.stringify(payload, null, 2);
+    // SPEC-022-2-02: enforce artifact-size cap on the JSON byte length.
+    // Boundary inclusive: a payload of EXACTLY maxArtifactSizeBytes is OK;
+    // strictly greater is rejected. Throws BEFORE any disk I/O so the
+    // executor records a clean producer-side failure.
+    const sizeBytes = Buffer.byteLength(data, 'utf-8');
+    if (sizeBytes > this.maxArtifactSizeBytes) {
+      throw new ArtifactTooLargeError(
+        scanId,
+        artifactType,
+        sizeBytes,
+        this.maxArtifactSizeBytes,
+      );
+    }
     const targetDir = path.join(
       requestRoot,
       '.autonomous-dev',
@@ -224,7 +260,6 @@ export class ArtifactRegistry {
     await fs.mkdir(targetDir, { recursive: true, mode: 0o700 });
     const targetPath = path.join(targetDir, `${scanId}.json`);
     const tempPath = `${targetPath}.tmp.${process.pid}.${Date.now()}`;
-    const data = JSON.stringify(payload, null, 2);
     await fs.writeFile(tempPath, data, { encoding: 'utf-8', mode: 0o600 });
     try {
       await fs.rename(tempPath, targetPath);
