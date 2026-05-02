@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev.io/schemas/bug-report.json",
+  "title": "BugReport",
+  "description": "Structured bug context payload submitted with request_type='bug'. Mirrors TDD-018 §6.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "title",
+    "description",
+    "reproduction_steps",
+    "expected_behavior",
+    "actual_behavior",
+    "error_messages",
+    "environment"
+  ],
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "reproduction_steps": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "expected_behavior": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "actual_behavior": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "error_messages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 0
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "runtime", "version"],
+      "properties": {
+        "os": { "type": "string", "minLength": 1 },
+        "runtime": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "affected_components": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "labels": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "user_impact": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    }
+  }
+}

@@ -59,6 +59,15 @@ import type {
   IncomingCommand,
   CommandResult,
 } from './adapter_interface';
+import { loadBugContext } from '../cli/bug-context-loader';
+import {
+  formatErrors,
+  runInteractivePrompts,
+  validateBugReport,
+  defaultPromptIO,
+  type PromptIO,
+} from '../cli/bug-prompts';
+import type { BugReport, Severity } from '../types/bug-report';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -192,6 +201,180 @@ export function parseListState(value: string): string {
     );
   }
   return value;
+}
+
+/**
+ * Commander collector for repeatable flags (e.g. `--repro-step a --repro-step b`).
+ * Appends each occurrence onto the accumulated array and returns it.
+ */
+export function collectArray(value: string, prev: string[]): string[] {
+  return [...(prev ?? []), value];
+}
+
+/** Fields that may NEVER be modified after a request has been submitted. */
+export const IMMUTABLE_FIELDS = [
+  'request_type',
+  'id',
+  'created_at',
+  'source_channel',
+] as const;
+
+/**
+ * Audit log file used by the CLI when no daemon-backed AuditLogger is
+ * available. Each rejection appends a single JSON line so downstream
+ * tooling can `tail -f` the file. Override with `AUTONOMOUS_DEV_AUDIT_LOG`
+ * (used by the test suite to redirect into a tmpdir).
+ */
+export function auditLogPath(): string {
+  if (process.env.AUTONOMOUS_DEV_AUDIT_LOG) {
+    return process.env.AUTONOMOUS_DEV_AUDIT_LOG;
+  }
+  return path.join(
+    process.env.HOME ?? os.homedir(),
+    '.autonomous-dev',
+    'audit.log',
+  );
+}
+
+/**
+ * Append a `request.edit_rejected` event to the audit log file
+ * (SPEC-018-3-03 AC #2). Emits the same JSON shape as the in-process
+ * AuditLogger.logEditRejected() so log consumers see one stream.
+ *
+ * Best-effort — failures to write the audit line do NOT block the
+ * primary CLI rejection (which is the contract).
+ */
+export function appendEditRejectedAudit(
+  requestId: string,
+  attemptedField: string,
+  reason: string,
+): void {
+  const logPath = auditLogPath();
+  try {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    const entry = {
+      level: 'info',
+      msg: 'request.edit_rejected',
+      ts: new Date().toISOString(),
+      type: 'request.edit_rejected',
+      request_id: requestId,
+      attempted_field: attemptedField,
+      reason,
+      user_id: os.userInfo().username,
+      source_channel: 'cli',
+    };
+    fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
+  } catch {
+    // Best-effort; do not surface audit-log IO failures.
+  }
+}
+
+/**
+ * Reject an attempted mutation of an immutable field. Writes the
+ * canonical `Error: <field> is immutable after submission` line to
+ * stderr, audits the rejection, and throws an
+ * {@link InvalidArgumentError} so the top-level handler exits with
+ * code 1.
+ */
+export function rejectImmutable(requestId: string, fieldName: string): never {
+  const reason = `${fieldName} is immutable after submission`;
+  appendEditRejectedAudit(requestId, fieldName, reason);
+  process.stderr.write(`Error: ${reason}\n`);
+  throw new InvalidArgumentError(reason);
+}
+
+/**
+ * Build a {@link BugReport} from CLI inputs for the `submit-bug`
+ * subcommand. Three input modes, in priority order:
+ *
+ *   1. `--bug-context-path` — load + validate JSON file, ignore other flags.
+ *   2. Non-TTY stdin or `--non-interactive` — assemble from flags only.
+ *   3. TTY stdin — drive {@link runInteractivePrompts}.
+ *
+ * On validation or load failure this writes to stderr and throws an
+ * {@link InvalidArgumentError} so commander's top-level handler exits 1.
+ *
+ * Exported for unit testing. The optional `io` arg lets tests inject a
+ * fake {@link PromptIO} for the interactive path.
+ */
+export async function collectBugReport(
+  opts: Record<string, unknown>,
+  io?: PromptIO,
+): Promise<BugReport | null> {
+  // Mode 1: path-supplied JSON
+  if (opts.bugContextPath) {
+    const result = loadBugContext(String(opts.bugContextPath));
+    if (!result.ok) {
+      process.stderr.write(`Error: ${result.error}\n`);
+      throw new InvalidArgumentError(result.error);
+    }
+    return result.report;
+  }
+
+  const isInteractive = process.stdin.isTTY === true && !opts.nonInteractive;
+  let report: Partial<BugReport>;
+
+  if (isInteractive) {
+    // Mode 3: interactive prompts (re-prompt inline on per-field failures).
+    const handle = (): void => {
+      process.stderr.write('\nCancelled — no request submitted.\n');
+      process.exit(130);
+    };
+    process.once('SIGINT', handle);
+    try {
+      report = await runInteractivePrompts(io ?? defaultPromptIO());
+    } finally {
+      process.removeListener('SIGINT', handle);
+    }
+  } else {
+    // Mode 2: build directly from flags. Missing-required-field detection
+    // happens in validateBugReport below — this assembly stays mechanical.
+    const reproSteps = (opts.reproStep as string[] | undefined) ?? [];
+    const errMessages = (opts.errorMessage as string[] | undefined) ?? [];
+    const components = (opts.component as string[] | undefined) ?? [];
+    const labels = (opts.label as string[] | undefined) ?? [];
+
+    const partial: Partial<BugReport> = {};
+    if (opts.title !== undefined) partial.title = String(opts.title);
+    if (opts.description !== undefined) partial.description = String(opts.description);
+    if (reproSteps.length > 0) partial.reproduction_steps = reproSteps;
+    if (opts.expected !== undefined) partial.expected_behavior = String(opts.expected);
+    if (opts.actual !== undefined) partial.actual_behavior = String(opts.actual);
+    // error_messages is required in the schema (≥0 items) — always present.
+    partial.error_messages = errMessages;
+    // environment block — always assemble; missing fields surface as errors.
+    partial.environment = {
+      os: opts.os !== undefined ? String(opts.os) : '',
+      runtime: opts.runtime !== undefined ? String(opts.runtime) : '',
+      version: opts.version !== undefined ? String(opts.version) : '',
+    };
+    if (opts.severity !== undefined) partial.severity = opts.severity as Severity;
+    if (components.length > 0) partial.affected_components = components;
+    if (labels.length > 0) partial.labels = labels;
+    if (opts.userImpact !== undefined) partial.user_impact = String(opts.userImpact);
+
+    // Strip the empty environment block if the user supplied nothing —
+    // that surfaces as a single missing-property error rather than three
+    // empty-string errors.
+    if (
+      partial.environment &&
+      partial.environment.os === '' &&
+      partial.environment.runtime === '' &&
+      partial.environment.version === ''
+    ) {
+      delete partial.environment;
+    }
+
+    report = partial;
+  }
+
+  const errors = validateBugReport(report);
+  if (errors.length > 0) {
+    const msg = `bug report validation failed:\n${formatErrors(errors)}`;
+    process.stderr.write(`Error: ${msg}\n`);
+    throw new InvalidArgumentError(msg);
+  }
+  return report as BugReport;
 }
 
 // ---------------------------------------------------------------------------
@@ -331,18 +514,160 @@ export function buildProgram(
       new Option('--deadline <iso8601>', 'Deadline (ISO 8601 timestamp)').argParser(parseDeadline),
     )
     .addOption(
-      new Option('--type <type>', 'Request type')
+      new Option(
+        '--type <type>',
+        `Request type (one of: ${VALID_REQUEST_TYPES.join(', ')})`,
+      )
         .argParser(parseType)
         .default('feature'),
     )
+    .option(
+      '--bug-context-path <file>',
+      'Path to a JSON BugReport (required when --type bug, unless using submit-bug)',
+    )
     .action(async (description: string, opts: Record<string, unknown>) => {
+      // SPEC-018-3-02: bug-typed requests must carry a populated bug_context.
+      // Either supply a pre-built JSON file via --bug-context-path or use
+      // the dedicated `submit-bug` subcommand.
+      let bugContext: BugReport | undefined;
+      if (opts.type === 'bug') {
+        if (opts.bugContextPath) {
+          const result = loadBugContext(String(opts.bugContextPath));
+          if (!result.ok) {
+            process.stderr.write(`Error: ${result.error}\n`);
+            throw new InvalidArgumentError(result.error);
+          }
+          bugContext = result.report;
+        } else {
+          const msg =
+            "bug-typed requests require bug context. " +
+            "Use 'autonomous-dev request submit-bug' or pass --bug-context-path <file>";
+          process.stderr.write(`Error: ${msg}\n`);
+          throw new InvalidArgumentError(msg);
+        }
+      }
+
       await dispatch('submit', {
         description,
         repo: opts.repo,
         priority: opts.priority,
         deadline: opts.deadline,
         type: opts.type,
+        bug_context: bugContext ? JSON.stringify(bugContext) : undefined,
       });
+    });
+
+  // -- submit-bug ---------------------------------------------------------
+  // SPEC-018-3-02: dedicated interactive (or scripted) bug-report intake.
+  program
+    .command('submit-bug')
+    .description(
+      'Submit a bug report (interactive when stdin is a TTY; flag-driven otherwise)',
+    )
+    .addOption(
+      new Option('--repo <repo>', 'Target repository (org/repo or absolute path)').argParser(parseRepo),
+    )
+    .addOption(
+      new Option('--priority <priority>', 'Priority: high|normal|low')
+        .choices(['high', 'normal', 'low'])
+        .default('normal'),
+    )
+    .option('--non-interactive', 'Force flag-only mode even on a TTY', false)
+    .option(
+      '--bug-context-path <file>',
+      'Path to a pre-built JSON BugReport (skips prompts/flags)',
+    )
+    // Scalar flags
+    .option('--title <s>', 'Bug title (1-200 chars)')
+    .option('--description <s>', 'Bug description (1-4000 chars)')
+    .option('--expected <s>', 'Expected behavior (1-2000 chars)')
+    .option('--actual <s>', 'Actual behavior (1-2000 chars)')
+    .option('--os <s>', 'environment.os override')
+    .option('--runtime <s>', 'environment.runtime override')
+    .option('--version <s>', 'environment.version override')
+    .option(
+      '--severity <s>',
+      'Severity: low|medium|high|critical',
+    )
+    .option('--user-impact <s>', 'User impact (1-1000 chars)')
+    // Repeatable array flags — commander's variadic via collector
+    .option(
+      '--repro-step <s>',
+      'A reproduction step (repeatable; ≥1 required)',
+      collectArray,
+      [] as string[],
+    )
+    .option(
+      '--error-message <s>',
+      'Verbatim error message (repeatable)',
+      collectArray,
+      [] as string[],
+    )
+    .option(
+      '--component <s>',
+      'Affected component (repeatable)',
+      collectArray,
+      [] as string[],
+    )
+    .option(
+      '--label <s>',
+      'Free-form label (repeatable)',
+      collectArray,
+      [] as string[],
+    )
+    .action(async (opts: Record<string, unknown>) => {
+      const report = await collectBugReport(opts);
+      if (!report) return; // collector already wrote stderr + threw OR exited
+
+      // Bash already sets the request type implicitly to 'bug' for this
+      // subcommand; the daemon needs both fields present.
+      await dispatch('submit', {
+        description: report.title, // short summary doubles as description
+        repo: opts.repo,
+        priority: opts.priority,
+        type: 'bug',
+        bug_context: JSON.stringify(report),
+      });
+    });
+
+  // -- edit ---------------------------------------------------------------
+  // SPEC-018-3-03: reject mutations to immutable fields, audit every reject.
+  program
+    .command('edit <request-id>')
+    .description('Edit mutable fields on an existing request')
+    .option('--priority <s>', 'Priority: high|normal|low')
+    .option('--description <s>', 'Updated description')
+    .option('--label <s>', 'Replace labels (repeatable)', collectArray, [] as string[])
+    .option('--user-impact <s>', 'Updated user impact')
+    // Immutable fields — accepted by commander but rejected by the action.
+    .option('--type <s>', 'IMMUTABLE — request type cannot be changed after submission')
+    .option('--id <s>', 'IMMUTABLE — request id cannot be changed')
+    .option('--created-at <s>', 'IMMUTABLE — created_at cannot be changed')
+    .option('--source-channel <s>', 'IMMUTABLE — source_channel cannot be changed')
+    .action(async (requestId: string, opts: Record<string, unknown>) => {
+      // Map commander's camelCase opts back onto the snake_case field
+      // names the audit log records.
+      const presence: Array<[string, string]> = [
+        ['type', 'request_type'],
+        ['id', 'id'],
+        ['createdAt', 'created_at'],
+        ['sourceChannel', 'source_channel'],
+      ];
+      for (const [optKey, fieldName] of presence) {
+        if (opts[optKey] !== undefined) {
+          rejectImmutable(requestId, fieldName);
+          return; // unreachable — rejectImmutable throws/exits
+        }
+      }
+      // Mutable changes — pass through to the daemon. Empty change set is
+      // an explicit no-op success.
+      const changes: Record<string, unknown> = {};
+      if (opts.priority !== undefined) changes.priority = opts.priority;
+      if (opts.description !== undefined) changes.description = opts.description;
+      if (opts.userImpact !== undefined) changes.user_impact = opts.userImpact;
+      const labels = opts.label as string[] | undefined;
+      if (labels && labels.length > 0) changes.labels = labels.join(',');
+      await dispatch('edit', changes, requestId);
     });
 
   // -- status -------------------------------------------------------------

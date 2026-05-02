@@ -66,6 +66,19 @@ features:
       url: https://${SLACK_HOST}/slack/commands
       description: Emergency stop all requests (admin only)
       should_escape: false
+    # SPEC-018-3-04: bug intake parity. Both commands open a Block Kit
+    # modal collecting BugReport fields; submission posts to the intake
+    # router with source_channel=slack.
+    - command: /ad-submit-bug
+      url: https://${SLACK_HOST}/slack/commands
+      description: Submit a structured bug report (opens a modal)
+      usage_hint: "<title>"
+      should_escape: false
+    - command: /ad-hotfix
+      url: https://${SLACK_HOST}/slack/commands
+      description: Submit a P0 bug requiring immediate attention
+      usage_hint: "<title>"
+      should_escape: false
 
 oauth_config:
   scopes:

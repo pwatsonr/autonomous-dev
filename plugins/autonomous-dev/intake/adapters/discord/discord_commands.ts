@@ -247,6 +247,54 @@ export const DISCORD_COMMANDS = [
         description: 'Emergency stop ALL running requests (admin only)',
         type: OptionType.SUB_COMMAND,
       },
+      // ---------------------------------------------------------------
+      // SPEC-018-3-04: bug intake parity with the CLI
+      //
+      // Both subcommands open a Discord modal collecting the BugReport
+      // fields documented in `schemas/bug-report.json`. `/ad submit-bug`
+      // submits with priority=normal; `/ad hotfix` submits with
+      // priority=high and severity defaulted to "high".
+      // ---------------------------------------------------------------
+      {
+        name: 'submit-bug',
+        description: 'Submit a structured bug report (opens a modal)',
+        type: OptionType.SUB_COMMAND,
+        options: [
+          {
+            name: 'title',
+            description: 'Bug title (1-200 chars)',
+            type: OptionType.STRING,
+            required: true,
+            max_length: 200,
+          },
+          {
+            name: 'repo',
+            description: 'Target repository (owner/name)',
+            type: OptionType.STRING,
+            required: false,
+          },
+        ],
+      },
+      {
+        name: 'hotfix',
+        description: 'Submit a P0 bug requiring immediate attention',
+        type: OptionType.SUB_COMMAND,
+        options: [
+          {
+            name: 'title',
+            description: 'Bug title (1-200 chars)',
+            type: OptionType.STRING,
+            required: true,
+            max_length: 200,
+          },
+          {
+            name: 'repo',
+            description: 'Target repository (owner/name)',
+            type: OptionType.STRING,
+            required: false,
+          },
+        ],
+      },
     ],
   },
 ];
