@@ -23,8 +23,15 @@ import type {
   ArtifactRecord,
   ChainValidationError,
   ChainValidationResult,
+  ConsumerPluginRef,
+  ValidatedArtifact,
+} from './types';
+import {
+  CapabilityError,
+  SchemaValidationError,
 } from './types';
 import { ArtifactTooLargeError } from './errors';
+import { getValidator, type SchemaResolver } from './schema-cache';
 
 const VERSION_FILE_RE = /^(\d+\.\d+)\.json$/;
 const ARTIFACT_DIR_NAME_RE = /^[a-z][a-z0-9-]*$/;
@@ -50,10 +57,16 @@ export interface ArtifactRegistryOptions {
 /**
  * Per-artifact-type cache entry: compiled AJV validator plus the version
  * (used by knownTypes() and as `schemaVersion` on persist records).
+ *
+ * `rawSchema` is retained so the strict-schema consumer pipeline
+ * (SPEC-022-3-01) can hand the parsed schema body to the per-consumer
+ * AJV instance with `removeAdditional: 'all'`. The non-strict `validator`
+ * here mutates nothing and is what the legacy `validate()` API uses.
  */
 interface CacheEntry {
   validator: ValidateFunction;
   schemaVersion: string;
+  rawSchema: object;
 }
 
 export class ArtifactRegistry {
@@ -163,7 +176,11 @@ export class ArtifactRegistry {
           continue;
         }
         const key = `${artifactType}@${version}`;
-        this.validators.set(key, { validator, schemaVersion: version });
+        this.validators.set(key, {
+          validator,
+          schemaVersion: version,
+          rawSchema: parsed as object,
+        });
         loaded.push(key);
       }
     }
@@ -325,6 +342,98 @@ export class ArtifactRegistry {
   }
 
   /**
+   * SPEC-022-3-01: capability-scoped, strict-schema artifact read.
+   *
+   * Pipeline (out-of-order layers added by SPEC-022-3-02 are noted inline):
+   *   1. Capability scope check — `consumerPlugin.consumes[]` MUST list
+   *      `artifactType`. Runs BEFORE any I/O so a denied capability never
+   *      touches disk or the schema cache.
+   *   2. Load the on-disk artifact JSON (existing `load()` behavior).
+   *      [SPEC-022-3-02 inserts HMAC + Ed25519 verify here.]
+   *   3. Strict-schema validate against the CONSUMER's declared
+   *      `schema_version`. The validator mutates the payload to strip
+   *      additional properties, so a producer's extra fields are silently
+   *      dropped.
+   *      [SPEC-022-3-02 inserts sanitization here.]
+   *   4. Return a `ValidatedArtifact` whose `schema_version` is the
+   *      consumer's declared version (the contract), not the producer's.
+   *
+   * The on-disk file is NEVER mutated — strict validation runs on a deep
+   * copy. The original JSON is preserved for audit + signature paths.
+   *
+   * Errors:
+   *   - `CapabilityError` if the consumer did not declare this artifact_type.
+   *   - `Error('artifact not found ...')` from {@link load} on ENOENT.
+   *   - `SchemaNotFoundError` if no schema is registered for
+   *     `(artifactType, consumerSchemaVersion)`.
+   *   - `SchemaValidationError` if the payload violates the consumer's
+   *     schema; AJV's `errors` array is attached.
+   */
+  async read(
+    artifactType: string,
+    artifactId: string,
+    consumerPlugin: ConsumerPluginRef,
+    requestRoot: string,
+  ): Promise<ValidatedArtifact> {
+    // 1. Capability scope check (FIRST, before any I/O).
+    const consumesEntry = consumerPlugin.consumes.find(
+      (c) => c.artifact_type === artifactType,
+    );
+    if (!consumesEntry) {
+      throw new CapabilityError(consumerPlugin.pluginId, artifactType);
+    }
+    const consumerSchemaVersion = consumesEntry.schema_version;
+
+    // 2. Load the raw artifact off disk. Reuses the legacy `load()` so
+    //    error-handling (ENOENT → 'artifact not found') matches PLAN-022-1.
+    const raw = (await this.load(requestRoot, artifactType, artifactId)) as
+      | Record<string, unknown>
+      | unknown;
+
+    // The on-disk shape MAY include envelope fields (`producer_plugin_id`,
+    // `produced_at`, `payload`, `_chain_hmac`, …) once SPEC-022-3-02 lands.
+    // Today, persist() writes the bare payload, so we tolerate both shapes.
+    const envelope = extractEnvelope(raw);
+
+    // 3. Strict-schema validation against the CONSUMER's version.
+    //    Deep-clone before validation so the on-disk payload cannot be
+    //    mutated by `removeAdditional: 'all'`.
+    const validator = getValidator(
+      artifactType,
+      consumerSchemaVersion,
+      this.schemaResolver,
+    );
+    const cloned = deepClone(envelope.payload);
+    const ok = validator(cloned);
+    if (!ok) {
+      throw new SchemaValidationError(
+        artifactType,
+        consumerSchemaVersion,
+        validator.errors ?? [],
+      );
+    }
+
+    return {
+      artifact_type: artifactType,
+      schema_version: consumerSchemaVersion,
+      payload: cloned as Record<string, unknown>,
+      producer_plugin_id: envelope.producer_plugin_id,
+      produced_at: envelope.produced_at,
+    };
+  }
+
+  /**
+   * Resolver wired into the schema cache. Returns the parsed schema body
+   * for `(artifactType, schemaVersion)` — or `null` when the pair was not
+   * loaded by `loadSchemas()`. Bound to `this` so callers (and the cache)
+   * can pass it as a plain function reference.
+   */
+  readonly schemaResolver: SchemaResolver = (artifactType, schemaVersion) => {
+    const entry = this.validators.get(`${artifactType}@${schemaVersion}`);
+    return entry ? entry.rawSchema : null;
+  };
+
+  /**
    * Sorted list of every loaded `(artifactType, schemaVersion)` pair.
    */
   knownTypes(): Array<{ artifactType: string; schemaVersion: string }> {
@@ -341,4 +450,76 @@ export class ArtifactRegistry {
     });
     return out;
   }
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-022-3-01 helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Internal envelope view used by `read()`. SPEC-022-3-02 will populate
+ * `_chain_hmac` / `_chain_signature`; today's persist() writes the bare
+ * payload so we tolerate both shapes. The contract is "either the file is
+ * already an envelope (has a `payload` key) or it IS the payload."
+ */
+interface ArtifactEnvelopeView {
+  payload: unknown;
+  producer_plugin_id: string;
+  produced_at: string;
+}
+
+const ENVELOPE_PROBE_KEYS = new Set([
+  'artifact_type',
+  'schema_version',
+  'producer_plugin_id',
+  'produced_at',
+  'payload',
+]);
+
+function extractEnvelope(raw: unknown): ArtifactEnvelopeView {
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    // Heuristic: if the on-disk file declares an explicit envelope (via the
+    // SPEC-022-3-02 wrapper), surface its inner payload. Otherwise treat
+    // the whole object as the payload (PLAN-022-1 / pre-signing shape).
+    const isEnvelope =
+      'payload' in obj && ENVELOPE_PROBE_KEYS.has('payload') &&
+      typeof obj.payload === 'object';
+    if (isEnvelope) {
+      return {
+        payload: obj.payload,
+        producer_plugin_id:
+          typeof obj.producer_plugin_id === 'string'
+            ? obj.producer_plugin_id
+            : 'unknown',
+        produced_at:
+          typeof obj.produced_at === 'string'
+            ? obj.produced_at
+            : '',
+      };
+    }
+    // Bare-payload shape: try to surface producer / produced_at if the
+    // payload itself records them (security-findings / code-patches do).
+    return {
+      payload: obj,
+      producer_plugin_id:
+        typeof obj.produced_by === 'string' ? obj.produced_by : 'unknown',
+      produced_at:
+        typeof obj.produced_at === 'string' ? obj.produced_at : '',
+    };
+  }
+  return { payload: raw, producer_plugin_id: 'unknown', produced_at: '' };
+}
+
+/**
+ * Deep clone via `structuredClone` when available, falling back to
+ * `JSON.parse(JSON.stringify(...))`. The strict-schema validator mutates
+ * its input; consumers MUST receive a fresh object so the on-disk file
+ * stays intact for audit + signature paths.
+ */
+function deepClone<T>(value: T): T {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
 }
