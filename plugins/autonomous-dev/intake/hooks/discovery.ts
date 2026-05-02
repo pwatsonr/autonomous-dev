@@ -23,6 +23,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { HookManifest } from './types';
+import { satisfiesRange } from './semver-compat';
 
 /** Discovery error. One of these is produced per failure encountered. */
 export interface DiscoveryError {
@@ -94,7 +95,77 @@ export class PluginDiscovery {
     }
 
     const settled = await Promise.all(tasks);
-    return settled.filter((r): r is DiscoveryResult => r !== null);
+    const results = settled.filter((r): r is DiscoveryResult => r !== null);
+    return this.validateChainConsistency(results);
+  }
+
+  /**
+   * SPEC-022-1-01: Cross-manifest validation for chain consistency.
+   *
+   * Runs AFTER per-manifest schema validation. For each `consumes[]` entry
+   * on a successfully-parsed manifest, verifies that at least one OTHER
+   * (or same — see Notes) plugin's `produces[]` declares the same
+   * `artifact_type` and a `schema_version` that satisfies the consumer's
+   * range. Orphan consumers are rejected by clearing `manifest` and
+   * appending a `SCHEMA_ERROR` to the result's `errors[]`.
+   *
+   * `optional: true` consumers with no producer are accepted as-is.
+   *
+   * The check is order-independent: the producer index is built from ALL
+   * results before any rejection decision is made.
+   */
+  validateChainConsistency(results: DiscoveryResult[]): DiscoveryResult[] {
+    // Build the producer index from every successfully-parsed manifest.
+    type ProducerEntry = { pluginId: string; schemaVersion: string };
+    const producerIndex = new Map<string, ProducerEntry[]>();
+    for (const r of results) {
+      if (!r.manifest || !r.manifest.produces) continue;
+      for (const p of r.manifest.produces) {
+        const list = producerIndex.get(p.artifact_type) ?? [];
+        list.push({ pluginId: r.manifest.id, schemaVersion: p.schema_version });
+        producerIndex.set(p.artifact_type, list);
+      }
+    }
+
+    for (const r of results) {
+      if (!r.manifest || !r.manifest.consumes) continue;
+      const newErrors: DiscoveryError[] = [];
+      let rejected = false;
+      r.manifest.consumes.forEach((c, idx) => {
+        if (c.optional === true) return;
+        const candidates = producerIndex.get(c.artifact_type) ?? [];
+        if (candidates.length === 0) {
+          newErrors.push({
+            manifestPath: r.manifestPath,
+            code: 'SCHEMA_ERROR',
+            pointer: `/consumes/${idx}/artifact_type`,
+            message: `no producer found for artifact_type "${c.artifact_type}"`,
+          });
+          rejected = true;
+          return;
+        }
+        const compatible = candidates.some((p) =>
+          satisfiesRange(p.schemaVersion, c.schema_version),
+        );
+        if (!compatible) {
+          const available = candidates.map((p) => p.schemaVersion).join(', ');
+          newErrors.push({
+            manifestPath: r.manifestPath,
+            code: 'SCHEMA_ERROR',
+            pointer: `/consumes/${idx}/schema_version`,
+            message: `no producer satisfies schema_version "${c.schema_version}" for artifact_type "${c.artifact_type}" (available: ${available})`,
+          });
+          rejected = true;
+        }
+      });
+      if (rejected) {
+        r.errors.push(...newErrors);
+        // Clear the manifest field — the plugin is rejected from the
+        // discovery results.
+        delete r.manifest;
+      }
+    }
+    return results;
   }
 
   private async processCandidate(

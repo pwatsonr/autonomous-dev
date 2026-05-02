@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev.local/schemas/artifacts/code-patches/1.0.json",
+  "title": "CodePatches 1.0",
+  "description": "Code-patch artifact emitted by code-fixer-style plugins. Mirrors security-findings shape; downstream consumers gate on requires_approval. See TDD-022 §6.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["patch_id", "produced_by", "produced_at", "patches"],
+  "properties": {
+    "patch_id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
+    "produced_by": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "produced_at": { "type": "string", "format": "date-time" },
+    "source_artifact": { "$ref": "#/$defs/ArtifactRef" },
+    "patches": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/CodePatch" }
+    }
+  },
+  "$defs": {
+    "ArtifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "scan_id"],
+      "properties": {
+        "artifact_type": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "scan_id": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" }
+      }
+    },
+    "CodePatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "file", "before", "after", "confidence", "requires_approval"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "file": { "type": "string", "minLength": 1 },
+        "before": { "type": "string" },
+        "after": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "requires_approval": { "type": "boolean" },
+        "rationale": { "type": "string" },
+        "fixes_finding_id": { "type": "string" }
+      }
+    }
+  }
+}

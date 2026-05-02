@@ -1,0 +1,31 @@
+{
+  "scan_id": "req-001-scan-1",
+  "produced_by": "security-reviewer",
+  "produced_at": "2026-05-02T12:00:00Z",
+  "summary": {
+    "total": 2,
+    "by_severity": {
+      "critical": 1,
+      "medium": 1
+    }
+  },
+  "findings": [
+    {
+      "id": "f-001",
+      "severity": "critical",
+      "title": "Hardcoded credentials",
+      "description": "API key checked into source",
+      "file": "src/auth.ts",
+      "line": 42,
+      "rule_id": "SEC-001",
+      "remediation": "Move to env var"
+    },
+    {
+      "id": "f-002",
+      "severity": "medium",
+      "title": "Unchecked input length",
+      "file": "src/util.ts",
+      "line": 7
+    }
+  ]
+}

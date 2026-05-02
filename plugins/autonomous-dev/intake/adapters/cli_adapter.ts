@@ -61,6 +61,7 @@ import type {
 } from './adapter_interface';
 import { loadBugContext } from '../cli/bug-context-loader';
 import { registerStandardsCommand } from './cli_adapter_standards';
+import { registerChainsCommand } from '../cli/chains_command';
 import {
   formatErrors,
   runInteractivePrompts,
@@ -763,6 +764,9 @@ export function buildProgram(
 
   // SPEC-021-1-04: standards subcommand family.
   registerStandardsCommand(program);
+
+  // SPEC-022-1-04: chains list / chains graph subcommands.
+  registerChainsCommand(program);
 
   return program;
 }

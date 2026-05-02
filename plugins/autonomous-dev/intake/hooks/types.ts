@@ -177,6 +177,60 @@ export interface HookManifest {
    * Paths beginning with `/tmp/` are exempt.
    */
   filesystem_write_paths?: string[];
+  /**
+   * SPEC-022-1-01: Artifact types this plugin emits. Optional in v2 manifests.
+   * v1 manifests without this field validate cleanly. See TDD-022 §5.
+   */
+  produces?: ProducesDeclaration[];
+  /**
+   * SPEC-022-1-01: Artifact types this plugin requires upstream. Optional in
+   * v2 manifests. v1 manifests without this field validate cleanly. See
+   * TDD-022 §5.
+   */
+  consumes?: ConsumesDeclaration[];
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-022-1-01: Plugin chaining — produces/consumes declarations.
+// ---------------------------------------------------------------------------
+
+/**
+ * Declaration that a plugin emits an artifact of a given type/version.
+ *
+ * See TDD-022 §5 (manifest extension catalog).
+ */
+export interface ProducesDeclaration {
+  /** Kebab-case artifact identifier, e.g. 'security-findings'. */
+  artifact_type: string;
+  /** Producer's exact MAJOR.MINOR (or MAJOR.MINOR.PATCH), e.g. '1.0'. */
+  schema_version: string;
+  /** Wire format on disk. */
+  format: 'json' | 'yaml' | 'text';
+  /** Free-form documentation string. */
+  description?: string;
+}
+
+/**
+ * Declaration that a plugin requires an artifact of a given type/version
+ * from some upstream producer.
+ *
+ * See TDD-022 §5 (manifest extension catalog).
+ */
+export interface ConsumesDeclaration {
+  /** Kebab-case artifact identifier. */
+  artifact_type: string;
+  /**
+   * Caret-allowed range, e.g. '^1.0' (any 1.x.y producer) or exact '1.0'.
+   * Patch versions are ignored for compat (artifacts evolve at MAJOR.MINOR).
+   */
+  schema_version: string;
+  /**
+   * If true, missing producer does NOT reject this plugin at orphan-check
+   * time. Default false. Used for progressive adoption.
+   */
+  optional?: boolean;
+  /** Free-form documentation string. */
+  description?: string;
 }
 
 // ---------------------------------------------------------------------------
