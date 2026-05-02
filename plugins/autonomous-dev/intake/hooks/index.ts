@@ -17,3 +17,4 @@ export * from './ipc-client';
 export * from './validation-pipeline';
 export * from './formats';
 export * from './keywords';
+export * from './validation-stats';

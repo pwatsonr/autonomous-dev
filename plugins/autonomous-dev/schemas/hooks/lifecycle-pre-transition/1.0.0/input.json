@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev/schemas/hooks/lifecycle-pre-transition/1.0.0/input.json",
+  "title": "lifecycle-pre-transition input v1.0.0",
+  "description": "Baseline permissive schema. Business-rule constraints are added by consumer plans.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {}
+}

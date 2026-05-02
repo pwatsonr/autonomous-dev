@@ -39,6 +39,7 @@ import type {
 } from './types';
 import { registerCustomFormats } from './formats';
 import { registerCustomKeywords, redactErrors, getRedactPathsFromSchema } from './keywords';
+import { ValidationStats, type AllStats } from './validation-stats';
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -81,9 +82,12 @@ export class ValidationPipeline {
   private readonly logger: ValidationLogger;
   /** Schema root passed in by caller. */
   protected readonly schemasRoot: string;
+  /** Telemetry collector (SPEC-019-2-03). */
+  private readonly stats: ValidationStats;
 
   constructor(options: ValidationPipelineOptions) {
     this.schemasRoot = options.schemasRoot;
+    this.stats = new ValidationStats(options.statsWindowSize ?? 1000);
     this.logger = options.logger ?? {
       // eslint-disable-next-line no-console
       info: (m: string) => console.info(m),
@@ -269,17 +273,24 @@ export class ValidationPipeline {
     return redactErrors(errors, payload, declaredPaths);
   }
 
-  /**
-   * Hook for SPEC-019-2-03 to record stats. Default is a no-op so the
-   * skeleton class is usable without the stats subsystem.
-   */
+  /** Forward to the embedded ValidationStats collector (SPEC-019-2-03). */
   protected recordStats(
-    _point: string,
-    _version: string,
-    _isValid: boolean,
-    _durationMs: number,
+    point: string,
+    version: string,
+    isValid: boolean,
+    durationMs: number,
   ): void {
-    // SPEC-019-2-03 overrides.
+    this.stats.record(point, version, isValid, durationMs);
+  }
+
+  /** Snapshot the current per-process telemetry. */
+  getStats(): AllStats {
+    return this.stats.getStats();
+  }
+
+  /** Wipe the telemetry collector. Intended for tests / operator triggers. */
+  resetStats(): void {
+    this.stats.reset();
   }
 
   /**

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev/schemas/hooks/document-pre-render/1.0.0/output.json",
+  "title": "document-pre-render output v1.0.0",
+  "description": "Baseline permissive schema. Business-rule constraints are added by consumer plans.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {}
+}
