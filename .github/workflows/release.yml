@@ -1,0 +1,83 @@
+# ============================================================
+# Release Workflow -- Trust Model & Job Graph
+# ============================================================
+# This workflow runs on every `v*` tag push. It is the single point
+# at which a tagged commit becomes a published GitHub Release. The
+# pipeline grows over three specs:
+#
+#   SPEC-017-3-01 (this scaffold): verify-version + spend artifact.
+#   SPEC-017-3-02:                 generate-changelog + create-release.
+#   SPEC-017-3-04:                 verify-evals (release-side gate).
+#
+# The trust model differs from `claude-assistant.yml`: there is no
+# comment author for a tag-push event. We rely on `contents: write`
+# being scoped to maintainers via repo permissions; if a future
+# scenario adds a workflow_dispatch path or non-trusted automation,
+# revisit the trust assumption (see SPEC-017-3-02 §Trust-Gate Note).
+#
+# Concurrency is non-cancellable -- a partially-published release is
+# worse than a duplicated run. The 10-minute job timeout keeps a stuck
+# step from hanging the runner indefinitely.
+#
+# Operator runbooks (added by later specs):
+#   docs/operators/release-smoke-tests.md
+#   docs/operators/release-recovery.md
+# ============================================================
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write       # required by softprops/action-gh-release in SPEC-017-3-02
+  pull-requests: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # releases must complete
+
+jobs:
+  verify-version:
+    name: Verify tag matches plugin manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: extract
+        name: Extract tag and manifest versions
+        run: |
+          set -euo pipefail
+          # Strip exactly one leading "v" -- "vv0.2.0" must surface as a
+          # mismatch, not be silently normalized.
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          MANIFEST_VERSION="$(jq -r '.version' plugins/autonomous-dev/.claude-plugin/plugin.json)"
+          echo "Tag version:      $TAG_VERSION"
+          echo "Manifest version: $MANIFEST_VERSION"
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+            # Exact text -- downstream operators grep for this string.
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match plugin manifest version ${MANIFEST_VERSION}"
+            exit 1
+          fi
+          echo "version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Emit spend estimate
+        if: always()
+        env:
+          BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+          ESTIMATED_COST_USD: "0.00"   # no Claude calls in this job
+          SPEND_WORKFLOW_NAME: release
+        run: bash scripts/ci/emit-spend-estimate.sh
+
+      - name: Upload spend artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spend-estimate-${{ github.run_id }}
+          path: .github/budget/spend-${{ github.run_id }}.json
+          retention-days: 90
