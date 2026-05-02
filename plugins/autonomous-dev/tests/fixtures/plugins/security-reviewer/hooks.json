@@ -1,0 +1,21 @@
+{
+  "id": "security-reviewer",
+  "name": "Security Reviewer",
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "id": "scan",
+      "hook_point": "review-pre-score",
+      "entry_point": "./scan.js",
+      "priority": 100,
+      "failure_mode": "warn"
+    }
+  ],
+  "produces": [
+    {
+      "artifact_type": "security-findings",
+      "schema_version": "1.0",
+      "format": "json"
+    }
+  ]
+}

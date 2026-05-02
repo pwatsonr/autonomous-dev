@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev.local/schemas/plugin-manifest-v2.json",
+  "title": "PluginManifest v2",
+  "description": "Plugin manifest (hooks.json) v2 — extends v1 with optional `produces[]` / `consumes[]` arrays for the chain engine. See TDD-022 §5 and SPEC-022-1-01. v1 manifests (no produces/consumes) validate cleanly against v2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "hooks"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Globally unique plugin id (kebab-case, no leading digit, no underscores)."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[\\w.-]+)?(?:\\+[\\w.-]+)?$",
+      "description": "Semver string."
+    },
+    "hooks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/HookEntry" }
+    },
+    "produces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ProducesDeclaration" },
+      "default": [],
+      "description": "Artifact types this plugin emits. SPEC-022-1-01."
+    },
+    "consumes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ConsumesDeclaration" },
+      "default": [],
+      "description": "Artifact types this plugin requires upstream. SPEC-022-1-01."
+    },
+    "reviewer_slots": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "filesystem-write",
+          "network",
+          "child-processes",
+          "privileged-env"
+        ]
+      }
+    },
+    "filesystem_write_paths": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "HookEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "hook_point", "entry_point", "priority", "failure_mode"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "hook_point": {
+          "type": "string",
+          "enum": [
+            "intake-pre-validate",
+            "prd-pre-author",
+            "tdd-pre-author",
+            "code-pre-write",
+            "code-post-write",
+            "review-pre-score",
+            "review-post-score",
+            "deploy-pre",
+            "deploy-post",
+            "rule-evaluation"
+          ]
+        },
+        "entry_point": {
+          "type": "string",
+          "pattern": "^\\./.+\\.(js|cjs|mjs)$"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "failure_mode": {
+          "type": "string",
+          "enum": ["block", "warn", "ignore"]
+        },
+        "reviewer_slot": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["agent_name", "review_gates", "expertise_domains", "minimum_threshold"],
+              "properties": {
+                "agent_name": { "type": "string", "minLength": 1 },
+                "review_gates": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string" }
+                },
+                "expertise_domains": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "minimum_threshold": { "type": "number" },
+                "fingerprint_format": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "filesystem-write",
+              "network",
+              "child-processes",
+              "privileged-env"
+            ]
+          }
+        },
+        "allow_child_processes": { "type": "boolean" }
+      }
+    },
+    "ProducesDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "schema_version", "format"],
+      "properties": {
+        "artifact_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Kebab-case artifact identifier."
+        },
+        "schema_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+(?:\\.\\d+)?$",
+          "description": "Producer's exact MAJOR.MINOR (or MAJOR.MINOR.PATCH)."
+        },
+        "format": {
+          "enum": ["json", "yaml", "text"]
+        },
+        "description": { "type": "string" }
+      }
+    },
+    "ConsumesDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "schema_version"],
+      "properties": {
+        "artifact_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "schema_version": {
+          "type": "string",
+          "pattern": "^\\^?\\d+\\.\\d+(?:\\.\\d+)?$",
+          "description": "Caret-allowed range, e.g. '^1.0' or exact '1.0'."
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false
+        },
+        "description": { "type": "string" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "security-reviewer",
+      "name": "Security Reviewer",
+      "version": "1.0.0",
+      "hooks": [
+        {
+          "id": "scan",
+          "hook_point": "review-pre-score",
+          "entry_point": "./scan.js",
+          "priority": 100,
+          "failure_mode": "warn"
+        }
+      ],
+      "produces": [
+        {
+          "artifact_type": "security-findings",
+          "schema_version": "1.0",
+          "format": "json"
+        }
+      ]
+    }
+  ]
+}

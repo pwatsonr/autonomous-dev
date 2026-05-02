@@ -1,0 +1,27 @@
+{
+  "id": "code-fixer",
+  "name": "Code Fixer",
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "id": "fix",
+      "hook_point": "review-post-score",
+      "entry_point": "./fix.js",
+      "priority": 50,
+      "failure_mode": "warn"
+    }
+  ],
+  "produces": [
+    {
+      "artifact_type": "code-patches",
+      "schema_version": "1.0",
+      "format": "json"
+    }
+  ],
+  "consumes": [
+    {
+      "artifact_type": "security-findings",
+      "schema_version": "^1.0"
+    }
+  ]
+}

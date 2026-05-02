@@ -1,0 +1,20 @@
+{
+  "id": "audit-logger",
+  "name": "Audit Logger",
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "id": "audit",
+      "hook_point": "deploy-post",
+      "entry_point": "./audit.js",
+      "priority": 10,
+      "failure_mode": "warn"
+    }
+  ],
+  "consumes": [
+    {
+      "artifact_type": "code-patches",
+      "schema_version": "^1.0"
+    }
+  ]
+}
