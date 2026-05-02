@@ -19,6 +19,8 @@ module.exports = {
     '<rootDir>',
     '<rootDir>/../autonomous-dev-deploy-gcp',
     '<rootDir>/../autonomous-dev-deploy-aws',
+    '<rootDir>/../autonomous-dev-deploy-azure',
+    '<rootDir>/../autonomous-dev-deploy-k8s',
   ],
   testMatch: ['**/?(*.)+(spec|test).ts'],
   // Ignore node_modules + the not-yet-runnable parallel suite (no source yet).

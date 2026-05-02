@@ -21,7 +21,11 @@
     "../autonomous-dev-deploy-gcp/src/**/*.ts",
     "../autonomous-dev-deploy-gcp/tests/**/*.ts",
     "../autonomous-dev-deploy-aws/src/**/*.ts",
-    "../autonomous-dev-deploy-aws/tests/**/*.ts"
+    "../autonomous-dev-deploy-aws/tests/**/*.ts",
+    "../autonomous-dev-deploy-azure/src/**/*.ts",
+    "../autonomous-dev-deploy-azure/tests/**/*.ts",
+    "../autonomous-dev-deploy-k8s/src/**/*.ts",
+    "../autonomous-dev-deploy-k8s/tests/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

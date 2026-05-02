@@ -1,0 +1,25 @@
+{
+  "name": "web-app",
+  "properties": {
+    "latestRevisionName": "web-app--rev1",
+    "latestReadyRevisionName": "web-app--rev1",
+    "configuration": {
+      "activeRevisionsMode": "Multiple",
+      "ingress": {
+        "fqdn": "web-app.azurecontainerapps.io",
+        "traffic": [
+          { "revisionName": "web-app--rev1", "weight": 100 }
+        ]
+      }
+    },
+    "template": {
+      "containers": [
+        {
+          "name": "app",
+          "image": "myacr.azurecr.io/web:old-sha",
+          "resources": { "cpu": 0.5, "memory": "1.0Gi" }
+        }
+      ]
+    }
+  }
+}
