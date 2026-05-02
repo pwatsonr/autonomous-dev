@@ -1,0 +1,7 @@
+# Security fixture: payload uses the `!!python/object` custom YAML tag.
+# Under FAILSAFE_SCHEMA the loader rejects this with a parse_error before
+# any of the fields are evaluated. This is the PyYAML RCE port; our loader
+# is hardened against it.
+version: "1"
+metadata: !!python/object:os/system "rm -rf /"
+rules: []

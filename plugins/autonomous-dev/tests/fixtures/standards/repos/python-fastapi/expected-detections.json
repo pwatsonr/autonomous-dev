@@ -1,0 +1,10 @@
+{
+  "expected": [
+    "auto:python-fastapi"
+  ],
+  "notExpected": [
+    "auto:python-django",
+    "auto:python-flask",
+    "auto:js-react"
+  ]
+}

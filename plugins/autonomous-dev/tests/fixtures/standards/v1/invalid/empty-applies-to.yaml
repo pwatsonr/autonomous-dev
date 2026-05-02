@@ -1,0 +1,15 @@
+# Invalid: applies_to has zero properties (schema requires minProperties: 1).
+version: "1"
+metadata:
+  name: "Empty predicate"
+  description: "Should fail schema validation (applies_to empty)."
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-01"
+rules:
+  - id: "test:empty-predicate"
+    severity: "advisory"
+    description: "Predicate has no keys."
+    applies_to: {}
+    requires:
+      uses_pattern: "x"
+    evaluator: "pattern-grep"

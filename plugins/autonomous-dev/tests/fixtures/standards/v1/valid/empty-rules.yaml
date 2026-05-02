@@ -1,0 +1,8 @@
+# Valid v1 artifact with zero rules — schema allows an empty rules array.
+version: "1"
+metadata:
+  name: "No rules"
+  description: "Empty-ruleset artifact (schema permits it)."
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-20"
+rules: []

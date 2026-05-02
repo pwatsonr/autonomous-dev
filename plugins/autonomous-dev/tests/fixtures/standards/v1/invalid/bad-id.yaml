@@ -1,0 +1,16 @@
+# Invalid: rule id violates the kebab-case + single-colon pattern.
+version: "1"
+metadata:
+  name: "Bad rule id"
+  description: "Should fail schema validation (id pattern)."
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-01"
+rules:
+  - id: "Org.NoSlash"
+    severity: "advisory"
+    description: "Bad id."
+    applies_to:
+      language: "typescript"
+    requires:
+      uses_pattern: "x"
+    evaluator: "pattern-grep"

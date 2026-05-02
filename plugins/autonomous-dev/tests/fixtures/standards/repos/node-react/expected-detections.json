@@ -1,0 +1,11 @@
+{
+  "expected": [
+    "auto:js-react",
+    "auto:js-vue",
+    "auto:node-express"
+  ],
+  "notExpected": [
+    "auto:js-angular",
+    "auto:python-fastapi"
+  ]
+}
