@@ -23,6 +23,10 @@ readonly COST_LEDGER_FILE="${DAEMON_HOME}/cost-ledger.json"
 readonly LOG_DIR="${DAEMON_HOME}/logs"
 readonly LOG_FILE="${LOG_DIR}/daemon.log"
 readonly CONFIG_FILE="${HOME}/.claude/autonomous-dev.json"
+# AUTONOMOUS_DEV_CONFIG is the path expected by lib/typed-limits.sh per
+# SPEC-018-2-02. We export the existing CONFIG_FILE under that name so the
+# helper library can stand alone and be sourced by the bats test harness.
+export AUTONOMOUS_DEV_CONFIG="${CONFIG_FILE}"
 readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
 readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
 
@@ -1265,16 +1269,101 @@ check_retry_exhaustion() {
     retry_count=$(jq -r '.current_phase_metadata.retry_count // 0' "${state_file}")
     status=$(jq -r '.status' "${state_file}")
 
-    # Check per-phase max retries from config, with default
+    # SPEC-018-2-02: prefer the type-aware budget from .type_config.maxRetries.
+    # Falls through to the previous .daemon.max_retries_by_phase override and
+    # finally to the typed-limits hard-coded default. The existing per-phase
+    # config override remains the secondary source of truth.
     local max_retries
-    max_retries=$(jq -r ".daemon.max_retries_by_phase.\"${status}\" // .daemon.max_retries_per_phase // 3" "${EFFECTIVE_CONFIG}" 2>/dev/null)
-    if [[ "${max_retries}" == "null" || -z "${max_retries}" ]]; then
-        max_retries="${MAX_RETRIES_PER_PHASE}"
+    if [[ -f "${LIB_DIR}/typed-limits.sh" ]]; then
+        # shellcheck source=lib/typed-limits.sh
+        source "${LIB_DIR}/typed-limits.sh"
+        # Type-aware lookup first
+        local typed_max
+        typed_max=$(resolve_max_retries "${state_file}")
+        # Phase-specific config override wins over the typed default only
+        # when explicitly set (preserves operator escape hatch).
+        local phase_override
+        phase_override=$(jq -r ".daemon.max_retries_by_phase.\"${status}\" // empty" \
+            "${EFFECTIVE_CONFIG}" 2>/dev/null || true)
+        if [[ -n "${phase_override}" && "${phase_override}" != "null" ]]; then
+            max_retries="${phase_override}"
+        else
+            max_retries="${typed_max}"
+        fi
+    else
+        max_retries=$(jq -r ".daemon.max_retries_by_phase.\"${status}\" // .daemon.max_retries_per_phase // 3" "${EFFECTIVE_CONFIG}" 2>/dev/null)
+        if [[ "${max_retries}" == "null" || -z "${max_retries}" ]]; then
+            max_retries="${MAX_RETRIES_PER_PHASE}"
+        fi
     fi
 
     if [[ ${retry_count} -ge ${max_retries} ]]; then
-        log_warn "Request ${request_id} exhausted retries for phase '${status}' (${retry_count}/${max_retries})"
+        local req_type
+        req_type=$(jq -r '.type // "feature"' "${state_file}" 2>/dev/null || echo "feature")
+        # Contract regex (SPEC-018-2-02 §Escalation Message Format):
+        # Phase '[a-z_]+' (exceeded timeout|exhausted retries) \(.*type=...\)
+        log_warn "Phase '${status}' exhausted retries (limit=${max_retries}, type=${req_type})"
         escalate_to_paused "${request_id}" "${project}" "${status}" "${retry_count}"
+        return 1
+    fi
+
+    return 0
+}
+
+###############################################################################
+# Type-Aware Phase-Timeout Enforcement (SPEC-018-2-02)
+###############################################################################
+
+# check_phase_timeout(request_id: string, project: string) -> int
+#   Compares (now - .phase_started_at) against resolve_phase_timeout for
+#   the current phase. If exceeded, raises a contract-format escalation
+#   message and returns 1 (caller should `continue` the supervisor loop).
+#   Returns 0 when the phase is within budget OR when phase_started_at is
+#   absent (no clock to compare against).
+check_phase_timeout() {
+    local request_id="$1"
+    local project="$2"
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+
+    [[ -f "${state_file}" ]] || return 0
+
+    local started
+    started=$(jq -r '.phase_started_at // empty' "${state_file}" 2>/dev/null || true)
+    [[ -n "${started}" && "${started}" != "null" ]] || return 0
+
+    # Allow either an integer epoch second or an ISO-8601 string.
+    local started_epoch
+    if [[ "${started}" =~ ^[0-9]+$ ]]; then
+        started_epoch="${started}"
+    else
+        started_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "${started}" +%s 2>/dev/null \
+                        || date -u -d "${started}" +%s 2>/dev/null \
+                        || echo "")
+        [[ -n "${started_epoch}" ]] || return 0
+    fi
+
+    if [[ ! -f "${LIB_DIR}/typed-limits.sh" ]]; then
+        return 0
+    fi
+    # shellcheck source=lib/typed-limits.sh
+    source "${LIB_DIR}/typed-limits.sh"
+
+    local current_phase
+    current_phase=$(jq -r '.current_phase // .status // ""' "${state_file}" 2>/dev/null || true)
+    [[ -n "${current_phase}" ]] || return 0
+
+    local timeout
+    timeout=$(resolve_phase_timeout "${state_file}" "${current_phase}")
+
+    local now_epoch
+    now_epoch=$(date -u +%s)
+    local elapsed=$(( now_epoch - started_epoch ))
+
+    if (( elapsed > timeout )); then
+        local req_type
+        req_type=$(resolve_request_type "${state_file}")
+        # Contract regex (SPEC-018-2-02 §Escalation Message Format)
+        log_warn "Phase '${current_phase}' exceeded timeout (${timeout} seconds, type=${req_type})"
         return 1
     fi
 
