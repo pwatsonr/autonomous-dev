@@ -431,3 +431,78 @@ export function isReviewerSlotObject(value: unknown): value is ReviewerSlot {
     typeof (value as ReviewerSlot).agent_name === 'string'
   );
 }
+
+// ---------------------------------------------------------------------------
+// SPEC-019-4-03: Sequential execution with chained context + failure modes
+// ---------------------------------------------------------------------------
+
+/**
+ * String-literal alias for the `FailureMode` enum values.
+ *
+ * Manifest authors and audit serializers use the bare string form; the enum
+ * is preserved for in-engine call sites that prefer the symbolic constants.
+ *
+ * Cross-reference: SPEC-019-4-03 Type Additions.
+ */
+export type FailureModeStr = 'block' | 'warn' | 'ignore';
+
+/**
+ * Per-invocation context handed to a chained hook entry-point as its
+ * SECOND argument (the first remains the raw, sanitized input for
+ * back-compat with PLAN-019-1 hook authors that accept `(input)` only).
+ *
+ * Hooks observe the cumulative `previousResults` for every prior hook at
+ * the same hook point — including warn/ignore failures — in execution
+ * order. The collection is provided as a `ReadonlyArray`; mutating it is
+ * a contract violation. The executor passes a defensive copy on each
+ * iteration so attempted mutations cannot leak between hook invocations.
+ *
+ * Cross-reference: SPEC-019-4-03 Type Additions; TDD-019 §12.1.
+ */
+export interface HookContext<I = unknown> {
+  /** The original input passed to executeHooks(). Read-only. */
+  readonly originalContext: I;
+  /** Results from all prior hooks at this hook point, in execution order. */
+  readonly previousResults: ReadonlyArray<HookResult>;
+}
+
+/**
+ * What a single hook returned (or recorded as a non-blocking failure).
+ *
+ * One of `output` (success) or `error` (failure under `warn`/`ignore`/`block`)
+ * is populated. `block`-mode failures additionally short-circuit the executor
+ * via `HookBlockedError`; the failing `HookResult` is carried on the error.
+ *
+ * Cross-reference: SPEC-019-4-03 Type Additions.
+ */
+export interface HookResult<O = unknown> {
+  plugin_id: string;
+  plugin_version: string;
+  /** Stable identifier from manifest (matches `HookEntry.id`). */
+  hook_id: string;
+  priority: number;
+  /** Set on success. */
+  output?: O;
+  /** Set on failure under any failure mode. */
+  error?: { message: string; stack?: string; failure_mode: FailureModeStr };
+  /** Wall-clock duration, milliseconds. Always non-negative. */
+  duration_ms: number;
+}
+
+/**
+ * Aggregated outcome from the chained-context executor variant
+ * (`HookExecutor.executeHooksChained`).
+ *
+ * `failures` is the subset of `results` whose `error` is set under a
+ * non-blocking mode (`warn` or `ignore`). `aborted` is `true` only when a
+ * `block`-mode failure threw `HookBlockedError` during the run; the catching
+ * caller assembles the partial result manually.
+ *
+ * Cross-reference: SPEC-019-4-03 Type Additions.
+ */
+export interface ChainedHookExecutionResult<O = unknown> {
+  hook_point: string;
+  results: HookResult<O>[];
+  failures: HookResult<O>[];
+  aborted: boolean;
+}
