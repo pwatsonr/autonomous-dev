@@ -1,0 +1,16 @@
+# Invalid: two simultaneous violations — bad id pattern AND empty `requires`.
+# Loader must surface BOTH in errors[], not just the first.
+version: "1"
+metadata:
+  name: "Multiple errors"
+  description: "Should produce >1 schema_error in errors[]."
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-01"
+rules:
+  - id: "BadId.NoColon"
+    severity: "advisory"
+    description: "Has both a bad id and an empty requires."
+    applies_to:
+      language: "typescript"
+    requires: {}
+    evaluator: "pattern-grep"

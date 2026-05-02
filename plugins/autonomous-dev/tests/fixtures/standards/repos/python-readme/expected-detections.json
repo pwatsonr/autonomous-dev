@@ -1,0 +1,11 @@
+{
+  "expected": [
+    "auto:readme-mentions-black",
+    "auto:readme-mentions-isort",
+    "auto:readme-mentions-mypy",
+    "auto:readme-mentions-pytest"
+  ],
+  "notExpected": [
+    "auto:readme-mentions-rubocop"
+  ]
+}

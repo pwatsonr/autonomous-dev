@@ -1,0 +1,13 @@
+{
+  "expected": [
+    "auto:typescript-strict-mode",
+    "auto:prettier-formatting",
+    "auto:eslint-configured",
+    "auto:eslint-no-console",
+    "auto:eslint-prefer-const"
+  ],
+  "notExpected": [
+    "auto:typescript-strict-null-checks",
+    "auto:js-react"
+  ]
+}

@@ -1,0 +1,7 @@
+# Invalid: missing top-level `version`.
+metadata:
+  name: "No version"
+  description: "Should fail schema validation (missing version)."
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-01"
+rules: []

@@ -1,0 +1,16 @@
+# Smallest possible v1 standards artifact: one rule, no immutable flag.
+version: "1"
+metadata:
+  name: "Minimal"
+  description: "Smallest valid v1 artifact for loader tests."
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-01"
+rules:
+  - id: "test:minimal-rule"
+    severity: "advisory"
+    description: "Minimal rule for loader smoke test."
+    applies_to:
+      language: "typescript"
+    requires:
+      uses_pattern: "anything"
+    evaluator: "pattern-grep"

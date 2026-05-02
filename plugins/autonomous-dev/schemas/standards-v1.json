@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev.dev/schemas/standards-v1.json",
+  "title": "Standards Artifact v1",
+  "description": "On-disk shape of every standards.yaml file (defaults, org, repo, request) per TDD-021 §5. Consumed by the loader, CLI validator, and downstream PLAN-021-2/3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "metadata", "rules"],
+  "properties": {
+    "version": {
+      "const": "1",
+      "description": "Schema version. Constant '1' for this schema; v1.1+ will widen evaluator to an enum."
+    },
+    "metadata": { "$ref": "#/$defs/Metadata" },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Rule" }
+    }
+  },
+  "$defs": {
+    "Metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "owner", "last_updated"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "last_updated": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "ISO 8601 date (YYYY-MM-DD)."
+        }
+      }
+    },
+    "Rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "severity", "description", "applies_to", "requires", "evaluator"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+:[a-z0-9-]+$",
+          "description": "Namespaced rule id <plugin>:<id>; kebab-case, single colon, lowercase."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["advisory", "warn", "blocking"]
+        },
+        "immutable": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true at the org level, repo cannot override this rule."
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "applies_to": { "$ref": "#/$defs/Predicate" },
+        "requires": { "$ref": "#/$defs/Assertion" },
+        "evaluator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "References the evaluator catalog from PLAN-021-2 (e.g., framework-detector, pattern-grep). v1 is free-form; v1.1 will tighten to an enum."
+        }
+      }
+    },
+    "Predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "Match a target before evaluating requires. Multiple keys AND together.",
+      "properties": {
+        "language": { "type": "string", "minLength": 1 },
+        "service_type": {
+          "type": "string",
+          "enum": ["api", "worker", "cli", "library", "frontend"]
+        },
+        "framework": { "type": "string", "minLength": 1 },
+        "implements": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "path_pattern": { "type": "string", "minLength": 1 }
+      }
+    },
+    "Assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "What the rule requires when the predicate matches.",
+      "properties": {
+        "framework_match": { "type": "string", "minLength": 1 },
+        "exposes_endpoint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "path_pattern"],
+          "properties": {
+            "method": { "type": "string", "minLength": 1 },
+            "path_pattern": { "type": "string", "minLength": 1 }
+          }
+        },
+        "uses_pattern": { "type": "string", "minLength": 1 },
+        "excludes_pattern": { "type": "string", "minLength": 1 },
+        "dependency_present": { "type": "string", "minLength": 1 },
+        "custom_evaluator_args": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "version": "1",
+      "metadata": {
+        "name": "Acme Engineering Standards",
+        "description": "Org-level rules for Acme microservices",
+        "owner": "platform-team@acme.io",
+        "last_updated": "2026-04-01"
+      },
+      "rules": [
+        {
+          "id": "org:python-fastapi-required",
+          "severity": "blocking",
+          "immutable": true,
+          "description": "All Python HTTP services must use FastAPI.",
+          "applies_to": { "language": "python", "service_type": "api" },
+          "requires": { "framework_match": "fastapi" },
+          "evaluator": "framework-detector"
+        }
+      ]
+    }
+  ]
+}

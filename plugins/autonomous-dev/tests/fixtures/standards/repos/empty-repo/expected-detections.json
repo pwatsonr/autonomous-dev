@@ -1,0 +1,9 @@
+{
+  "expected": [],
+  "notExpected": [
+    "auto:js-react",
+    "auto:python-fastapi",
+    "auto:typescript-strict-mode",
+    "auto:eslint-configured"
+  ]
+}

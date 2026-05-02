@@ -1,0 +1,35 @@
+# Multi-rule v1 artifact: covers all severities and an immutable flag.
+version: "1"
+metadata:
+  name: "Multi-rule fixture"
+  description: "Exercises every severity and the immutable flag."
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-15"
+rules:
+  - id: "org:fastapi-required"
+    severity: "blocking"
+    description: "Python HTTP services must use FastAPI."
+    applies_to:
+      language: "python"
+      service_type: "api"
+    requires:
+      framework_match: "fastapi"
+    evaluator: "framework-detector"
+  - id: "org:health-endpoint"
+    severity: "warn"
+    description: "Every API service must expose GET /health."
+    applies_to:
+      service_type: "api"
+    requires:
+      exposes_endpoint:
+        method: "GET"
+        path_pattern: "^/health$"
+    evaluator: "endpoint-prober"
+  - id: "org:no-eval"
+    severity: "advisory"
+    description: "eval() is forbidden."
+    applies_to:
+      language: "javascript"
+    requires:
+      excludes_pattern: "\\beval\\("
+    evaluator: "pattern-grep"

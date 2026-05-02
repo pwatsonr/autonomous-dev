@@ -1,0 +1,11 @@
+# Security fixture: payload uses the `!!js/function` custom YAML tag.
+# Under FAILSAFE_SCHEMA the loader rejects this with a parse_error before
+# attempting to instantiate any function — js-yaml's DEFAULT_FULL_SCHEMA
+# would happily eval this; FAILSAFE refuses every custom tag.
+version: "1"
+metadata:
+  name: !!js/function "function () { return 'pwn'; }"
+  description: "rce probe"
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-01"
+rules: []

@@ -1,0 +1,8 @@
+# Invalid: version is the literal "2" but schema constrains to "1".
+version: "2"
+metadata:
+  name: "Wrong version"
+  description: "Should fail schema validation (version != '1')."
+  owner: "tests@autonomous-dev.dev"
+  last_updated: "2026-04-01"
+rules: []
