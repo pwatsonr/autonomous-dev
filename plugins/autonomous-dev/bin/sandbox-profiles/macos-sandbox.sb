@@ -1,0 +1,41 @@
+;; SPEC-021-2-03 §macOS sandbox profile.
+;;
+;; Applied via `sandbox-exec -f <this-file> <evaluator>` to confine
+;; operator-supplied custom evaluators on macOS.
+;;
+;; Posture: deny-all baseline; explicitly allow only what the evaluator
+;; needs to run (process lifecycle, read system libraries, write inside the
+;; per-evaluator cwd). Network is denied; writes outside /private/tmp/eval-sandbox
+;; are denied.
+;;
+;; sandbox-exec is officially deprecated since macOS 10.15 (Catalina) but
+;; remains shipped through macOS 15.x. PLAN-021-2 §Risks documents the
+;; future migration to Docker-based isolation if it disappears.
+
+(version 1)
+(deny default)
+
+;; Process lifecycle
+(allow process-fork)
+(allow process-exec)
+(allow signal (target self))
+
+;; Read-only access to system shared libraries + the evaluator binary
+;; (the evaluator itself is read+exec via the parent execFile call;
+;; sandbox-exec inherits the open exec file descriptor).
+(allow file-read*
+  (subpath "/usr/lib")
+  (subpath "/usr/bin")
+  (subpath "/System")
+  (subpath "/Library/Frameworks")
+  (subpath "/private/tmp/eval-sandbox"))
+
+;; Writes are confined to the sandbox cwd (and only there).
+(allow file-write*
+  (subpath "/private/tmp/eval-sandbox"))
+
+;; All network is denied.
+(deny network*)
+
+;; Inherit stdin/stdout/stderr for JSON contract reporting.
+(allow file-ioctl)

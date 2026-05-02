@@ -39,3 +39,60 @@ export class LoaderError extends Error {
     this.name = 'LoaderError';
   }
 }
+
+// ---------------------------------------------------------------------------
+// PLAN-021-2 evaluator/sandbox errors (SPEC-021-2-03)
+// ---------------------------------------------------------------------------
+
+/** Operator-supplied custom evaluator violated the sandbox trust boundary. */
+export class SecurityError extends Error {
+  readonly code = 'EVALUATOR_SECURITY';
+  constructor(message: string) {
+    super(message);
+    this.name = 'SecurityError';
+  }
+}
+
+/** Requested evaluator name is not registered. */
+export class EvaluatorNotFoundError extends Error {
+  readonly code = 'EVALUATOR_NOT_FOUND';
+  constructor(public readonly evaluatorName: string) {
+    super(`Evaluator "${evaluatorName}" is not registered`);
+    this.name = 'EvaluatorNotFoundError';
+  }
+}
+
+/** Wraps any error thrown during evaluator dispatch, preserving the rule id. */
+export class EvaluatorRunError extends Error {
+  readonly code = 'EVALUATOR_RUN';
+  constructor(
+    public readonly ruleId: string,
+    public readonly cause: Error,
+  ) {
+    super(`Evaluator failed for rule "${ruleId}": ${cause.message}`);
+    this.name = 'EvaluatorRunError';
+  }
+}
+
+/** Custom evaluator exceeded the 30s wall-clock cap. */
+export class SandboxTimeoutError extends Error {
+  readonly code = 'SANDBOX_TIMEOUT';
+  constructor(
+    public readonly path: string,
+    public readonly elapsedMs: number,
+  ) {
+    super(
+      `Custom evaluator "${path}" exceeded 30s wall clock (ran for ${elapsedMs}ms)`,
+    );
+    this.name = 'SandboxTimeoutError';
+  }
+}
+
+/** Custom evaluator exceeded the 256MB memory cap (Linux prlimit). */
+export class SandboxMemoryError extends Error {
+  readonly code = 'SANDBOX_MEMORY';
+  constructor(public readonly path: string) {
+    super(`Custom evaluator "${path}" exceeded 256MB memory cap`);
+    this.name = 'SandboxMemoryError';
+  }
+}
