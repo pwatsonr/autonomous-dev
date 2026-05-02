@@ -1,0 +1,6 @@
+version: "1.0"
+environments:
+  dev:
+    parameters: {}
+    approval: "none"
+    cost_cap_usd: 0

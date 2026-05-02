@@ -1,0 +1,7 @@
+version: "1.0"
+environments:
+  dev:
+    backend: "local"
+    parameters: {}
+    approval: "optional"
+    cost_cap_usd: 0

@@ -1,0 +1,20 @@
+version: "1.0"
+default_backend: "static-stub"
+environments:
+  dev:
+    backend: "local-stub"
+    parameters: {}
+    approval: "none"
+    cost_cap_usd: 0
+  staging:
+    backend: "static-stub"
+    parameters:
+      target_dir: "/tmp/staging-test"
+    approval: "single"
+    cost_cap_usd: 5
+  prod:
+    backend: "static-stub"
+    parameters:
+      target_dir: "/tmp/prod-test"
+    approval: "two-person"
+    cost_cap_usd: 25
