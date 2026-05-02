@@ -27,8 +27,51 @@ import type {
   TrustVerdict,
 } from './types';
 import type { ValidationPipeline } from './validation-pipeline';
+import type { MetaReviewCache, MetaReviewVerdict } from './meta-review-cache';
+import { SignatureVerifier } from './signature-verifier';
+
+/**
+ * Pluggable spawner contract for invoking the `agent-meta-reviewer` agent
+ * (SPEC-019-3-03). Real implementation comes from PLAN-005 / agent
+ * registry; tests inject a stub that returns a fixed verdict.
+ */
+export interface AgentSpawner {
+  invoke(
+    agentName: 'agent-meta-reviewer',
+    payload: { manifest: HookManifest; triggerReasons: string[] },
+  ): Promise<{ pass: boolean; findings: string[] }>;
+}
+
+/**
+ * Optional dependencies for the trust validator. SPEC-019-3-01 leaves
+ * them undefined (skeleton stubs); SPEC-019-3-03 injects real
+ * implementations. Keeping them optional means the skeleton remains
+ * importable without dragging in crypto / agent infrastructure.
+ */
+export interface TrustValidatorDeps {
+  /** Real Ed25519 / RSA-PSS verifier; SPEC-019-3-03. */
+  signatureVerifier?: SignatureVerifier;
+  /** File-backed verdict cache; SPEC-019-3-03. */
+  metaReviewCache?: MetaReviewCache;
+  /** Agent spawner used for `agent-meta-reviewer` invocation; SPEC-019-3-03. */
+  agentSpawner?: AgentSpawner;
+}
+
+/**
+ * Critical hook points per TDD-019 §6 — failure_mode `block` on these
+ * triggers the meta-review.
+ */
+const CRITICAL_HOOK_POINTS: ReadonlySet<string> = new Set([
+  'pre-tool-use',
+  'pre-commit',
+  'pre-push',
+]);
 
 export class TrustValidator {
+  protected readonly signatureVerifier?: SignatureVerifier;
+  protected readonly metaReviewCache?: MetaReviewCache;
+  protected readonly agentSpawner?: AgentSpawner;
+
   /**
    * @param config the `extensions` section of the active autonomous-dev
    *   config. Treat as immutable for the lifetime of the validator; reloads
@@ -39,12 +82,23 @@ export class TrustValidator {
    * @param trustedKeysDir absolute path to the trusted-keys directory
    *   (`~/.claude/trusted-keys/` by default). Read by SPEC-019-3-03's
    *   signature verifier.
+   * @param deps optional crypto / agent / cache dependencies. When
+   *   omitted, `signatureVerifier` defaults to one rooted at
+   *   `trustedKeysDir`; `metaReviewCache` and `agentSpawner` remain
+   *   undefined and any meta-review trigger short-circuits to trusted
+   *   (the SPEC-019-3-03 stub fallback).
    */
   constructor(
     protected readonly config: ExtensionsConfig,
     protected readonly validationPipeline: ValidationPipeline,
     protected readonly trustedKeysDir: string,
-  ) {}
+    deps: TrustValidatorDeps = {},
+  ) {
+    this.signatureVerifier =
+      deps.signatureVerifier ?? new SignatureVerifier(trustedKeysDir);
+    this.metaReviewCache = deps.metaReviewCache;
+    this.agentSpawner = deps.agentSpawner;
+  }
 
   /**
    * Run the seven-step validation order. Returns the first failing
@@ -244,10 +298,105 @@ export class TrustValidator {
     return { trusted: true, requiresMetaReview: false };
   }
 
+  /**
+   * Meta-reviewer step (SPEC-019-3-03). Evaluates the six trigger
+   * conditions; if any match, consults the cache and otherwise invokes
+   * the `agent-meta-reviewer`. PASS verdicts continue the pipeline;
+   * FAIL verdicts reject with a reason that quotes the findings.
+   *
+   * If the agent spawner / cache are not injected (skeleton fallback),
+   * the trigger evaluation still runs and is reported via
+   * `requiresMetaReview`, but the step trusts the plugin to keep the
+   * skeleton path operable.
+   */
   protected async stepMetaReviewerAudit(
-    _manifest: HookManifest,
+    manifest: HookManifest,
   ): Promise<TrustVerdict> {
-    return { trusted: true, requiresMetaReview: false };
+    const { triggered, reasons } = this.evaluateMetaReviewTriggers(manifest);
+    if (!triggered) {
+      return { trusted: true, requiresMetaReview: false };
+    }
+
+    // Without a wired agent spawner we cannot make a real verdict; flag
+    // the meta-review requirement and pass through. This keeps the
+    // skeleton importable in environments that have not opted into the
+    // agent infrastructure yet.
+    if (!this.agentSpawner) {
+      return { trusted: true, requiresMetaReview: true };
+    }
+
+    if (this.metaReviewCache) {
+      const cached = await this.metaReviewCache.get(manifest.id, manifest.version);
+      if (cached) {
+        return this.verdictFromMetaReview(cached);
+      }
+    }
+
+    const verdict = await this.agentSpawner.invoke('agent-meta-reviewer', {
+      manifest,
+      triggerReasons: reasons,
+    });
+    if (this.metaReviewCache) {
+      await this.metaReviewCache.set(manifest.id, manifest.version, verdict);
+    }
+    return this.verdictFromMetaReview({
+      ...verdict,
+      reviewedAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Evaluate the six meta-review trigger conditions (TDD-019 §10.3).
+   * Returns the list of human-readable reasons for any match. The
+   * reasons strings are part of the audit-log contract — adding new
+   * triggers must append, not rename.
+   */
+  evaluateMetaReviewTriggers(manifest: HookManifest): {
+    triggered: boolean;
+    reasons: string[];
+  } {
+    const reasons: string[] = [];
+    const slots = manifest.reviewer_slots ?? [];
+    if (slots.some((s) => s === 'code-review' || s === 'security-review')) {
+      reasons.push('privileged reviewer slot');
+    }
+    const caps = manifest.capabilities ?? [];
+    if (caps.includes('network')) reasons.push('network capability');
+    if (caps.includes('privileged-env')) reasons.push('privileged-env capability');
+    const fsWrites = manifest.filesystem_write_paths ?? [];
+    if (fsWrites.some((p) => !p.startsWith('/tmp/'))) {
+      reasons.push('filesystem-write outside /tmp');
+    }
+    const hooks = manifest.hooks ?? [];
+    if (hooks.some((h) => h.allow_child_processes === true)) {
+      reasons.push('allow_child_processes');
+    }
+    if (
+      hooks.some(
+        (h) =>
+          h.failure_mode === 'block' && CRITICAL_HOOK_POINTS.has(h.hook_point),
+      )
+    ) {
+      reasons.push('failure_mode=block on critical hook');
+    }
+    return { triggered: reasons.length > 0, reasons };
+  }
+
+  /** Lift a meta-review verdict into a TrustVerdict. */
+  private verdictFromMetaReview(verdict: MetaReviewVerdict): TrustVerdict {
+    if (verdict.pass) {
+      return {
+        trusted: true,
+        requiresMetaReview: true,
+        metaReviewVerdict: { pass: true, findings: verdict.findings },
+      };
+    }
+    return {
+      trusted: false,
+      reason: `meta-review FAIL: ${verdict.findings.join('; ')}`,
+      requiresMetaReview: true,
+      metaReviewVerdict: { pass: false, findings: verdict.findings },
+    };
   }
 
   protected async stepDependencyResolution(
@@ -263,20 +412,20 @@ export class TrustValidator {
   }
 
   /**
-   * Stub signature verifier. SPEC-019-3-03 replaces this with a real
-   * Ed25519 / RSA-PSS verifier delegated to `SignatureVerifier`.
+   * Verify the manifest's detached signature (SPEC-019-3-03). The
+   * convention is `<manifestPath>.sig` next to the manifest; the
+   * SignatureVerifier walks every key in `trustedKeysDir` and returns
+   * true on the first match.
    *
-   * Marked `protected` so unit tests in SPEC-019-3-02 can subclass and
-   * override to simulate signed/unsigned/invalid scenarios without
-   * needing real key material.
+   * `protected` so SPEC-019-3-02's truth-table tests can subclass and
+   * override to simulate signed/unsigned/invalid without real keys.
    */
   protected async verifySignature(
     _manifest: HookManifest,
-    _manifestPath: string,
+    manifestPath: string,
   ): Promise<boolean> {
-    // Safe default until SPEC-019-3-03 wires the real verifier: nothing is
-    // signed. Allowlist mode never calls this; permissive-no-verify
-    // short-circuits before reaching it.
-    return false;
+    if (!this.signatureVerifier) return false;
+    const sigPath = `${manifestPath}.sig`;
+    return this.signatureVerifier.verify(manifestPath, sigPath);
   }
 }
