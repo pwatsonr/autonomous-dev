@@ -83,6 +83,44 @@ jobs:
           retention-days: 90
 
   # ----------------------------------------------------------------
+  # verify-evals (SPEC-017-3-04)
+  # ----------------------------------------------------------------
+  # Runs in parallel with verify-version (no `needs:` between them).
+  # Does NOT re-run the eval suite -- it trusts the most recent
+  # main-branch baseline published by the assist-evals.yml cron.
+  # Operator runbook: docs/operators/release-recovery.md
+  verify-evals:
+    name: Verify assist eval baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      baseline-rate: ${{ steps.baseline.outputs.baseline-rate }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch eval baseline
+        id: baseline
+        run: bash scripts/ci/fetch-eval-baseline.sh
+
+      - name: Assert baseline meets threshold
+        env:
+          THRESHOLD: ${{ vars.ASSIST_EVAL_THRESHOLD || '0.85' }}
+          BASELINE_RATE: ${{ steps.baseline.outputs.baseline-rate }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BASELINE_RATE:-}" ]; then
+            echo "::error::No assist eval baseline found on _eval-baseline branch; release blocked. See docs/operators/release-recovery.md"
+            exit 1
+          fi
+          if awk "BEGIN { exit !($BASELINE_RATE < $THRESHOLD) }"; then
+            echo "::error::Assist eval baseline is below $THRESHOLD; release blocked"
+            exit 1
+          fi
+          echo "Baseline $BASELINE_RATE meets threshold $THRESHOLD"
+
+  # ----------------------------------------------------------------
   # generate-changelog (SPEC-017-3-02)
   # ----------------------------------------------------------------
   # Generates a CHANGELOG.md entry via Claude using the commit log

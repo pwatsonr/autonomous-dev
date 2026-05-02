@@ -79,6 +79,52 @@ jobs:
           path: eval-results.json
           retention-days: 90
 
+      # ----------------------------------------------------------
+      # Threshold + regression gate (SPEC-017-3-04)
+      # ----------------------------------------------------------
+      # Operator runbook: docs/operators/assist-evals.md
+      - name: Fetch baseline
+        id: baseline
+        if: always() && steps.summary.outputs.pass-rate != ''
+        run: bash scripts/ci/fetch-eval-baseline.sh
+
+      - name: Check threshold + regression
+        if: always() && steps.summary.outputs.pass-rate != ''
+        env:
+          THRESHOLD: ${{ vars.ASSIST_EVAL_THRESHOLD || '0.85' }}
+          PASS_RATE: ${{ steps.summary.outputs.pass-rate }}
+          BASELINE_RATE: ${{ steps.baseline.outputs.baseline-rate }}
+        run: bash scripts/ci/check-eval-threshold.sh
+
+      # ----------------------------------------------------------
+      # Baseline update (cron-only; main only)
+      # ----------------------------------------------------------
+      # PRs MUST NOT update the baseline -- a regression PR could
+      # otherwise lower the bar for itself.
+      - name: Update baseline (cron only)
+        if: success() && github.event_name == 'schedule' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Create or update _eval-baseline branch as an orphan branch
+          # containing only baseline.json (no main-history files).
+          git fetch origin _eval-baseline 2>/dev/null || true
+          if git show-ref --verify --quiet refs/remotes/origin/_eval-baseline; then
+            git checkout -B _eval-baseline origin/_eval-baseline
+          else
+            git checkout --orphan _eval-baseline
+            git rm -rf . 2>/dev/null || true
+          fi
+
+          cp eval-results.json baseline.json
+          git add baseline.json
+          git commit -m "chore(evals): update baseline pass_rate from run ${GITHUB_RUN_ID}"
+          git push origin _eval-baseline
+
       - name: Emit spend estimate
         if: always()
         env:
