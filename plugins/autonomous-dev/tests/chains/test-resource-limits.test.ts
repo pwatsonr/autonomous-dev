@@ -376,3 +376,318 @@ describe('SPEC-022-2-02: strictestFailureMode helper', () => {
     expect(strictestFailureMode([])).toBe('warn');
   });
 });
+
+// =====================================================================
+// SPEC-022-2-05 cross-feature scenarios. The single-feature blocks above
+// cover one limit at a time; these exercise interactions between them.
+// =====================================================================
+
+describe('SPEC-022-2-05: resource-limits cross-feature scenarios', () => {
+  let tempRoot: string;
+  let registry: ArtifactRegistry;
+  let securityExample: unknown;
+
+  beforeEach(async () => {
+    tempRoot = await createTempRequestDir();
+    registry = await loadArtifactSchemas();
+    securityExample = await loadSecurityFindingsExample();
+    ChainExecutor.__resetActiveChainsForTest();
+  });
+
+  afterEach(async () => {
+    ChainExecutor.__resetActiveChainsForTest();
+    await cleanupTempDir(tempRoot);
+  });
+
+  it('length limit overrides everything: chain length > max throws before any plugin invokes, even with on_failure ignore', async () => {
+    // Build a 12-plugin chain with all producers declaring `ignore` mode.
+    // Length cap fires first.
+    const manifests: HookManifest[] = [];
+    for (let i = 0; i < 12; i++) {
+      manifests.push(
+        buildManifest({
+          id: `n${i}`,
+          produces:
+            i === 0
+              ? [
+                  {
+                    artifact_type: 'security-findings',
+                    schema_version: '1.0',
+                    format: 'json',
+                    on_failure: 'ignore',
+                  },
+                ]
+              : undefined,
+          consumes:
+            i === 0
+              ? undefined
+              : [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+        }),
+      );
+    }
+    const graph = buildGraphFrom(manifests);
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+    const invokerCalls: string[] = [];
+    const invoker: ChainHookInvoker = async (pid) => {
+      invokerCalls.push(pid);
+      return [];
+    };
+    const exec = new ChainExecutor(graph, registry, lookup, invoker, undefined, {
+      limits: { ...DEFAULT_CHAIN_LIMITS, max_length: 10 },
+    });
+    await expect(
+      exec.executeChain(
+        'n0',
+        { requestRoot: tempRoot, requestId: 'CFL' },
+        { artifactType: 'security-findings', scanId: 'cfl', payload: securityExample },
+      ),
+    ).rejects.toMatchObject({ name: 'ChainTooLongError' });
+    expect(invokerCalls).toEqual([]);
+  });
+
+  it('size cap during a would-be-paused chain: oversize requires_approval artifact fails, no state file', async () => {
+    // Producer emits a code-patches artifact whose serialized size exceeds
+    // the cap. Even though the artifact is `requires_approval`, the size
+    // check fires inside persist() BEFORE the pause logic.
+    const manifests = [
+      buildManifest({
+        id: 'producer',
+        produces: [
+          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
+        ],
+      }),
+      buildManifest({
+        id: 'fixer',
+        consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+        produces: [
+          {
+            artifact_type: 'code-patches',
+            schema_version: '1.0',
+            format: 'json',
+            requires_approval: true,
+          },
+        ],
+      }),
+    ];
+    const graph = buildGraphFrom(manifests);
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+    // Inject a tiny artifact-size cap on the registry by re-instantiating it.
+    const tinyRegistry = new (registry.constructor as typeof ArtifactRegistry)({
+      maxArtifactSizeMb: 1 / 1024, // 1 KB
+    });
+    // Re-load schemas so `validate` works.
+    await tinyRegistry.loadSchemas(
+      `${__dirname}/../../schemas/artifacts`,
+    );
+    const oversize = { patches: 'a'.repeat(5000) };
+    const invoker: ChainHookInvoker = async (pid) => {
+      if (pid === 'fixer') {
+        return [
+          { artifactType: 'code-patches', scanId: 'big', payload: oversize },
+        ];
+      }
+      return [];
+    };
+    const stateStore = new (require('../../intake/chains/state-store').StateStore)();
+    const exec = new ChainExecutor(graph, tinyRegistry, lookup, invoker, undefined, {
+      stateStore,
+      chainId: 'size-pause',
+    });
+    const result = await exec.executeChain(
+      'producer',
+      { requestRoot: tempRoot, requestId: 'SP' },
+      { artifactType: 'security-findings', scanId: 'sp', payload: securityExample },
+    );
+    // Chain marked failed (per-step error caught), NOT paused.
+    expect(result.outcome).toBe('failed');
+    // No state file should exist.
+    const fs = await import('node:fs/promises');
+    const statePath = `${tempRoot}/.autonomous-dev/chains/size-pause.state.json`;
+    await expect(fs.stat(statePath)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('timeout at length boundary: a downstream plugin hangs, per-plugin timeout fires, further downstream skip-cascades per default warn', async () => {
+    // 3-plugin chain: trigger t0 (security-findings) → middle code-fixer
+    // (hangs, times out) → audit-logger (skip-cascades). Verifies that the
+    // chain at any length tolerates a timeout in a non-trigger plugin
+    // without leaking the slot or invoking downstream.
+    const trio: HookManifest[] = [
+      buildManifest({
+        id: 't0',
+        produces: [
+          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
+        ],
+      }),
+      buildManifest({
+        id: 'middle',
+        consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+        produces: [
+          { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
+        ],
+      }),
+      buildManifest({
+        id: 'tail',
+        consumes: [{ artifact_type: 'code-patches', schema_version: '^1.0' }],
+      }),
+    ];
+    const graph = buildGraphFrom(trio);
+    const lookup: ManifestLookup = (id) => trio.find((m) => m.id === id);
+    let tailInvoked = false;
+    const invoker: ChainHookInvoker = (pid) => {
+      if (pid === 'middle') return new Promise(() => {}); // hangs forever
+      if (pid === 'tail') tailInvoked = true;
+      return Promise.resolve<ChainHookOutput[]>([]);
+    };
+    const exec = new ChainExecutor(graph, registry, lookup, invoker, undefined, {
+      limits: {
+        ...DEFAULT_CHAIN_LIMITS,
+        max_length: 10,
+        per_plugin_timeout_seconds: 0.1,
+      },
+      chainId: 'tlb',
+    });
+    const result = await exec.executeChain(
+      't0',
+      { requestRoot: tempRoot, requestId: 'TLB' },
+      { artifactType: 'security-findings', scanId: 'tlb', payload: securityExample },
+    );
+    const midStep = result.steps.find((s) => s.pluginId === 'middle');
+    const tailStep = result.steps.find((s) => s.pluginId === 'tail');
+    expect(midStep?.status).toBe('error');
+    expect(midStep?.error).toMatch(/exceeded.*timeout|PluginTimeout/i);
+    expect(tailStep?.status).toBe('skipped');
+    expect(tailInvoked).toBe(false);
+    // Slot released cleanly.
+    expect(ChainExecutor.getActiveChainCount()).toBe(0);
+  }, 10_000);
+
+  it('concurrent-cap with timeout in flight: 4th attempt rejected; after timeout fires and slot frees, 4th succeeds', async () => {
+    const manifests = [
+      buildManifest({
+        id: 'security-reviewer',
+        produces: [
+          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
+        ],
+      }),
+      buildManifest({
+        id: 'code-fixer',
+        consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+      }),
+    ];
+    const graph = buildGraphFrom(manifests);
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+
+    // First three chains hang on code-fixer; the 4th attempt is rejected by
+    // the cap. After all three time out, the slot is released and a fresh
+    // attempt succeeds.
+    const hangingInvoker: ChainHookInvoker = (pid) => {
+      if (pid === 'code-fixer') return new Promise(() => {});
+      return Promise.resolve<ChainHookOutput[]>([]);
+    };
+    const fastInvoker: ChainHookInvoker = async () => [];
+    const limits = {
+      ...DEFAULT_CHAIN_LIMITS,
+      max_concurrent_chains: 3,
+      per_plugin_timeout_seconds: 0.1,
+    };
+    const e1 = new ChainExecutor(graph, registry, lookup, hangingInvoker, undefined, {
+      limits,
+      chainId: 'cct1',
+    });
+    const e2 = new ChainExecutor(graph, registry, lookup, hangingInvoker, undefined, {
+      limits,
+      chainId: 'cct2',
+    });
+    const e3 = new ChainExecutor(graph, registry, lookup, hangingInvoker, undefined, {
+      limits,
+      chainId: 'cct3',
+    });
+    const e4 = new ChainExecutor(graph, registry, lookup, hangingInvoker, undefined, {
+      limits,
+      chainId: 'cct4',
+    });
+
+    const p1 = e1.executeChain(
+      'security-reviewer',
+      { requestRoot: tempRoot, requestId: 'CCT1' },
+      { artifactType: 'security-findings', scanId: 'c1', payload: securityExample },
+    );
+    const p2 = e2.executeChain(
+      'security-reviewer',
+      { requestRoot: tempRoot, requestId: 'CCT2' },
+      { artifactType: 'security-findings', scanId: 'c2', payload: securityExample },
+    );
+    const p3 = e3.executeChain(
+      'security-reviewer',
+      { requestRoot: tempRoot, requestId: 'CCT3' },
+      { artifactType: 'security-findings', scanId: 'c3', payload: securityExample },
+    );
+    // Yield so the three chains enter runChainBody and bump the counter.
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    expect(ChainExecutor.getActiveChainCount()).toBe(3);
+
+    // 4th attempt: rejected by the cap.
+    await expect(
+      e4.executeChain(
+        'security-reviewer',
+        { requestRoot: tempRoot, requestId: 'CCT4' },
+        { artifactType: 'security-findings', scanId: 'c4', payload: securityExample },
+      ),
+    ).rejects.toMatchObject({ name: 'ConcurrentChainLimitError' });
+
+    // Wait for the three hanging chains to time out and release their slots.
+    await Promise.all([p1, p2, p3]);
+    expect(ChainExecutor.getActiveChainCount()).toBe(0);
+
+    // Fresh executor with a fast invoker now succeeds (slot available).
+    const e5 = new ChainExecutor(graph, registry, lookup, fastInvoker, undefined, {
+      limits,
+      chainId: 'cct5',
+    });
+    const result = await e5.executeChain(
+      'security-reviewer',
+      { requestRoot: tempRoot, requestId: 'CCT5' },
+      { artifactType: 'security-findings', scanId: 'c5', payload: securityExample },
+    );
+    expect(result).toBeDefined();
+    expect(ChainExecutor.getActiveChainCount()).toBe(0);
+  }, 15_000);
+
+  it('concurrent-cap counter decrements after a length-cap throw (no slot leaked)', async () => {
+    const manifests: HookManifest[] = [];
+    for (let i = 0; i < 12; i++) {
+      manifests.push(
+        buildManifest({
+          id: `m${i}`,
+          produces:
+            i === 0
+              ? [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }]
+              : undefined,
+          consumes:
+            i === 0
+              ? undefined
+              : [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+        }),
+      );
+    }
+    const graph = buildGraphFrom(manifests);
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+    const exec = new ChainExecutor(graph, registry, lookup, async () => [], undefined, {
+      limits: { ...DEFAULT_CHAIN_LIMITS, max_length: 10, max_concurrent_chains: 2 },
+    });
+    // Trigger the length-cap throw repeatedly; counter must remain 0
+    // (slot was never acquired since pre-flight ran in the outer try).
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        exec.executeChain(
+          'm0',
+          { requestRoot: tempRoot, requestId: `CFL-${i}` },
+          { artifactType: 'security-findings', scanId: `cfl-${i}`, payload: securityExample },
+        ),
+      ).rejects.toMatchObject({ name: 'ChainTooLongError' });
+    }
+    expect(ChainExecutor.getActiveChainCount()).toBe(0);
+  });
+});

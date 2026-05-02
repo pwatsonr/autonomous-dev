@@ -520,3 +520,206 @@ describe('SPEC-022-2-04: PrivilegedChainResolver glob matcher', () => {
     expect(verdict.allowed).toBe(true);
   });
 });
+
+// =====================================================================
+// SPEC-022-2-05 cross-feature scenarios: trust × privileged-chain.
+// =====================================================================
+
+describe('SPEC-022-2-05: trust × privileged-chain interactions', () => {
+  let tempRoot: string;
+  let registry: ArtifactRegistry;
+  let securityExample: unknown;
+
+  beforeEach(async () => {
+    tempRoot = await createTempRequestDir();
+    registry = await loadArtifactSchemas();
+    securityExample = await loadSecurityFindingsExample();
+    ChainExecutor.__resetActiveChainsForTest();
+  });
+
+  afterEach(async () => {
+    ChainExecutor.__resetActiveChainsForTest();
+    await cleanupTempDir(tempRoot);
+  });
+
+  it('untrusted producer in privileged chain (allowlist matches): producer skipped, consumer cascade-skipped, privileged check still passed', async () => {
+    const manifests = makeTrioManifests('1.0.0', 'middle');
+    const graph = buildGraphFrom(manifests);
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+    const invokerCalls: string[] = [];
+    const invoker: ChainHookInvoker = async (pid) => {
+      invokerCalls.push(pid);
+      return [];
+    };
+    const exec = new ChainExecutor(graph, registry, lookup, invoker, undefined, {
+      privilegedChainAllowlist: ['code-fixer:audit-logger@*'],
+      trustChecker: {
+        isTrusted: (pid) =>
+          pid === 'code-fixer' ? { trusted: false, reason: 'revoked' } : { trusted: true },
+      },
+    });
+    const result = await exec.executeChain(
+      'security-reviewer',
+      { requestRoot: tempRoot, requestId: 'TXP-1' },
+      { artifactType: 'security-findings', scanId: 'stxp1', payload: securityExample },
+    );
+    // Privileged pre-flight passed (didn't throw).
+    // Trust short-circuited code-fixer; audit-logger skip-cascaded.
+    expect(invokerCalls).not.toContain('code-fixer');
+    const fixer = result.steps.find((s) => s.pluginId === 'code-fixer');
+    expect(fixer?.error).toMatch(/revoked/);
+    const audit = result.steps.find((s) => s.pluginId === 'audit-logger');
+    expect(audit?.status).toBe('skipped');
+  });
+
+  it('privileged chain not in allowlist: privileged check throws BEFORE trust check fires', async () => {
+    const manifests = makeTrioManifests('1.0.0', 'middle');
+    const graph = buildGraphFrom(manifests);
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+    const trustCalls: string[] = [];
+    const exec = new ChainExecutor(graph, registry, lookup, async () => [], undefined, {
+      privilegedChainAllowlist: [], // explicit opt-in, empty
+      trustChecker: {
+        isTrusted: (pid) => {
+          trustCalls.push(pid);
+          return { trusted: true };
+        },
+      },
+    });
+    await expect(
+      exec.executeChain(
+        'security-reviewer',
+        { requestRoot: tempRoot, requestId: 'TXP-2' },
+        { artifactType: 'security-findings', scanId: 'stxp2', payload: securityExample },
+      ),
+    ).rejects.toBeInstanceOf(PrivilegedChainNotAllowedError);
+    // Trust never ran because privileged pre-flight is structural.
+    expect(trustCalls).toEqual([]);
+  });
+
+  it('trusted producer, untrusted consumer in privileged chain: producer runs, consumer skipped with TrustValidationError, chain failed', async () => {
+    const manifests = makeTrioManifests('1.0.0', 'middle');
+    const graph = buildGraphFrom(manifests);
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+    const invokerCalls: string[] = [];
+    const invoker: ChainHookInvoker = async (pid) => {
+      invokerCalls.push(pid);
+      if (pid === 'code-fixer') {
+        return [{ artifactType: 'code-patches', scanId: 'p1', payload: patchesExample }];
+      }
+      return [];
+    };
+    const exec = new ChainExecutor(graph, registry, lookup, invoker, undefined, {
+      privilegedChainAllowlist: ['code-fixer:audit-logger@*'],
+      trustChecker: {
+        isTrusted: (pid) =>
+          pid === 'audit-logger'
+            ? { trusted: false, reason: 'consumer-revoked' }
+            : { trusted: true },
+      },
+      chainId: 'txp-tpc',
+    });
+    const result = await exec.executeChain(
+      'security-reviewer',
+      { requestRoot: tempRoot, requestId: 'TPC' },
+      { artifactType: 'security-findings', scanId: 'stpc', payload: securityExample },
+    );
+    // Producer ran; consumer trust-blocked.
+    expect(invokerCalls).toContain('code-fixer');
+    expect(invokerCalls).not.toContain('audit-logger');
+    const audit = result.steps.find((s) => s.pluginId === 'audit-logger')!;
+    expect(audit.status).toBe('error');
+    expect(audit.error).toMatch(/consumer-revoked/);
+    expect(result.ok).toBe(false);
+    expect(result.outcome).toBe('failed');
+  });
+
+  it('allowlist glob `*` matches all versions: chain proceeds for both v1.0.0 and v9.9.9 consumer', async () => {
+    // v1.0.0 consumer
+    {
+      const manifests = makeTrioManifests('1.0.0', 'middle');
+      manifests[2].version = '1.0.0';
+      const graph = buildGraphFrom(manifests);
+      const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+      const invokerCalls: string[] = [];
+      const exec = new ChainExecutor(
+        graph,
+        registry,
+        lookup,
+        async (pid) => {
+          invokerCalls.push(pid);
+          return [];
+        },
+        undefined,
+        { privilegedChainAllowlist: ['code-fixer:audit-logger@*'], chainId: 'star-v1' },
+      );
+      await exec.executeChain(
+        'security-reviewer',
+        { requestRoot: tempRoot, requestId: 'STAR-V1' },
+        { artifactType: 'security-findings', scanId: 'star-v1', payload: securityExample },
+      );
+      expect(invokerCalls).toContain('code-fixer');
+    }
+    // v9.9.9 consumer
+    {
+      const manifests = makeTrioManifests('1.0.0', 'middle');
+      manifests[2].version = '9.9.9';
+      const graph = buildGraphFrom(manifests);
+      const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+      const invokerCalls: string[] = [];
+      const exec = new ChainExecutor(
+        graph,
+        registry,
+        lookup,
+        async (pid) => {
+          invokerCalls.push(pid);
+          return [];
+        },
+        undefined,
+        { privilegedChainAllowlist: ['code-fixer:audit-logger@*'], chainId: 'star-v9' },
+      );
+      await exec.executeChain(
+        'security-reviewer',
+        { requestRoot: tempRoot, requestId: 'STAR-V9' },
+        { artifactType: 'security-findings', scanId: 'star-v9', payload: securityExample },
+      );
+      expect(invokerCalls).toContain('code-fixer');
+    }
+  });
+
+  it('allowlist `1.x` admits v1.5.2 consumer; rejects v2.0.0', async () => {
+    // v1.5.2 consumer (admit)
+    {
+      const manifests = makeTrioManifests('1.5.2', 'middle');
+      const graph = buildGraphFrom(manifests);
+      const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+      const exec = new ChainExecutor(graph, registry, lookup, async () => [], undefined, {
+        privilegedChainAllowlist: ['code-fixer:audit-logger@1.x'],
+      });
+      // Doesn't throw on the privileged check.
+      await exec.executeChain(
+        'security-reviewer',
+        { requestRoot: tempRoot, requestId: 'V15' },
+        { artifactType: 'security-findings', scanId: 'sv15', payload: securityExample },
+      );
+    }
+    // v2.0.0 consumer (reject)
+    {
+      const manifests = makeTrioManifests('1.5.2', 'middle');
+      // Bump audit-logger to v2.
+      manifests[2].version = '2.0.0';
+      const graph = buildGraphFrom(manifests);
+      const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+      const exec = new ChainExecutor(graph, registry, lookup, async () => [], undefined, {
+        privilegedChainAllowlist: ['code-fixer:audit-logger@1.x'],
+      });
+      await expect(
+        exec.executeChain(
+          'security-reviewer',
+          { requestRoot: tempRoot, requestId: 'V20' },
+          { artifactType: 'security-findings', scanId: 'sv20', payload: securityExample },
+        ),
+      ).rejects.toBeInstanceOf(PrivilegedChainNotAllowedError);
+    }
+  });
+});

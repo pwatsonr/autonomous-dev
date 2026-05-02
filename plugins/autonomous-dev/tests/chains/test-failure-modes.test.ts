@@ -316,3 +316,252 @@ describe('SPEC-022-2-02: on_failure resolution', () => {
     expect(result.steps.find((s) => s.pluginId === 'code-fixer')?.status).toBe('ok');
   });
 });
+
+// =====================================================================
+// SPEC-022-2-05 cross-feature matrix: error-source × on_failure mode.
+// Trust-failure × any mode always behaves as `warn` per the SPEC-022-2-04
+// design note; verified by the dedicated row below.
+// =====================================================================
+
+describe('SPEC-022-2-05: failure-mode × error-source matrix', () => {
+  let tempRoot: string;
+  let registry: ArtifactRegistry;
+  let securityExample: unknown;
+  let patchesExample: unknown;
+
+  beforeEach(async () => {
+    tempRoot = await createTempRequestDir();
+    registry = await loadArtifactSchemas();
+    securityExample = await loadSecurityFindingsExample();
+    patchesExample = await loadCodePatchesExample();
+    ChainExecutor.__resetActiveChainsForTest();
+  });
+
+  afterEach(async () => {
+    ChainExecutor.__resetActiveChainsForTest();
+    await cleanupTempDir(tempRoot);
+  });
+
+  /** Helper: drive a trio with a producer that fails via `source`, mode `mode`, and
+   *  return whether audit-logger ran (true=invoked) plus the chain ok flag. */
+  async function runMatrix(
+    source: 'throw' | 'timeout',
+    mode: ChainFailureMode,
+  ): Promise<{ auditInvoked: boolean; ok: boolean }> {
+    const { manifests, graph } = buildTrio(mode);
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+    const auditCalls: string[] = [];
+    const invoker: ChainHookInvoker = (pid) => {
+      if (pid === 'code-fixer') {
+        if (source === 'throw') {
+          return Promise.reject(new Error('synthetic'));
+        }
+        // `timeout`: never resolves; rely on per_plugin_timeout to fire.
+        return new Promise(() => {});
+      }
+      if (pid === 'audit-logger') {
+        auditCalls.push(pid);
+      }
+      return Promise.resolve<ChainHookOutput[]>([]);
+    };
+    const exec = new ChainExecutor(graph, registry, lookup, invoker, undefined, {
+      limits:
+        source === 'timeout'
+          ? { ...DEFAULT_CHAIN_LIMITS, per_plugin_timeout_seconds: 0.1 }
+          : { ...DEFAULT_CHAIN_LIMITS },
+      chainId: `mat-${source}-${mode}`,
+    });
+    const result = await exec.executeChain(
+      'security-reviewer',
+      { requestRoot: tempRoot, requestId: `MAT-${source}-${mode}` },
+      { artifactType: 'security-findings', scanId: `s-${source}-${mode}`, payload: securityExample },
+    );
+    return { auditInvoked: auditCalls.length > 0, ok: result.ok };
+  }
+
+  describe('throw × mode', () => {
+    it('throw × block: chain halts; audit-logger NOT invoked', async () => {
+      const r = await runMatrix('throw', 'block');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.ok).toBe(false);
+    });
+    it('throw × warn: audit-logger SKIPPED (not invoked); chain marked failed', async () => {
+      const r = await runMatrix('throw', 'warn');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.ok).toBe(false);
+    });
+    it('throw × ignore: audit-logger attempts (but skips for missing input); chain still failed', async () => {
+      const r = await runMatrix('throw', 'ignore');
+      // ignore mode does NOT skip-cascade. audit-logger reaches its consume
+      // check, finds no upstream code-patches, and records a `skipped` step
+      // (not invoked). ok=false because code-fixer's step is `error`.
+      expect(r.ok).toBe(false);
+    });
+  });
+
+  describe('timeout × mode', () => {
+    it('timeout × block: chain halts before audit-logger', async () => {
+      const r = await runMatrix('timeout', 'block');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.ok).toBe(false);
+    }, 10_000);
+    it('timeout × warn: audit-logger skip-cascades', async () => {
+      const r = await runMatrix('timeout', 'warn');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.ok).toBe(false);
+    }, 10_000);
+    it('timeout × ignore: chain marked failed; downstream not invoked due to missing input', async () => {
+      const r = await runMatrix('timeout', 'ignore');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.ok).toBe(false);
+    }, 10_000);
+  });
+
+  describe('size-cap × mode', () => {
+    /** Variant of runMatrix where code-fixer's output is forced to exceed
+     *  the artifact size cap. The producer's `produces.on_failure` mode
+     *  governs how the failure cascades to audit-logger. */
+    async function runSizeCapMatrix(
+      mode: ChainFailureMode,
+    ): Promise<{ auditInvoked: boolean; ok: boolean }> {
+      const { manifests, graph } = buildTrio(undefined);
+      // Set the producer mode on the failing artifact (code-fixer's output).
+      manifests[1].produces = [
+        {
+          artifact_type: 'code-patches',
+          schema_version: '1.0',
+          format: 'json',
+          on_failure: mode,
+        },
+      ];
+      // Build a registry with a tiny cap so the patches payload fails persist().
+      const tinyRegistry = new (registry.constructor as typeof registry.constructor)({
+        maxArtifactSizeMb: 1 / 1024, // 1 KB cap
+      }) as ArtifactRegistry;
+      // Re-load schemas so validate works.
+      await (
+        tinyRegistry as unknown as {
+          loadSchemas: (p: string) => Promise<void>;
+        }
+      ).loadSchemas(`${__dirname}/../../schemas/artifacts`);
+
+      const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+      const auditCalls: string[] = [];
+      const oversize = { patches: 'a'.repeat(5000) };
+      const invoker: ChainHookInvoker = (pid) => {
+        if (pid === 'code-fixer') {
+          return Promise.resolve<ChainHookOutput[]>([
+            { artifactType: 'code-patches', scanId: 'oversize', payload: oversize },
+          ]);
+        }
+        if (pid === 'audit-logger') auditCalls.push(pid);
+        return Promise.resolve<ChainHookOutput[]>([]);
+      };
+      const exec = new ChainExecutor(graph, tinyRegistry, lookup, invoker, undefined, {
+        limits: { ...DEFAULT_CHAIN_LIMITS },
+        chainId: `mat-size-${mode}`,
+      });
+      const result = await exec.executeChain(
+        'security-reviewer',
+        { requestRoot: tempRoot, requestId: `MAT-size-${mode}` },
+        { artifactType: 'security-findings', scanId: `s-size-${mode}`, payload: securityExample },
+      );
+      return { auditInvoked: auditCalls.length > 0, ok: result.ok };
+    }
+
+    it('size-cap × block: chain halts; audit-logger NOT invoked', async () => {
+      const r = await runSizeCapMatrix('block');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.ok).toBe(false);
+    });
+    it('size-cap × warn: audit-logger skip-cascades', async () => {
+      const r = await runSizeCapMatrix('warn');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.ok).toBe(false);
+    });
+    it('size-cap × ignore: chain marked failed; downstream NOT invoked (input missing)', async () => {
+      const r = await runSizeCapMatrix('ignore');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.ok).toBe(false);
+    });
+  });
+
+  describe('trust-failure × mode (always behaves as warn)', () => {
+    /** Invoke the trio with code-fixer's trust check failing. Producer's
+     *  declared on_failure mode is varied; trust-failure should always
+     *  behave as `warn` (skip-cascade), per SPEC-022-2-04 design note. */
+    async function runTrustMatrix(
+      mode: ChainFailureMode,
+    ): Promise<{ auditInvoked: boolean; ok: boolean; auditStepStatus: string | undefined }> {
+      const { manifests, graph } = buildTrio(mode);
+      const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+      let auditInvoked = false;
+      const invoker: ChainHookInvoker = (pid) => {
+        if (pid === 'audit-logger') auditInvoked = true;
+        return Promise.resolve<ChainHookOutput[]>([]);
+      };
+      const exec = new ChainExecutor(graph, registry, lookup, invoker, undefined, {
+        limits: { ...DEFAULT_CHAIN_LIMITS },
+        trustChecker: {
+          isTrusted: (pid) =>
+            pid === 'code-fixer' ? { trusted: false, reason: 'revoked' } : { trusted: true },
+        },
+        chainId: `mat-trust-${mode}`,
+      });
+      const result = await exec.executeChain(
+        'security-reviewer',
+        { requestRoot: tempRoot, requestId: `MAT-trust-${mode}` },
+        { artifactType: 'security-findings', scanId: `s-trust-${mode}`, payload: securityExample },
+      );
+      const audit = result.steps.find((s) => s.pluginId === 'audit-logger');
+      return { auditInvoked, ok: result.ok, auditStepStatus: audit?.status };
+    }
+
+    it('trust-failure × block: behaves as warn (audit-logger SKIP, not blocked)', async () => {
+      const r = await runTrustMatrix('block');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.auditStepStatus).toBe('skipped');
+      expect(r.ok).toBe(false);
+    });
+    it('trust-failure × warn: audit-logger SKIP', async () => {
+      const r = await runTrustMatrix('warn');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.auditStepStatus).toBe('skipped');
+      expect(r.ok).toBe(false);
+    });
+    it('trust-failure × ignore: behaves as warn (audit-logger SKIP)', async () => {
+      const r = await runTrustMatrix('ignore');
+      expect(r.auditInvoked).toBe(false);
+      expect(r.auditStepStatus).toBe('skipped');
+      expect(r.ok).toBe(false);
+    });
+  });
+
+  it('trust-failure × ANY mode behaves as `warn`: downstream skip-cascades regardless of declared mode', async () => {
+    // Use `block` mode on the producer to prove trust-failure overrides it.
+    const { manifests, graph } = buildTrio('block');
+    const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
+    let auditInvoked = false;
+    const invoker: ChainHookInvoker = (pid) => {
+      if (pid === 'audit-logger') auditInvoked = true;
+      return Promise.resolve<ChainHookOutput[]>([]);
+    };
+    const exec = new ChainExecutor(graph, registry, lookup, invoker, undefined, {
+      limits: { ...DEFAULT_CHAIN_LIMITS },
+      trustChecker: {
+        isTrusted: (pid) =>
+          pid === 'code-fixer' ? { trusted: false, reason: 'revoked' } : { trusted: true },
+      },
+    });
+    const result = await exec.executeChain(
+      'security-reviewer',
+      { requestRoot: tempRoot, requestId: 'TRUST-BLK' },
+      { artifactType: 'security-findings', scanId: 's-tb', payload: securityExample },
+    );
+    // Trust-failure is treated as `warn` regardless: audit-logger SKIP, not blocked.
+    const audit = result.steps.find((s) => s.pluginId === 'audit-logger')!;
+    expect(audit.status).toBe('skipped');
+    expect(auditInvoked).toBe(false);
+    expect(result.ok).toBe(false);
+  });
+});
