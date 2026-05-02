@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev.local/test-fixtures/security-findings/1.1.json",
+  "title": "TestSecurityFindings 1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["findings"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "line", "rule_id"],
+        "properties": {
+          "file": { "type": "string", "minLength": 1 },
+          "line": { "type": "integer", "minimum": 1 },
+          "rule_id": { "type": "string", "minLength": 1 },
+          "severity": {
+            "enum": ["critical", "high", "medium", "low", "info"]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "_comment": "SPEC-022-3-04. Chain config used by the secured-chain integration test. Both producer (rule-set-enforcement) and consumer (code-fixer) appear in extensions.privileged_chains[] so the persist+read pipeline attaches and verifies an Ed25519 _chain_signature in addition to the always-on HMAC. The pair entry uses the SPEC-022-2-04 grammar `<producer>:<consumer>@<version-glob>`.",
+  "chain": {
+    "id": "secure-fix-flow",
+    "name": "secure-fix-flow",
+    "trigger": "rule-set-enforcement",
+    "plugins": [
+      {
+        "id": "rule-set-enforcement",
+        "version": "1.0.0",
+        "produces": [
+          {
+            "artifact_type": "security-findings",
+            "schema_version": "1.0",
+            "format": "json"
+          }
+        ]
+      },
+      {
+        "id": "code-fixer",
+        "version": "1.0.0",
+        "consumes": [
+          {
+            "artifact_type": "security-findings",
+            "schema_version": "^1.0"
+          }
+        ],
+        "produces": [
+          {
+            "artifact_type": "code-patches",
+            "schema_version": "1.0",
+            "format": "json",
+            "requires_approval": true
+          }
+        ]
+      },
+      {
+        "id": "audit-logger",
+        "version": "1.0.0",
+        "consumes": [
+          {
+            "artifact_type": "code-patches",
+            "schema_version": "^1.0"
+          }
+        ]
+      }
+    ]
+  },
+  "extensions": {
+    "privileged_chains": [
+      "code-fixer:audit-logger@*",
+      "rule-set-enforcement:code-fixer@*"
+    ]
+  }
+}
