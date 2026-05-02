@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev/schemas/autonomous-dev-config.schema.json",
+  "title": "autonomous-dev global config",
+  "description": "Schema for ~/.claude/autonomous-dev.json. Subsets relevant to PLAN-019-3 (extensions / trust pipeline). Other top-level keys are passthrough until subsumed by other plans; additional top-level properties are permitted to keep this schema additive across plans.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "extensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Plugin trust policy. See TDD-019 §10.1.",
+      "properties": {
+        "allowlist": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9.-]+$" },
+          "default": []
+        },
+        "privileged_reviewers": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z0-9.-]+$" },
+          "default": []
+        },
+        "trust_mode": {
+          "type": "string",
+          "enum": ["allowlist", "permissive", "strict"],
+          "default": "allowlist"
+        },
+        "signature_verification": { "type": "boolean", "default": false },
+        "auto_update_allowed": { "type": "boolean", "default": false },
+        "max_plugins_per_hook_point": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 5
+        },
+        "global_resource_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_total_memory_mb": { "type": "integer", "minimum": 16, "default": 256 },
+            "max_concurrent_executions": { "type": "integer", "minimum": 1, "default": 8 },
+            "max_execution_time_seconds": { "type": "integer", "minimum": 1, "default": 30 }
+          },
+          "default": {
+            "max_total_memory_mb": 256,
+            "max_concurrent_executions": 8,
+            "max_execution_time_seconds": 30
+          }
+        }
+      },
+      "default": {
+        "allowlist": [],
+        "privileged_reviewers": [],
+        "trust_mode": "allowlist",
+        "signature_verification": false,
+        "auto_update_allowed": false,
+        "max_plugins_per_hook_point": 5,
+        "global_resource_limits": {
+          "max_total_memory_mb": 256,
+          "max_concurrent_executions": 8,
+          "max_execution_time_seconds": 30
+        }
+      }
+    }
+  }
+}
