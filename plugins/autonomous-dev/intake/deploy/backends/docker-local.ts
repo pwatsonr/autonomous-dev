@@ -20,6 +20,7 @@ import {
 import { ParameterValidationError } from '../errors';
 import { generateUlid } from '../id';
 import { runTool, type RunToolOptions } from '../exec';
+import type { DeployLogger } from '../logger';
 import { validateParameters, type ParamSchema } from '../parameters';
 import { signDeploymentRecord } from '../record-signer';
 import type {
@@ -51,6 +52,8 @@ export interface DockerLocalBackendOptions {
   fetchFn?: typeof fetch;
   /** Test seam for `setTimeout` so health-check polling can use fake timers. */
   sleepFn?: (ms: number) => Promise<void>;
+  /** Optional structured logger (SPEC-023-3-02). Absence is non-fatal. */
+  logger?: DeployLogger;
 }
 
 export class DockerLocalBackend implements DeploymentBackend {
@@ -65,6 +68,7 @@ export class DockerLocalBackend implements DeploymentBackend {
   private readonly run: typeof runTool;
   private readonly fetchFn: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
+  private readonly logger: DeployLogger | undefined;
   private lastBuildContext: BuildContext | null = null;
 
   constructor(opts: DockerLocalBackendOptions = {}) {
@@ -73,60 +77,77 @@ export class DockerLocalBackend implements DeploymentBackend {
     this.fetchFn = opts.fetchFn ?? globalThis.fetch.bind(globalThis);
     this.sleep =
       opts.sleepFn ?? ((ms: number) => new Promise((res) => setTimeout(res, ms)));
+    this.logger = opts.logger;
   }
 
   async build(ctx: BuildContext): Promise<BuildArtifact> {
+    const buildLogger = this.logger?.forComponent('build');
+    const t0 = Date.now();
+    buildLogger?.info('build_started', { commit: ctx.commitSha, target: ctx.branch });
     this.lastBuildContext = ctx;
-    const validation = validateParameters(
-      {
-        image_name: PARAM_SCHEMA.image_name,
-        dockerfile_path: PARAM_SCHEMA.dockerfile_path,
-      },
-      {
-        image_name: ctx.params.image_name,
-        ...(ctx.params.dockerfile_path !== undefined
-          ? { dockerfile_path: ctx.params.dockerfile_path }
-          : {}),
-      },
-    );
-    if (!validation.valid) throw new ParameterValidationError(validation.errors);
-    const imageName = String(validation.sanitized.image_name);
-    const dockerfilePath = String(validation.sanitized.dockerfile_path);
+    try {
+      const validation = validateParameters(
+        {
+          image_name: PARAM_SCHEMA.image_name,
+          dockerfile_path: PARAM_SCHEMA.dockerfile_path,
+        },
+        {
+          image_name: ctx.params.image_name,
+          ...(ctx.params.dockerfile_path !== undefined
+            ? { dockerfile_path: ctx.params.dockerfile_path }
+            : {}),
+        },
+      );
+      if (!validation.valid) throw new ParameterValidationError(validation.errors);
+      const imageName = String(validation.sanitized.image_name);
+      const dockerfilePath = String(validation.sanitized.dockerfile_path);
 
-    const tag = `${imageName}:${ctx.commitSha.slice(0, 12)}`;
-    const runOpts: RunToolOptions = {
-      cwd: ctx.repoPath,
-      timeoutMs: 1_200_000,
-    };
-    await this.run(
-      'docker',
-      ['build', '-t', tag, '-f', dockerfilePath, '.'],
-      runOpts,
-    );
-    const inspect = await this.run(
-      'docker',
-      ['image', 'inspect', tag, '--format', '{{.Id}}'],
-      { cwd: ctx.repoPath, timeoutMs: 30_000 },
-    );
-    const imageId = inspect.stdout.trim();
+      const tag = `${imageName}:${ctx.commitSha.slice(0, 12)}`;
+      const runOpts: RunToolOptions = {
+        cwd: ctx.repoPath,
+        timeoutMs: 1_200_000,
+      };
+      await this.run(
+        'docker',
+        ['build', '-t', tag, '-f', dockerfilePath, '.'],
+        runOpts,
+      );
+      const inspect = await this.run(
+        'docker',
+        ['image', 'inspect', tag, '--format', '{{.Id}}'],
+        { cwd: ctx.repoPath, timeoutMs: 30_000 },
+      );
+      const imageId = inspect.stdout.trim();
 
-    const artifact: BuildArtifact = {
-      artifactId: generateUlid(),
-      type: 'docker-image',
-      location: tag,
-      // Docker-image artifacts use the image_id as the integrity anchor.
-      // Length is not 64-hex (sha256:<hex>) so we hash it ourselves into
-      // a stable lowercase-hex sha256 to satisfy the conformance suite.
-      checksum: hashSha256(imageId),
-      sizeBytes: 0,
-      metadata: {
-        image_id: imageId,
-        image_tag: tag,
-        commitSha: ctx.commitSha,
-      },
-    };
-    await writeArtifact(ctx.repoPath, artifact);
-    return artifact;
+      const artifact: BuildArtifact = {
+        artifactId: generateUlid(),
+        type: 'docker-image',
+        location: tag,
+        // Docker-image artifacts use the image_id as the integrity anchor.
+        // Length is not 64-hex (sha256:<hex>) so we hash it ourselves into
+        // a stable lowercase-hex sha256 to satisfy the conformance suite.
+        checksum: hashSha256(imageId),
+        sizeBytes: 0,
+        metadata: {
+          image_id: imageId,
+          image_tag: tag,
+          commitSha: ctx.commitSha,
+        },
+      };
+      buildLogger?.info('commit_validated', { commit: ctx.commitSha });
+      await writeArtifact(ctx.repoPath, artifact);
+      buildLogger?.info('build_completed', {
+        duration_ms: Date.now() - t0,
+        artifact_size_bytes: artifact.sizeBytes,
+      });
+      return artifact;
+    } catch (err) {
+      buildLogger?.error('build_failed', {
+        error: (err as Error).message,
+        stage: 'build',
+      });
+      throw err;
+    }
   }
 
   async deploy(
@@ -139,76 +160,88 @@ export class DockerLocalBackend implements DeploymentBackend {
       throw new Error('DockerLocalBackend.deploy() called before build()');
     }
 
-    const extra = (params.extra_run_args as unknown) ?? [];
-    if (!Array.isArray(extra) || !extra.every((v) => typeof v === 'string')) {
-      throw new ParameterValidationError([
-        { key: 'extra_run_args', message: 'must be a string[] when present' },
-      ]);
-    }
-    // Validate each entry as shell-safe-arg; compose into the validator.
-    for (let i = 0; i < extra.length; i++) {
-      const v = extra[i] as string;
-      const r = validateParameters(
-        { v: { type: 'string', format: 'shell-safe-arg' } },
-        { v },
-      );
-      if (!r.valid) {
+    const deployLogger = this.logger?.forComponent('deploy');
+    const t0 = Date.now();
+    deployLogger?.info('deploy_started', { env: environment });
+
+    try {
+      const extra = (params.extra_run_args as unknown) ?? [];
+      if (!Array.isArray(extra) || !extra.every((v) => typeof v === 'string')) {
         throw new ParameterValidationError([
-          { key: `extra_run_args[${i}]`, message: r.errors[0]?.message ?? 'invalid' },
+          { key: 'extra_run_args', message: 'must be a string[] when present' },
         ]);
       }
+      // Validate each entry as shell-safe-arg; compose into the validator.
+      for (let i = 0; i < extra.length; i++) {
+        const v = extra[i] as string;
+        const r = validateParameters(
+          { v: { type: 'string', format: 'shell-safe-arg' } },
+          { v },
+        );
+        if (!r.valid) {
+          throw new ParameterValidationError([
+            { key: `extra_run_args[${i}]`, message: r.errors[0]?.message ?? 'invalid' },
+          ]);
+        }
+      }
+
+      // Validate the rest of the schema (without extra_run_args).
+      const { extra_run_args: _drop, ...rest } = params as Record<string, unknown>;
+      const validation = validateParameters(PARAM_SCHEMA, rest);
+      if (!validation.valid) throw new ParameterValidationError(validation.errors);
+      const sanitized = validation.sanitized;
+      const imageName = String(sanitized.image_name);
+      const hostPort = Number(sanitized.host_port);
+      const containerPort = Number(sanitized.container_port);
+
+      const containerName = `${imageName}-${ctx.requestId}`;
+      const args = [
+        'run',
+        '-d',
+        '--name',
+        containerName,
+        '-p',
+        `${hostPort}:${containerPort}`,
+        ...(extra as string[]),
+        artifact.location,
+      ];
+      const result = await this.run('docker', args, {
+        cwd: ctx.repoPath,
+        timeoutMs: 60_000,
+      });
+      const containerId = result.stdout.trim();
+
+      const unsigned: DeploymentRecord = {
+        deployId: generateUlid(),
+        backend: this.metadata.name,
+        environment,
+        artifactId: artifact.artifactId,
+        deployedAt: new Date().toISOString(),
+        status: 'deployed',
+        details: {
+          container_id: containerId,
+          container_name: containerName,
+          image_tag: artifact.location,
+          host_port: hostPort,
+          container_port: containerPort,
+          health_path: String(sanitized.health_path),
+          health_timeout_seconds: Number(sanitized.health_timeout_seconds),
+        },
+        hmac: '',
+      };
+      const signed = signDeploymentRecord(unsigned);
+      await writeDeploymentRecord(ctx.repoPath, signed as unknown as Record<string, unknown> & { deployId: string });
+      deployLogger?.info('deploy_completed', { duration_ms: Date.now() - t0 });
+      return signed;
+    } catch (err) {
+      deployLogger?.error('deploy_failed', { error: (err as Error).message });
+      throw err;
     }
-
-    // Validate the rest of the schema (without extra_run_args).
-    const { extra_run_args: _drop, ...rest } = params as Record<string, unknown>;
-    const validation = validateParameters(PARAM_SCHEMA, rest);
-    if (!validation.valid) throw new ParameterValidationError(validation.errors);
-    const sanitized = validation.sanitized;
-    const imageName = String(sanitized.image_name);
-    const hostPort = Number(sanitized.host_port);
-    const containerPort = Number(sanitized.container_port);
-
-    const containerName = `${imageName}-${ctx.requestId}`;
-    const args = [
-      'run',
-      '-d',
-      '--name',
-      containerName,
-      '-p',
-      `${hostPort}:${containerPort}`,
-      ...(extra as string[]),
-      artifact.location,
-    ];
-    const result = await this.run('docker', args, {
-      cwd: ctx.repoPath,
-      timeoutMs: 60_000,
-    });
-    const containerId = result.stdout.trim();
-
-    const unsigned: DeploymentRecord = {
-      deployId: generateUlid(),
-      backend: this.metadata.name,
-      environment,
-      artifactId: artifact.artifactId,
-      deployedAt: new Date().toISOString(),
-      status: 'deployed',
-      details: {
-        container_id: containerId,
-        container_name: containerName,
-        image_tag: artifact.location,
-        host_port: hostPort,
-        container_port: containerPort,
-        health_path: String(sanitized.health_path),
-        health_timeout_seconds: Number(sanitized.health_timeout_seconds),
-      },
-      hmac: '',
-    };
-    const signed = signDeploymentRecord(unsigned);
-    await writeDeploymentRecord(ctx.repoPath, signed as unknown as Record<string, unknown> & { deployId: string });
-    return signed;
   }
 
   async healthCheck(record: DeploymentRecord): Promise<HealthStatus> {
+    const healthLogger = this.logger?.forComponent('health');
+    const tStart = Date.now();
     const hostPort = Number(record.details.host_port);
     const healthPath = String(record.details.health_path ?? '/');
     const timeoutSec = Number(record.details.health_timeout_seconds ?? 30);
@@ -269,12 +302,18 @@ export class DockerLocalBackend implements DeploymentBackend {
     });
 
     if (probeOk && containerRunning) {
+      healthLogger?.info('health_check_passed', { latency_ms: Date.now() - tStart });
       return { healthy: true, checks };
     }
+    const reason = !probeOk ? 'health-timeout' : 'container-not-running';
+    healthLogger?.warn('health_check_failed', {
+      latency_ms: Date.now() - tStart,
+      error: reason,
+    });
     return {
       healthy: false,
       checks,
-      unhealthyReason: !probeOk ? 'health-timeout' : 'container-not-running',
+      unhealthyReason: reason,
     };
   }
 

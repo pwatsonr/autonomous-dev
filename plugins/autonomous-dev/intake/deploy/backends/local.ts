@@ -23,6 +23,7 @@ import {
 import { generateUlid } from '../id';
 import { ParameterValidationError } from '../errors';
 import { runTool, type RunToolOptions } from '../exec';
+import type { DeployLogger } from '../logger';
 import { validateParameters, type ParamSchema } from '../parameters';
 import { signDeploymentRecord } from '../record-signer';
 import type {
@@ -50,6 +51,15 @@ export const PARAM_SCHEMA: Record<string, ParamSchema> = {
 /** Test-only seam — production callers use the default. */
 export interface LocalBackendOptions {
   runTool?: typeof runTool;
+  /**
+   * Optional structured logger (SPEC-023-3-02). Backend emits
+   * documented lifecycle events via `info`/`warn`/`error` when present;
+   * absence is non-fatal so prior callers still work.
+   *
+   * When passed, the backend uses `forComponent('build')` for the build
+   * phase and `forComponent('deploy')` for the deploy phase.
+   */
+  logger?: DeployLogger;
 }
 
 const PR_URL_REGEX = /https:\/\/github\.com\/[^\s]+\/pull\/\d+/;
@@ -64,16 +74,21 @@ export class LocalBackend implements DeploymentBackend {
   };
 
   private readonly run: typeof runTool;
+  private readonly logger: DeployLogger | undefined;
   private lastBuildContext: BuildContext | null = null;
 
   constructor(opts: LocalBackendOptions = {}) {
     this.run = opts.runTool ?? runTool;
+    this.logger = opts.logger;
   }
 
   async build(ctx: BuildContext): Promise<BuildArtifact> {
     // Pure: capture the context for `deploy()` (no side effects on the
     // repo). The HMAC-flavored checksum makes two builds with identical
     // context produce identical checksums (deterministic).
+    const buildLogger = this.logger?.forComponent('build');
+    const t0 = Date.now();
+    buildLogger?.info('build_started', { commit: ctx.commitSha, target: ctx.branch });
     this.lastBuildContext = ctx;
     const checksum = createHash('sha256')
       .update(ctx.commitSha)
@@ -82,6 +97,7 @@ export class LocalBackend implements DeploymentBackend {
       .update('\0')
       .update(ctx.requestId)
       .digest('hex');
+    buildLogger?.info('commit_validated', { commit: ctx.commitSha });
     const artifact: BuildArtifact = {
       artifactId: generateUlid(),
       type: 'commit',
@@ -90,7 +106,19 @@ export class LocalBackend implements DeploymentBackend {
       sizeBytes: 0,
       metadata: { branch: ctx.branch, requestId: ctx.requestId },
     };
-    await writeArtifact(ctx.repoPath, artifact);
+    try {
+      await writeArtifact(ctx.repoPath, artifact);
+    } catch (err) {
+      buildLogger?.error('build_failed', {
+        error: (err as Error).message,
+        stage: 'write_artifact',
+      });
+      throw err;
+    }
+    buildLogger?.info('build_completed', {
+      duration_ms: Date.now() - t0,
+      artifact_size_bytes: artifact.sizeBytes,
+    });
     return artifact;
   }
 
@@ -104,8 +132,16 @@ export class LocalBackend implements DeploymentBackend {
       throw new Error('LocalBackend.deploy() called before build()');
     }
 
+    const deployLogger = this.logger?.forComponent('deploy');
+    const t0 = Date.now();
+    deployLogger?.info('deploy_started', { env: environment });
+
     const validation = validateParameters(PARAM_SCHEMA, params);
-    if (!validation.valid) throw new ParameterValidationError(validation.errors);
+    if (!validation.valid) {
+      const err = new ParameterValidationError(validation.errors);
+      deployLogger?.error('deploy_failed', { error: err.message });
+      throw err;
+    }
     const sanitized = validation.sanitized;
     const prTitle = String(sanitized.pr_title);
     const prBody = String(sanitized.pr_body);
@@ -117,9 +153,11 @@ export class LocalBackend implements DeploymentBackend {
     // mismatch between commitSha and live worktree.
     const status = await this.run('git', ['status', '--porcelain'], runOpts);
     if (status.stdout.trim().length > 0) {
-      throw new Error(
+      const err = new Error(
         `LocalBackend.deploy aborted: worktree is dirty\n${status.stdout}`,
       );
+      deployLogger?.error('deploy_failed', { error: err.message });
+      throw err;
     }
 
     await this.run('git', ['push', 'origin', ctx.branch], runOpts);
@@ -177,12 +215,19 @@ export class LocalBackend implements DeploymentBackend {
     };
     const signed = signDeploymentRecord(unsigned);
     await writeDeploymentRecord(ctx.repoPath, signed as unknown as Record<string, unknown> & { deployId: string });
+    deployLogger?.info('deploy_completed', { duration_ms: Date.now() - t0 });
     return signed;
   }
 
   async healthCheck(record: DeploymentRecord): Promise<HealthStatus> {
+    const healthLogger = this.logger?.forComponent('health');
+    const t0 = Date.now();
     const prUrl = String(record.details.pr_url ?? '');
     if (!prUrl) {
+      healthLogger?.warn('health_check_failed', {
+        latency_ms: Date.now() - t0,
+        error: 'pr-url-missing',
+      });
       return {
         healthy: false,
         checks: [{ name: 'pr-url-missing', passed: false }],
@@ -197,6 +242,15 @@ export class LocalBackend implements DeploymentBackend {
       );
       const parsed = JSON.parse(result.stdout) as { state?: string };
       const open = parsed.state === 'OPEN';
+      const latency = Date.now() - t0;
+      if (open) {
+        healthLogger?.info('health_check_passed', { latency_ms: latency });
+      } else {
+        healthLogger?.warn('health_check_failed', {
+          latency_ms: latency,
+          error: `pr-state-${parsed.state ?? 'unknown'}`,
+        });
+      }
       return {
         healthy: open,
         checks: [
@@ -205,6 +259,10 @@ export class LocalBackend implements DeploymentBackend {
         ...(open ? {} : { unhealthyReason: `pr-state-${parsed.state ?? 'unknown'}` }),
       };
     } catch (err) {
+      healthLogger?.warn('health_check_failed', {
+        latency_ms: Date.now() - t0,
+        error: (err as Error).message,
+      });
       return {
         healthy: false,
         checks: [{ name: 'pr-state', passed: false, message: (err as Error).message }],

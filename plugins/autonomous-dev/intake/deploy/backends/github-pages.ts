@@ -20,6 +20,7 @@ import { ExternalToolError, ParameterValidationError } from '../errors';
 import { buildFileTreeManifest } from '../file-tree';
 import { generateUlid } from '../id';
 import { runTool, type RunToolOptions } from '../exec';
+import type { DeployLogger } from '../logger';
 import { validateParameters, type ParamSchema } from '../parameters';
 import { signDeploymentRecord } from '../record-signer';
 import type {
@@ -44,6 +45,8 @@ export const PARAM_SCHEMA: Record<string, ParamSchema> = {
 export interface GithubPagesBackendOptions {
   runTool?: typeof runTool;
   fetchFn?: typeof fetch;
+  /** Optional structured logger (SPEC-023-3-02). Absence is non-fatal. */
+  logger?: DeployLogger;
 }
 
 const SUBTREE_DIVERGED_RE = /(would clobber existing tag|updates were rejected|non-fast-forward|diverged)/i;
@@ -59,15 +62,20 @@ export class GithubPagesBackend implements DeploymentBackend {
 
   private readonly run: typeof runTool;
   private readonly fetchFn: typeof fetch;
+  private readonly logger: DeployLogger | undefined;
   private lastBuildContext: BuildContext | null = null;
 
   constructor(opts: GithubPagesBackendOptions = {}) {
     this.run = opts.runTool ?? runTool;
     // eslint-disable-next-line @typescript-eslint/unbound-method
     this.fetchFn = opts.fetchFn ?? globalThis.fetch.bind(globalThis);
+    this.logger = opts.logger;
   }
 
   async build(ctx: BuildContext): Promise<BuildArtifact> {
+    const buildLogger = this.logger?.forComponent('build');
+    const t0 = Date.now();
+    buildLogger?.info('build_started', { commit: ctx.commitSha, target: ctx.branch });
     this.lastBuildContext = ctx;
     const validation = validateParameters(
       {
@@ -81,47 +89,67 @@ export class GithubPagesBackend implements DeploymentBackend {
         pages_branch: ctx.params.pages_branch ?? 'gh-pages',
       },
     );
-    if (!validation.valid) throw new ParameterValidationError(validation.errors);
+    if (!validation.valid) {
+      const err = new ParameterValidationError(validation.errors);
+      buildLogger?.error('build_failed', { error: err.message, stage: 'validate_params' });
+      throw err;
+    }
 
     const buildCommand = String(validation.sanitized.build_command);
     const buildDir = String(validation.sanitized.build_dir);
     if (isAbsolute(buildDir)) {
-      throw new ParameterValidationError([
+      const err = new ParameterValidationError([
         { key: 'build_dir', message: 'must be relative to repoPath' },
       ]);
+      buildLogger?.error('build_failed', { error: err.message, stage: 'validate_params' });
+      throw err;
     }
     const tokens = buildCommand.split(/\s+/).filter((s) => s.length > 0);
     if (tokens.length === 0) {
-      throw new ParameterValidationError([
+      const err = new ParameterValidationError([
         { key: 'build_command', message: 'is empty' },
       ]);
+      buildLogger?.error('build_failed', { error: err.message, stage: 'validate_params' });
+      throw err;
     }
     const [cmd, ...args] = tokens;
     const runOpts: RunToolOptions = { cwd: ctx.repoPath, timeoutMs: 600_000 };
-    await this.run(cmd, args, runOpts);
+    try {
+      await this.run(cmd, args, runOpts);
 
-    const fullBuildPath = resolve(ctx.repoPath, buildDir);
-    const stat = await fs.stat(fullBuildPath).catch(() => null);
-    if (!stat || !stat.isDirectory()) {
-      throw new Error(
-        `GithubPagesBackend.build: build_dir does not exist: ${buildDir}`,
-      );
+      const fullBuildPath = resolve(ctx.repoPath, buildDir);
+      const stat = await fs.stat(fullBuildPath).catch(() => null);
+      if (!stat || !stat.isDirectory()) {
+        throw new Error(
+          `GithubPagesBackend.build: build_dir does not exist: ${buildDir}`,
+        );
+      }
+      const manifest = await buildFileTreeManifest(fullBuildPath);
+      const artifact: BuildArtifact = {
+        artifactId: generateUlid(),
+        type: 'directory',
+        location: buildDir,
+        checksum: manifest.checksum,
+        sizeBytes: manifest.sizeBytes,
+        metadata: {
+          fileCount: manifest.fileCount,
+          commitSha: ctx.commitSha,
+          branch: ctx.branch,
+        },
+      };
+      await writeArtifact(ctx.repoPath, artifact);
+      buildLogger?.info('build_completed', {
+        duration_ms: Date.now() - t0,
+        artifact_size_bytes: artifact.sizeBytes,
+      });
+      return artifact;
+    } catch (err) {
+      buildLogger?.error('build_failed', {
+        error: (err as Error).message,
+        stage: 'build',
+      });
+      throw err;
     }
-    const manifest = await buildFileTreeManifest(fullBuildPath);
-    const artifact: BuildArtifact = {
-      artifactId: generateUlid(),
-      type: 'directory',
-      location: buildDir,
-      checksum: manifest.checksum,
-      sizeBytes: manifest.sizeBytes,
-      metadata: {
-        fileCount: manifest.fileCount,
-        commitSha: ctx.commitSha,
-        branch: ctx.branch,
-      },
-    };
-    await writeArtifact(ctx.repoPath, artifact);
-    return artifact;
   }
 
   async deploy(
@@ -132,63 +160,78 @@ export class GithubPagesBackend implements DeploymentBackend {
     const ctx = this.lastBuildContext;
     if (!ctx) throw new Error('GithubPagesBackend.deploy() called before build()');
 
-    const validation = validateParameters(PARAM_SCHEMA, params);
-    if (!validation.valid) throw new ParameterValidationError(validation.errors);
-    const sanitized = validation.sanitized;
-    const buildDir = String(sanitized.build_dir);
-    const pagesBranch = String(sanitized.pages_branch);
+    const deployLogger = this.logger?.forComponent('deploy');
+    const tDeploy = Date.now();
+    deployLogger?.info('deploy_started', { env: environment });
 
-    const runOpts: RunToolOptions = { cwd: ctx.repoPath, timeoutMs: 300_000 };
-
-    // Capture pre-deploy sha (may be empty for first deploy).
-    const previousSha = await this.lsRemoteSha(ctx.repoPath, pagesBranch);
-
-    // Try subtree push first; fall back to worktree path on diverge.
     try {
-      await this.run(
-        'git',
-        ['subtree', 'push', '--prefix', buildDir, 'origin', pagesBranch],
-        runOpts,
-      );
-    } catch (err) {
-      if (
-        err instanceof ExternalToolError &&
-        SUBTREE_DIVERGED_RE.test(err.stderr + err.stdout)
-      ) {
-        await this.worktreePush(ctx, buildDir, pagesBranch);
-      } else {
-        throw err;
+      const validation = validateParameters(PARAM_SCHEMA, params);
+      if (!validation.valid) {
+        throw new ParameterValidationError(validation.errors);
       }
+      const sanitized = validation.sanitized;
+      const buildDir = String(sanitized.build_dir);
+      const pagesBranch = String(sanitized.pages_branch);
+
+      const runOpts: RunToolOptions = { cwd: ctx.repoPath, timeoutMs: 300_000 };
+
+      // Capture pre-deploy sha (may be empty for first deploy).
+      const previousSha = await this.lsRemoteSha(ctx.repoPath, pagesBranch);
+
+      // Try subtree push first; fall back to worktree path on diverge.
+      try {
+        await this.run(
+          'git',
+          ['subtree', 'push', '--prefix', buildDir, 'origin', pagesBranch],
+          runOpts,
+        );
+      } catch (err) {
+        if (
+          err instanceof ExternalToolError &&
+          SUBTREE_DIVERGED_RE.test(err.stderr + err.stdout)
+        ) {
+          await this.worktreePush(ctx, buildDir, pagesBranch);
+        } else {
+          throw err;
+        }
+      }
+
+      const newSha = await this.lsRemoteSha(ctx.repoPath, pagesBranch);
+
+      const unsigned: DeploymentRecord = {
+        deployId: generateUlid(),
+        backend: this.metadata.name,
+        environment,
+        artifactId: artifact.artifactId,
+        deployedAt: new Date().toISOString(),
+        status: 'deployed',
+        details: {
+          pages_branch: pagesBranch,
+          previous_sha: previousSha,
+          new_sha: newSha,
+          ...(typeof sanitized.pages_url === 'string' && sanitized.pages_url
+            ? { pages_url: sanitized.pages_url }
+            : {}),
+          allow_force_rollback: Boolean(sanitized.allow_force_rollback),
+        },
+        hmac: '',
+      };
+      const signed = signDeploymentRecord(unsigned);
+      await writeDeploymentRecord(ctx.repoPath, signed as unknown as Record<string, unknown> & { deployId: string });
+      deployLogger?.info('deploy_completed', { duration_ms: Date.now() - tDeploy });
+      return signed;
+    } catch (err) {
+      deployLogger?.error('deploy_failed', { error: (err as Error).message });
+      throw err;
     }
-
-    const newSha = await this.lsRemoteSha(ctx.repoPath, pagesBranch);
-
-    const unsigned: DeploymentRecord = {
-      deployId: generateUlid(),
-      backend: this.metadata.name,
-      environment,
-      artifactId: artifact.artifactId,
-      deployedAt: new Date().toISOString(),
-      status: 'deployed',
-      details: {
-        pages_branch: pagesBranch,
-        previous_sha: previousSha,
-        new_sha: newSha,
-        ...(typeof sanitized.pages_url === 'string' && sanitized.pages_url
-          ? { pages_url: sanitized.pages_url }
-          : {}),
-        allow_force_rollback: Boolean(sanitized.allow_force_rollback),
-      },
-      hmac: '',
-    };
-    const signed = signDeploymentRecord(unsigned);
-    await writeDeploymentRecord(ctx.repoPath, signed as unknown as Record<string, unknown> & { deployId: string });
-    return signed;
   }
 
   async healthCheck(record: DeploymentRecord): Promise<HealthStatus> {
+    const healthLogger = this.logger?.forComponent('health');
+    const t0 = Date.now();
     const url = typeof record.details.pages_url === 'string' ? record.details.pages_url : '';
     if (!url) {
+      healthLogger?.info('health_check_passed', { latency_ms: Date.now() - t0 });
       return {
         healthy: true,
         checks: [{ name: 'no-pages-url-configured', passed: true }],
@@ -200,6 +243,9 @@ export class GithubPagesBackend implements DeploymentBackend {
       try {
         const res = await this.fetchFn(url, { signal: ac.signal });
         const ok = res.status === 200;
+        const latency = Date.now() - t0;
+        if (ok) healthLogger?.info('health_check_passed', { latency_ms: latency });
+        else healthLogger?.warn('health_check_failed', { latency_ms: latency, error: `http-${res.status}` });
         return {
           healthy: ok,
           checks: [{ name: 'pages-url', passed: ok, message: `status ${res.status}` }],
@@ -209,6 +255,10 @@ export class GithubPagesBackend implements DeploymentBackend {
         clearTimeout(timer);
       }
     } catch (err) {
+      healthLogger?.warn('health_check_failed', {
+        latency_ms: Date.now() - t0,
+        error: (err as Error).message,
+      });
       return {
         healthy: false,
         checks: [{ name: 'pages-url', passed: false, message: (err as Error).message }],
