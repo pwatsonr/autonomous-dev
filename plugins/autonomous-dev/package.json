@@ -13,6 +13,8 @@
     "test:perf": "ts-node --transpile-only --compiler-options '{\"module\":\"commonjs\"}' tests/perf/test-validation-pipeline.bench.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sts": "^3.1041.0",
+    "@google-cloud/iam-credentials": "^4.2.2",
     "@slack/socket-mode": "^2.0.0",
     "@slack/web-api": "^7.0.0",
     "ajv": "^8.20.0",
