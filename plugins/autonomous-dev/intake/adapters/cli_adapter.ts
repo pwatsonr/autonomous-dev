@@ -211,6 +211,78 @@ export function collectArray(value: string, prev: string[]): string[] {
   return [...(prev ?? []), value];
 }
 
+/** Fields that may NEVER be modified after a request has been submitted. */
+export const IMMUTABLE_FIELDS = [
+  'request_type',
+  'id',
+  'created_at',
+  'source_channel',
+] as const;
+
+/**
+ * Audit log file used by the CLI when no daemon-backed AuditLogger is
+ * available. Each rejection appends a single JSON line so downstream
+ * tooling can `tail -f` the file. Override with `AUTONOMOUS_DEV_AUDIT_LOG`
+ * (used by the test suite to redirect into a tmpdir).
+ */
+export function auditLogPath(): string {
+  if (process.env.AUTONOMOUS_DEV_AUDIT_LOG) {
+    return process.env.AUTONOMOUS_DEV_AUDIT_LOG;
+  }
+  return path.join(
+    process.env.HOME ?? os.homedir(),
+    '.autonomous-dev',
+    'audit.log',
+  );
+}
+
+/**
+ * Append a `request.edit_rejected` event to the audit log file
+ * (SPEC-018-3-03 AC #2). Emits the same JSON shape as the in-process
+ * AuditLogger.logEditRejected() so log consumers see one stream.
+ *
+ * Best-effort — failures to write the audit line do NOT block the
+ * primary CLI rejection (which is the contract).
+ */
+export function appendEditRejectedAudit(
+  requestId: string,
+  attemptedField: string,
+  reason: string,
+): void {
+  const logPath = auditLogPath();
+  try {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    const entry = {
+      level: 'info',
+      msg: 'request.edit_rejected',
+      ts: new Date().toISOString(),
+      type: 'request.edit_rejected',
+      request_id: requestId,
+      attempted_field: attemptedField,
+      reason,
+      user_id: os.userInfo().username,
+      source_channel: 'cli',
+    };
+    fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
+  } catch {
+    // Best-effort; do not surface audit-log IO failures.
+  }
+}
+
+/**
+ * Reject an attempted mutation of an immutable field. Writes the
+ * canonical `Error: <field> is immutable after submission` line to
+ * stderr, audits the rejection, and throws an
+ * {@link InvalidArgumentError} so the top-level handler exits with
+ * code 1.
+ */
+export function rejectImmutable(requestId: string, fieldName: string): never {
+  const reason = `${fieldName} is immutable after submission`;
+  appendEditRejectedAudit(requestId, fieldName, reason);
+  process.stderr.write(`Error: ${reason}\n`);
+  throw new InvalidArgumentError(reason);
+}
+
 /**
  * Build a {@link BugReport} from CLI inputs for the `submit-bug`
  * subcommand. Three input modes, in priority order:
@@ -553,6 +625,46 @@ export function buildProgram(
         type: 'bug',
         bug_context: JSON.stringify(report),
       });
+    });
+
+  // -- edit ---------------------------------------------------------------
+  // SPEC-018-3-03: reject mutations to immutable fields, audit every reject.
+  program
+    .command('edit <request-id>')
+    .description('Edit mutable fields on an existing request')
+    .option('--priority <s>', 'Priority: high|normal|low')
+    .option('--description <s>', 'Updated description')
+    .option('--label <s>', 'Replace labels (repeatable)', collectArray, [] as string[])
+    .option('--user-impact <s>', 'Updated user impact')
+    // Immutable fields — accepted by commander but rejected by the action.
+    .option('--type <s>', 'IMMUTABLE — request type cannot be changed after submission')
+    .option('--id <s>', 'IMMUTABLE — request id cannot be changed')
+    .option('--created-at <s>', 'IMMUTABLE — created_at cannot be changed')
+    .option('--source-channel <s>', 'IMMUTABLE — source_channel cannot be changed')
+    .action(async (requestId: string, opts: Record<string, unknown>) => {
+      // Map commander's camelCase opts back onto the snake_case field
+      // names the audit log records.
+      const presence: Array<[string, string]> = [
+        ['type', 'request_type'],
+        ['id', 'id'],
+        ['createdAt', 'created_at'],
+        ['sourceChannel', 'source_channel'],
+      ];
+      for (const [optKey, fieldName] of presence) {
+        if (opts[optKey] !== undefined) {
+          rejectImmutable(requestId, fieldName);
+          return; // unreachable — rejectImmutable throws/exits
+        }
+      }
+      // Mutable changes — pass through to the daemon. Empty change set is
+      // an explicit no-op success.
+      const changes: Record<string, unknown> = {};
+      if (opts.priority !== undefined) changes.priority = opts.priority;
+      if (opts.description !== undefined) changes.description = opts.description;
+      if (opts.userImpact !== undefined) changes.user_impact = opts.userImpact;
+      const labels = opts.label as string[] | undefined;
+      if (labels && labels.length > 0) changes.labels = labels.join(',');
+      await dispatch('edit', changes, requestId);
     });
 
   // -- status -------------------------------------------------------------

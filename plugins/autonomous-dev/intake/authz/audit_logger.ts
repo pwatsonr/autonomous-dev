@@ -128,6 +128,58 @@ export class AuditLogger {
   }
 
   /**
+   * Log a `request.edit_rejected` event (SPEC-018-3-03, Task 5).
+   *
+   * Emitted whenever the operator attempts to mutate an immutable field
+   * on an existing request (e.g. `--type`, `--id`, `--created_at`,
+   * `--source_channel`). The event is appended to the audit log even
+   * when the underlying mutation is rejected — the rejection IS the
+   * contract; the audit is the observability record.
+   *
+   * The event maps onto the existing AuditLogEntry shape so we don't
+   * need a parallel table:
+   *   - action          := 'request.edit_rejected'
+   *   - decision        := 'deny'
+   *   - resource        := request_id
+   *   - reason          := the human-readable rejection reason
+   *   - source_channel  := caller-supplied channel
+   *
+   * The attempted field is encoded into `reason` so the existing schema
+   * carries it without a migration (full structured form is reserved
+   * for a future dedicated event table).
+   */
+  logEditRejected(params: {
+    requestId: string;
+    attemptedField: string;
+    reason: string;
+    userId: string;
+    sourceChannel: ChannelType | string;
+    timestamp?: Date;
+  }): void {
+    const ts = (params.timestamp ?? new Date()).toISOString();
+    const entry: AuditLogEntry = {
+      user_id: params.userId,
+      action: 'request.edit_rejected',
+      resource: params.requestId,
+      decision: 'deny',
+      reason: params.reason,
+      source_channel: params.sourceChannel,
+      created_at: ts,
+    };
+
+    this.db.insertAuditLog(entry);
+
+    this.logger.info('request.edit_rejected', {
+      request_id: params.requestId,
+      attempted_field: params.attemptedField,
+      reason: params.reason,
+      user_id: params.userId,
+      source_channel: params.sourceChannel,
+      timestamp: ts,
+    });
+  }
+
+  /**
    * Log an authorization decision.
    *
    * @param decision       The {@link AuthzDecision} returned by the engine.
