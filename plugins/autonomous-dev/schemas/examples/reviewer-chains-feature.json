@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "request_types": {
+    "feature": {
+      "code_review": [
+        { "name": "code-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
+        { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 85 },
+        { "name": "qa-edge-case-reviewer", "type": "specialist", "blocking": true, "threshold": 80 },
+        { "name": "ux-ui-reviewer", "type": "specialist", "blocking": false, "threshold": 75, "trigger": "frontend" },
+        { "name": "accessibility-reviewer", "type": "specialist", "blocking": false, "threshold": 75, "trigger": "frontend" },
+        { "name": "rule-set-enforcement-reviewer", "type": "specialist", "blocking": true, "threshold": 90 }
+      ]
+    }
+  }
+}
