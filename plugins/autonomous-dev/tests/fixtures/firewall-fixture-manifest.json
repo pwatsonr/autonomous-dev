@@ -1,0 +1,9 @@
+{
+  "name": "autonomous-dev-fixture-firewall-backend",
+  "type": "cloud-backend",
+  "version": "0.0.1",
+  "egress_allowlist": [
+    { "fqdn": "httpbin.org", "port": 443, "protocol": "tcp" }
+  ],
+  "capabilities": ["network", "privileged-env"]
+}

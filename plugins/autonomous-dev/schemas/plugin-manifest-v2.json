@@ -56,6 +56,33 @@
     "filesystem_write_paths": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "egress_allowlist": {
+      "type": "array",
+      "description": "FQDNs (with optional '*' wildcard prefix) the plugin's child process may reach. Empty or omitted means no egress is permitted. SPEC-024-3-01.",
+      "items": {
+        "type": "object",
+        "required": ["fqdn"],
+        "additionalProperties": false,
+        "properties": {
+          "fqdn": {
+            "type": "string",
+            "pattern": "^(\\*\\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
+            "description": "FQDN. A leading '*.' matches any single subdomain label."
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535,
+            "default": 443
+          },
+          "protocol": {
+            "type": "string",
+            "enum": ["tcp", "udp"],
+            "default": "tcp"
+          }
+        }
+      }
     }
   },
   "$defs": {
