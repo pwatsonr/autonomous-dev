@@ -13,6 +13,7 @@ set -euo pipefail
 # All paths derived from $HOME and the script's own location.
 
 readonly PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+readonly LIB_DIR="${PLUGIN_DIR}/bin/lib"
 readonly DAEMON_HOME="${HOME}/.autonomous-dev"
 readonly LOCK_FILE="${DAEMON_HOME}/daemon.lock"
 readonly HEARTBEAT_FILE="${DAEMON_HOME}/heartbeat.json"
@@ -48,6 +49,14 @@ ITERATION_COUNT=0
 EFFECTIVE_CONFIG=""
 CONSECUTIVE_CRASHES=0
 CIRCUIT_BREAKER_TRIPPED=false
+
+# Per-process dedup table for the legacy phase-fallback warning
+# (SPEC-018-2-01 §Warning Deduplication). Keyed by absolute state file path.
+# Reset only by daemon restart — that is the intentional "re-surface migration
+# debt" cadence per TDD-001's daily restart contract.
+if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+    declare -gA _phase_legacy_warned=()
+fi
 
 ###############################################################################
 # Logging Functions
@@ -718,6 +727,138 @@ select_request() {
     if [[ -n "${best_id}" ]]; then
         echo "${best_id}|${best_project}"
     fi
+}
+
+###############################################################################
+# Type-Aware Phase Progression (SPEC-018-2-01)
+###############################################################################
+# These helpers replace the implicit hardcoded 14-phase progression with a
+# v1.1-aware lookup against the state file's phase_overrides[] array. When
+# phase_overrides is absent (legacy v1.0 state), they fall back to the
+# LEGACY_PHASES array sourced from lib/phase-legacy.sh and emit a
+# deduplicated WARN line so operators see the migration debt once per
+# daemon process per request.
+
+# warn_legacy_fallback_once(state_file: string) -> void
+#   Emits a single WARN line per state_file per supervisor process lifetime.
+#   The dedup table is reset on daemon restart, which by TDD-001 is daily —
+#   so an unmigrated state file surfaces the warning at most once per day.
+warn_legacy_fallback_once() {
+    local state_file="$1"
+    if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+        # No associative arrays on bash 3.x: fall back to a per-call warn
+        # rather than maintain a string-keyed file. macOS users with stock
+        # bash hit this path; the validate_dependencies() preamble already
+        # warns on bash < 4 once at startup, so the duplication here is
+        # acceptable for an edge platform.
+        printf 'WARN select_request: state %s lacks phase_overrides, using legacy sequence\n' \
+            "${state_file}" >&2
+        return 0
+    fi
+    if [[ -z "${_phase_legacy_warned[${state_file}]:-}" ]]; then
+        printf 'WARN select_request: state %s lacks phase_overrides, using legacy sequence\n' \
+            "${state_file}" >&2
+        _phase_legacy_warned[${state_file}]=1
+    fi
+}
+
+# next_phase_for_state(state_file: string) -> string
+#   Returns the phase name that should follow .current_phase for the given
+#   state. Lookup order:
+#     1. state.json .phase_overrides[] (v1.1) — find current_phase, return next.
+#     2. LEGACY_PHASES (v1.0 fallback) — same logic, with a WARN emitted once.
+#
+#   Returns empty string when current_phase is the terminal element.
+#   Returns non-zero exit (and emits ERROR to stderr) when current_phase is
+#   not present in the resolved sequence — surfaces a corrupted state file
+#   rather than silently masking it.
+#
+#   Pure: does not modify state.json.
+next_phase_for_state() {
+    local state_file="$1"
+    if [[ ! -f "${state_file}" ]]; then
+        printf 'ERROR next_phase_for_state: state file not found: %s\n' \
+            "${state_file}" >&2
+        return 2
+    fi
+
+    local current_phase
+    current_phase=$(jq -r '.current_phase // empty' "${state_file}" 2>/dev/null || true)
+    if [[ -z "${current_phase}" ]]; then
+        printf 'ERROR next_phase_for_state: .current_phase missing in %s\n' \
+            "${state_file}" >&2
+        return 2
+    fi
+
+    local overrides_len
+    overrides_len=$(jq -r '(.phase_overrides // []) | length' "${state_file}" 2>/dev/null || echo "0")
+
+    local -a phases=()
+    if [[ "${overrides_len}" -gt 0 ]]; then
+        # v1.1 path: read phase_overrides[] in order
+        local phases_raw
+        phases_raw=$(jq -r '.phase_overrides[]' "${state_file}" 2>/dev/null || true)
+        while IFS= read -r p; do
+            [[ -n "${p}" ]] && phases+=("${p}")
+        done <<< "${phases_raw}"
+    else
+        # v1.0 fallback: source legacy sequence and warn once
+        # shellcheck source=lib/phase-legacy.sh
+        source "${LIB_DIR}/phase-legacy.sh"
+        warn_legacy_fallback_once "${state_file}"
+        phases=("${LEGACY_PHASES[@]}")
+    fi
+
+    local idx=-1 i
+    for i in "${!phases[@]}"; do
+        if [[ "${phases[$i]}" == "${current_phase}" ]]; then
+            idx=$i
+            break
+        fi
+    done
+
+    if [[ ${idx} -lt 0 ]]; then
+        printf "ERROR select_request: phase '%s' not in sequence for %s\n" \
+            "${current_phase}" "${state_file}" >&2
+        return 1
+    fi
+
+    local next_idx=$(( idx + 1 ))
+    if [[ ${next_idx} -ge ${#phases[@]} ]]; then
+        # Terminal phase: empty string (success, exit 0)
+        echo ""
+        return 0
+    fi
+
+    echo "${phases[${next_idx}]}"
+    return 0
+}
+
+# is_enhanced_phase(state_file: string, phase: string) -> int
+#   Returns 0 (true) if phase is in .type_config.enhancedPhases for this
+#   state, 1 (false) otherwise. Returns 1 when type_config is absent.
+#   Used by the supervisor to decide whether to pass --strict-mode to the
+#   score-evaluator on review phases.
+is_enhanced_phase() {
+    local state_file="$1" phase="$2"
+    [[ -f "${state_file}" ]] || return 1
+    local enhanced
+    enhanced=$(jq -r --arg p "${phase}" \
+        '(.type_config.enhancedPhases // []) | index($p) // empty' \
+        "${state_file}" 2>/dev/null || true)
+    [[ -n "${enhanced}" ]]
+}
+
+# invoke_score_evaluator(state_file: string, phase: string) -> int
+#   Wires the type-aware --strict-mode flag into the score-evaluator
+#   invocation. Returns the evaluator's exit code.
+invoke_score_evaluator() {
+    local state_file="$1" phase="$2"
+    local -a score_args=()
+    if is_enhanced_phase "${state_file}" "${phase}"; then
+        score_args+=(--strict-mode)
+    fi
+    "${PLUGIN_DIR}/bin/score-evaluator.sh" "${score_args[@]}" "${state_file}"
 }
 
 ###############################################################################
