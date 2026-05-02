@@ -160,7 +160,24 @@
         "format": {
           "enum": ["json", "yaml", "text"]
         },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 1800,
+          "description": "Per-plugin override for chains.per_plugin_timeout_seconds. SPEC-022-2-01."
+        },
+        "on_failure": {
+          "type": "string",
+          "enum": ["block", "warn", "ignore"],
+          "default": "warn",
+          "description": "Behavior when this declaration's plugin fails. SPEC-022-2-02."
+        },
+        "requires_approval": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, the chain pauses on this artifact pending human approval. SPEC-022-2-03."
+        }
       }
     },
     "ConsumesDeclaration": {
@@ -181,7 +198,18 @@
           "type": "boolean",
           "default": false
         },
-        "description": { "type": "string" }
+        "description": { "type": "string" },
+        "on_failure": {
+          "type": "string",
+          "enum": ["block", "warn", "ignore"],
+          "default": "warn",
+          "description": "Behavior when the upstream producer fails. SPEC-022-2-02."
+        },
+        "requires_approval": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, this consumer is part of a privileged chain. SPEC-022-2-04."
+        }
       }
     }
   },

@@ -34,6 +34,44 @@ import type { DependencyGraph } from './dependency-graph';
 import type { ArtifactRegistry } from './artifact-registry';
 import type { HookManifest } from '../hooks/types';
 import { satisfiesRange } from '../hooks/semver-compat';
+import { PluginTimeoutError } from './errors';
+
+/**
+ * Resource-limit configuration consumed by ChainExecutor (SPEC-022-2-01,
+ * SPEC-022-2-02). Mirrors the `chains` block in the global config schema.
+ */
+export interface ChainResourceLimits {
+  max_length: number;
+  per_plugin_timeout_seconds: number;
+  per_chain_timeout_seconds: number;
+  max_artifact_size_mb: number;
+  max_concurrent_chains: number;
+}
+
+/** Default limits matching `config_defaults.json`. SPEC-022-2-01. */
+export const DEFAULT_CHAIN_LIMITS: ChainResourceLimits = Object.freeze({
+  max_length: 10,
+  per_plugin_timeout_seconds: 120,
+  per_chain_timeout_seconds: 600,
+  max_artifact_size_mb: 10,
+  max_concurrent_chains: 3,
+});
+
+/**
+ * Optional ChainExecutor dependencies bolted on across PLAN-022-2.
+ *
+ * Kept on a single options bag (rather than positional constructor args)
+ * so future specs can extend without breaking call sites. PLAN-022-1
+ * `buildExecutor` test helper still works because every field is optional.
+ */
+export interface ChainExecutorOptions {
+  /** SPEC-022-2-01: chain-resource limits. Defaults to DEFAULT_CHAIN_LIMITS. */
+  limits?: ChainResourceLimits;
+  /** Stable chain-id assigned by caller; used in timeout error messages and telemetry. */
+  chainId?: string;
+  /** Logger. Defaults to console. */
+  logger?: { info: (s: string) => void; warn?: (s: string) => void };
+}
 
 export interface ChainStep {
   pluginId: string;
@@ -99,13 +137,73 @@ export type ChainHookInvoker = (
 export type ManifestLookup = (pluginId: string) => HookManifest | undefined;
 
 export class ChainExecutor {
+  private readonly limits: ChainResourceLimits;
+  private readonly chainId: string;
   constructor(
     private readonly graph: DependencyGraph,
     private readonly artifacts: ArtifactRegistry,
     private readonly manifestLookup: ManifestLookup,
     private readonly chainHookInvoker: ChainHookInvoker,
-    private readonly logger: { info: (s: string) => void } = console,
-  ) {}
+    private readonly logger: { info: (s: string) => void; warn?: (s: string) => void } = console,
+    options: ChainExecutorOptions = {},
+  ) {
+    this.limits = options.limits ?? DEFAULT_CHAIN_LIMITS;
+    this.chainId = options.chainId ?? `chain-${process.pid}-${Date.now()}`;
+    if (options.logger) {
+      this.logger = options.logger;
+    }
+  }
+
+  /** Effective resource limits in use. Visible for tests + telemetry. */
+  getLimits(): ChainResourceLimits {
+    return this.limits;
+  }
+
+  /** Stable chain id assigned at construction. */
+  getChainId(): string {
+    return this.chainId;
+  }
+
+  /**
+   * Wrap a plugin invocation in a deadline timer (SPEC-022-2-01). Resolves
+   * with the plugin output if it completes first, rejects with
+   * `PluginTimeoutError` if the deadline fires first. The timer is
+   * always cleared so no `setTimeout` handles leak.
+   *
+   * Timeout precedence: `produces[i].timeout_seconds` (per-declaration)
+   * > `limits.per_plugin_timeout_seconds` (global). When a plugin produces
+   * multiple artifacts with mixed overrides, the MINIMUM override wins
+   * (strictest deadline).
+   */
+  protected async invokeWithTimeout(
+    pid: string,
+    manifest: HookManifest,
+    ctx: ChainHookInvocationContext,
+  ): Promise<ChainHookOutput[]> {
+    const overrides = (manifest.produces ?? [])
+      .map((p) => p.timeout_seconds)
+      .filter((v): v is number => typeof v === 'number' && v > 0);
+    const timeoutSeconds = overrides.length > 0
+      ? Math.min(...overrides)
+      : this.limits.per_plugin_timeout_seconds;
+    const timeoutMs = timeoutSeconds * 1000;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new PluginTimeoutError(pid, timeoutMs, this.chainId)),
+        timeoutMs,
+      );
+    });
+    try {
+      return await Promise.race([
+        this.chainHookInvoker(pid, ctx),
+        timeoutPromise,
+      ]);
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+    }
+  }
 
   /**
    * Execute the chain rooted at `triggeringPluginId`. The triggering plugin
@@ -308,10 +406,10 @@ export class ChainExecutor {
         continue;
       }
 
-      // Invoke the plugin's chain hook.
+      // Invoke the plugin's chain hook (SPEC-022-2-01: enforced timeout).
       let outputs: ChainHookOutput[];
       try {
-        outputs = await this.chainHookInvoker(pid, {
+        outputs = await this.invokeWithTimeout(pid, manifest, {
           requestState: state,
           inputs,
         });

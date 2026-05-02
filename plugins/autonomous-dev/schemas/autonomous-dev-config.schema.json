@@ -47,6 +47,12 @@
             "max_concurrent_executions": 8,
             "max_execution_time_seconds": 30
           }
+        },
+        "privileged_chains": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[^:]+:[^@]+@.+$" },
+          "default": [],
+          "description": "Allowlist of privileged chain pairs (producer:consumer@version-glob). SPEC-022-2-04."
         }
       },
       "default": {
@@ -60,7 +66,27 @@
           "max_total_memory_mb": 256,
           "max_concurrent_executions": 8,
           "max_execution_time_seconds": 30
-        }
+        },
+        "privileged_chains": []
+      }
+    },
+    "chains": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Chain-engine resource limits (TDD-022 §9 / SPEC-022-2-01).",
+      "properties": {
+        "max_length": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 },
+        "per_plugin_timeout_seconds": { "type": "integer", "minimum": 5, "maximum": 1800, "default": 120 },
+        "per_chain_timeout_seconds": { "type": "integer", "minimum": 30, "maximum": 7200, "default": 600 },
+        "max_artifact_size_mb": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 },
+        "max_concurrent_chains": { "type": "integer", "minimum": 1, "maximum": 32, "default": 3 }
+      },
+      "default": {
+        "max_length": 10,
+        "per_plugin_timeout_seconds": 120,
+        "per_chain_timeout_seconds": 600,
+        "max_artifact_size_mb": 10,
+        "max_concurrent_chains": 3
       }
     }
   }

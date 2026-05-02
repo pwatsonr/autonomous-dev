@@ -208,7 +208,33 @@ export interface ProducesDeclaration {
   format: 'json' | 'yaml' | 'text';
   /** Free-form documentation string. */
   description?: string;
+  /**
+   * SPEC-022-2-01: Per-plugin override for `chains.per_plugin_timeout_seconds`.
+   * Optional; when absent the global default applies.
+   */
+  timeout_seconds?: number;
+  /**
+   * SPEC-022-2-02: Failure-mode for downstream consumers when this
+   * producer fails. Default `warn`.
+   */
+  on_failure?: ChainFailureMode;
+  /**
+   * SPEC-022-2-03: When true, the executor pauses the chain after this
+   * artifact is produced and awaits operator approval before resuming.
+   */
+  requires_approval?: boolean;
 }
+
+/**
+ * Failure-mode triggered when a chain plugin fails.
+ *
+ * - `block`: halt the entire chain and propagate the error.
+ * - `warn`: log + skip downstream consumers (default; PLAN-022-1 behavior).
+ * - `ignore`: continue invoking downstream regardless.
+ *
+ * SPEC-022-2-02.
+ */
+export type ChainFailureMode = 'block' | 'warn' | 'ignore';
 
 /**
  * Declaration that a plugin requires an artifact of a given type/version
@@ -231,6 +257,18 @@ export interface ConsumesDeclaration {
   optional?: boolean;
   /** Free-form documentation string. */
   description?: string;
+  /**
+   * SPEC-022-2-02: Failure-mode triggered when the upstream producer
+   * fails. Used as fallback when the producer omits `produces.on_failure`.
+   * Default `warn`.
+   */
+  on_failure?: ChainFailureMode;
+  /**
+   * SPEC-022-2-04: If true, this consume edge participates in a
+   * privileged chain. Operators must allowlist the producer/consumer
+   * pair via `extensions.privileged_chains`.
+   */
+  requires_approval?: boolean;
 }
 
 // ---------------------------------------------------------------------------
