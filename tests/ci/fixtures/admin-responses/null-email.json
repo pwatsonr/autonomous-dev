@@ -1,0 +1,8 @@
+{
+  "_comment": "An admin's verified email is null — must be rejected.",
+  "admins": [
+    {"login": "alice", "email": "alice@example.com"},
+    {"login": "bob",   "email": null}
+  ],
+  "labelers": ["alice", "bob"]
+}

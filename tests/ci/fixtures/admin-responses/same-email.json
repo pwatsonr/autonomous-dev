@@ -1,0 +1,8 @@
+{
+  "_comment": "Two admins sharing the same verified email — must be rejected.",
+  "admins": [
+    {"login": "alice",      "email": "shared@example.com"},
+    {"login": "alice-alt",  "email": "Shared@Example.com"}
+  ],
+  "labelers": ["alice", "alice-alt"]
+}
