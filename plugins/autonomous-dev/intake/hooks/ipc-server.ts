@@ -19,9 +19,19 @@ import * as path from 'node:path';
 import type { HookRegistry } from './registry';
 import type { ReloadController } from './reload-controller';
 import type { RegisteredHook } from './registry';
+import type { DependencyGraph, ChainEdge } from '../chains/dependency-graph';
+import { renderGraph, type ChainGraphFormat } from '../chains/render';
 
+/**
+ * IPC request envelope.
+ *
+ * SPEC-022-1-04 widens this from `'list'|'reload'` to include the chain
+ * inspection commands. `format` is only meaningful for `'chains-graph'`.
+ */
 export interface IpcRequest {
-  command: 'list' | 'reload';
+  command: 'list' | 'reload' | 'chains-list' | 'chains-graph';
+  /** Only used by 'chains-graph'; defaults to 'dot'. */
+  format?: ChainGraphFormat;
 }
 
 export interface IpcResponse {
@@ -58,6 +68,10 @@ export class IpcServer {
     private readonly registry: HookRegistry,
     private readonly reloadController: ReloadController,
     private readonly socketPath: string = defaultSocketPath(),
+    /** SPEC-022-1-04: optional chain dependency graph for chains-list /
+     *  chains-graph IPC commands. When undefined the daemon was started
+     *  without chain support; chain commands return an error. */
+    private readonly chainGraph?: DependencyGraph,
   ) {}
 
   /** Start listening. Removes a stale socket file if present. */
@@ -170,6 +184,24 @@ export class IpcServer {
         try {
           const diff = await this.reloadController.reload();
           return { status: 'ok', payload: diff };
+        } catch (err) {
+          return { status: 'error', error: (err as Error).message };
+        }
+      case 'chains-list':
+        if (!this.chainGraph) {
+          return { status: 'error', error: 'chain graph not available' };
+        }
+        return { status: 'ok', payload: this.chainGraph.getEdges() satisfies ChainEdge[] };
+      case 'chains-graph':
+        if (!this.chainGraph) {
+          return { status: 'error', error: 'chain graph not available' };
+        }
+        try {
+          const fmt: ChainGraphFormat = req.format ?? 'dot';
+          if (fmt !== 'dot' && fmt !== 'mermaid') {
+            return { status: 'error', error: `unsupported format '${fmt}' (use dot or mermaid)` };
+          }
+          return { status: 'ok', payload: renderGraph(this.chainGraph, fmt) };
         } catch (err) {
           return { status: 'error', error: (err as Error).message };
         }
