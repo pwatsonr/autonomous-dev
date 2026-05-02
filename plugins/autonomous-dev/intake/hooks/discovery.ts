@@ -103,14 +103,29 @@ export class PluginDiscovery {
     manifestPath: string,
     isSymlink: boolean,
   ): Promise<DiscoveryResult | null> {
-    // Path canonicalization: real path of the candidate must remain a child
-    // of the resolved root. Defends against symlink-to-`..` escapes.
-    let realDir: string;
+    // Lexical path canonicalization: ensure the candidate's resolved
+    // (lexical) path stays under resolvedRoot. This defends against names
+    // like `../../etc` while still permitting npm-link-style symlinks (which
+    // live under rootDir but point elsewhere on disk).
+    const lexical = path.resolve(candidateDir);
+    const lexRel = path.relative(resolvedRoot, lexical);
+    if (lexRel.startsWith('..') || path.isAbsolute(lexRel)) {
+      return {
+        manifestPath,
+        errors: [
+          {
+            manifestPath,
+            code: 'IO_ERROR',
+            message: `candidate path escapes rootDir: ${lexical}`,
+          },
+        ],
+      };
+    }
+
+    // Verify the candidate exists (handles broken symlinks gracefully).
     try {
-      realDir = await fs.realpath(candidateDir);
+      await fs.stat(candidateDir);
     } catch (err) {
-      // Broken symlink or stat failure — skip silently (broken symlinks are
-      // not "discovered plugins", they are filesystem noise).
       const e = err as NodeJS.ErrnoException;
       if (e.code === 'ENOENT') return null;
       return {
@@ -119,23 +134,7 @@ export class PluginDiscovery {
           {
             manifestPath,
             code: 'IO_ERROR',
-            message: `realpath failed: ${(err as Error).message}`,
-          },
-        ],
-      };
-    }
-
-    const realRoot = await fs.realpath(resolvedRoot).catch(() => resolvedRoot);
-    const rel = path.relative(realRoot, realDir);
-    if (rel.startsWith('..') || path.isAbsolute(rel)) {
-      // Symlink that points outside the rootDir — defense in depth.
-      return {
-        manifestPath,
-        errors: [
-          {
-            manifestPath,
-            code: 'IO_ERROR',
-            message: `candidate path escapes rootDir: ${realDir}`,
+            message: `stat failed: ${(err as Error).message}`,
           },
         ],
       };
