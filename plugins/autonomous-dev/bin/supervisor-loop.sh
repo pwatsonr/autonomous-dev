@@ -865,6 +865,40 @@ invoke_score_evaluator() {
     "${PLUGIN_DIR}/bin/score-evaluator.sh" "${score_args[@]}" "${state_file}"
 }
 
+# check_phase_advancement_blocked(state_file: string) -> int
+#   SPEC-018-2-03 Task 4. Returns 0 (no block) when the current phase has
+#   no required additionalGates or when the gate artifact is present.
+#   Returns 1 (blocked) and idempotently writes status_reason="awaiting
+#   gate: <gate>" into state.json when the artifact is missing.
+#
+#   Called by the lifecycle engine immediately before advancing the phase.
+#   The supervisor itself does not advance phases — the spawned Claude
+#   session does — so this helper exists for future wiring. Wiring it into
+#   the existing main_loop is intentionally deferred until PLAN-018-3 ships
+#   the agent-side phase-advancement contract.
+check_phase_advancement_blocked() {
+    local state_file="$1"
+    [[ -f "${state_file}" ]] || return 0
+
+    local current_phase
+    current_phase=$(jq -r '.current_phase // .status // ""' "${state_file}" 2>/dev/null || true)
+    [[ -n "${current_phase}" ]] || return 0
+
+    if [[ ! -f "${LIB_DIR}/gate-check.sh" ]]; then
+        return 0  # helper not present, nothing to enforce
+    fi
+    # shellcheck source=lib/gate-check.sh
+    source "${LIB_DIR}/gate-check.sh"
+
+    local missing
+    missing=$(check_required_gates "${state_file}" "${current_phase}")
+    if [[ -n "${missing}" ]]; then
+        update_status_reason_awaiting "${state_file}" "${missing}"
+        return 1
+    fi
+    return 0
+}
+
 ###############################################################################
 # Phase-Aware Max-Turns Resolution (SPEC-001-2-02 Task 4)
 ###############################################################################
