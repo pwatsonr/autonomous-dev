@@ -1,0 +1,21 @@
+{
+  "taskDefinition": {
+    "family": "web-svc",
+    "taskDefinitionArn": "arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:7",
+    "taskRoleArn": "arn:aws:iam::123456789012:role/ecs-task-role",
+    "executionRoleArn": "arn:aws:iam::123456789012:role/ecs-exec-role",
+    "networkMode": "awsvpc",
+    "cpu": "512",
+    "memory": "1024",
+    "requiresCompatibilities": ["FARGATE"],
+    "containerDefinitions": [
+      {
+        "name": "web",
+        "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/web:old-sha",
+        "cpu": 512,
+        "memory": 1024,
+        "portMappings": [{ "containerPort": 8080, "hostPort": 8080, "protocol": "tcp" }]
+      }
+    ]
+  }
+}

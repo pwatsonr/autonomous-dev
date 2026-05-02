@@ -1,0 +1,5 @@
+{
+  "metadata": {
+    "annotations": { "deployment.kubernetes.io/revision": "1" }
+  }
+}

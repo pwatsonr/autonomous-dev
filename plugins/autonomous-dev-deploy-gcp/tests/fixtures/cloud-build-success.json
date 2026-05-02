@@ -1,0 +1,12 @@
+{
+  "id": "build-12345",
+  "status": "SUCCESS",
+  "results": {
+    "images": [
+      {
+        "name": "gcr.io/test-project/api:abc123",
+        "digest": "sha256:fa1afe1c0ffeefa1afe1c0ffeefa1afe1c0ffeefa1afe1c0ffeefa1afe1c0ff"
+      }
+    ]
+  }
+}

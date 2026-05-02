@@ -1,0 +1,12 @@
+{
+  "runId": "run-abc123",
+  "status": "Succeeded",
+  "outputImages": [
+    {
+      "registry": "myacr.azurecr.io",
+      "repository": "web",
+      "tag": "abc123def456",
+      "digest": "sha256:deadbeefcafe1234"
+    }
+  ]
+}

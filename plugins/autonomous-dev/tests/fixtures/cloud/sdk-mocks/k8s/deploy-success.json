@@ -1,0 +1,5 @@
+{
+  "appliedKinds": ["Deployment", "Service"],
+  "appliedCount": 2,
+  "deploymentRevision": "2"
+}

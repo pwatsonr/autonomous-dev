@@ -1,0 +1,20 @@
+{
+  "statusCode": 403,
+  "body": {
+    "kind": "Status",
+    "apiVersion": "v1",
+    "code": 403,
+    "reason": "Forbidden",
+    "message": "admission webhook \"validation.gatekeeper.sh\" denied the request: Container 'web' must drop ALL capabilities",
+    "details": {
+      "kind": "AdmissionReview",
+      "causes": [
+        {
+          "reason": "Gatekeeper",
+          "message": "Container 'web' must drop ALL capabilities",
+          "field": "spec.template.spec.containers[0].securityContext"
+        }
+      ]
+    }
+  }
+}

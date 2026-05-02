@@ -23,7 +23,11 @@ export type BackendCapability =
   | 'local-fs'
   | 'remote-rsync'
   | 'localhost-docker'
-  | 'github-pages';
+  | 'github-pages'
+  | 'gcp-cloud-run'
+  | 'aws-ecs-fargate'
+  | 'azure-container-apps'
+  | 'k8s-kubectl-apply';
 
 /** Static metadata describing a backend at registration time. */
 export interface BackendMetadata {

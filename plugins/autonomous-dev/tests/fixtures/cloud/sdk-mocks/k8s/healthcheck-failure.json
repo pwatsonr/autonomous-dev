@@ -1,0 +1,9 @@
+{
+  "status": {
+    "replicas": 2,
+    "readyReplicas": 0,
+    "observedGeneration": 1
+  },
+  "metadata": { "generation": 1 },
+  "podWaitingReason": "ImagePullBackOff"
+}

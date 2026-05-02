@@ -1,0 +1,12 @@
+{
+  "TargetHealthDescriptions": [
+    {
+      "Target": { "Id": "10.0.0.1", "Port": 8080 },
+      "TargetHealth": { "State": "healthy" }
+    },
+    {
+      "Target": { "Id": "10.0.0.2", "Port": 8080 },
+      "TargetHealth": { "State": "healthy" }
+    }
+  ]
+}

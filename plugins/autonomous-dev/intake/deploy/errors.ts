@@ -330,6 +330,59 @@ export class CostLedgerKeyMissingError extends DeployError {
   }
 }
 
+/**
+ * Categorised cloud-deploy error codes (SPEC-024-1-02). Cloud backends
+ * translate provider-specific SDK errors into one of these codes so
+ * upstream callers (orchestrator, telemetry, retry middleware) can
+ * react without knowing which cloud emitted the failure.
+ */
+export type CloudErrorCode =
+  | 'AUTH_FAILED'
+  | 'RATE_LIMIT'
+  | 'QUOTA_EXCEEDED'
+  | 'NETWORK'
+  | 'NOT_FOUND'
+  | 'POLICY_VIOLATION'
+  | 'RESOURCE_CONFLICT'
+  | 'BUILD_FAILED'
+  | 'DEPLOY_FAILED'
+  | 'HEALTH_TIMEOUT'
+  | 'ROLLBACK_FAILED'
+  | 'UNKNOWN';
+
+/** Subset of cloud providers used as error tagging discriminators. */
+export type CloudErrorProvider = 'gcp' | 'aws' | 'azure' | 'k8s';
+
+/**
+ * Categorised cloud-deploy error (SPEC-024-1-02 §"Error mapping").
+ * Cloud backends throw this from build/deploy/healthCheck/rollback so
+ * structured retry / alert logic can act on `code` and `retriable`
+ * without parsing free-form messages.
+ */
+export class CloudDeployError extends DeployError {
+  constructor(
+    public readonly code: CloudErrorCode,
+    public readonly cloud: CloudErrorProvider,
+    public readonly operation: string,
+    public readonly retriable: boolean,
+    message: string,
+    public readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = 'CloudDeployError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+      cloud: this.cloud,
+      operation: this.operation,
+      retriable: this.retriable,
+    };
+  }
+}
+
 /** Raised by external-tool wrappers (`runTool`) on non-zero exit. */
 export class ExternalToolError extends DeployError {
   constructor(

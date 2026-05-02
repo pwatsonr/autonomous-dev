@@ -1,0 +1,16 @@
+{
+  "name": "web-app",
+  "properties": {
+    "latestRevisionName": "web-app--rev2",
+    "latestReadyRevisionName": "web-app--rev2",
+    "configuration": {
+      "activeRevisionsMode": "Multiple",
+      "ingress": {
+        "fqdn": "web-app.azurecontainerapps.io",
+        "traffic": [
+          { "revisionName": "web-app--rev2", "weight": 100 }
+        ]
+      }
+    }
+  }
+}

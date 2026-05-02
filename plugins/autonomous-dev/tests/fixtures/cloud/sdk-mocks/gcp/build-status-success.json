@@ -1,0 +1,7 @@
+{
+  "id": "build-12345",
+  "status": "SUCCESS",
+  "results": {
+    "images": [{ "digest": "sha256:abcd1234" }]
+  }
+}

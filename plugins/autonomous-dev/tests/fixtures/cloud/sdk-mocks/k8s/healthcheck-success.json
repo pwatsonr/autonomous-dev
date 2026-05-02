@@ -1,0 +1,8 @@
+{
+  "status": {
+    "replicas": 2,
+    "readyReplicas": 2,
+    "observedGeneration": 1
+  },
+  "metadata": { "generation": 1 }
+}

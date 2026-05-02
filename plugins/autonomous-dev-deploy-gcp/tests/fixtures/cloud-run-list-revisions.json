@@ -1,0 +1,12 @@
+[
+  {
+    "name": "api-00002-abc",
+    "createTime": "2025-04-01T10:00:00Z",
+    "containers": [{ "image": "gcr.io/test-project/api:abc123" }]
+  },
+  {
+    "name": "api-00001-def",
+    "createTime": "2025-03-01T10:00:00Z",
+    "containers": [{ "image": "gcr.io/test-project/api:def456" }]
+  }
+]

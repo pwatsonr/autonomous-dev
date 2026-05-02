@@ -1,0 +1,13 @@
+{
+  "name": "autonomous-dev-deploy-k8s",
+  "version": "0.1.0",
+  "description": "Kubernetes (kubectl apply) deployment backend for autonomous-dev.",
+  "author": "autonomous-dev contributors",
+  "extends": ["autonomous-dev"],
+  "deployment_backend": {
+    "name": "k8s",
+    "regions_supported": ["cluster-local"],
+    "services_supported": ["kubectl-apply", "deployment", "service", "configmap"],
+    "credential_provider": "credential-proxy"
+  }
+}
