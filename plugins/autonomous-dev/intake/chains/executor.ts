@@ -40,8 +40,16 @@ import {
   ConcurrentChainLimitError,
   ChainNotApprovedError,
   ChainStateMissingError,
+  TrustValidationError,
+  PrivilegedChainNotAllowedError,
 } from './errors';
 import { StateStore } from './state-store';
+import { PrivilegedChainResolver } from './privileged-chain-resolver';
+import {
+  emitChainTelemetry,
+  type ChainTelemetryEvent,
+  type ChainTelemetryOutcome,
+} from './telemetry-emitter';
 import type {
   ArtifactRef,
   ChainPausedState,
@@ -110,6 +118,43 @@ export interface ChainExecutorOptions {
    * pause is silent (state file written but no notification fires).
    */
   escalationRouter?: EscalationRouter;
+  /**
+   * SPEC-022-2-04: optional trust checker. Called once per plugin in the
+   * downstream walk; an untrusted plugin is skipped with a
+   * `TrustValidationError` recorded on its step. When absent, every
+   * plugin is treated as trusted (back-compat with PLAN-022-1).
+   */
+  trustChecker?: ChainTrustChecker;
+  /**
+   * SPEC-022-2-04: privileged-chain allowlist (`extensions.privileged_chains`).
+   * When the chain includes any privileged producer→consumer pair (a
+   * consume edge on a `requires_approval` artifact), every such pair must
+   * appear in this list. When the allowlist is omitted OR the chain has
+   * no privileged pairs, the check is a no-op.
+   */
+  privilegedChainAllowlist?: ReadonlyArray<string>;
+  /**
+   * SPEC-022-2-04: when true (default), the executor emits exactly one
+   * `chain.completed` telemetry event in its `finally` block. Set false
+   * to disable for tests that want to assert the absence of emissions.
+   */
+  emitTelemetry?: boolean;
+}
+
+/**
+ * Per-plugin trust verdict consumed by the executor (SPEC-022-2-04). Distinct
+ * from PLAN-019-3's `TrustVerdict` so the chain layer doesn't bind itself to
+ * the trust pipeline's full surface; a thin adapter wires the real validator
+ * to this shape at the daemon's construction site.
+ */
+export interface ChainTrustVerdict {
+  trusted: boolean;
+  /** Populated when `trusted: false`; surfaced in `TrustValidationError.reason`. */
+  reason?: string;
+}
+
+export interface ChainTrustChecker {
+  isTrusted(pluginId: string): ChainTrustVerdict | Promise<ChainTrustVerdict>;
 }
 
 export interface ChainStep {
@@ -217,6 +262,17 @@ export class ChainExecutor {
   private readonly chainId: string;
   private readonly stateStore?: StateStore;
   private readonly escalationRouter?: EscalationRouter;
+  private readonly trustChecker?: ChainTrustChecker;
+  /**
+   * SPEC-022-2-04: privileged-chain allowlist. `undefined` (option omitted)
+   * means the operator has not opted in — the structural check is a no-op
+   * to preserve back-compat with PLAN-022-1 / SPEC-022-2-03 callers. An
+   * explicit `[]` opts in with an empty allowlist, which DOES reject any
+   * privileged chain.
+   */
+  private readonly privilegedChainAllowlist: ReadonlyArray<string> | undefined;
+  private readonly privilegedChainResolver: PrivilegedChainResolver;
+  private readonly emitTelemetryFlag: boolean;
   constructor(
     private readonly graph: DependencyGraph,
     private readonly artifacts: ArtifactRegistry,
@@ -232,6 +288,10 @@ export class ChainExecutor {
     }
     this.stateStore = options.stateStore;
     this.escalationRouter = options.escalationRouter;
+    this.trustChecker = options.trustChecker;
+    this.privilegedChainAllowlist = options.privilegedChainAllowlist;
+    this.privilegedChainResolver = new PrivilegedChainResolver();
+    this.emitTelemetryFlag = options.emitTelemetry !== false;
   }
 
   /** Effective resource limits in use. Visible for tests + telemetry. */
@@ -308,23 +368,159 @@ export class ChainExecutor {
       // length check only fires on a successful topo sort.
       topoOrder = [];
     }
-    if (topoOrder.length > this.limits.max_length) {
-      throw new ChainTooLongError(topoOrder, this.limits.max_length);
-    }
+    // Outer try/finally wraps ALL pre-flights + semaphore + body so that
+    // SPEC-022-2-04 telemetry emits exactly once per executeChain call,
+    // including for `blocked` (privileged-chain rejection) and
+    // `ChainTooLongError` paths that throw before the semaphore.
+    const startTime = performance.now();
+    let result: ChainExecutionResult | undefined;
+    let thrown: unknown;
+    let semaphoreHeld = false;
+    try {
+      if (topoOrder.length > this.limits.max_length) {
+        throw new ChainTooLongError(topoOrder, this.limits.max_length);
+      }
 
-    // SPEC-022-2-02: concurrent-chain semaphore.
-    if (ChainExecutor.activeChains >= this.limits.max_concurrent_chains) {
-      throw new ConcurrentChainLimitError(
-        ChainExecutor.activeChains,
-        this.limits.max_concurrent_chains,
+      // SPEC-022-2-04: privileged-chain pre-flight. Build the structural
+      // pair list and require an allowlist match for every privileged pair.
+      // Pre-flight runs BEFORE the concurrent-chain semaphore so an
+      // allowlist failure does not consume a slot.
+      this.checkPrivilegedChainAllowed(topoOrder);
+
+      // SPEC-022-2-02: concurrent-chain semaphore.
+      if (ChainExecutor.activeChains >= this.limits.max_concurrent_chains) {
+        throw new ConcurrentChainLimitError(
+          ChainExecutor.activeChains,
+          this.limits.max_concurrent_chains,
+        );
+      }
+      ChainExecutor.activeChains += 1;
+      semaphoreHeld = true;
+      result = await this.runChainBody(triggeringPluginId, state, seedArtifact, topoOrder);
+      return result;
+    } catch (err) {
+      thrown = err;
+      throw err;
+    } finally {
+      if (semaphoreHeld) {
+        ChainExecutor.activeChains -= 1;
+      }
+      // SPEC-022-2-04: telemetry emission. Wrapped in try/catch in case
+      // result accessor or payload construction fails — must never break
+      // the chain return path.
+      if (this.emitTelemetryFlag) {
+        try {
+          const duration_ms = performance.now() - startTime;
+          const event = this.buildTelemetryEvent(
+            triggeringPluginId,
+            state,
+            duration_ms,
+            result,
+            thrown,
+          );
+          emitChainTelemetry(event);
+        } catch (e) {
+          this.logger.warn?.(
+            `chain ${this.chainId}: telemetry emit failed: ${(e as Error).message}`,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * SPEC-022-2-04: throw `PrivilegedChainNotAllowedError` if the chain
+   * contains any privileged producer→consumer pair not represented in
+   * the allowlist. Plugins missing from `manifestLookup` are skipped from
+   * the structural check (the per-step skip-cascade handles them).
+   */
+  private checkPrivilegedChainAllowed(order: ReadonlyArray<string>): void {
+    // Back-compat: when the operator has not opted in (option omitted), skip
+    // the structural check. An explicit `[]` opts in and rejects any
+    // privileged chain.
+    if (this.privilegedChainAllowlist === undefined) return;
+    if (order.length < 2) return;
+    const pluginRecords: Array<{ id: string; version: string; manifest: HookManifest }> = [];
+    for (const pid of order) {
+      const m = this.manifestLookup(pid);
+      if (!m) continue;
+      pluginRecords.push({ id: pid, version: m.version, manifest: m });
+    }
+    if (pluginRecords.length < 2) return;
+    const verdict = this.privilegedChainResolver.matches(
+      pluginRecords,
+      this.privilegedChainAllowlist,
+    );
+    if (!verdict.allowed) {
+      throw new PrivilegedChainNotAllowedError(
+        pluginRecords.map((p) => p.id),
+        pluginRecords.map((p) => p.version),
       );
     }
-    ChainExecutor.activeChains += 1;
-    try {
-      return await this.runChainBody(triggeringPluginId, state, seedArtifact, topoOrder);
-    } finally {
-      ChainExecutor.activeChains -= 1;
+  }
+
+  /** SPEC-022-2-04: assemble the telemetry envelope from the chain result. */
+  private buildTelemetryEvent(
+    triggeringPluginId: string,
+    state: RequestState,
+    durationMs: number,
+    result: ChainExecutionResult | undefined,
+    thrown: unknown,
+  ): ChainTelemetryEvent {
+    let outcome: ChainTelemetryOutcome;
+    let errorType: string | undefined;
+    if (thrown !== undefined) {
+      const err = thrown as { name?: string };
+      errorType = err?.name ?? 'Error';
+      outcome =
+        errorType === 'PrivilegedChainNotAllowedError'
+          ? 'blocked'
+          : 'failed';
+    } else if (result?.outcome === 'paused') {
+      outcome = 'paused';
+    } else if (result?.outcome === 'success') {
+      outcome = 'success';
+    } else {
+      outcome = 'failed';
+      // Find first errored step to surface its category as error_type.
+      const errStep = result?.steps.find((s) => s.status === 'error');
+      if (errStep?.error) {
+        errorType = errStep.error.includes('timeout')
+          ? 'PluginTimeoutError'
+          : errStep.error.includes('artifact too large')
+          ? 'ArtifactTooLargeError'
+          : 'StepError';
+      }
     }
+    const plugins: string[] = result
+      ? Array.from(new Set(result.steps.map((s) => s.pluginId)))
+      : [triggeringPluginId];
+    const artifacts: ChainTelemetryEvent['artifacts'] = result
+      ? result.steps.flatMap((s) =>
+          s.produced.map((p) => {
+            const declared = this.manifestLookup(s.pluginId)?.produces?.find(
+              (d) => d.artifact_type === p.artifactType,
+            );
+            return {
+              id: p.scanId,
+              type: p.artifactType,
+              size_bytes: 0,
+              requires_approval: declared?.requires_approval === true,
+            };
+          }),
+        )
+      : [];
+    const event: ChainTelemetryEvent = {
+      event: 'chain.completed',
+      chain_id: this.chainId,
+      request_id: state.requestId,
+      plugins,
+      duration_ms: durationMs,
+      artifacts,
+      outcome,
+    };
+    if (errorType !== undefined) event.error_type = errorType;
+    return event;
   }
 
   /** Original walk extracted into a private method so the semaphore wraps it. */
@@ -480,6 +676,43 @@ export class ChainExecutor {
         steps.push(step);
         this.logStep(pid, 'skipped', step.durationMs, step.error);
         continue;
+      }
+
+      // SPEC-022-2-04: trust check before invocation. Untrusted plugins
+      // are recorded as `error` with `TrustValidationError` and added to
+      // `failedSet` under `warn` mode so their downstream consumers
+      // skip-cascade. This `warn` behavior is fixed regardless of the
+      // manifest's declared mode (trust failures must not be silently
+      // masked by an `ignore`-mode declaration).
+      if (this.trustChecker) {
+        let trustVerdict: ChainTrustVerdict;
+        try {
+          trustVerdict = await this.trustChecker.isTrusted(pid);
+        } catch (err) {
+          trustVerdict = {
+            trusted: false,
+            reason: `trust check threw: ${(err as Error).message}`,
+          };
+        }
+        if (!trustVerdict.trusted) {
+          const trustErr = new TrustValidationError(
+            pid,
+            trustVerdict.reason ?? 'unknown',
+          );
+          failedSet.add(pid);
+          failureModes.set(pid, 'warn');
+          const step: ChainStep = {
+            pluginId: pid,
+            consumed: [],
+            produced: [],
+            status: 'error',
+            error: trustErr.message,
+            durationMs: performance.now() - stepStart,
+          };
+          steps.push(step);
+          this.logStep(pid, 'error', step.durationMs, step.error);
+          continue;
+        }
       }
 
       // Skip-cascade (SPEC-022-2-02): if any upstream plugin already failed

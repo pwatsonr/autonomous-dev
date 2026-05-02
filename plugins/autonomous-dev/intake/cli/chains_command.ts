@@ -23,6 +23,14 @@ import { send } from '../hooks/ipc-client';
 import type { IpcRequest, IpcResponse } from '../hooks/ipc-server';
 import type { ChainEdge } from '../chains/dependency-graph';
 import type { ChainGraphFormat } from '../chains/render';
+import {
+  registerChainsApprove,
+  type ChainsApproveDeps,
+} from './chains_approve_command';
+import {
+  registerChainsReject,
+  type ChainsRejectDeps,
+} from './chains_reject_command';
 
 /**
  * Stream pair injected for testability — defaults to process.stdout/stderr.
@@ -39,6 +47,15 @@ export type ChainsIpcSend = (req: IpcRequest) => Promise<IpcResponse>;
 
 export interface ChainsCommandDeps extends ChainsCommandStreams {
   send?: ChainsIpcSend;
+  /**
+   * SPEC-022-2-04: factory for the `chains approve` subcommand
+   * dependencies. When omitted, the subcommand is NOT registered (so
+   * the existing `list`/`graph` continue to work without the executor
+   * + state store).
+   */
+  approveDepsFactory?: () => ChainsApproveDeps;
+  /** SPEC-022-2-04: factory for the `chains reject` subcommand deps. */
+  rejectDepsFactory?: () => ChainsRejectDeps;
 }
 
 /**

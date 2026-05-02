@@ -12,3 +12,5 @@ export * from './errors';
 export * from './executor';
 export * from './render';
 export * from './state-store';
+export * from './privileged-chain-resolver';
+export * from './telemetry-emitter';
