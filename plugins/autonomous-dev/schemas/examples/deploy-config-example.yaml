@@ -1,0 +1,24 @@
+# Worked example of <repo>/.autonomous-dev/deploy.yaml.
+# Validated by plugins/autonomous-dev/schemas/deploy-config-v1.json.
+# Cross-reference: TDD-023 §9, SPEC-023-2-01.
+version: "1.0"
+default_backend: "static"
+environments:
+  dev:
+    backend: "local"
+    parameters: {}
+    approval: "none"
+    cost_cap_usd: 0
+  staging:
+    backend: "static"
+    parameters:
+      target_dir: "/var/www/staging"
+    approval: "single"
+    cost_cap_usd: 5
+  prod:
+    backend: "static"
+    parameters:
+      target_dir: "/var/www/prod"
+    approval: "two-person"
+    cost_cap_usd: 25
+    auto_promote_from: "staging"

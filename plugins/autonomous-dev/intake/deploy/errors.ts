@@ -90,6 +90,154 @@ export class BackendNotFoundError extends DeployError {
   }
 }
 
+/**
+ * Raised by `loadConfig` when `deploy.yaml` exists but is malformed or
+ * fails JSON-Schema validation (SPEC-023-2-01).
+ */
+export class ConfigValidationError extends DeployError {
+  public readonly errors: readonly { pointer: string; message: string }[];
+  constructor(
+    message: string,
+    public readonly configPath: string,
+    public readonly line: number | null,
+    errors: readonly { pointer: string; message: string }[],
+  ) {
+    super(message);
+    this.name = 'ConfigValidationError';
+    this.errors = Object.freeze([...errors]);
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      configPath: this.configPath,
+      line: this.line,
+      errors: [...this.errors],
+    };
+  }
+}
+
+/**
+ * Raised by `resolveEnvironment` when the requested env is not declared
+ * in the loaded `DeployConfig` (SPEC-023-2-01).
+ */
+export class UnknownEnvironmentError extends DeployError {
+  constructor(
+    public readonly envName: string,
+    public readonly available: readonly string[],
+  ) {
+    super(
+      `unknown environment '${envName}'; available: ${available.join(', ') || '(none)'}`,
+    );
+    this.name = 'UnknownEnvironmentError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      envName: this.envName,
+      available: [...this.available],
+    };
+  }
+}
+
+/**
+ * Raised by `BackendSelector` when the chosen backend name is not
+ * registered (SPEC-023-2-02). Carries the available list so the error
+ * is actionable.
+ */
+export class UnknownBackendError extends DeployError {
+  constructor(
+    public readonly requested: string,
+    public readonly available: readonly string[],
+  ) {
+    super(
+      `Backend '${requested}' is not registered. Available: ${available.join(', ') || '(none)'}`,
+    );
+    this.name = 'UnknownBackendError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      requested: this.requested,
+      available: [...this.available],
+    };
+  }
+}
+
+/**
+ * Raised when an approval-state file's HMAC chain does not verify
+ * (SPEC-023-2-03 tamper detection).
+ */
+export class ApprovalChainError extends DeployError {
+  constructor(
+    public readonly deployId: string,
+    public readonly entryIndex: number,
+    reason: string,
+  ) {
+    super(
+      `approval chain verification failed for deploy ${deployId} at entry ${entryIndex}: ${reason}`,
+    );
+    this.name = 'ApprovalChainError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      deployId: this.deployId,
+      entryIndex: this.entryIndex,
+    };
+  }
+}
+
+/** Raised when the same approver attempts to record two approvals on a two-person gate. */
+export class DuplicateApproverError extends DeployError {
+  constructor(public readonly deployId: string, public readonly approver: string) {
+    super(
+      `approver '${approver}' has already recorded a decision for deploy ${deployId}`,
+    );
+    this.name = 'DuplicateApproverError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      deployId: this.deployId,
+      approver: this.approver,
+    };
+  }
+}
+
+/** Raised when an `approval: "admin"` requirement gets an operator-role approve. */
+export class AdminRequiredError extends DeployError {
+  constructor(public readonly deployId: string, public readonly approver: string) {
+    super(
+      `deploy ${deployId} requires admin role; approver '${approver}' has insufficient role`,
+    );
+    this.name = 'AdminRequiredError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      deployId: this.deployId,
+      approver: this.approver,
+    };
+  }
+}
+
+/** Raised when the per-env cost cap is exceeded (SPEC-023-2-04). */
+export class CostCapExceededError extends DeployError {
+  constructor(public readonly reason: string) {
+    super(`cost cap exceeded: ${reason}`);
+    this.name = 'CostCapExceededError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return { name: this.name, message: this.message, reason: this.reason };
+  }
+}
+
 /** Raised by external-tool wrappers (`runTool`) on non-zero exit. */
 export class ExternalToolError extends DeployError {
   constructor(
