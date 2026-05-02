@@ -120,6 +120,11 @@ export interface HookEntry {
   dependencies?: string[];
   /** Capabilities the hook requests; sandbox enforces in a future plan. */
   capabilities?: Capability[];
+  /**
+   * SPEC-019-3-03: when true, the hook may spawn child processes. Triggers
+   * the meta-reviewer audit per TDD-019 §10.3 condition #5.
+   */
+  allow_child_processes?: boolean;
 }
 
 /**
@@ -127,6 +132,12 @@ export interface HookEntry {
  *
  * Produced by `PluginDiscovery.parseManifest` after JSON parsing and schema
  * validation. See TDD-019 §13.1 for canonical field semantics.
+ *
+ * SPEC-019-3-01 / -02 / -03 add the optional trust-pipeline fields
+ * (`reviewer_slots`, `capabilities`, `filesystem_write_paths`). They are
+ * additive — older manifests without them validate cleanly against
+ * `hook-manifest-v1.json` and are treated as "no privileged surface" by
+ * the trust validator.
  */
 export interface HookManifest {
   /** Globally unique plugin id (kebab-case). */
@@ -137,6 +148,72 @@ export interface HookManifest {
   version: string;
   /** Hooks declared by this plugin. May be empty. */
   hooks: HookEntry[];
+  /**
+   * Reviewer slots this plugin claims at the manifest level. Distinct from
+   * the per-hook `reviewer_slot` field — those bind a single hook entry to
+   * a slot, while this lists every slot the plugin participates in for
+   * trust-policy purposes (SPEC-019-3-02 strict-mode privileged-reviewer
+   * arm).
+   */
+  reviewer_slots?: string[];
+  /**
+   * Top-level capability claims aggregated across the plugin. The trust
+   * validator's meta-review trigger (SPEC-019-3-03) consults this list.
+   */
+  capabilities?: ReadonlyArray<Capability | string>;
+  /**
+   * Filesystem paths the plugin declares it writes to. Used by the
+   * meta-review trigger to decide whether the plugin needs `agent-meta-reviewer`.
+   * Paths beginning with `/tmp/` are exempt.
+   */
+  filesystem_write_paths?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-019-3-01: Extensions / trust-pipeline types
+// ---------------------------------------------------------------------------
+
+/**
+ * Three trust-policy modes per TDD-019 §10.1.
+ *
+ * - `allowlist` — explicit operator opt-in only. Signature ignored.
+ * - `permissive` — trust by default; if `signature_verification: true`,
+ *   gate on signature.
+ * - `strict` — allowlist AND signature both required; reviewer slots
+ *   constrained to `privileged_reviewers`.
+ */
+export type TrustMode = 'allowlist' | 'permissive' | 'strict';
+
+/**
+ * The `extensions` section of `~/.claude/autonomous-dev.json`. See
+ * `schemas/autonomous-dev-config.schema.json` for canonical defaults.
+ */
+export interface ExtensionsConfig {
+  allowlist: string[];
+  privileged_reviewers: string[];
+  trust_mode: TrustMode;
+  signature_verification: boolean;
+  auto_update_allowed: boolean;
+  max_plugins_per_hook_point: number;
+  global_resource_limits: {
+    max_total_memory_mb: number;
+    max_concurrent_executions: number;
+    max_execution_time_seconds: number;
+  };
+}
+
+/**
+ * The verdict returned by `TrustValidator.validatePlugin` and each step
+ * method. `requiresMetaReview` is set when the plugin matched any
+ * meta-review trigger condition (SPEC-019-3-03), regardless of the
+ * verdict's pass/fail. `metaReviewVerdict` is populated only when a
+ * meta-review actually ran (or a cached verdict was returned).
+ */
+export interface TrustVerdict {
+  trusted: boolean;
+  reason?: string;
+  requiresMetaReview: boolean;
+  metaReviewVerdict?: { pass: boolean; findings: string[] };
 }
 
 // ---------------------------------------------------------------------------

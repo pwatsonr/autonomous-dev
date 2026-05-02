@@ -282,6 +282,20 @@
     }
   },
 
+  "extensions": {
+    "allowlist": [],
+    "privileged_reviewers": [],
+    "trust_mode": "allowlist",
+    "signature_verification": false,
+    "auto_update_allowed": false,
+    "max_plugins_per_hook_point": 5,
+    "global_resource_limits": {
+      "max_total_memory_mb": 256,
+      "max_concurrent_executions": 8,
+      "max_execution_time_seconds": 30
+    }
+  },
+
   "emergency": {
     "kill_default_mode": "graceful",
     "restart_requires_human": true
