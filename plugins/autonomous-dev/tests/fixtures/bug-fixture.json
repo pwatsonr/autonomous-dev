@@ -1,0 +1,23 @@
+{
+  "title": "submit-bug fails when description contains backtick",
+  "description": "When submitting a bug whose description contains a backtick character, the CLI raises an UnhandledPromiseRejection in the readline pipe and exits with status 0 instead of writing the request to disk.",
+  "reproduction_steps": [
+    "Run `autonomous-dev request submit-bug --repo /tmp/r`",
+    "At the description prompt, type a string containing a single backtick",
+    "Press enter and observe the crash"
+  ],
+  "expected_behavior": "The CLI accepts arbitrary string content (including backticks) in the description field and persists the request.",
+  "actual_behavior": "The CLI crashes with UnhandledPromiseRejection and exits 0; no request is persisted.",
+  "error_messages": [
+    "(node:12345) UnhandledPromiseRejectionWarning: SyntaxError: Invalid or unexpected token"
+  ],
+  "environment": {
+    "os": "macOS 14.4",
+    "runtime": "node 20.11.0",
+    "version": "0.1.0"
+  },
+  "affected_components": ["intake/cli/bug-prompts.ts"],
+  "severity": "high",
+  "labels": ["intake", "cli", "regression"],
+  "user_impact": "Operators cannot file any bug whose description contains a backtick — common when pasting code snippets."
+}

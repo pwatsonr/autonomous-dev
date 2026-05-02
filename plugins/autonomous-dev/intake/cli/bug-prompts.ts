@@ -537,7 +537,13 @@ export async function runInteractivePrompts(
           }
           items.push(raw);
         }
-        setField(out, p.field, items);
+        // Skip optional empty arrays so callers can rely on
+        // `'affected_components' in report` being false when the user
+        // didn't enter any value.  Required loops (e.g. reproduction_steps
+        // with minItems >= 1) always set the field.
+        if (items.length > 0 || p.required || (p.minItems ?? 0) > 0) {
+          setField(out, p.field, items);
+        }
       } else if (p.kind === 'csv') {
         const raw = (await io.ask(`${p.label} (comma-separated, optional): `)).trim();
         if (raw !== '') {

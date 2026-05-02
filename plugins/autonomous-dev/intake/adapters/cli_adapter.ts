@@ -514,7 +514,10 @@ export function buildProgram(
       new Option('--deadline <iso8601>', 'Deadline (ISO 8601 timestamp)').argParser(parseDeadline),
     )
     .addOption(
-      new Option('--type <type>', 'Request type')
+      new Option(
+        '--type <type>',
+        `Request type (one of: ${VALID_REQUEST_TYPES.join(', ')})`,
+      )
         .argParser(parseType)
         .default('feature'),
     )
