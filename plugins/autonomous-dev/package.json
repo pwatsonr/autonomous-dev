@@ -20,12 +20,14 @@
     "commander": "^11.1.0",
     "discord.js": "^14.26.3",
     "express": "^4.21.0",
+    "js-yaml": "^3.14.1",
     "picomatch": "^4.0.4",
     "semver": "^7.7.4"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.0",
+    "@types/js-yaml": "^3.12.10",
     "@types/node": "^22.0.0",
     "@types/supertest": "^6.0.0",
     "jest": "^29.7.0",
