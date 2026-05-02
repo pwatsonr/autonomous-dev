@@ -1,0 +1,96 @@
+# ============================================================
+# Assist Evals Workflow
+# ============================================================
+# Runs the autonomous-dev-assist eval suite against the seed
+# scenarios in `tests/evals/assist/`. Triggers:
+#
+#   - PRs touching assist code or eval scaffolding
+#   - Nightly cron at 06:00 UTC
+#
+# This file is the SPEC-017-3-03 scaffold. SPEC-017-3-04 appends
+# threshold-check + cron-only baseline-update steps.
+#
+# Operator runbook: docs/operators/assist-evals.md (added by SPEC-017-3-04)
+# ============================================================
+
+name: assist-evals
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/autonomous-dev-assist/skills/**'
+      - 'plugins/autonomous-dev-assist/agents/**'
+      - 'tests/evals/assist/**'
+      - 'scripts/ci/run-assist-evals.sh'
+      - 'scripts/ci/score-eval-response.js'
+  schedule:
+    - cron: '0 6 * * *'
+
+permissions:
+  contents: read
+  pull-requests: write   # for results comment in SPEC-017-3-04
+
+concurrency:
+  group: assist-evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-evals:
+    name: Run assist eval scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      pass-rate: ${{ steps.summary.outputs.pass-rate }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run eval suite
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: bash scripts/ci/run-assist-evals.sh
+
+      - name: Summarize results
+        id: summary
+        run: |
+          set -euo pipefail
+          PASS_RATE="$(jq -r '.pass_rate' eval-results.json)"
+          TOTAL="$(jq -r '.total' eval-results.json)"
+          PASSED="$(jq -r '.passed' eval-results.json)"
+          echo "Pass rate: $PASS_RATE  ($PASSED / $TOTAL)"
+          echo "pass-rate=${PASS_RATE}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Assist Evals"
+            echo ""
+            echo "- Total scenarios: ${TOTAL}"
+            echo "- Passed: ${PASSED}"
+            echo "- Pass rate: ${PASS_RATE}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.run_id }}
+          path: eval-results.json
+          retention-days: 90
+
+      - name: Emit spend estimate
+        if: always()
+        env:
+          BUDGET_HMAC_KEY: ${{ secrets.BUDGET_HMAC_KEY }}
+          ESTIMATED_COST_USD: "0.30"   # ~10 scenarios * ~$0.03 per Claude call
+          SPEND_WORKFLOW_NAME: assist-evals
+        run: bash scripts/ci/emit-spend-estimate.sh
+
+      - name: Upload spend artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spend-estimate-${{ github.run_id }}
+          path: .github/budget/spend-${{ github.run_id }}.json
+          retention-days: 90

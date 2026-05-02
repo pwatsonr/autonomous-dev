@@ -1,0 +1,9 @@
+{
+  "description": "Setup-wizard help happy path: a clear install question should produce step-by-step guidance referencing plugin installation.",
+  "skill": "help",
+  "input": "How do I install autonomous-dev?",
+  "expected_keywords": ["install", "plugin"],
+  "forbidden_phrases": [],
+  "min_response_length": 100,
+  "max_response_length": 2000
+}

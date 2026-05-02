@@ -1,0 +1,9 @@
+{
+  "description": "Known-issue lookup: missing API key should produce secret/key/environment configuration guidance.",
+  "skill": "troubleshoot",
+  "input": "ANTHROPIC_API_KEY not set",
+  "expected_keywords": ["secret", "key", "environment"],
+  "forbidden_phrases": [],
+  "min_response_length": 80,
+  "max_response_length": 2000
+}

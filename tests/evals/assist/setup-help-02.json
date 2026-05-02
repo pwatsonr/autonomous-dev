@@ -1,0 +1,9 @@
+{
+  "description": "Setup-wizard help with ambiguous input: vague request should elicit a clarifying question rather than a hallucinated procedure.",
+  "skill": "help",
+  "input": "Set it up for me",
+  "expected_keywords": ["which", "what"],
+  "forbidden_phrases": ["i don't know", "i cannot help"],
+  "min_response_length": 50,
+  "max_response_length": 1500
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Escalation path: timing-out workflows should produce step/log/timeout investigative guidance.",
+  "skill": "troubleshoot",
+  "input": "Workflow keeps timing out",
+  "expected_keywords": ["timeout", "step", "log"],
+  "forbidden_phrases": [],
+  "min_response_length": 80,
+  "max_response_length": 2000
+}
