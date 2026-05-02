@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev/schemas/state-v1.1.json",
+  "title": "RequestState v1.1",
+  "description": "Persisted state for an autonomous-dev request. Schema v1.1 adds request typing.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "id",
+    "status",
+    "phase_overrides",
+    "type_config"
+  ],
+  "properties": {
+    "schema_version": { "const": 1.1 },
+    "id": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "minLength": 1 },
+    "request_type": {
+      "type": "string",
+      "enum": ["feature", "bug", "infra", "refactor", "hotfix"]
+    },
+    "bug_context": {
+      "type": "object",
+      "description": "Validated by bug-report sub-schema in PLAN-018-3."
+    },
+    "phase_overrides": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "type_config": {
+      "type": "object",
+      "required": [
+        "skippedPhases",
+        "enhancedPhases",
+        "expeditedReviews",
+        "additionalGates",
+        "maxRetries",
+        "phaseTimeouts"
+      ],
+      "properties": {
+        "skippedPhases": { "type": "array", "items": { "type": "string" } },
+        "enhancedPhases": { "type": "array", "items": { "type": "string" } },
+        "expeditedReviews": { "type": "boolean" },
+        "additionalGates": { "type": "array", "items": { "type": "string" } },
+        "maxRetries": { "type": "integer", "minimum": 0 },
+        "phaseTimeouts": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "priority": { "type": "integer" },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "repository": { "type": "string" },
+    "branch": { "type": "string" },
+    "worktree_path": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "cost_accrued_usd": { "type": "number", "minimum": 0 },
+    "turn_count": { "type": "integer", "minimum": 0 },
+    "escalation_count": { "type": "integer", "minimum": 0 },
+    "blocked_by": { "type": "array", "items": { "type": "string" } },
+    "phase_history": { "type": "array" },
+    "current_phase_metadata": { "type": "object" },
+    "error": { "type": ["string", "null"] },
+    "last_checkpoint": { "type": "string", "format": "date-time" }
+  }
+}
