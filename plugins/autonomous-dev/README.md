@@ -9,8 +9,6 @@ A continuously-running, self-improving development pipeline that receives produc
 | **Version** | 0.1.0 |
 | **License** | MIT |
 | **Platform** | Claude Code plugin |
-| **Files** | 781+ source files |
-| **Lines** | ~227K lines of code |
 | **Language** | TypeScript + Bash |
 
 ---
@@ -250,7 +248,7 @@ The daemon is a long-running background process that polls for work every 30 sec
 
 ### Agent Factory
 
-The system ships with 13 specialist agents (prd-author, tdd-author, plan-author, spec-author, code-executor, test-executor, deploy-executor, and six reviewers). The Agent Factory is a self-improvement subsystem that monitors each agent's performance metrics (approval rate, quality scores, escalation rate, token usage). When performance degrades, it generates improvement proposals, A/B tests the proposed changes against the current version using blind scoring, and promotes winners through a canary period. Humans always approve new agents and promotions. Rate limits prevent runaway modifications: at most 1 new agent and 1 modification per agent per week.
+The system ships with 18 specialist agents: seven authors/executors (prd-author, tdd-author, plan-author, spec-author, code-executor, test-executor, deploy-executor) and eleven reviewers (architecture, doc, performance, quality, security, agent-meta, accessibility, qa-edge-case, rule-set-enforcement, standards-meta, ux-ui). The five specialist reviewers (accessibility, qa-edge-case, rule-set-enforcement, standards-meta, ux-ui) were added in TDD-020/021 to enforce project-defined standards and domain-specific quality rubrics. The Agent Factory is a self-improvement subsystem that monitors each agent's performance metrics (approval rate, quality scores, escalation rate, token usage). When performance degrades, it generates improvement proposals, A/B tests the proposed changes against the current version using blind scoring, and promotes winners through a canary period. Humans always approve new agents and promotions. Rate limits prevent runaway modifications: at most 1 new agent and 1 modification per agent per week.
 
 ---
 
@@ -729,6 +727,130 @@ autonomous-dev agent gaps
 ```
 
 List all detected domain gaps -- areas where no existing agent has sufficient expertise, suggesting a new specialist agent may be needed.
+
+---
+
+### `chains` (subcommands)
+
+Inspect, audit, and approve the artifact chain that links plugins together. Chains are declared by each plugin as `(producer, consumer, artifactType, schemaVersion)` edges and are validated for cycles and schema compatibility on daemon start.
+
+#### `chains list`
+
+```bash
+autonomous-dev chains list [--json]
+```
+
+Display every registered chain edge as a table, or as JSON for scripting.
+
+#### `chains graph`
+
+```bash
+autonomous-dev chains graph [--format dot|mermaid]
+```
+
+Emit the dependency graph in Graphviz DOT or Mermaid syntax for visualisation.
+
+#### `chains audit`
+
+```bash
+autonomous-dev chains audit [--since <timestamp>]
+```
+
+Walk the HMAC-chained chains audit log and verify integrity. Reports any approval, rejection, or schema-version change since the supplied timestamp.
+
+#### `chains approve` / `chains reject`
+
+```bash
+autonomous-dev chains approve <edge-id>
+autonomous-dev chains reject <edge-id> --reason "<text>"
+```
+
+Approve or reject a privileged chain edge. Privileged edges (those crossing trust boundaries or carrying credentials) require human approval before they take effect; the decision is recorded in the audit log.
+
+---
+
+### `deploy` (subcommands)
+
+Manage deployments through the bundled and cloud backends. Backends register at daemon start; the four bundled backends (`local`, `static`, `docker-local`, `github-pages`) are always present, plus any installed cloud plugins (`gcp`, `aws`, `azure`, `k8s`).
+
+#### `deploy backends list`
+
+```bash
+autonomous-dev deploy backends list [--json]
+```
+
+Show every registered backend with its capability, supported targets, and required parameters.
+
+#### `deploy backends describe`
+
+```bash
+autonomous-dev deploy backends describe <backend-name>
+```
+
+Print the parameter schema, defaults, and conformance test results for one backend.
+
+#### `deploy plan`
+
+```bash
+autonomous-dev deploy plan --env <environment> [--backend <name>] [--dry-run]
+```
+
+Resolve `deploy.yaml` against the four-source precedence chain (CLI > env > project > defaults), select the backend, validate parameters, and emit a plan. With `--dry-run`, no side effects occur.
+
+#### `deploy approve` / `deploy reject`
+
+```bash
+autonomous-dev deploy approve <deploy-id>
+autonomous-dev deploy reject <deploy-id> --reason "<text>"
+```
+
+Advance a pending deploy through the HMAC-chained approval state machine. Approval is required at trust levels below the configured threshold.
+
+#### `deploy logs`
+
+```bash
+autonomous-dev deploy logs <deploy-id> [--tail] [--since <timestamp>]
+```
+
+Stream the structured per-deploy log written by the deploy logger.
+
+#### `deploy cost`
+
+```bash
+autonomous-dev deploy cost [--env <environment>] [--since <timestamp>]
+```
+
+Read the HMAC-chained daily cost ledger and report spend by environment. Cap enforcement uses the same ledger.
+
+#### `deploy estimate`
+
+```bash
+autonomous-dev deploy estimate --env <environment> [--backend <name>]
+```
+
+Estimate the deploy's cost using per-cloud estimators against the pricing fixtures, before any side effects. The estimate is recorded alongside the plan.
+
+---
+
+### `cred-proxy` (subcommands)
+
+Inspect and manage the credential proxy. The proxy mints short-TTL scoped credentials per deploy operation, records every issuance in the audit log, and auto-revokes on completion or timeout. It listens on a Unix socket; only the daemon and authorised callers may connect.
+
+```bash
+autonomous-dev cred-proxy status
+autonomous-dev cred-proxy list-active [--json]
+autonomous-dev cred-proxy revoke <token-id>
+autonomous-dev cred-proxy audit [--since <timestamp>]
+```
+
+| Subcommand | Description |
+|---|---|
+| `status` | Show whether the proxy socket is up, the active token count, and TTL summary |
+| `list-active` | List currently-active scoped tokens (caller, cloud, scope, expiry) |
+| `revoke` | Force-revoke a single token; the next caller refresh fails closed |
+| `audit` | Walk the credential audit log with HMAC verification |
+
+> **Warning:** `cred-proxy` never returns secret material. The proxy delivers credentials directly into per-deploy environment variables; CLI output redacts every secret-bearing field.
 
 ---
 
@@ -1487,20 +1609,25 @@ autonomous-dev/
 |-- .claude-plugin/
 |   +-- plugin.json              # Plugin metadata (name, version, description)
 |
-|-- agents/                      # Agent definition files (Markdown frontmatter)
-|   |-- prd-author.md            #   Writes Product Requirements Documents
-|   |-- tdd-author.md            #   Writes Technical Design Documents
-|   |-- plan-author.md           #   Writes implementation plans
-|   |-- spec-author.md           #   Writes implementation specs
-|   |-- code-executor.md         #   Writes and tests code
-|   |-- test-executor.md         #   Runs test suites
-|   |-- deploy-executor.md       #   Handles deployment
-|   |-- quality-reviewer.md      #   Reviews quality
-|   |-- security-reviewer.md     #   Reviews security
-|   |-- architecture-reviewer.md #   Reviews architecture
-|   |-- doc-reviewer.md          #   Reviews documents
-|   |-- performance-analyst.md   #   Reviews performance
-|   +-- agent-meta-reviewer.md   #   Reviews agent improvements
+|-- agents/                              # Agent definition files (Markdown frontmatter)
+|   |-- prd-author.md                    #   Writes Product Requirements Documents
+|   |-- tdd-author.md                    #   Writes Technical Design Documents
+|   |-- plan-author.md                   #   Writes implementation plans
+|   |-- spec-author.md                   #   Writes implementation specs
+|   |-- code-executor.md                 #   Writes and tests code
+|   |-- test-executor.md                 #   Runs test suites
+|   |-- deploy-executor.md               #   Handles deployment
+|   |-- quality-reviewer.md              #   Reviews quality
+|   |-- security-reviewer.md             #   Reviews security
+|   |-- architecture-reviewer.md         #   Reviews architecture
+|   |-- doc-reviewer.md                  #   Reviews documents
+|   |-- performance-analyst.md           #   Reviews performance
+|   |-- agent-meta-reviewer.md           #   Reviews agent improvements
+|   |-- accessibility-reviewer.md        #   Reviews WCAG 2.2 AA conformance
+|   |-- qa-edge-case-reviewer.md         #   Hunts edge cases, races, error paths
+|   |-- rule-set-enforcement-reviewer.md #   Enforces standards.yaml rules
+|   |-- standards-meta-reviewer.md       #   Two-person approval for standards changes
+|   +-- ux-ui-reviewer.md                #   Reviews UX/UI heuristics
 |
 |-- bin/
 |   |-- autonomous-dev.sh        # CLI dispatcher (routes all commands)
@@ -1532,6 +1659,29 @@ autonomous-dev/
 |   |   |-- discord/             # Discord bot (7 files)
 |   |   +-- slack/               # Slack bot (11 files, includes manifest)
 |   |-- core/                    # Request parsing, routing, dedup, sanitization
+|   |-- cli/                     # Top-level CLI subcommand registrations
+|   |                            #   (chains, deploy, cred-proxy, reconcile)
+|   |-- chains/                  # Inter-plugin artifact chain engine
+|   |                            #   (registry, dependency graph, executor,
+|   |                            #   privileged approval, audit log)
+|   |-- deploy/                  # Deployment subsystem (backends, selector,
+|   |                            #   approval state machine, cost ledger,
+|   |                            #   monitor, log rotation, cost estimation)
+|   |-- cred-proxy/              # Short-TTL scoped credential proxy
+|   |                            #   (per-cloud scopers, Unix socket server,
+|   |                            #   audit emitter, auto-revoke)
+|   |-- firewall/                # Egress firewall (nftables + pfctl backends,
+|   |                            #   DNS refresh, plugin-manifest-v2
+|   |                            #   `egress_allowlist` enforcement)
+|   |-- standards/               # Project standards engine (auto-detection,
+|   |                            #   evaluators, fix-recipes, prompt rendering)
+|   |-- reviewers/               # Reviewer dispatch and panel selection
+|   |-- recovery/                # Crash recovery, lease management
+|   |-- sessions/                # Per-request session state
+|   |-- router/                  # Request routing
+|   |-- audit/                   # Hash-chained audit trail writers
+|   |-- daemon/                  # Daemon lifecycle, IPC server, supervisor
+|   |-- hooks/                   # IPC client/server, lifecycle hooks
 |   |-- queue/                   # Priority queue, starvation monitor
 |   |-- handlers/                # Submit, status, cancel, pause, resume, etc.
 |   |-- conversation/            # Clarifying question flow

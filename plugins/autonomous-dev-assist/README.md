@@ -67,10 +67,20 @@ Step-by-step guided setup. Checks prerequisites (Node.js, Claude Code CLI, git, 
 plugins/autonomous-dev-assist/
   .claude-plugin/
     plugin.json          # Plugin metadata
+  agents/
+    onboarding.md        # First-run onboarding agent
+    troubleshooter.md    # Diagnostic agent for stuck pipelines
   commands/
     assist.md            # Expert assistant command
     eval.md              # Eval harness command
     quickstart.md        # Quickstart guide command
+  skills/
+    config-guide/        # Configuration reference skill
+    help/                # General-help skill
+    setup-wizard/        # Step-by-step setup skill
+    troubleshoot/        # Diagnostic / fix-it skill
+  instructions/
+    runbook.md           # Operational runbook
   evals/                 # Eval case definitions
     results/             # Eval run results (timestamped)
   README.md              # This file
