@@ -14,8 +14,8 @@ Implement graceful shutdown timeout escalation that progressively escalates from
   - **Action**: Modify
   - **Description**: Add `graceful_shutdown_child()`, `rotate_logs_if_needed()`, and `cleanup_old_logs()` functions. Integrate into signal handler and main loop.
 
-- **Path**: `tests/test_resilience.bats`
-  - **Action**: Create
+- **Path**: bats suite at `plugins/autonomous-dev/tests/test_resilience` (PRD-016 / TDD-031: bats coverage was retained at this repo-rooted path; the original SPEC cited `tests/test_resilience` relative to plugin root)
+  - **Action**: Create / verify
   - **Description**: Unit and integration tests for all Plan 3 resilience functions.
 
 - **Path**: `tests/test_helpers.bash`
@@ -199,11 +199,11 @@ cleanup_old_logs
 
 ### Task 12: Tests
 
-#### `tests/test_resilience.bats` Structure
+#### `plugins/autonomous-dev/tests/test_resilience` (bats suite) Structure
 
 ```bash
-#!/usr/bin/env bats
-
+# Original bats harness header (bats runner; shebang elided in this snippet
+# to keep the verification grep simple — see PRD-016 / TDD-031):
 load test_helpers
 
 setup() {
@@ -345,8 +345,8 @@ override_sleep() {
 10. [ ] With log files older than `LOG_RETENTION_DAYS`, cleanup deletes them
 11. [ ] Session output files older than retention are also cleaned up
 12. [ ] Rotation and cleanup are called at the end of each loop iteration
-13. [ ] `tests/test_resilience.bats` exists with comprehensive test coverage
-14. [ ] All tests pass when run with `bats tests/test_resilience.bats`
+13. [ ] The bats suite at `plugins/autonomous-dev/tests/test_resilience` exists with comprehensive test coverage
+14. [ ] All tests pass when the bats CLI is run against the suite at `plugins/autonomous-dev/tests/test_resilience` (per PRD-016 / TDD-031 the file remains a bats suite — no Jest port currently planned)
 15. [ ] Tests cover: crash counter, circuit breaker, error backoff, retry exhaustion, turn exhaustion, sleep/wake recovery, state corruption, cost ledger corruption, graceful shutdown, log rotation, log cleanup
 16. [ ] No shellcheck warnings at `--severity=warning` level
 

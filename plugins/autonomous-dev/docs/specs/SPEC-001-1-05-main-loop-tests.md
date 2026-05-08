@@ -6,7 +6,7 @@
 - **Estimated effort**: 8 hours
 
 ## Description
-Implement the `main()` function that orchestrates the init phase and enters the main loop with stub work-selection logic. Create comprehensive unit tests for all Plan 1 functions using the bats testing framework.
+Implement the `main()` function that orchestrates the init phase and enters the main loop with stub work-selection logic. Comprehensive unit tests for all Plan 1 functions were originally planned in the bats testing framework; per PRD-016 / TDD-031 reconciliation, that bats coverage was retired and no Jest replacement is currently planned (see PRD-016 §G-08).
 
 ## Files to Create/Modify
 
@@ -14,13 +14,7 @@ Implement the `main()` function that orchestrates the init phase and enters the 
   - **Action**: Modify
   - **Description**: Add the `main()` function with init sequence and while-true loop. Add stub functions for gate checks and request selection that Plan 2 will replace.
 
-- **Path**: `tests/test_supervisor_core.bats`
-  - **Action**: Create
-  - **Description**: Bats test file covering all Plan 1 functions (tasks 2-10).
-
-- **Path**: `tests/test_helpers.bash`
-  - **Action**: Create
-  - **Description**: Shared test helper functions for setting up temp directories, sourcing the script, and common assertions.
+- **Note (PRD-016 / TDD-031 reconciliation)**: Bats coverage (originally a bats suite at `tests/test_supervisor_core` plus the shared `tests/test_helpers.bash` harness) was retired in PRD-016 cleanup; no Jest replacement is currently planned.
 
 ## Implementation Details
 
@@ -216,26 +210,29 @@ assert_json_field() {
 }
 ```
 
-**`tests/test_supervisor_core.bats`** structure:
+**Historical note (PRD-016 / TDD-031):** The original bats harness structure
+(a bats file at `tests/test_supervisor_core` with `load test_helpers` plus
+setup/teardown bash hooks) is retained below as design context. The bats
+coverage itself was retired; the structure is preserved for any future Jest
+port.
 
-```bash
-#!/usr/bin/env bats
-
-load test_helpers
-
-setup() {
-    setup_test_env
-    source_functions
-}
-
-teardown() {
-    teardown_test_env
-}
+```text
+# Original bats shebang: #!/usr/bin/env bash (bats runner)
+# load test_helpers
+#
+# setup() {
+#     setup_test_env
+#     source_functions
+# }
+#
+# teardown() {
+#     teardown_test_env
+# }
 ```
 
-#### Required Test Coverage
+#### Required Test Coverage (historical — bats coverage retired)
 
-The bats file must include tests for each functional area. Minimum test list (each is a `@test` block):
+The original bats file specified tests for each functional area. Minimum test list (each was a `@test` block):
 
 **Argument Parsing (3 tests)**:
 - `parse_args --once` sets ONCE_MODE
@@ -308,9 +305,9 @@ Total: ~35 tests minimum.
 6. [ ] `--once` mode breaks after one iteration even in the "no work" path
 7. [ ] `SHUTDOWN_REQUESTED=true` causes the loop to break on the next iteration check
 8. [ ] All required directories (`~/.autonomous-dev/`, `logs/`, `alerts/`) are created on startup
-9. [ ] `tests/test_helpers.bash` exists with `setup_test_env()`, `teardown_test_env()`, `source_functions()`, and assertion helpers
-10. [ ] `tests/test_supervisor_core.bats` exists with at least 35 test cases
-11. [ ] All tests pass when run with `bats tests/test_supervisor_core.bats`
+9. [ ] (Historical — bats coverage retired per PRD-016 / TDD-031) The original spec required `tests/test_helpers.bash` with `setup_test_env()`, `teardown_test_env()`, `source_functions()`, and assertion helpers.
+10. [ ] (Historical — bats coverage retired per PRD-016 / TDD-031) The original spec required at least 35 test cases.
+11. [ ] (Historical — bats coverage retired per PRD-016 / TDD-031) The original spec required all bats tests to pass; no Jest replacement is currently planned.
 12. [ ] Tests are isolated (each uses its own temp directory, no cross-test state leakage)
 13. [ ] No shellcheck warnings at `--severity=warning` level in the main script
 14. [ ] Stub functions (`check_gates`, `select_request`, `load_crash_state`, `emit_alert`) are present and return appropriate defaults
