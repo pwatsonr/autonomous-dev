@@ -380,41 +380,25 @@ function test_parse_no_reason(): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const tests = [
-  test_slack_message_format,
-  test_discord_message_format,
-  test_notification_disabled,
-  test_notification_wrong_severity,
-  test_channel_health_reachable,
-  test_channel_health_timeout,
-  test_channel_health_server_error,
-  test_parse_promote,
-  test_parse_dismiss,
-  test_parse_defer,
-  test_parse_investigate,
-  test_parse_invalid,
-  test_parse_whitespace,
-  test_severity_emoji,
-  test_severity_color,
-  test_build_triage_commands,
-  test_slack_block_structure,
-  test_discord_embed_structure,
-  test_parse_case_insensitive_hex,
-  test_parse_no_reason,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe("TriageNotification", () => {
+  it("formats slack message", () => { test_slack_message_format(); });
+  it("formats discord message", () => { test_discord_message_format(); });
+  it("respects notification disabled", () => { test_notification_disabled(); });
+  it("respects notification severity threshold", () => { test_notification_wrong_severity(); });
+  it("reports channel health reachable", () => { test_channel_health_reachable(); });
+  it("reports channel health timeout", () => { test_channel_health_timeout(); });
+  it("reports channel health server error", () => { test_channel_health_server_error(); });
+  it("parses promote command", () => { test_parse_promote(); });
+  it("parses dismiss command", () => { test_parse_dismiss(); });
+  it("parses defer command", () => { test_parse_defer(); });
+  it("parses investigate command", () => { test_parse_investigate(); });
+  it("rejects invalid command", () => { test_parse_invalid(); });
+  it("handles whitespace in command", () => { test_parse_whitespace(); });
+  it("returns severity emoji", () => { test_severity_emoji(); });
+  it("returns severity color", () => { test_severity_color(); });
+  it("builds triage commands", () => { test_build_triage_commands(); });
+  it("uses slack block structure", () => { test_slack_block_structure(); });
+  it("uses discord embed structure", () => { test_discord_embed_structure(); });
+  it("parses case-insensitive hex", () => { test_parse_case_insensitive_hex(); });
+  it("rejects commands missing required reason", () => { test_parse_no_reason(); });
+});
