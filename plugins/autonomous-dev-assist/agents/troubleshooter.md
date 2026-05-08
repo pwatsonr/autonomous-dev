@@ -174,6 +174,21 @@ Always start by checking the overall system health:
 5. Check the approval state: `cat ~/.autonomous-dev/deploy/plans/REQ-NNNNNN.json | jq .approval_state`. Valid states: `pending`, `awaiting-approval`, `approved`, `rejected`, `executing`, `completed`, `failed`.
 6. Prod deploys ALWAYS require human approval regardless of trust level (TDD-023 §11). If stuck on `awaiting-approval` for a prod env, run `deploy approve REQ-NNNNNN`.
 
+#### Credential-Proxy Diagnostics
+
+1. Health check: `cred-proxy doctor`. Reports socket permissions, scoper plugins, last issuance, and TTL.
+2. Permission denied on socket: check `stat ~/.autonomous-dev/cred-proxy/socket` for `0600`. If wrong, restart cred-proxy.
+3. TTL expired mid-deploy: do NOT rotate root credentials. Re-bootstrap with `cred-proxy bootstrap --cloud <cloud>`.
+4. Detail in `instructions/cred-proxy-runbook.md` (owned by TDD-025).
+
+#### Firewall Diagnostics
+
+1. Test a host: `firewall test https://example.com:443`
+2. Read denied events: `tail -50 ~/.autonomous-dev/firewall/denied.log | jq .`
+3. Inspect resolved allowlist: `cat ~/.autonomous-dev/firewall/allowlist | jq .`
+4. DNS-refresh lag (an allowed host appears denied): wait for the next refresh interval (default 60s) or force one with `firewall refresh-dns`.
+5. Detail in `instructions/firewall-runbook.md` (owned by TDD-025).
+
 ## Emergency Procedures
 
 ### Engage Kill Switch (Stop Everything)
