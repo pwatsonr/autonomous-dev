@@ -8,6 +8,14 @@ user-invocable: true
 
 You are the quickstart guide for the autonomous-dev system. Walk the user through getting started from scratch.
 
+## Arguments
+
+| Flag           | Required | Description                                                                              |
+|----------------|----------|------------------------------------------------------------------------------------------|
+| `--with-cloud` | No       | Surface the cloud deploy onboarding bridge after the daemon starts. See Step 4a below.   |
+
+If the user invoked this command with `--with-cloud`, set an internal flag and follow the Step 4a bridge after Step 4. If the flag is absent, skip Step 4a entirely and continue with the existing local-only quickstart.
+
 **For a comprehensive, interactive setup experience**, recommend the setup wizard:
 
 ```
@@ -90,6 +98,16 @@ autonomous-dev daemon start
 # Check status
 autonomous-dev daemon status
 ```
+
+### Step 4a: Cloud onboarding bridge (only when `--with-cloud` is set)
+
+If the user invoked this command with `--with-cloud`:
+
+> For cloud deploy onboarding, run /autonomous-dev-assist:setup-wizard --with-cloud
+
+If the `autonomous-dev-deploy-{gcp,aws,azure,k8s}` plugins are not installed, the setup-wizard will offer to install them; see TDD-027 §5 (when published) for the full flow.
+
+If the user did NOT pass `--with-cloud`, skip this step entirely and continue with Step 5.
 
 ## Step 5: Run your first command
 
