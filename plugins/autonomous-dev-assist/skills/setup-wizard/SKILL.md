@@ -659,6 +659,28 @@ PHASE_REGISTRY=(08 11 12 13 14 15 16)
 for nn in "${PHASE_REGISTRY[@]}"; do
   _wizard_run_phase "$nn"
 done
+
+# After phase 16 returns control (regardless of skip/complete status),
+# emit the phases-17-19 deferral notice exactly once per wizard run.
+# Idempotency (FR-3, FR-20 of SPEC-033-4-03) is achieved by a top-level
+# `deferral_notice_emitted: true` flag in wizard-state.json that is
+# never reset; this survives resumes correctly across SIGINT.
+_wizard_emit_deferral_once() {
+  local state_file="${HOME}/.autonomous-dev/wizard-state.json"
+  local emitted
+  emitted="$(jq -r '.deferral_notice_emitted // false' "$state_file" 2>/dev/null || echo false)"
+  [[ "$emitted" == "true" ]] && return 0
+  awk '
+    /<!-- BEGIN-PHASE-17-19-DEFERRAL -->/ { p=1; next }
+    /<!-- END-PHASE-17-19-DEFERRAL -->/   { p=0 }
+    p { print }
+  ' "${PLUGIN_DIR}/skills/setup-wizard/SKILL.md"
+  # Persist the flag atomically (tmp+rename).
+  local tmp="${state_file}.tmp.$$"
+  jq '. + {deferral_notice_emitted: true}' "$state_file" > "$tmp"
+  mv "$tmp" "$state_file"
+}
+_wizard_emit_deferral_once
 ```
 
 ### Front-matter parser (bash shim fallback)
@@ -849,6 +871,64 @@ or Slack (if configured).
 
 Happy building!
 ```
+
+<!-- BEGIN-PHASE-20-SUMMARY (SPEC-033-4-03 FR-4..FR-7) -->
+
+### Per-phase module summary (AMENDMENT-002 phases)
+
+This subsection enumerates the AMENDMENT-002 phase modules and their
+status from `~/.autonomous-dev/wizard-state.json`. Acquire a `flock`
+on the state file before reading so the rendering does not race with
+daemon SIGHUP writes.
+
+```bash
+# Acquire shared lock on wizard-state.json (blocking, no timeout for the
+# common case; the state file write side also takes the lock).
+exec 9>"${HOME}/.autonomous-dev/wizard-state.json.lock"
+flock 9
+state="$(cat "${HOME}/.autonomous-dev/wizard-state.json")"
+flock -u 9
+exec 9>&-
+
+# Title lookup is sourced from each phase module's YAML front-matter so
+# the table never drifts from the source of truth.
+_phase_title() {
+  local nn="$1"
+  local file
+  file="$(ls "${PLUGIN_DIR}/skills/setup-wizard/phases/phase-${nn}-"*.md 2>/dev/null | head -1)"
+  [[ -z "$file" ]] && { echo "(missing module)"; return; }
+  awk '/^---$/{c++; next} c==1 && /^title:/' "$file" | sed -E 's/^title:[[:space:]]*"?([^"]*)"?$/\1/'
+}
+
+# Map status → hint per FR-5.
+_render_hint() {
+  local nn="$1" status="$2"
+  case "$status" in
+    complete|skipped) echo "" ;;
+    not-run)          echo "Run: autonomous-dev wizard --phase ${nn}" ;;
+    unavailable)      echo "Re-enabled in next release; feature flag wizard.phase_${nn}_module_enabled is false." ;;
+    failed)           echo "See ~/.autonomous-dev/logs/wizard.log; consider autonomous-dev wizard rollback --phase ${nn}." ;;
+    blocked)          echo "Blocked: a prerequisite phase is incomplete; see wizard.log." ;;
+    *)                echo "" ;;
+  esac
+}
+
+printf '| phase | title | status | hint |\n'
+printf '|-------|-------|--------|------|\n'
+for nn in 08 11 12 13 14 15 16; do
+  status=$(jq -r ".phases.\"$nn\".status // \"not-run\"" <<<"$state")
+  title="$(_phase_title "$nn")"
+  hint="$(_render_hint "$nn" "$status")"
+  printf '| %s | %s | %s | %s |\n' "$nn" "$title" "$status" "$hint"
+done
+```
+
+The orchestrator emits this table after the existing Phase 10 content
+(it is additive). For legacy 10-phase upgraders who have not yet run
+the AMENDMENT-002 modules, every row will read `not-run` and the hint
+column will tell them which `wizard --phase NN` invocation to use.
+
+<!-- END-PHASE-20-SUMMARY -->
 
 ---
 
