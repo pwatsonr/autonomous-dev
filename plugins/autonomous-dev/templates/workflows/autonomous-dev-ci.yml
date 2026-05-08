@@ -1,0 +1,17 @@
+name: autonomous-dev-ci
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run autonomous-dev CI gates
+        env:
+          AUTONOMOUS_DEV_TOKEN: ${{ secrets.AUTONOMOUS_DEV_TOKEN }}
+        run: |
+          # See PRD-015 / TDD-025 for chain content.
+          echo "autonomous-dev-ci: chain runtime invoked here"
