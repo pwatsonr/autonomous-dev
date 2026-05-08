@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "total_usd": 1.2345,
+  "daily_usd": {
+    "2026-05-02": 1.2345
+  },
+  "per_request": {
+    "REQ-000001": 1.2345
+  },
+  "entries": [
+    {
+      "ts": "2026-05-02T00:00:00.000Z",
+      "request_id": "REQ-000001",
+      "phase": "executing",
+      "delta_usd": 1.2345,
+      "reason": "session_completion"
+    }
+  ],
+  "last_updated": "2026-05-02T00:00:00.000Z"
+}
