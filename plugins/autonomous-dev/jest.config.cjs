@@ -31,6 +31,14 @@ module.exports = {
       transform: {
         '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
       },
+      // SPEC-030-3-02 added explicit `.js` suffixes on TS imports so the
+      // bin/reload-plugins.js loader can resolve them via ESM. Under
+      // ts-jest's CJS module resolution those literal `.js` paths do not
+      // exist on disk, so we strip the suffix here. See SPEC-030-3-03
+      // closeout for the integration test that depends on this mapping.
+      moduleNameMapper: {
+        '^(\\.{1,2}/.*)\\.js$': '$1',
+      },
     },
     '<rootDir>/../autonomous-dev-portal/jest.config.cjs',
   ],
