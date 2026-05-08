@@ -180,30 +180,14 @@ function test_all_system_prompts_are_substantive(): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const tests = [
-  test_prd_author_passes_validation,
-  test_tdd_author_passes_validation,
-  test_code_executor_passes_validation,
-  test_quality_reviewer_passes_validation,
-  test_doc_reviewer_passes_validation,
-  test_agent_meta_reviewer_passes_validation,
-  test_all_agents_have_minimum_2_rubric_dimensions,
-  test_all_agents_respect_tool_allowlist,
-  test_all_system_prompts_are_substantive,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe("AgentFactory: agent definitions", () => {
+  it("prd-author passes validation", () => { test_prd_author_passes_validation(); });
+  it("tdd-author passes validation", () => { test_tdd_author_passes_validation(); });
+  it("code-executor passes validation", () => { test_code_executor_passes_validation(); });
+  it("quality-reviewer passes validation", () => { test_quality_reviewer_passes_validation(); });
+  it("doc-reviewer passes validation", () => { test_doc_reviewer_passes_validation(); });
+  it("agent-meta-reviewer passes validation", () => { test_agent_meta_reviewer_passes_validation(); });
+  it("all agents have minimum 2 rubric dimensions", () => { test_all_agents_have_minimum_2_rubric_dimensions(); });
+  it("all agents respect tool allowlist", () => { test_all_agents_respect_tool_allowlist(); });
+  it("all system prompts are substantive", () => { test_all_system_prompts_are_substantive(); });
+});

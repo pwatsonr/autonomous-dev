@@ -303,33 +303,17 @@ function test_deep_sort_keys_edge_cases(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Test runner
+// Jest suite
 // ---------------------------------------------------------------------------
 
-const tests = [
-  test_genesis_event_hash,
-  test_chain_continuation,
-  test_deterministic_canonicalization,
-  test_nested_objects_sorted,
-  test_arrays_preserved_in_order,
-  test_disabled_mode_returns_empty,
-  test_different_payloads_different_hashes,
-  test_same_payload_different_prev_hash,
-  test_deep_sort_keys_edge_cases,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe("HashChainComputer (SPEC-009-5-2, Task 3)", () => {
+  it("computes genesis event hash", () => { test_genesis_event_hash(); });
+  it("continues chain across events", () => { test_chain_continuation(); });
+  it("uses deterministic canonicalization", () => { test_deterministic_canonicalization(); });
+  it("sorts nested object keys", () => { test_nested_objects_sorted(); });
+  it("preserves array order", () => { test_arrays_preserved_in_order(); });
+  it("returns empty in disabled mode", () => { test_disabled_mode_returns_empty(); });
+  it("produces different hashes for different payloads", () => { test_different_payloads_different_hashes(); });
+  it("produces different hash for same payload with different prevHash", () => { test_same_payload_different_prev_hash(); });
+  it("handles deep sort key edge cases", () => { test_deep_sort_keys_edge_cases(); });
+});

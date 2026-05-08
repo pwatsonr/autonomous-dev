@@ -612,36 +612,16 @@ async function test_list_archives_no_directory(): Promise<void> {
 // Test runner
 // ---------------------------------------------------------------------------
 
-const tests = [
-  test_archive_old_events,
-  test_no_events_to_archive,
-  test_archive_file_naming,
-  test_metadata_sidecar,
-  test_active_log_intact_after_archive,
-  test_crash_safety_archive_before_rewrite,
-  test_atomic_active_log_rewrite,
-  test_list_archives,
-  test_archive_preserves_hash_chain_head,
-  test_empty_log_file,
-  test_list_archives_no_directory,
-];
-
-async function runTests(): Promise<void> {
-  let passed = 0;
-  let failed = 0;
-
-  for (const test of tests) {
-    try {
-      await test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
-}
-
-runTests();
+describe("LogArchival (SPEC-009-5-3, Task 6)", () => {
+  it("archives old events", async () => { await test_archive_old_events(); });
+  it("handles no events to archive", async () => { await test_no_events_to_archive(); });
+  it("uses correct archive file naming", async () => { await test_archive_file_naming(); });
+  it("writes metadata sidecar", async () => { await test_metadata_sidecar(); });
+  it("keeps active log intact after archive", async () => { await test_active_log_intact_after_archive(); });
+  it("preserves crash safety: archive written before active rewrite", async () => { await test_crash_safety_archive_before_rewrite(); });
+  it("performs atomic active log rewrite (temp+rename)", async () => { await test_atomic_active_log_rewrite(); });
+  it("lists archives", async () => { await test_list_archives(); });
+  it("preserves hash chain head", async () => { await test_archive_preserves_hash_chain_head(); });
+  it("handles empty log file", async () => { await test_empty_log_file(); });
+  it("listArchives returns empty when archive dir missing", async () => { await test_list_archives_no_directory(); });
+});

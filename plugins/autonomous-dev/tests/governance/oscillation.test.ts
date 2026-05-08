@@ -273,31 +273,15 @@ function assert(condition: boolean, message: string): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const tests = [
-  test_oscillation_triggered,
-  test_oscillation_not_triggered,
-  test_oscillation_exact_threshold,
-  test_oscillation_observations_outside_window,
-  test_oscillation_markdown_format,
-  test_observation_status_promoted_improved,
-  test_observation_status_current,
-  test_observation_status_promoted_pending,
-  test_markdown_empty_when_not_oscillating,
-  test_window_start_calculation,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe("OscillationGovernance", () => {
+  it("triggers oscillation when threshold met", () => { test_oscillation_triggered(); });
+  it("does not trigger oscillation below threshold", () => { test_oscillation_not_triggered(); });
+  it("triggers oscillation at exact threshold", () => { test_oscillation_exact_threshold(); });
+  it("ignores observations outside window", () => { test_oscillation_observations_outside_window(); });
+  it("formats markdown for oscillation", () => { test_oscillation_markdown_format(); });
+  it("classifies observation status as promoted+improved", () => { test_observation_status_promoted_improved(); });
+  it("classifies observation status as current", () => { test_observation_status_current(); });
+  it("classifies observation status as promoted+pending", () => { test_observation_status_promoted_pending(); });
+  it("returns empty markdown when not oscillating", () => { test_markdown_empty_when_not_oscillating(); });
+  it("calculates window start", () => { test_window_start_calculation(); });
+});

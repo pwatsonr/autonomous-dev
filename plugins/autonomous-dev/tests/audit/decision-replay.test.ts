@@ -371,36 +371,16 @@ async function test_malformed_lines_skipped(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Test runner
+// Jest suite
 // ---------------------------------------------------------------------------
 
-const tests = [
-  test_replay_single_request,
-  test_chronological_order,
-  test_unknown_request_returns_empty,
-  test_large_log_streaming,
-  test_all_event_types_included,
-  test_format_narrative,
-  test_missing_log_file_returns_empty,
-  test_malformed_lines_skipped,
-];
-
-async function runTests(): Promise<void> {
-  let passed = 0;
-  let failed = 0;
-
-  for (const test of tests) {
-    try {
-      await test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
-}
-
-runTests();
+describe("DecisionReplay (SPEC-009-5-3, Task 5)", () => {
+  it("replays single request", async () => { await test_replay_single_request(); });
+  it("returns events in chronological order", async () => { await test_chronological_order(); });
+  it("returns empty for unknown request", async () => { await test_unknown_request_returns_empty(); });
+  it("streams large logs line-by-line", async () => { await test_large_log_streaming(); });
+  it("includes all event types", async () => { await test_all_event_types_included(); });
+  it("formats narrative", async () => { await test_format_narrative(); });
+  it("returns empty when log file is missing", async () => { await test_missing_log_file_returns_empty(); });
+  it("skips malformed lines", async () => { await test_malformed_lines_skipped(); });
+});
