@@ -288,3 +288,105 @@ step 3 and execute the rollback. The rollback procedure itself lives in
 
 The `degraded → ok` transition is automatic once the SLA window closes
 without further breach. The duration timer resets at that point.
+
+## 6. Rollback
+
+When HealthMonitor's `degraded` state crosses the > 30-minute threshold
+(see §5), execute a rollback. The detailed mitigation playbook —
+pre-flight checks, communication template, post-mortem template —
+lives in PRD-014 §17.R7. This section documents the invocation surface
+and what the runtime preserves; do NOT duplicate the procedure here.
+
+### Invocation
+
+```bash
+deploy rollback REQ-NNNNNN --to <previous-deploy-id>
+```
+
+The `<previous-deploy-id>` is the request ID of the last `completed`
+deploy in the same env. Find it via:
+
+```bash
+deploy logs --env <env> --status completed
+```
+
+A dry-run is supported via `--dry-run`; it validates the target without
+mutating any state. Always dry-run before executing in prod.
+
+### What rollback preserves
+
+- **Logs.** `deploy logs REQ-NNNNNN` continues to return the failed
+  deploy's full event history. Rollback does NOT redact log content.
+- **Ledger entries.** Rollback APPENDS a new entry to
+  `~/.autonomous-dev/deploy/ledger.json` describing the rollback action;
+  the cost is recorded. **do NOT edit by hand** to suppress the entry —
+  the ledger discipline from §3 still applies during rollback.
+- **Audit history.** Both the failed deploy and the rollback action are
+  visible via `deploy logs --request REQ-NNNNNN`; the audit trail is
+  cumulative across the rollback boundary.
+
+The full mitigation playbook (pre-flight, comms template, post-mortem
+template) is in PRD-014 §17.R7. Read it before invoking rollback in
+prod for the first time.
+
+## 7. Common errors
+
+The eight mappings below cover the full set of operator-visible failure
+modes. Each row gives the symptom, the cause, and the action. For
+deeper context, follow the cross-reference in the action column.
+
+| Error / symptom | Cause | Action |
+|---|---|---|
+| Stuck on `awaiting-approval` | `deploy approve` was never run | `deploy approve REQ-NNNNNN` (or `deploy reject REQ-NNNNNN --reason "..."`) |
+| `cost-cap-tripped` after a crash | Inconsistent ledger entry from a mid-deploy crash | See §3 — `deploy ledger reset --request REQ-NNNNNN`; **do NOT edit by hand** |
+| `cost-cap-tripped` from duplicate entries | Clock skew across hosts produced a duplicate entry | See §3 — `deploy ledger reset --since <ISO-timestamp>` |
+| `backend not registered: gcp` (or `aws` / `azure` / `k8s`) | The cloud-backend plugin is not installed | Install the plugin: `claude plugin install autonomous-dev-deploy-gcp` (substitute the backend name); see TDD-025 for the cloud-plugin catalog |
+| HealthMonitor reports `degraded` | Latency or error-rate breach post-deploy | See §5 decision tree; rollback per §6 if duration exceeds 30 minutes |
+| `deploy.yaml: schema error` | Config does not validate against `deploy-config-v1` | Validate per TDD-023 §9; common causes are an `is_prod` typo, a missing `cost_cap_usd`, or a wrong `default_backend` |
+| "Prod skipped approval" — operator concern | Misread of the logs; this is **impossible by design** | Every env with `is_prod: true` requires approval **regardless of trust level**; see §2 + TDD-023 §11. Walk back through `deploy logs REQ-NNNNNN` — the `awaiting-approval` event IS there. Confirm `is_prod: true` is set in `deploy.yaml` for the env in question. |
+| Unknown `REQ-NNNNNN` | Request was rejected, expired, or never existed | `deploy logs REQ-NNNNNN` returns the historical state; if the result is empty, the ID is invalid — confirm it against the original `deploy plan` output |
+
+### How to read the table
+
+Each row maps a single observed symptom to the canonical recovery. The
+"Action" column is authoritative — do NOT improvise a recovery if the
+table prescribes one. The cost-cap rows in particular forward to §3
+because manual ledger edits are unsafe; follow the §3 procedure.
+
+### Notes on the "Prod skipped approval" mapping
+
+This is the single mapping operators most often arrive at after a
+shift-handover misread. The deploy framework's prod-override rule
+(see §2 callout) is enforced unconditionally; there is no path to
+`executing` for an `is_prod: true` env that bypasses
+`awaiting-approval`. If the logs appear to show otherwise, the most
+common explanation is that the request landed against a non-prod env
+that shares a similar name, OR the operator is reading
+`deploy logs --env staging` while believing it is prod. Confirm the
+env via `deploy logs REQ-NNNNNN | jq '.env'` (read-only, safe).
+
+### Notes on the "backend not registered" mapping
+
+The cloud-backend plugins ship via TDD-025 as separate Claude plugins
+(autonomous-dev-deploy-gcp, autonomous-dev-deploy-aws, etc.). They are
+not bundled with the assist plugin to keep the install lightweight. If
+the plugin is not installed, `deploy plan` returns a clear error; the
+recovery is `claude plugin install autonomous-dev-deploy-<backend>`
+followed by a fresh `deploy plan`.
+
+If the symptom does not match any row above, escalate per §8 See also —
+specifically, check whether the chains-runbook documents a parallel
+behavior (chain-aware deploys cross-reference both runbooks). When in
+doubt, the §3 ledger discipline and the §2 prod-override rule are the
+two invariants that always hold; do not improvise around them.
+
+## 8. See also
+
+- [`chains-runbook.md` §3 Audit verification](./chains-runbook.md#3-audit-verification) — the parallel safety-critical section
+- TDD-023 §5 (Deploy CLI), §11 (Trust integration), §14 (Ledger reset)
+- [`help/SKILL.md` Deploy Framework](../skills/help/SKILL.md#deploy-framework) — the quick reference
+- PRD-014 §17.R7 — Rollback mitigation playbook
+
+For broader operator concerns (daemon, kill-switch, circuit-breaker,
+config validation), see `runbook.md` — the top-level operator runbook
+linked from the See-also block at the end of that file.

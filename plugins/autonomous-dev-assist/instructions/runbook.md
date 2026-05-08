@@ -1261,3 +1261,10 @@ Additional fields vary by event type (e.g., `review_fail` includes `score`, `thr
 | Recent events | `tail -20 .autonomous-dev/requests/<id>/events.jsonl \| jq .` |
 | Daemon errors | `tail -50 ~/.autonomous-dev/logs/daemon.log \| jq 'select(.level == "ERROR")'` |
 | Allowlist | `autonomous-dev config show \| jq '.config.repositories.allowlist'` |
+
+## See also
+
+- [chains-runbook.md](./chains-runbook.md) — plugin chain operator runbook
+- [deploy-runbook.md](./deploy-runbook.md) — deploy framework operator runbook
+- [cred-proxy-runbook.md](./cred-proxy-runbook.md) — credential proxy runbook <!-- XFAIL: TDD-025 ships this runbook -->
+- [firewall-runbook.md](./firewall-runbook.md) — egress firewall runbook <!-- XFAIL: TDD-025 ships this runbook -->
