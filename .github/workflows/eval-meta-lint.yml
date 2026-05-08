@@ -1,0 +1,110 @@
+# ============================================================
+# eval-meta-lint workflow
+# ============================================================
+# Runs evals/meta-lint.sh against PRs that touch the
+# autonomous-dev-assist eval suite scaffolding. Fails the PR
+# check on any meta-lint violation; tolerates case_minimum
+# deficits when the PR carries the
+# `meta-lint-allow-baseline-deficit` label (used by
+# sibling-pending eval-suite PRs per SPEC-028-1-03 rollout).
+#
+# Authored under SPEC-028-1-04 / TDD-028 §9.
+# ============================================================
+
+name: eval-meta-lint
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/autonomous-dev-assist/evals/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: eval-meta-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  meta-lint:
+    name: Run eval meta-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install PyYAML jsonschema
+
+      - name: Determine flags
+        id: flags
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          set -euo pipefail
+          FLAGS=""
+          if echo "${LABELS_JSON}" | grep -q 'meta-lint-allow-baseline-deficit'; then
+            FLAGS="--allow-baseline-deficit"
+          fi
+          echo "flags=${FLAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Run meta-lint
+        id: meta_lint
+        continue-on-error: true
+        env:
+          FLAGS: ${{ steps.flags.outputs.flags }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC2086
+          bash plugins/autonomous-dev-assist/evals/meta-lint.sh --json ${FLAGS} \
+            > meta-lint-output.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Capture exit code
+        id: capture
+        run: |
+          set -euo pipefail
+          EC=${{ steps.meta_lint.outcome == 'success' && 0 || 1 }}
+          echo "exit_code=${EC}" >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('meta-lint-output.json')) return;
+            const data = JSON.parse(fs.readFileSync('meta-lint-output.json', 'utf8'));
+            const findings = data.findings || [];
+            if (findings.length === 0 && data.pass) return;
+            const rows = findings.map(f =>
+              `| ${f.suite || '-'} | ${f.rule || '-'} | ${f.severity || '-'} | ${f.message || '-'} |`
+            ).join('\n');
+            const status = data.pass ? 'PASS (warnings present)' : 'FAIL';
+            const body = [
+              `## eval-meta-lint: ${status}`,
+              '',
+              '| suite | rule | severity | message |',
+              '|-------|------|----------|---------|',
+              rows || '| - | - | - | (none) |',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+
+      - name: Reflect exit code
+        if: always()
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.meta_lint.outcome }}" != "success" ]]; then
+            echo "meta-lint reported violations" >&2
+            exit 1
+          fi
