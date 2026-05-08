@@ -26,7 +26,7 @@ The unit tests run in CI on every PR. The E2E test runs in CI but uses mocked Cl
 
 ### Test Runner
 
-All tests use the project's existing Vitest setup. No new framework introduced. Vitest's `describe`/`it`/`expect` plus `vi.mock` for mocking the intake router client and Claude SDK.
+All tests use the project's existing Jest setup. No new framework introduced. Jest's `describe`/`it`/`expect` plus `jest.mock` for mocking the intake router client and Claude SDK.
 
 ### `test-request-submit-types.test.ts`
 
@@ -87,7 +87,7 @@ End-to-end harness:
 
 ### Coverage Configuration
 
-Update `vitest.config.ts` (or equivalent) to enforce a per-file 90% line coverage threshold on:
+Update `jest.config.ts` (or equivalent) to enforce a per-file 90% line coverage threshold on:
 - `src/cli/commands/request-submit.ts`
 - `src/cli/commands/submit-bug.ts`
 - `src/cli/commands/request-edit.ts`
@@ -119,7 +119,7 @@ CI fails if any file falls below the threshold.
 - **Blocking**: PLAN-018-1 (state schema), PLAN-018-2 (daemon iterate `--test-mode` and `--bug-context-path` propagation).
 - **Optional**: SPEC-018-3-04 (multi-channel parity test lives in its own file `tests/parity/test-multi-channel-bug-parity.test.ts`; not in scope here).
 - `inquirer-test@^3.0.0` (new devDep).
-- Vitest (existing).
+- Jest (existing).
 - Existing Claude SDK mock harness (from prior plans' E2E scaffolding).
 
 ## Notes
