@@ -119,3 +119,172 @@ To inspect the live state of any request, run
 its timestamp. To list all in-flight requests for one env, run
 `deploy logs --env <env> --status awaiting-approval`. These are
 read-only commands and do not advance the state machine.
+
+## 3. Cost-cap trip recovery
+
+> **Safety.** `~/.autonomous-dev/deploy/ledger.json` is the cost-tracking
+> invariant. **do NOT edit by hand**. **do NOT rm the ledger**. The
+> supported recovery is `deploy ledger reset` — see below.
+
+### How the cost cap works
+
+The deploy executor maintains a running per-environment tally in the
+append-only `ledger.json`. Each completed deploy appends one entry. When
+the NEXT planned deploy's estimated cost would push the tally past
+`cost_cap_usd` (from `deploy.yaml`), the executor refuses to enter
+`executing` and emits `cost-cap-tripped` instead. The request is held;
+no money is spent.
+
+The ledger is a Stripe-style append-only contract. Manual edits corrupt
+the cost-tracking invariant — **do NOT edit by hand**. Use
+`deploy ledger reset` for every recovery path described below.
+
+### Recovery procedure
+
+1. Read the most recent ledger entries:
+
+   ```bash
+   cat ~/.autonomous-dev/deploy/ledger.json | jq '.entries[-5:]'
+   ```
+
+2. Identify the offending entry — the most recent `cost-cap-tripped`
+   request, or any duplicate / impossible entry.
+3. Decide between `deploy ledger reset --request REQ-NNNNNN` (reconcile
+   one entry), `deploy ledger reset --since <ISO-timestamp>` (truncate
+   from a point), or waiting for the billing-period reset (the cap is
+   per-period; check `deploy.yaml`).
+4. Re-run `deploy plan REQ-NNNNNN --env <env>` and proceed through the
+   §2 state machine.
+
+### Common causes
+
+#### (a) Crash mid-deploy
+
+The executor crashed between writing the ledger entry and completing the
+deploy, leaving the tally inconsistent. Use:
+
+```bash
+deploy ledger reset --request REQ-NNNNNN
+```
+
+#### (b) Clock skew across hosts
+
+A duplicate entry appears with a near-identical timestamp. Truncate from
+the earliest skewed entry:
+
+```bash
+deploy ledger reset --since 2026-05-02T14:00:00Z
+```
+
+#### (c) Genuine cost overrun
+
+The deploys are landing as planned; the cap is too low. Edit
+`deploy.yaml` to raise `cost_cap_usd`, commit the change, and re-plan.
+Every change to `cost_cap_usd` is reviewable in version control — that
+is the supported way to extend the cap.
+
+### What NOT to do
+
+- **do NOT edit by hand** any field in `ledger.json`. Signatures break,
+  the tally diverges, and the audit trail loses integrity.
+- **do NOT rm the ledger** — there is no recovery from a deleted ledger;
+  the cost tally is irrecoverable.
+- Do NOT use `vi`, `sed`, or any in-place editor on the file. The
+  supported recovery is always `deploy ledger reset`.
+
+## 4. Ledger inspection
+
+The ledger schema (per TDD-023 §14 Ledger Reset) is a single
+`entries[]` array of records:
+
+```json
+{
+  "entries": [
+    {
+      "request_id": "REQ-NNNNNN",
+      "env": "staging",
+      "backend": "gcp",
+      "cost_usd": 12.40,
+      "timestamp": "2026-05-02T14:32:11Z",
+      "signature": "<HMAC>"
+    }
+  ]
+}
+```
+
+Three read-only inspection recipes follow. Each is safe to run against a
+production ledger.
+
+### Recipe 1 — last-7-days total cost
+
+```bash
+jq '[.entries[]
+     | select((.timestamp | fromdateiso8601) > (now - 604800))
+     | .cost_usd] | add' ~/.autonomous-dev/deploy/ledger.json
+```
+
+### Recipe 2 — per-environment breakdown
+
+```bash
+jq '.entries
+    | group_by(.env)
+    | map({env: .[0].env, total: (map(.cost_usd) | add)})' \
+  ~/.autonomous-dev/deploy/ledger.json
+```
+
+### Recipe 3 — signature-violation finder
+
+```bash
+jq '.entries[] | select(.signature == null or .signature == "")' \
+  ~/.autonomous-dev/deploy/ledger.json
+```
+
+If any signature-violation entry appears, file a TDD-023 issue —
+the entry is read-only evidence of tampering or a runtime bug.
+
+## 5. HealthMonitor + SLA tracker
+
+After a deploy enters `completed`, HealthMonitor watches the post-deploy
+SLA window for the configured duration (per TDD-023 §11). Inspect the
+live state:
+
+```bash
+deploy logs REQ-NNNNNN --health
+```
+
+Output includes latency p50/p95, error-rate, and the SLA window
+remaining. The `degraded` state activates when latency or error-rate
+breaches the threshold from `deploy.yaml`; HealthMonitor reports
+`degraded` and starts a duration timer.
+
+### Rollback decision tree
+
+When HealthMonitor reports `degraded`, decide based on duration:
+
+1. **Degraded for < 5 minutes:** monitor; transient blips are common
+   during warm-up. Do nothing yet — the timer may clear on its own.
+2. **Degraded for 5–30 minutes:** prepare for rollback. Alert on-call.
+   Capture metrics
+   (`deploy logs REQ-NNNNNN --health > /tmp/health.txt`). Run a dry-run
+   rollback (`deploy rollback REQ-NNNNNN --dry-run --to <prev>`) to
+   validate the target before executing.
+3. **Degraded for > 30 minutes:** execute rollback per §6.
+
+The thresholds are advisory — if the failure mode is unambiguous
+(for example, 5xx-rate at 100% from the first sample), skip directly to
+step 3 and execute the rollback. The rollback procedure itself lives in
+§6; do NOT duplicate it here.
+
+### What HealthMonitor does NOT do
+
+- HealthMonitor does NOT auto-rollback. The decision to roll back is
+  always operator-driven; the rollback decision tree above is the
+  authority.
+- HealthMonitor does NOT mutate the ledger. Health-check results are
+  written to a separate event stream (`deploy logs --health`); the cost
+  ledger only gains entries from `deploy plan` and from rollback.
+- HealthMonitor does NOT reach across environments. A `degraded` signal
+  on staging never triggers any action against prod.
+
+The `degraded → ok` transition is automatic once the SLA window closes
+without further breach. The duration timer resets at that point.
