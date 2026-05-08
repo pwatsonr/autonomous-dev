@@ -1,6 +1,6 @@
 ---
 name: autonomous-dev-config-guide
-description: Configuration guide for autonomous-dev — all 20 config sections with parameters, defaults, ranges, and examples. Triggered by config questions.
+description: Configuration guide for autonomous-dev — all 23 config sections with parameters, defaults, ranges, and examples. Triggered by config questions.
 user-invocable: true
 model: claude-sonnet-4-6
 ---
@@ -695,7 +695,107 @@ Controls how long different data types are retained before archival or deletion.
 
 ---
 
-## Section 19: audit
+## Section 19: chains
+
+*Topic:* chains
+
+The `chains` section configures plugin chaining (TDD-022 §1) and the
+HMAC-chained audit log.
+
+```yaml
+chains:
+  enabled: true
+  audit:
+    key_env: CHAINS_AUDIT_KEY
+    log_path: ~/.autonomous-dev/chains/audit.log
+  approval:
+    required_for_prod_egress: true
+```
+
+| Parameter                                  | Type    | Default                                | Description                                       |
+|--------------------------------------------|---------|----------------------------------------|---------------------------------------------------|
+| `chains.enabled`                           | bool    | `true`                                 | Enable plugin chaining engine                     |
+| `chains.audit.key_env`                     | string  | `"CHAINS_AUDIT_KEY"`                   | Env var holding the HMAC key                      |
+| `chains.audit.log_path`                    | string  | `"~/.autonomous-dev/chains/audit.log"` | Path to append-only HMAC-chained audit log        |
+| `chains.approval.required_for_prod_egress` | bool    | `true`                                 | Force approval gate when egress hits prod hosts   |
+
+### Worked example
+
+A `sql-injection-scanner` plugin declares it produces `findings/security` and
+consumes `source/code`. The resulting `chains graph` excerpt:
+
+```
+source/code ──> sql-injection-scanner ──> findings/security ──> security-report
+```
+
+### HMAC key custody
+
+- The HMAC key MUST live in the env var named by `chains.audit.key_env`. Never
+  store it in this YAML file.
+- **no rotation command exists** in TDD-022 §13. Rotating the env-var value
+  naively invalidates verification of every prior entry.
+- Rotation is tracked as TDD-022 OQ-3 future work.
+
+### See also
+
+- [chains-runbook §1 Bootstrap](../../instructions/chains-runbook.md#1-bootstrap)
+- [TDD-022 §5 Plugin Manifest Extensions](../../../autonomous-dev/docs/tdd/TDD-022-plugin-chaining-engine.md#5-plugin-manifest-extensions)
+- [TDD-022 §13 Audit Log](../../../autonomous-dev/docs/tdd/TDD-022-plugin-chaining-engine.md#13-audit-log)
+
+---
+
+## Section 20: deploy
+
+*Topic:* deploy
+
+The `deploy` section configures the deploy framework (TDD-023 §1). The schema
+is [`deploy-config-v1`](../../../autonomous-dev/docs/tdd/TDD-023-deployment-backend-framework-core.md#9-deploy-config-v1).
+
+```yaml
+deploy:
+  default_backend: gcp
+  environments:
+    staging:
+      backend: gcp
+      cost_cap_usd: 50.00
+      approval:
+        required: false
+    prod:
+      backend: gcp
+      is_prod: true
+      cost_cap_usd: 500.00
+      approval:
+        required: true
+```
+
+### Approval rules
+
+| Trust level | `is_prod: false`  | `is_prod: true`         |
+|-------------|-------------------|--------------------------|
+| L0          | approval required | approval required        |
+| L1          | approval required | approval required        |
+| L2          | auto-approved     | **approval required**    |
+| L3          | auto-approved     | **approval required**    |
+
+`is_prod: true` always requires human approval; trust elevation does NOT
+bypass.
+
+### Cost-cap interaction
+
+Cost caps and approval gates are independent. A staging deploy with
+`cost_cap_usd: 50.00` and `approval.required: false` still aborts at 50 USD;
+a prod deploy under cap still waits on approval. For per-environment cost
+estimation, see TDD-025 §X Cost Estimation when published.
+
+### See also
+
+- [deploy-runbook §2 Approval State Machine](../../instructions/deploy-runbook.md#2-the-approval-state-machine)
+- [TDD-023 §9 deploy-config-v1](../../../autonomous-dev/docs/tdd/TDD-023-deployment-backend-framework-core.md#9-deploy-config-v1)
+- [TDD-023 §11 Trust Integration](../../../autonomous-dev/docs/tdd/TDD-023-deployment-backend-framework-core.md#11-trust-integration)
+
+---
+
+## Section 21: audit
 
 Controls audit trail integrity features.
 
@@ -719,7 +819,7 @@ When enabled, each audit event includes a hash of the previous event, creating a
 
 ---
 
-## Section 20: emergency
+## Section 22: emergency
 
 Controls emergency stop and restart behavior.
 
@@ -744,7 +844,7 @@ Controls emergency stop and restart behavior.
 
 ---
 
-## Section 21: cred_proxy
+## Section 23: cred_proxy
 
 Configuration for the credential proxy daemon. The proxy issues short-lived, scope-narrowed credentials to the deploy framework so root credentials never reach the deploy worker process. See the **Credential Proxy** section in `skills/help/SKILL.md` for the operator overview and `instructions/cred-proxy-runbook.md` for the deep walkthrough.
 
