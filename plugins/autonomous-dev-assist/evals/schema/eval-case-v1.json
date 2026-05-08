@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autonomous-dev/schemas/eval-case-v1.json",
+  "title": "eval-case-v1",
+  "description": "Versioned schema for a single eval case across all autonomous-dev-assist eval suites. v1 is closed (no additional properties).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "category",
+    "difficulty",
+    "question",
+    "expected_topics",
+    "must_mention",
+    "must_not_mention"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*-[a-z][a-z0-9_-]*-[0-9]{3}$",
+      "description": "Format: <suite>-<category>-<NNN>. Lowercase, hyphen-separated, ending with a 3-digit ordinal. Example: chains-list-001."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "what-is",
+        "command-syntax",
+        "concept-explanation",
+        "comparison",
+        "edge-case",
+        "troubleshoot-scenario",
+        "config-lookup",
+        "happy-path",
+        "negative",
+        "warning"
+      ],
+      "description": "Case category. One of the 10 enum values."
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard"],
+      "description": "Operator-perceived difficulty: easy (rote), medium (contextual), hard (incident-pressure)."
+    },
+    "question": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 500,
+      "description": "The operator's question, verbatim. Length bounded to keep cases readable."
+    },
+    "expected_topics": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"},
+      "description": "Topics the correct response should cover. At least one required."
+    },
+    "must_mention": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Substrings/regex the correct response MUST include. May be empty for negative cases."
+    },
+    "must_not_mention": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Substrings/regex the response MUST NOT include. Hard-fail on match."
+    }
+  }
+}

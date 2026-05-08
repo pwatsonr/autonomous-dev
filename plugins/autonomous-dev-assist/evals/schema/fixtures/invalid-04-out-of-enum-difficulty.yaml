@@ -1,0 +1,11 @@
+# invalid-04-out-of-enum-difficulty.yaml
+# Rule exercised: difficulty MUST be one of easy|medium|hard.
+# Expected validator outcome: FAIL at /difficulty (enum mismatch).
+id: fixture-command-syntax-004
+category: command-syntax
+difficulty: expert
+question: "How do I list active chains?"
+expected_topics:
+  - "chains list command"
+must_mention: []
+must_not_mention: []

@@ -1,0 +1,15 @@
+# valid-04-comparison.yaml
+# Rule exercised: category=comparison.
+# Expected validator outcome: PASS.
+id: fixture-comparison-004
+category: comparison
+difficulty: medium
+question: "What is the difference between a PRD and a TDD?"
+expected_topics:
+  - "PRD purpose"
+  - "TDD purpose"
+must_mention:
+  - "PRD"
+  - "TDD"
+must_not_mention:
+  - "interchangeable"

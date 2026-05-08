@@ -1,0 +1,14 @@
+# valid-02-command-syntax.yaml
+# Rule exercised: category=command-syntax. Worked example for sibling
+# TDD-025 / TDD-026 authors writing command-syntax cases.
+# Expected validator outcome: PASS.
+id: fixture-command-syntax-002
+category: command-syntax
+difficulty: easy
+question: "How do I list active chains?"
+expected_topics:
+  - "chains list command"
+must_mention:
+  - "chains list"
+must_not_mention:
+  - "delete"

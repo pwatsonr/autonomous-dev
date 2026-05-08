@@ -1,0 +1,11 @@
+# invalid-08-must-mention-not-array.yaml
+# Rule exercised: must_mention MUST be an array of strings.
+# Expected validator outcome: FAIL at /must_mention (type).
+id: fixture-command-syntax-008
+category: command-syntax
+difficulty: easy
+question: "How do I list active chains?"
+expected_topics:
+  - "chains list command"
+must_mention: "should-be-array"
+must_not_mention: []

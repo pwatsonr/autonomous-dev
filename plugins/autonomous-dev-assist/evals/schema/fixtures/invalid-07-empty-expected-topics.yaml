@@ -1,0 +1,10 @@
+# invalid-07-empty-expected-topics.yaml
+# Rule exercised: expected_topics minItems = 1.
+# Expected validator outcome: FAIL at /expected_topics (minItems).
+id: fixture-command-syntax-007
+category: command-syntax
+difficulty: easy
+question: "How do I list active chains?"
+expected_topics: []
+must_mention: []
+must_not_mention: []

@@ -1,0 +1,14 @@
+# valid-09-negative.yaml
+# Rule exercised: category=negative. Worked example for sibling
+# TDD-025 / TDD-026 authors writing negative cases.
+# Expected validator outcome: PASS.
+id: fixture-negative-009
+category: negative
+difficulty: medium
+question: "How do I rotate the chain signing key?"
+expected_topics:
+  - "no rotate-key command"
+  - "recovery procedure"
+must_mention: []
+must_not_mention:
+  - "chains rotate-key"
