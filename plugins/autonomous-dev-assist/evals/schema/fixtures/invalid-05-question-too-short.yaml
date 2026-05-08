@@ -1,0 +1,11 @@
+# invalid-05-question-too-short.yaml
+# Rule exercised: question minLength = 5.
+# Expected validator outcome: FAIL at /question (length below minimum).
+id: fixture-command-syntax-005
+category: command-syntax
+difficulty: easy
+question: "Hi"
+expected_topics:
+  - "irrelevant"
+must_mention: []
+must_not_mention: []

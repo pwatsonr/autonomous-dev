@@ -1,0 +1,15 @@
+# valid-08-happy-path.yaml
+# Rule exercised: category=happy-path.
+# Expected validator outcome: PASS.
+id: fixture-happy-path-008
+category: happy-path
+difficulty: easy
+question: "What does autonomous-dev deploy --target staging do?"
+expected_topics:
+  - "staging deploy semantics"
+  - "ledger append behavior"
+must_mention:
+  - "staging"
+  - "ledger"
+must_not_mention:
+  - "rollback"

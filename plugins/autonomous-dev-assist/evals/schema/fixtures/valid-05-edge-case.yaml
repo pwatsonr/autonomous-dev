@@ -1,0 +1,14 @@
+# valid-05-edge-case.yaml
+# Rule exercised: category=edge-case.
+# Expected validator outcome: PASS.
+id: fixture-edge-case-005
+category: edge-case
+difficulty: hard
+question: "What happens if two reviewer agents disagree on a PRD score?"
+expected_topics:
+  - "tie-breaker rule"
+  - "escalation procedure"
+must_mention:
+  - "review"
+must_not_mention:
+  - "ignore"

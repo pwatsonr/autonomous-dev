@@ -1,0 +1,14 @@
+# valid-07-config-lookup.yaml
+# Rule exercised: category=config-lookup.
+# Expected validator outcome: PASS.
+id: fixture-config-lookup-007
+category: config-lookup
+difficulty: easy
+question: "What is the default value for trust_level in config_defaults.json?"
+expected_topics:
+  - "default value"
+  - "config file location"
+must_mention:
+  - "trust_level"
+must_not_mention:
+  - "undefined"

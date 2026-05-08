@@ -1,0 +1,11 @@
+# invalid-03-out-of-enum-category.yaml
+# Rule exercised: category MUST be in the documented enum.
+# Expected validator outcome: FAIL at /category (enum mismatch).
+id: fixture-command-syntax-003
+category: philosophy
+difficulty: easy
+question: "How do I list active chains?"
+expected_topics:
+  - "chains list command"
+must_mention: []
+must_not_mention: []

@@ -1,0 +1,14 @@
+# valid-06-troubleshoot-scenario.yaml
+# Rule exercised: category=troubleshoot-scenario.
+# Expected validator outcome: PASS.
+id: fixture-troubleshoot-scenario-006
+category: troubleshoot-scenario
+difficulty: medium
+question: "The pipeline is stuck on the review gate. What should I do?"
+expected_topics:
+  - "diagnostic commands"
+  - "common causes"
+must_mention:
+  - "review"
+must_not_mention:
+  - "rm -rf"

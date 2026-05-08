@@ -1,0 +1,13 @@
+# valid-01-what-is.yaml
+# Rule exercised: id-regex + category=what-is + happy-path schema shape.
+# Expected validator outcome: PASS.
+id: fixture-what-is-001
+category: what-is
+difficulty: easy
+question: "What is autonomous-dev?"
+expected_topics:
+  - "autonomous-dev definition"
+must_mention:
+  - "autonomous-dev"
+must_not_mention:
+  - "deprecated"

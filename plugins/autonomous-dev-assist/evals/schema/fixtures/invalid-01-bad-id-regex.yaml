@@ -1,0 +1,11 @@
+# invalid-01-bad-id-regex.yaml
+# Rule exercised: id MUST match ^[a-z][a-z0-9_-]*-[a-z][a-z0-9_-]*-[0-9]{3}$.
+# Expected validator outcome: FAIL at /id (pattern mismatch).
+id: BadId
+category: command-syntax
+difficulty: easy
+question: "How do I list active chains?"
+expected_topics:
+  - "chains list command"
+must_mention: []
+must_not_mention: []

@@ -1,0 +1,13 @@
+# valid-10-warning.yaml
+# Rule exercised: category=warning.
+# Expected validator outcome: PASS.
+id: fixture-warning-010
+category: warning
+difficulty: hard
+question: "Can I chmod the cred-proxy socket so my service can read it directly?"
+expected_topics:
+  - "socket permissions are protective"
+  - "audit implications"
+must_mention: []
+must_not_mention:
+  - "chmod.*cred-proxy.*sock"

@@ -1,0 +1,10 @@
+# invalid-02-missing-category.yaml
+# Rule exercised: category is a required property.
+# Expected validator outcome: FAIL at / (required: category).
+id: fixture-command-syntax-002
+difficulty: easy
+question: "How do I list active chains?"
+expected_topics:
+  - "chains list command"
+must_mention: []
+must_not_mention: []

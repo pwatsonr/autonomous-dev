@@ -1,0 +1,14 @@
+# valid-03-concept-explanation.yaml
+# Rule exercised: category=concept-explanation.
+# Expected validator outcome: PASS.
+id: fixture-concept-explanation-003
+category: concept-explanation
+difficulty: medium
+question: "What is the difference between trust levels and review thresholds?"
+expected_topics:
+  - "trust-level definition"
+  - "review-threshold definition"
+must_mention:
+  - "trust level"
+must_not_mention:
+  - "deprecated"
