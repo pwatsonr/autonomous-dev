@@ -284,7 +284,33 @@ phase-13-probe() {
 }
 
 phase-14-probe() {
-  wizard_state_phase_complete 14
+  # Compose standards_yaml_exists_at + today's dry-run file presence.
+  # Layout:
+  #   start-fresh             → standards.yaml missing
+  #   resume-from:offer-pack  → standards.yaml present but invalid (resume-with-diff)
+  #   resume-from:meta-reviewer-dry-run → valid yaml but no today's dry-run file
+  #   already-complete        → valid yaml + today's dry-run file present
+  local repo="${WIZARD_REPO:-$PWD}"
+  local target="$repo/.autonomous-dev/standards.yaml"
+  local probe
+  probe="$(standards_yaml_exists_at "$target")" || return $?
+  case "$probe" in
+    start-fresh)
+      echo "start-fresh"; return 0 ;;
+    resume-with-diff)
+      echo "resume-from:offer-pack"; return 0 ;;
+    already-complete)
+      local today
+      today="$(date -u +%Y-%m-%d)"
+      if [[ -f "$repo/.autonomous-dev/standards-dry-run-${today}.json" ]]; then
+        echo "already-complete"
+      else
+        echo "resume-from:meta-reviewer-dry-run"
+      fi
+      return 0 ;;
+  esac
+  echo "start-fresh"
+  return 0
 }
 
 phase-15-probe() {
