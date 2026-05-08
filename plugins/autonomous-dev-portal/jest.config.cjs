@@ -37,9 +37,17 @@ module.exports = {
     'server/auth/session/session-cookie.ts',
     'server/auth/session/session-manager.ts',
     'server/security/csrf-protection.ts',
+    // SPEC-030-2-05: pipeline coverage. state-pipeline.ts predates
+    // this PRD (TDD-015 / NG-3004) and is intentionally excluded.
+    'server/integration/cost-pipeline.ts',
+    'server/integration/heartbeat-pipeline.ts',
+    'server/integration/log-pipeline.ts',
+    'server/integration/pipeline-types.ts',
+    'server/integration/redact-url.ts',
     '!server/auth/**/*.d.ts',
     '!server/auth/**/__tests__/**',
     '!server/auth/**/__mocks__/**',
+    '!server/integration/__tests__/**',
   ],
   // SPEC-030-1-05: enforce >=90% line coverage on the auth surface
   // shipped by PLAN-030-1. Glob keys match against the project rootDir
@@ -48,9 +56,24 @@ module.exports = {
   // defensive `/* istanbul ignore next */` branches would skew an
   // enforced number. Threshold applies cumulatively across the matched
   // files.
+  //
+  // SPEC-030-2-05: per-file thresholds for the three pipelines at
+  // lines >= 80%. Per-file (not glob) so adding a new file to
+  // server/integration/ becomes an explicit addition rather than a
+  // silent threshold dilution. pipeline-types.ts is a pure type module
+  // and reports 100% by default — no threshold added (would be a no-op).
   coverageThreshold: {
     './server/auth/': {
       lines: 90,
+    },
+    './server/integration/cost-pipeline.ts': {
+      lines: 80,
+    },
+    './server/integration/heartbeat-pipeline.ts': {
+      lines: 80,
+    },
+    './server/integration/log-pipeline.ts': {
+      lines: 80,
     },
   },
 };
