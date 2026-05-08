@@ -27,7 +27,12 @@
  * @module intake/cli/dispatcher
  */
 
-import { runPluginReload, type PluginReloadDeps } from './commands/plugin';
+// The `.js` extension is intentional — TypeScript permits it on an import
+// of a `.ts` source, and it makes the import portable across both the
+// ts-jest CJS test runner AND the ESM-loader path that
+// `bin/reload-plugins.js` (SPEC-030-3-02) uses to load this module via
+// `ts-node/esm` (which requires explicit extensions in ESM).
+import { runPluginReload, type PluginReloadDeps } from './commands/plugin.js';
 
 /**
  * Minimal logger surface — a structural subset of `Console`. The default is
