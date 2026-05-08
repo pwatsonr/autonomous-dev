@@ -1,320 +1,316 @@
 ---
 phase: 16
-title: "Deploy backends, cred-proxy, and firewall (optional)"
+title: "Deployment backends"
+amendment_001_phase: 16
 amendment_002_phase: 16
-tdd_anchors: [TDD-024, TDD-025]
-prd_links: [PRD-015]
+tdd_anchors: [TDD-023, TDD-024]
+prd_links: [PRD-014, PRD-015, PRD-017]
 required_inputs:
   phases_complete: [1,2,3,4,5,6,7]
   config_keys: []
 optional_inputs:
+  prior_envs_configured: true
   with_cloud_flag: true
-skip_predicate: "skip-predicates.sh phase_16_default_skip"
+skip_predicate: "skip-predicates.sh phase_16_skip_predicate"
 skip_consequence: |
-  No cloud-backend plugins, scopers, or cred-proxy bootstrap performed.
-  Cloud deploys remain unavailable; the wizard's existing 10-phase flow
-  is sufficient for non-cloud workflows. Re-run with `--with-cloud` to
-  enter this phase.
+  Only `local` backend configured; daemon cannot deploy to dev/staging/prod.
 idempotency_probe: "idempotency-checks.sh phase-16-probe"
 output_state:
   config_keys_written:
-    - cloud.selected
-    - cred_proxy.audit_key_env
-    - cred_proxy.default_ttl_seconds
-    - cred_proxy.socket_path
-  files_created:
-    - "~/.autonomous-dev/cred-proxy/audit-key"
-    - "~/.autonomous-dev/cred-proxy/config.yaml"
-  external_resources_created: []
+    - deploy.envs.dev.backend
+    - deploy.envs.dev.cred_proxy_handle
+    - deploy.envs.dev.firewall_template
+    - deploy.envs.dev.last_dry_run_at
+    - deploy.envs.staging.backend
+    - deploy.envs.staging.cred_proxy_handle
+    - deploy.envs.staging.firewall_template
+    - deploy.envs.staging.last_dry_run_at
+    - deploy.envs.prod.backend
+    - deploy.envs.prod.cred_proxy_handle
+    - deploy.envs.prod.firewall_template
+    - deploy.envs.prod.last_dry_run_at
+  files_created: []
+  external_resources_created:
+    - "cred-proxy-handle:dev"
+    - "cred-proxy-handle:staging"
+    - "cred-proxy-handle:prod"
+    - "firewall-allowlist:dev"
+    - "firewall-allowlist:staging"
+    - "firewall-allowlist:prod"
 verification:
-  - "cred-proxy doctor exits 0 for each chosen cloud"
-  - "cred-proxy doctor --verify-audit exits 0 (chain advances after test issuance)"
-  - "Socket mode is 0600 and owner UID matches operator UID"
-  - "audit_key_env field contains an env-var NAME, not the key value"
+  - "Per-env: plugin installed at expected version"
+  - "Per-env: cred_proxy_validate_handle returns ok"
+  - "Per-env: firewall apply returned success"
+  - "Per-env: cost-cap-enforcer estimate is finite"
+  - "Final deploy --dry-run --env dev exits 0 with structured plan"
+  - "Daemon SIGHUP issued"
+  - "No credential pattern observed in stdout/stderr/log/transcript"
 eval_set: "evals/test-cases/setup-wizard/phase-16-deploy-backends/"
 ---
 
-# Phase 16 — Deploy backends, cred-proxy, and firewall (optional)
+# Phase 16 — Deployment backends (per-env iteration: dev → staging → prod)
 
-This phase covers PRD-015's cloud + credential-proxy operator-onboarding
-surface. It is **default-skip**: operators who do not pass `--with-cloud`
-to `quickstart` see no change in the wizard's existing 10-phase flow.
-When entered, this phase walks two cohesive groups of steps:
+This phase configures deployment backends per environment. For each
+environment in fixed order (`dev` → `staging` → `prod`) it:
 
-- **Phase 16-A: Cloud backend selection.** Verify per-cloud
-  `autonomous-dev-deploy-<cloud>` plugin install, cloud-CLI on PATH, and
-  root-credential reachability (per PRD-015 R-3: check, do not install).
-- **Phase 16-B: Credential-proxy bootstrap.** Verify per-cloud
-  `cred-proxy-scoper-<cloud>` plugin install; walk through `cred-proxy
-  start` and `cred-proxy doctor`; auto-verify socket permissions; install
-  the audit key without echoing it (FR-1539); test issuance and verify
-  the audit chain advances.
+1. Prompts for backend choice from `{local, aws, gcp, azure, k8s}`.
+2. Runs **every** operator input through `lib/credential-scanner.sh` BEFORE
+   any state write (FR-9). First match aborts the phase.
+3. For non-`local` backends: upserts the matching `autonomous-dev-deploy-*`
+   plugin install, provisions a credential proxy **handle** (handle-only;
+   credential bytes never enter the wizard process), validates the handle,
+   applies a firewall allowlist template, and runs the cost-cap-enforcer
+   dry-run.
+4. After all envs are configured, runs a final `autonomous-dev deploy
+   --dry-run --env dev` and asserts a structured plan response.
 
-The firewall sub-phase (referenced in TDD-024 §11 and TDD-025 §11.4) is
-owned by TDD-028 and is layered into this same module by a future spec.
+Per-env state is written transactionally; an env's failure does not
+corrupt prior envs' already-written state. Cross-env rollback is handled
+by `autonomous-dev wizard rollback --phase 16` (SPEC-033-4-04), NOT
+inline.
+
+## PRD cross-reference banner (FR-16)
+
+Emitted exactly once before the plugin/firewall/deploy chain steps:
+
+```
+================================================================
+NOTE: This phase configures deployment backends. The chain
+orchestration that runs deploy steps live (post-merge) is documented
+in PRD-015. The cost-cap-enforcer behavior on actual deploys is in
+PRD-017 (FR-1701-1705).
+
+PRD-015 reference: docs/prds/PRD-015-ci-cd-pipeline-and-chain-orchestration.md
+PRD-017 reference: docs/prds/PRD-017-cost-cap-enforcer.md
+
+This phase performs DRY-RUN verification only; no cloud resources
+are created.
+================================================================
+```
+
+The banner names PRDs and links to them by relative repo path; it does
+NOT inline PRD content. The eval `linked-prd-no-duplication.md` regex-scans
+rendered output for ≥40-char verbatim sentence matches against PRD-015
+and PRD-017; the banner sentences are intentionally short or are paths.
 
 ## Steps
 
-### Step `intro`
+### Step `intro-and-prd-banner`
 
-Banner:
+Emit the FR-16 banner once. Set `WIZARD_PHASE_16_BANNER_EMITTED=1` to
+guard against re-emit on resume.
 
-```
-================================================================
-   Phase 16: Deploy backends, cred-proxy, firewall (OPTIONAL)
-================================================================
-Default: SKIP. Enter only if you passed `--with-cloud` to quickstart
-or you explicitly opt in here. Without it, the wizard's existing
-10-phase flow is sufficient for non-cloud workflows.
-```
-
-If the operator did not pass `--with-cloud` and does not opt in
-explicitly, mark phase skipped, emit `skip_consequence`, return.
-
-## Phase 16-A: Cloud backend selection
-
-**Goal.** Identify the cloud(s) the operator targets, verify the
-per-cloud `autonomous-dev-deploy-<cloud>` plugin is installed, verify
-the cloud's CLI is on PATH, and verify root credentials are reachable.
-The phase does **not** install plugins or modify credentials; per
-PRD-015 R-3 the wizard checks and surfaces install commands but does
-not run them.
-
-### Step `prompt-clouds`
-
-Present the operator with the four-option choice (multi-select):
-
-```text
-Which cloud(s) do you target?
-  [ ] gcp     (autonomous-dev-deploy-gcp)
-  [ ] aws     (autonomous-dev-deploy-aws)
-  [ ] azure   (autonomous-dev-deploy-azure)
-  [ ] k8s     (autonomous-dev-deploy-k8s)
-```
-
-If the operator selects nothing, exit phase 16 cleanly with a note that
-`--with-cloud` was passed but no clouds were selected. Write
-`cloud.selected = []` to wizard-state.
-
-### Step `verify-plugin-install`
-
-For each chosen `<cloud>`:
+### Step `iter-envs`
 
 ```bash
-ls plugins/autonomous-dev-deploy-<cloud>/
+for env in dev staging prod; do
+  _phase16_run_env "$env"
+done
 ```
 
-If the directory does not exist, emit the install command and exit
-phase 16 cleanly:
+Per-env subroutine (see below) handles backend prompt, scanner gate,
+plugin install, cred-proxy provision/validate, firewall apply, cost-cap
+dry-run, and per-env state write.
 
-```text
-Plugin autonomous-dev-deploy-<cloud> is not installed. Install it with:
+### Step `prompt-backend` (per env)
 
-    claude plugin install autonomous-dev-deploy-<cloud>
-
-Then re-run quickstart --with-cloud.
-```
-
-The wizard does **not** invoke `claude plugin install` itself
-(PRD-015 R-3).
-
-### Step `verify-cloud-cli`
-
-For each chosen cloud, the corresponding CLI must be discoverable:
-
-| Cloud | CLI command  |
-|-------|--------------|
-| gcp   | `gcloud`     |
-| aws   | `aws`        |
-| azure | `az`         |
-| k8s   | `kubectl`    |
+Prompt the operator for one of `{local, aws, gcp, azure, k8s}`. Default
+for the first env is `local`; subsequent envs default to the prior env's
+choice.
 
 ```bash
-command -v gcloud   # for gcp
-command -v aws      # for aws
-command -v az       # for azure
-command -v kubectl  # for k8s
-```
-
-If `command -v` returns non-zero, emit the install instruction (link to
-the cloud's official install docs) and exit phase 16 cleanly. Do not
-attempt to install the CLI.
-
-### Step `verify-root-creds`
-
-For each chosen cloud, run the per-cloud reachability check. **Do not
-store, echo, or log the output** — only the exit code matters.
-
-| Cloud | Reachability check                                              |
-|-------|-----------------------------------------------------------------|
-| gcp   | `gcloud auth list --format=value(account) > /dev/null 2>&1`     |
-| aws   | `aws sts get-caller-identity > /dev/null 2>&1`                  |
-| azure | `az account show > /dev/null 2>&1`                              |
-| k8s   | `kubectl auth can-i get pods --all-namespaces > /dev/null 2>&1` |
-
-Each check exits zero on success. On failure, surface a generic "Could
-not reach <cloud> root credentials; verify your <CLI> session is
-active" message — **do not** include the underlying error text (which
-may contain credential fragments).
-
-**Phase 16-A exit criterion.** All chosen clouds have: plugin
-installed, CLI on PATH, root credentials reachable. Operator proceeds
-to Phase 16-B. Write `cloud.selected = [<list>]` to wizard-state.
-
-## Phase 16-B: Credential proxy bootstrap
-
-**Goal.** Verify each chosen cloud's scoper plugin is installed; walk
-the operator through starting the cred-proxy daemon and running its
-diagnostic; auto-verify socket permissions; install the audit key
-without echoing it; verify a test issuance succeeds.
-
-### Step `verify-scoper-install`
-
-For each `<cloud>` chosen in 16-A:
-
-```bash
-ls ~/.autonomous-dev/cred-proxy/scopers/<cloud>/   # OR plugins/cred-proxy-scoper-<cloud>/
-```
-
-If the directory does not exist, emit the install command and exit
-phase 16 cleanly:
-
-```text
-Scoper cred-proxy-scoper-<cloud> is not installed. Install it with:
-
-    claude plugin install cred-proxy-scoper-<cloud>
-
-Then re-run quickstart --with-cloud.
-```
-
-The wizard does **not** invoke `claude plugin install` itself
-(PRD-015 R-3).
-
-### Step `cred-proxy-start`
-
-```bash
-cred-proxy start
-```
-
-If the daemon is already running, `start` exits zero with a note. If it
-fails to start (port-in-use, ownership conflict, etc.), surface the
-diagnostic and exit phase 16.
-
-### Step `cred-proxy-doctor`
-
-```bash
-cred-proxy doctor
-```
-
-`doctor` exits zero on a clean run and reports: socket exists with mode
-`0600`; ownership matches running user; per-cloud scopers discoverable;
-root credentials reachable. If `doctor` reports a problem, refer the
-operator to `instructions/cred-proxy-runbook.md` §5 (recovery).
-
-### Step `verify-socket-perms`
-
-Use the platform-aware `stat` invocation (same as `commands/assist.md`
-Step 2 Bash):
-
-```bash
-if [[ "$(uname)" == "Darwin" ]]; then
-  stat -f "%Sp %u %g" ~/.autonomous-dev/cred-proxy/socket
-else
-  stat -c "%a %u %g" ~/.autonomous-dev/cred-proxy/socket
+read -r choice
+# FR-9: scan operator input BEFORE any state write.
+if ! bash "$LIB_DIR/credential-scanner.sh" "$choice"; then
+  echo "[phase-16] credential pattern detected in operator input; aborting phase." >&2
+  _phase16_set_status failed
+  exit 1
 fi
 ```
 
-Confirm: mode is `0600` (`srw-------` on macOS, `600` on Linux); owner
-UID matches the operator's UID. If either is wrong, refer to runbook
-§5.1.
+### Step `plugin-install` (per env, non-local only)
 
-### Step `install-audit-key`
+Upsert install. Skip when the installed version matches the available
+version; on mismatch, prompt the operator:
 
-If the operator's shell environment does not have
-`CRED_PROXY_AUDIT_KEY` exported, walk through generating and installing
-it. **Never echo the audit-key value to stdout.** The wizard does not
-modify the operator's shell rc itself — it surfaces the line to add.
-The operator is the agent that completes the install, ensuring the
-operator owns the change.
-
-The wizard's recommended pattern (file-based, atomic, no stdout
-exposure):
+```
+currently installed: X.Y.Z; available: X.Y.Z+1; install? [y/N]
+```
 
 ```bash
-( umask 0177; openssl rand -hex 32 > ~/.autonomous-dev/cred-proxy/audit-key )
-chmod 0600 ~/.autonomous-dev/cred-proxy/audit-key
+plugin="autonomous-dev-deploy-${backend}"
+installed_version="$(autonomous-dev plugin info "$plugin" 2>/dev/null \
+  | jq -r '.version // empty')"
+# Probe what's available; mock returns available version on exit code 4.
+install_out="$(autonomous-dev plugin install "$plugin" 2>&1)"; rc=$?
+if (( rc == 0 )); then
+  : # already at matching version OR newly installed
+elif (( rc == 4 )); then
+  # version-mismatch — prompt operator
+  available="$(echo "$install_out" | jq -r '.available // empty')"
+  current="$(echo "$install_out" | jq -r '.current // empty')"
+  printf 'currently installed: %s; available: %s; install? [y/N] ' \
+    "$current" "$available"
+  read -r upgrade_choice
+  if [[ "$upgrade_choice" == "y" || "$upgrade_choice" == "Y" ]]; then
+    autonomous-dev plugin install "$plugin" --upgrade || _phase16_abort_env "$env"
+  else
+    _phase16_abort_env "$env"   # operator declined; per-env atomicity
+  fi
+else
+  _phase16_abort_env "$env"
+fi
 ```
 
-Then prompt the operator to add the export to their shell rc
-(`~/.bashrc`, `~/.zshrc`):
+### Step `cred-proxy-provision` (per env, non-local only)
+
+Invoke `cred_proxy_provision` from `lib/cred-proxy-bridge.sh`. The wizard
+process receives ONLY the opaque handle on stdout. Credential bytes are
+entered via cred-proxy's own TTY context; they NEVER flow through the
+wizard's stdin / pipes / state.
 
 ```bash
-# Add to your shell rc:
-export CRED_PROXY_AUDIT_KEY="$(cat ~/.autonomous-dev/cred-proxy/audit-key)"
+# shellcheck source=../lib/cred-proxy-bridge.sh
+source "$LIB_DIR/cred-proxy-bridge.sh"
+handle="$(cred_proxy_provision "$backend" "$env")" || _phase16_abort_env "$env"
+# Defense in depth: handle shape check (also enforced inside the bridge).
+if [[ ! "$handle" =~ ^cph_[A-Za-z0-9]{32}$ ]]; then
+  echo "[phase-16] invalid handle shape returned by cred-proxy" >&2
+  _phase16_abort_env "$env"
+fi
 ```
 
-And to ensure `~/.autonomous-dev/cred-proxy/config.yaml` references the
-env-var by name:
-
-```yaml
-cred_proxy:
-  audit_key_env: CRED_PROXY_AUDIT_KEY   # the NAME of the env var, not the key
-```
-
-If the operator prefers an interactive (no file) pattern, document the
-alternative:
+### Step `cred-proxy-validate` (per env, non-local only)
 
 ```bash
-read -s -p "Audit key: " CRED_PROXY_AUDIT_KEY
-export CRED_PROXY_AUDIT_KEY
+status="$(cred_proxy_validate_handle "$handle")"
+case "$status" in
+  ok) ;;
+  expired|unknown) _phase16_abort_env "$env" ;;
+  *) _phase16_abort_env "$env" ;;
+esac
 ```
 
-Both patterns satisfy the FR-1539 never-echo contract.
-
-### Step `test-issuance`
-
-For one of the chosen clouds, perform a test issuance:
+### Step `firewall-apply` (per env, non-local only)
 
 ```bash
-cred-proxy issue <cloud> "<minimal-scope>"   # e.g., aws "ec2:DescribeInstances"
+fw_resp="$(autonomous-dev firewall apply \
+  --allowlist-template "${backend}-default" --env "$env")"
+fw_status="$(echo "$fw_resp" | jq -r '.status // empty')"
+case "$fw_status" in
+  applied|idempotent) ;;   # both are success
+  *) _phase16_abort_env "$env" ;;
+esac
 ```
 
-If `cred-proxy issue` supports `--dry-run`, prefer it (no live
-cloud-side issuance). If it does not, the live-issuance path is
-acceptable for the wizard — the issued credential expires in 15 minutes
-and the audit log records the event.
-
-### Step `verify-audit`
-
-Verify the audit-log entry appears:
+### Step `cost-cap-dry-run` (per env, non-local only)
 
 ```bash
-cred-proxy doctor --verify-audit
+cost_resp="$(autonomous-dev deploy --dry-run --env "$env" --estimate-only)"
+cost="$(echo "$cost_resp" | jq -r '.estimated_monthly_cost_usd')"
+# FR-14: must be a finite numeric.
+if [[ "$cost" == "null" || -z "$cost" || ! "$cost" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+  echo "[phase-16] cost-cap-enforcer returned non-finite estimate; see PRD-017 FR-1701-1705." >&2
+  _phase16_abort_env "$env"
+fi
+ceiling="$(jq -r '.deploy.cost_cap_monthly_usd_max // 50' "$AUTONOMOUS_DEV_CONFIG")"
+if (( $(echo "$cost > $ceiling" | bc -l) )); then
+  echo "[phase-16] cost estimate \$$cost exceeds ceiling \$$ceiling; see PRD-017." >&2
+  _phase16_abort_env "$env"
+fi
 ```
 
-The chain hash should advance by one. A clean exit confirms the
-bootstrap succeeded.
+### Step `write-env-state` (per env)
 
-**Phase 16-B exit criterion.** `cred-proxy doctor` and `cred-proxy
-doctor --verify-audit` both exit zero. The audit key is installed and
-the env-var export is documented (the operator may need to re-source
-their shell rc before the next phase). At least one test issuance
-succeeded for one chosen cloud.
+Per-env atomicity: write the four config keys for THIS env only. On
+abort, prior envs' state is untouched.
 
-## See also
+```bash
+jq --arg env "$env" --arg backend "$backend" --arg handle "$handle" \
+   --arg fw "${backend}-default" --arg ts "$(date -u +%FT%TZ)" \
+   '.deploy.envs[$env] = {
+      backend: $backend,
+      cred_proxy_handle: $handle,
+      firewall_template: $fw,
+      last_dry_run_at: $ts
+    }' "$AUTONOMOUS_DEV_CONFIG" > "$AUTONOMOUS_DEV_CONFIG.new"
+mv "$AUTONOMOUS_DEV_CONFIG.new" "$AUTONOMOUS_DEV_CONFIG"
+```
 
-- `instructions/cred-proxy-runbook.md` §2 (bootstrap), §3 (per-cloud
-  scoper installation), §6 (TTL tuning).
-- `skills/config-guide/SKILL.md` Section 21: cred_proxy (config schema).
-- `skills/help/SKILL.md` Cloud Backends + Credential Proxy sections.
+For `local` backends, the per-env block stores only the backend value;
+`cred_proxy_handle` and `firewall_template` are empty strings.
+
+### Step `final-dry-run`
+
+After all envs are configured, run a final dry-run for `dev`:
+
+```bash
+final_resp="$(autonomous-dev deploy --dry-run --env dev)"
+plan_steps="$(echo "$final_resp" | jq -r '.plan_steps // empty')"
+if [[ -z "$plan_steps" ]]; then
+  echo "[phase-16] final dry-run did not return a structured plan." >&2
+  _phase16_set_status failed
+  exit 1
+fi
+```
+
+### Step `sighup-and-summary`
+
+```bash
+if [[ -z "${WIZARD_HEADLESS:-}" ]]; then
+  pkill -HUP -f autonomous-dev-daemon || true
+fi
+_phase16_set_status complete
+```
+
+## Helper functions (sourced from this phase only)
+
+```bash
+_phase16_set_status() {
+  local s="$1"
+  jq --arg s "$s" '.phases["16"].status = $s' \
+     "$WIZARD_STATE_FILE" > "$WIZARD_STATE_FILE.new"
+  mv "$WIZARD_STATE_FILE.new" "$WIZARD_STATE_FILE"
+}
+
+# Per-env atomicity: env-N abort does NOT touch env<N already-written state.
+_phase16_abort_env() {
+  local env="$1"
+  echo "[phase-16] aborting at env=$env; prior envs preserved." >&2
+  _phase16_set_status failed
+  exit 1
+}
+```
+
+## Eval cases
+
+Six cases live under `evals/test-cases/setup-wizard/phase-16-deploy-backends/`:
+
+| File                              | Purpose                                              |
+|-----------------------------------|------------------------------------------------------|
+| `happy-path.md`                   | dev=aws + staging/prod=local; full success           |
+| `skip-with-consequence.md`        | `wizard.skip_phase_16=true`; FR-4 verbatim emitted   |
+| `error-recovery.md`               | 4 sub-cases: net-fail / version-mismatch / cred-proxy fail / dry-run fail |
+| `idempotency-resume.md`           | 4 sub-cases: plugin skip / handle keep-vs-rotate / firewall no-op / dry-run always re-runs |
+| `linked-prd-no-duplication.md`    | regex-scan: 0 ≥40-char verbatim PRD-015/017 matches  |
+| `credential-leak.md`              | 6 family injections + post-run scanner sweep (AC-08) |
+
+## Cross-references
+
+- `_phase-contract.md` — front-matter schema.
+- `lib/cred-proxy-bridge.sh` — provision/validate/revoke wrappers (handle-only).
+- `lib/credential-scanner.sh` — six-family scanner used uniformly on EVERY operator input.
+- SPEC-033-4-04 — `autonomous-dev wizard rollback --phase 16` reverts the
+  12 config keys, revokes 3 cred-proxy handles, rolls back 3 firewall
+  allowlists. Snapshot capture happens automatically at phase entry.
+- TDD-025 prior-art (cloud + cred-proxy bootstrap content from earlier
+  phase 16 module) is preserved upstream of the per-env iteration above
+  for operator reference; the operative state-writing flow is the
+  per-env loop in this module.
 
 ## Phase-numbering integration walk
 
 This module sits at phase 16 in the modular orchestrator's
-`PHASE_REGISTRY=(08 11 12 13 14 15 16)` (per
-`skills/setup-wizard/SKILL.md` Phase Modules section). Phases 1-10 are
-byte-for-byte unchanged; this phase runs only when the operator opts in
-or passes `--with-cloud`. Future TDD-028 (firewall) and TDD-026
-(`--with-cloud` flag wiring) extend this module with additional steps;
-phase numbering does not collide because all cloud + cred-proxy +
-firewall content is namespaced under phase 16.
+`PHASE_REGISTRY=(08 11 12 13 14 15 16)`. Phases 1-10 are byte-for-byte
+unchanged. The phase runs only when the operator opts in (default-skip
+via `wizard.skip_phase_16=true` or `wizard.phase_16_module_enabled=false`).

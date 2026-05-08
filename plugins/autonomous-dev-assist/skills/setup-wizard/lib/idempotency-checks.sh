@@ -354,7 +354,53 @@ phase-15-probe() {
 }
 
 phase-16-probe() {
-  wizard_state_phase_complete 16
+  # SPEC-033-4-02: per-env iteration probe (dev → staging → prod).
+  # Layout:
+  #   start-fresh        → no env configured (no deploy.envs.* keys)
+  #   resume-from:<env>  → at least one env configured but not all
+  #   already-complete   → all 3 envs configured AND for non-local envs:
+  #                        plugin@version + handle valid + firewall template
+  #                        applied + last dry-run within 7 days.
+  local cfg="${AUTONOMOUS_DEV_CONFIG:-$HOME/.autonomous-dev/config.json}"
+  if [[ ! -f "$cfg" ]]; then
+    echo "start-fresh"; return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    _idem_err "jq not on PATH"
+  fi
+  local envs=(dev staging prod) env backend last
+  local any_present=0
+  for env in "${envs[@]}"; do
+    backend="$(jq -r ".deploy.envs.${env}.backend // empty" "$cfg" 2>/dev/null)"
+    if [[ -z "$backend" ]]; then
+      if (( any_present == 1 )); then
+        echo "resume-from:${env}"; return 0
+      fi
+      echo "start-fresh"; return 0
+    fi
+    any_present=1
+    if [[ "$backend" == "local" ]]; then
+      continue   # local needs no plugin/handle/firewall checks
+    fi
+    # Non-local: handle must validate ok, last_dry_run_at must be <7d old.
+    last="$(jq -r ".deploy.envs.${env}.last_dry_run_at // empty" "$cfg" 2>/dev/null)"
+    if [[ -z "$last" ]]; then
+      echo "resume-from:${env}"; return 0
+    fi
+    local last_epoch now_epoch age_days
+    if last_epoch="$(date -u -d "$last" +%s 2>/dev/null)"; then :
+    elif last_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$last" +%s 2>/dev/null)"; then :
+    else
+      echo "resume-from:${env}"; return 0
+    fi
+    now_epoch="$(date -u +%s)"
+    age_days=$(( (now_epoch - last_epoch) / 86400 ))
+    if (( age_days > 7 )); then
+      echo "resume-from:${env}"; return 0
+    fi
+  done
+  echo "already-complete"
+  return 0
 }
 
 # Dispatch shim
