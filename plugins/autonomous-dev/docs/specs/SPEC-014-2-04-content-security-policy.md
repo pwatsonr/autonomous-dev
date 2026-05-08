@@ -12,9 +12,12 @@ Deploy a strict Content Security Policy and the supporting security headers (X-C
 
 | File | Action | Notes |
 |------|--------|-------|
-| `src/portal/security/csp-middleware.ts` | Create | `CSPMiddleware` class — generates nonce, builds directives, sets header |
-| `src/portal/security/csp-config.ts` | Create | Environment-keyed CSP directive defaults; `buildCustomCSP` helper |
-| `src/portal/security/security-headers.ts` | Create | Composite middleware setting all non-CSP security headers |
+<!-- moved-from: src/portal/security/csp-middleware.ts -->
+| `plugins/autonomous-dev-portal/server/security/csp-middleware.ts` | Create | `CSPMiddleware` class — generates nonce, builds directives, sets header |
+<!-- moved-from: src/portal/security/csp-config.ts -->
+| `plugins/autonomous-dev-portal/server/security/csp-config.ts` | Create | Environment-keyed CSP directive defaults; `buildCustomCSP` helper |
+<!-- moved-from: src/portal/security/security-headers.ts -->
+| `plugins/autonomous-dev-portal/server/security/security-headers.ts` | Create | Composite middleware setting all non-CSP security headers |
 | `src/portal/config/header-config.ts` | Create | Centralized header configuration with environment overrides |
 | `src/portal/routes/csp-violation-report.ts` | Create | `POST /csp-violation-report` endpoint with rate limiting and structured logging |
 | `src/portal/helpers/nonce-helper.ts` | Create | `{{nonce}}` Handlebars helper exposing `req.nonce` to templates |

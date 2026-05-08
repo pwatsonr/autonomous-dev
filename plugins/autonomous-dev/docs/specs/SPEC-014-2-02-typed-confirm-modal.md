@@ -12,9 +12,12 @@ Implement a server-authoritative typed-confirmation flow that protects destructi
 
 | File | Action | Notes |
 |------|--------|-------|
-| `src/portal/security/confirmation-tokens.ts` | Create | `TypedConfirmationService` class with token generation, validation, rate limiting, cleanup |
-| `src/portal/security/confirmation-phrases.ts` | Create | Allowlist mapping `action -> phrase` (single source of truth) |
-| `src/portal/routes/confirmation-routes.ts` | Create | `POST /api/security/confirmation/request` and `POST /api/security/confirmation/validate` |
+<!-- moved-from: src/portal/security/confirmation-tokens.ts -->
+| `plugins/autonomous-dev-portal/server/security/confirmation-tokens.ts` | Create | `TypedConfirmationService` class with token generation, validation, rate limiting, cleanup |
+<!-- moved-from: src/portal/security/confirmation-phrases.ts -->
+| `plugins/autonomous-dev-portal/server/security/confirmation-phrases.ts` | Create | Allowlist mapping `action -> phrase` (single source of truth) |
+<!-- moved-from: src/portal/routes/confirmation-routes.ts -->
+| `plugins/autonomous-dev-portal/server/routes/confirmation-routes.ts` | Create | `POST /api/security/confirmation/request` and `POST /api/security/confirmation/validate` |
 | `src/portal/middleware/require-confirmation.ts` | Create | `requireConfirmation(action)` middleware factory for protected routes |
 | `src/portal/components/confirm-modal.hbs` | Create | Server-rendered modal partial with HTMX wiring |
 | `src/portal/public/js/confirm-modal.js` | Create | Client-side modal show/hide, input validation, error display |

@@ -15,16 +15,26 @@ The event protocol is typed (`state-change`, `cost-update`, `heartbeat`, `log-li
 
 | File | Action | Notes |
 |------|--------|-------|
-| `src/portal/sse/SSEEventBus.ts` | Create | Public class: connection registry, broadcast, lifecycle |
-| `src/portal/sse/Connection.ts` | Create | Per-client wrapper: write queue, sequence tracking, backpressure |
-| `src/portal/sse/HeartbeatManager.ts` | Create | 30s broadcast loop + 5min staleness sweeper |
-| `src/portal/sse/EventProtocol.ts` | Create | Sequence counter, `formatSSE()` framing helper |
-| `src/portal/events/schemas.ts` | Create | Zod schemas for all 5 event types + envelope |
-| `src/portal/events/types.ts` | Create | TS types inferred from Zod schemas |
-| `src/portal/sse/types.ts` | Create | `SSEServerOptions`, `ConnectionState`, internal types |
-| `src/portal/sse/index.ts` | Create | Barrel export |
-| `src/portal/events/index.ts` | Create | Barrel export |
-| `src/portal/routes/events.ts` | Create | Hono route handler that delegates to `SSEEventBus.handleConnection` |
+<!-- moved-from: src/portal/sse/SSEEventBus.ts -->
+| `plugins/autonomous-dev-portal/server/sse/SSEEventBus.ts` | Create | Public class: connection registry, broadcast, lifecycle |
+<!-- moved-from: src/portal/sse/Connection.ts -->
+| `plugins/autonomous-dev-portal/server/sse/Connection.ts` | Create | Per-client wrapper: write queue, sequence tracking, backpressure |
+<!-- moved-from: src/portal/sse/HeartbeatManager.ts -->
+| `plugins/autonomous-dev-portal/server/sse/HeartbeatManager.ts` | Create | 30s broadcast loop + 5min staleness sweeper |
+<!-- moved-from: src/portal/sse/EventProtocol.ts -->
+| `plugins/autonomous-dev-portal/server/sse/EventProtocol.ts` | Create | Sequence counter, `formatSSE()` framing helper |
+<!-- moved-from: src/portal/events/schemas.ts -->
+| `plugins/autonomous-dev-portal/server/events/schemas.ts` | Create | Zod schemas for all 5 event types + envelope |
+<!-- moved-from: src/portal/events/types.ts -->
+| `plugins/autonomous-dev-portal/server/events/types.ts` | Create | TS types inferred from Zod schemas |
+<!-- moved-from: src/portal/sse/types.ts -->
+| `plugins/autonomous-dev-portal/server/sse/types.ts` | Create | `SSEServerOptions`, `ConnectionState`, internal types |
+<!-- moved-from: src/portal/sse/index.ts -->
+| `plugins/autonomous-dev-portal/server/sse/index.ts` | Create | Barrel export |
+<!-- moved-from: src/portal/events/index.ts -->
+| `plugins/autonomous-dev-portal/server/events/index.ts` | Create | Barrel export |
+<!-- moved-from: src/portal/routes/events.ts -->
+| `plugins/autonomous-dev-portal/server/routes/events.ts` | Create | Hono route handler that delegates to `SSEEventBus.handleConnection` |
 
 ## Implementation Details
 
