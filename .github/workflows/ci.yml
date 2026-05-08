@@ -113,6 +113,22 @@ jobs:
         with:
           fail-on-error: true
 
+  no-tbd-shas:
+    # PRD-017 FR-1709 / SPEC-032-2-02 — regression guard against the
+    # `TBD-replace-with-pinned-SHA` literal re-entering the four
+    # cloud-deploy plugins or `.github/workflows/release.yml`. Runs
+    # unconditionally (no `if:` gate) per FR-8 — a literal could land
+    # via merge or rename outside the paths-filter scope. The < 1 s
+    # cost is negligible.
+    name: no-tbd-shas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint — no TBD action SHAs
+        run: bash scripts/lint/no-tbd-shas.sh
+
   spec-reconciliation:
     # TDD-031 §5.4 / PRD-016 G-08, FR-1654.
     # Runs unconditionally on every PR (no paths filter, per SPEC-031-4-02
