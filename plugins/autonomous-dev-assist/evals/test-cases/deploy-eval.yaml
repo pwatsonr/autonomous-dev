@@ -1,0 +1,437 @@
+# deploy-eval.yaml -- TDD-026 §9 deploy assist evals
+# 30+ cases across: backends, plan-approve, cost-cap, ledger-corruption,
+# healthmonitor, sla, prod-approval. Negative-bag enforces R-4 hallucinated-CLI
+# and R-7 ledger-destruction guards from PRD-015 (TDD-026 §9.1).
+
+suite: deploy
+skill: help
+description: >
+  Validates the assist's answers about the deploy framework, cost-cap
+  ledger, HealthMonitor, and the prod-always-approval rule. The negative
+  bag blocks the five destructive misreadings catalogued in TDD-026 §9.1.
+
+# Negative-mention bag (TDD-026 §9.1, applied to every case via YAML anchor)
+_deploy_neg_bag: &deploy_neg_bag
+  - "deploy force-approve"
+  - "edit.*ledger\\.json"
+  - "deploy auto-prod"
+  - "cost cap.*ignore"
+  - "deploy.*--no-approval"
+
+cases:
+
+  # ── Category 1: backends list/describe (6 cases, cloud-plugin-tolerant) ─
+  - id: deploy-backends-001
+    category: backends
+    difficulty: easy
+    question: "What backends are installed?"
+    expected_topics:
+      - backends list
+      - install
+      - plugin
+    must_mention:
+      - "backends list"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-backends-002
+    category: backends
+    difficulty: medium
+    question: "Describe the GCP backend."
+    expected_topics:
+      - autonomous-dev-deploy-gcp
+      - install
+      - TDD-025
+    must_mention:
+      - "install"
+    must_not_mention:
+      - "deploy force-approve"
+      - "edit.*ledger\\.json"
+      - "deploy auto-prod"
+      - "cost cap.*ignore"
+      - "deploy.*--no-approval"
+      - "hallucinated config"
+
+  - id: deploy-backends-003
+    category: backends
+    difficulty: medium
+    question: "Describe the AWS backend."
+    expected_topics:
+      - autonomous-dev-deploy-aws
+      - install
+      - TDD-025
+    must_mention:
+      - "install"
+    must_not_mention:
+      - "deploy force-approve"
+      - "edit.*ledger\\.json"
+      - "deploy auto-prod"
+      - "cost cap.*ignore"
+      - "deploy.*--no-approval"
+      - "hallucinated config"
+
+  - id: deploy-backends-004
+    category: backends
+    difficulty: medium
+    question: "Describe the Azure backend."
+    expected_topics:
+      - autonomous-dev-deploy-azure
+      - install
+      - TDD-025
+    must_mention:
+      - "install"
+    must_not_mention:
+      - "deploy force-approve"
+      - "edit.*ledger\\.json"
+      - "deploy auto-prod"
+      - "cost cap.*ignore"
+      - "deploy.*--no-approval"
+      - "hallucinated config"
+
+  - id: deploy-backends-005
+    category: backends
+    difficulty: medium
+    question: "Describe the Kubernetes backend."
+    expected_topics:
+      - autonomous-dev-deploy-k8s
+      - install
+      - TDD-025
+    must_mention:
+      - "install"
+    must_not_mention:
+      - "deploy force-approve"
+      - "edit.*ledger\\.json"
+      - "deploy auto-prod"
+      - "cost cap.*ignore"
+      - "deploy.*--no-approval"
+      - "hallucinated config"
+
+  - id: deploy-backends-006
+    category: backends
+    difficulty: easy
+    question: "How do I list available deploy backends?"
+    expected_topics:
+      - deploy backends list
+      - registered backends
+      - install
+    must_mention:
+      - "deploy backends"
+    must_not_mention: *deploy_neg_bag
+
+  # ── Category 2: plan/approve/reject (8 cases) ──────────────────────────
+  - id: deploy-plan-001
+    category: plan-approve
+    difficulty: easy
+    question: "How do I plan a deploy to staging?"
+    expected_topics:
+      - deploy plan
+      - --env staging
+      - REQ-NNNNNN
+    must_mention:
+      - "deploy plan"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-plan-002
+    category: plan-approve
+    difficulty: easy
+    question: "How do I dry-run a deploy without entering the state machine?"
+    expected_topics:
+      - deploy estimate
+      - read-only
+      - no ledger write
+    must_mention:
+      - "deploy estimate"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-plan-003
+    category: plan-approve
+    difficulty: easy
+    question: "How do I approve a planned deploy?"
+    expected_topics:
+      - deploy approve
+      - REQ-NNNNNN
+      - state machine
+    must_mention:
+      - "deploy approve"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-plan-004
+    category: plan-approve
+    difficulty: easy
+    question: "How do I reject a planned deploy?"
+    expected_topics:
+      - deploy reject
+      - reason flag
+      - terminal state
+    must_mention:
+      - "deploy reject"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-plan-005
+    category: plan-approve
+    difficulty: medium
+    question: "What states does a deploy request pass through?"
+    expected_topics:
+      - pending
+      - awaiting-approval
+      - approved
+      - executing
+      - completed
+      - failed
+    must_mention:
+      - "awaiting-approval"
+      - "executing"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-plan-006
+    category: plan-approve
+    difficulty: medium
+    question: "My deploy is stuck on awaiting-approval -- what now?"
+    expected_topics:
+      - deploy approve
+      - never run
+      - state inspection
+    must_mention:
+      - "deploy approve"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-plan-007
+    category: plan-approve
+    difficulty: medium
+    question: "How do I see the full event history for a deploy?"
+    expected_topics:
+      - deploy logs
+      - REQ-NNNNNN
+      - audit trail
+    must_mention:
+      - "deploy logs"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-plan-008
+    category: plan-approve
+    difficulty: hard
+    question: "After a rejected request, can I re-plan with the same REQ-ID?"
+    expected_topics:
+      - terminal sink
+      - new REQ-NNNNNN
+      - fresh plan
+    must_mention:
+      - "deploy plan"
+    must_not_mention: *deploy_neg_bag
+
+  # ── Category 3: cost-cap trip (4 cases) ────────────────────────────────
+  - id: deploy-cost-001
+    category: cost-cap
+    difficulty: medium
+    question: "I hit cost-cap-tripped -- what now?"
+    expected_topics:
+      - ledger reset
+      - deploy ledger reset
+      - do NOT edit
+    must_mention:
+      - "ledger reset"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-cost-002
+    category: cost-cap
+    difficulty: medium
+    question: "The cost cap is too low for my deploy -- can I bypass it?"
+    expected_topics:
+      - raise the cap
+      - deploy.yaml
+      - review
+    must_mention:
+      - "raise the cap in deploy.yaml"
+    must_not_mention:
+      - "deploy force-approve"
+      - "edit.*ledger\\.json"
+      - "deploy auto-prod"
+      - "cost cap.*ignore"
+      - "deploy.*--no-approval"
+      - "ignore"
+
+  - id: deploy-cost-003
+    category: cost-cap
+    difficulty: hard
+    question: "Can I edit the ledger to clear a stale cost-cap entry?"
+    expected_topics:
+      - do NOT edit
+      - deploy ledger reset
+      - append-only
+    must_mention:
+      - "do NOT edit"
+      - "deploy ledger reset"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-cost-004
+    category: cost-cap
+    difficulty: hard
+    question: "Can I delete the ledger to start fresh?"
+    expected_topics:
+      - do NOT rm
+      - irrecoverable
+      - deploy ledger reset
+    must_mention:
+      - "do NOT rm the ledger"
+    must_not_mention: *deploy_neg_bag
+
+  # ── Category 4: ledger-corruption inspection (3 cases) ─────────────────
+  - id: deploy-ledger-001
+    category: ledger-corruption
+    difficulty: medium
+    question: "How do I inspect the ledger for the last 7 days of cost?"
+    expected_topics:
+      - jq
+      - last 7 days
+      - cost_usd
+    must_mention:
+      - "jq"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-ledger-002
+    category: ledger-corruption
+    difficulty: hard
+    question: "How do I find ledger entries with missing or empty signatures?"
+    expected_topics:
+      - signature
+      - jq
+      - violation
+    must_mention:
+      - "signature"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-ledger-003
+    category: ledger-corruption
+    difficulty: hard
+    question: "Can I open ledger.json in vi to fix a malformed entry?"
+    expected_topics:
+      - do NOT edit by hand
+      - append-only
+      - deploy ledger reset
+    must_mention:
+      - "do NOT edit by hand"
+      - "deploy ledger reset"
+    must_not_mention: *deploy_neg_bag
+
+  # ── Category 5: HealthMonitor (3 cases) ────────────────────────────────
+  - id: deploy-health-001
+    category: healthmonitor
+    difficulty: medium
+    question: "How do I check the post-deploy health of REQ-NNNNNN?"
+    expected_topics:
+      - deploy logs
+      - --health
+      - latency
+      - error-rate
+    must_mention:
+      - "deploy logs"
+      - "--health"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-health-002
+    category: healthmonitor
+    difficulty: medium
+    question: "What does the degraded state mean?"
+    expected_topics:
+      - latency breach
+      - error-rate breach
+      - SLA threshold
+    must_mention:
+      - "degraded"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-health-003
+    category: healthmonitor
+    difficulty: hard
+    question: "Does HealthMonitor auto-rollback on degraded?"
+    expected_topics:
+      - operator-driven
+      - decision tree
+      - no auto-rollback
+    must_mention:
+      - "no auto-rollback"
+    must_not_mention: *deploy_neg_bag
+
+  # ── Category 6: SLA tracker (2 cases) ──────────────────────────────────
+  - id: deploy-sla-001
+    category: sla
+    difficulty: medium
+    question: "When should I roll back after a degraded signal?"
+    expected_topics:
+      - 5 minutes
+      - 30 minutes
+      - decision tree
+    must_mention:
+      - "30 minutes"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-sla-002
+    category: sla
+    difficulty: medium
+    question: "How long does HealthMonitor watch a deploy?"
+    expected_topics:
+      - SLA window
+      - deploy.yaml threshold
+      - duration timer
+    must_mention:
+      - "SLA window"
+    must_not_mention: *deploy_neg_bag
+
+  # ── Category 7: prod-always-approval (4 cases) ─────────────────────────
+  - id: deploy-prod-001
+    category: prod-approval
+    difficulty: easy
+    question: "Why does prod always require approval?"
+    expected_topics:
+      - is_prod true
+      - regardless of trust level
+      - TDD-023 §11
+    must_mention:
+      - "regardless of trust level"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-prod-002
+    category: prod-approval
+    difficulty: medium
+    question: "I'm at trust level L3 -- can prod auto-approve for me?"
+    expected_topics:
+      - is_prod true
+      - no auto-approval
+      - human approval required
+    must_mention:
+      - "is_prod: true forces approval"
+    must_not_mention:
+      - "deploy force-approve"
+      - "edit.*ledger\\.json"
+      - "deploy auto-prod"
+      - "cost cap.*ignore"
+      - "deploy.*--no-approval"
+      - "auto"
+
+  - id: deploy-prod-003
+    category: prod-approval
+    difficulty: hard
+    question: "Can I force-approve a prod deploy?"
+    expected_topics:
+      - no force-approve
+      - human approval required
+      - regardless of trust level
+    must_mention:
+      - "regardless of trust level"
+    must_not_mention: *deploy_neg_bag
+
+  - id: deploy-prod-004
+    category: prod-approval
+    difficulty: hard
+    question: "Is there a flag to skip approval on prod?"
+    expected_topics:
+      - no skip flag
+      - is_prod
+      - regardless of trust level
+    must_mention:
+      - "regardless of trust level"
+    must_not_mention:
+      - "deploy force-approve"
+      - "edit.*ledger\\.json"
+      - "deploy auto-prod"
+      - "cost cap.*ignore"
+      - "deploy.*--no-approval"

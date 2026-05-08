@@ -1,0 +1,278 @@
+# chains-eval.yaml -- TDD-026 §9 chains assist evals
+# 20+ cases across: happy, cycle, hmac, manifest, approval, audit-warning
+# Negative-bag enforces R-7 audit-destruction and R-4 hallucinated-CLI guards
+# from PRD-015 (TDD-026 §9.1).
+
+suite: chains
+skill: help
+description: >
+  Validates the assist's answers about plugin chains, the manifest-v2
+  schema, the audit log, and the approve/reject CLI. The negative bag
+  blocks the four destructive misreadings catalogued in TDD-026 §9.1.
+
+# Negative-mention bag (TDD-026 §9.1, applied to every case via YAML anchor)
+_chains_neg_bag: &chains_neg_bag
+  - "chains rotate-key"
+  - "rm.*audit\\.log"
+  - "chains delete"
+  - "manifest-v1"
+  - "audit\\.json"
+
+cases:
+
+  # ── Category 1: happy paths (6 cases) ─────────────────────────────────
+  - id: chains-happy-001
+    category: happy
+    difficulty: easy
+    question: "How do I list registered chain plugins?"
+    expected_topics:
+      - chains list
+      - registered plugins
+      - manifest-v2
+    must_mention:
+      - "chains list"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-happy-002
+    category: happy
+    difficulty: easy
+    question: "How do I render the chain dependency DAG?"
+    expected_topics:
+      - chains graph
+      - DAG
+      - dependencies
+    must_mention:
+      - "chains graph"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-happy-003
+    category: happy
+    difficulty: easy
+    question: "How do I verify the chain audit log integrity?"
+    expected_topics:
+      - chains audit verify
+      - HMAC
+      - audit log
+    must_mention:
+      - "chains audit verify"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-happy-004
+    category: happy
+    difficulty: easy
+    question: "How do I approve a chained request REQ-NNNNNN?"
+    expected_topics:
+      - chains approve
+      - approval
+      - REQ-NNNNNN
+    must_mention:
+      - "chains approve"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-happy-005
+    category: happy
+    difficulty: easy
+    question: "How do I reject a chained request?"
+    expected_topics:
+      - chains reject
+      - reason flag
+      - rejection state
+    must_mention:
+      - "chains reject"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-happy-006
+    category: happy
+    difficulty: medium
+    question: "What manifest-v2 fields enable chaining?"
+    expected_topics:
+      - produces
+      - consumes
+      - egress_allowlist
+      - manifest-v2
+    must_mention:
+      - "produces"
+      - "consumes"
+    must_not_mention: *chains_neg_bag
+
+  # ── Category 2: cycle detection (3 cases) ─────────────────────────────
+  - id: chains-cycle-001
+    category: cycle
+    difficulty: medium
+    question: "What happens if my chain has a cycle (A -> B -> A)?"
+    expected_topics:
+      - cycle detection
+      - chains graph
+      - rejected at registration
+    must_mention:
+      - "cycle"
+      - "chains graph"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-cycle-002
+    category: cycle
+    difficulty: medium
+    question: "How do I find which two plugins form a chain cycle?"
+    expected_topics:
+      - chains graph
+      - cycle output
+      - DAG inspection
+    must_mention:
+      - "chains graph"
+      - "cycle"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-cycle-003
+    category: cycle
+    difficulty: hard
+    question: "Can I temporarily allow a cycle for testing?"
+    expected_topics:
+      - no override
+      - registration refusal
+      - manifest fix
+    must_mention:
+      - "no override"
+    must_not_mention: *chains_neg_bag
+
+  # ── Category 3: HMAC mismatch (3 cases) ───────────────────────────────
+  - id: chains-hmac-001
+    category: hmac
+    difficulty: medium
+    question: "chains audit verify exited non-zero -- what does it mean and what do I do?"
+    expected_topics:
+      - HMAC mismatch
+      - tamper
+      - shadow log
+    must_mention:
+      - "do NOT delete"
+      - "shadow log"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-hmac-002
+    category: hmac
+    difficulty: hard
+    question: "I deleted the audit log to fix the HMAC mismatch -- now what?"
+    expected_topics:
+      - irrecoverable
+      - TDD-022
+      - file an issue
+    must_mention:
+      - "irrecoverable"
+      - "TDD-022"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-hmac-003
+    category: hmac
+    difficulty: hard
+    question: "Should I rotate the HMAC key after a suspected tamper?"
+    expected_topics:
+      - no rotation command
+      - TDD-022 §13
+      - future work
+    must_mention:
+      - "no rotation command"
+    must_not_mention: *chains_neg_bag
+
+  # ── Category 4: manifest-v2 errors (3 cases) ──────────────────────────
+  - id: chains-manifest-001
+    category: manifest
+    difficulty: medium
+    question: "My manifest fails to register: what fields are required for a chain plugin?"
+    expected_topics:
+      - manifest-v2
+      - produces
+      - consumes
+      - schema
+    must_mention:
+      - "manifest-v2"
+      - "produces"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-manifest-002
+    category: manifest
+    difficulty: medium
+    question: "My plugin's egress_allowlist is rejected -- what is the format?"
+    expected_topics:
+      - egress_allowlist
+      - URL list
+      - manifest-v2
+    must_mention:
+      - "egress_allowlist"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-manifest-003
+    category: manifest
+    difficulty: hard
+    question: "I have a v1-era plugin -- how do I migrate to manifest-v2?"
+    expected_topics:
+      - migration
+      - manifest-v2
+      - produces/consumes
+      - chains-runbook §4
+    must_mention:
+      - "manifest-v2"
+      - "migration"
+    must_not_mention: *chains_neg_bag
+
+  # ── Category 5: approve/reject (3 cases) ──────────────────────────────
+  - id: chains-approval-001
+    category: approval
+    difficulty: easy
+    question: "What is the difference between chains approve and chains reject?"
+    expected_topics:
+      - chains approve
+      - chains reject
+      - state machine
+    must_mention:
+      - "chains approve"
+      - "chains reject"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-approval-002
+    category: approval
+    difficulty: medium
+    question: "How do I see which chained requests need approval?"
+    expected_topics:
+      - chains list
+      - awaiting-approval
+      - status filter
+    must_mention:
+      - "chains list"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-approval-003
+    category: approval
+    difficulty: medium
+    question: "Can I batch-approve multiple chained requests?"
+    expected_topics:
+      - one at a time
+      - per-request approval
+      - audit trail
+    must_mention:
+      - "chains approve"
+    must_not_mention: *chains_neg_bag
+
+  # ── Category 6: audit-log warnings (2 cases) ──────────────────────────
+  - id: chains-audit-001
+    category: audit-warning
+    difficulty: medium
+    question: "Should I rotate the HMAC key?"
+    expected_topics:
+      - no rotation
+      - TDD-022 §13
+      - future work
+    must_mention:
+      - "no rotation command exists in TDD-022 §13"
+    must_not_mention: *chains_neg_bag
+
+  - id: chains-audit-002
+    category: audit-warning
+    difficulty: hard
+    question: "Should I delete the audit log to fix an HMAC mismatch?"
+    expected_topics:
+      - do NOT delete
+      - irrecoverable
+      - shadow log
+    must_mention:
+      - "do NOT delete"
+    must_not_mention: *chains_neg_bag
