@@ -407,3 +407,182 @@ Then escalate per §9. The on-call security contact will:
 - Decide on the recovery path (re-key the chain from a known-good entry; restore from a backup; investigate further).
 
 **Do not delete the audit log.** Deleting the log destroys the only forensic record of what was issued and when. **Do not edit the audit log.** Editing the log makes the chain-hash mismatch worse and obscures the original cause. **Do not attempt unilateral recovery.** Escalate and let the security contact decide.
+
+---
+
+## 6. TTL tuning
+
+The `default_ttl_seconds` config controls the lifetime of every credential the cred-proxy issues. The default of `900` (15 minutes) is calibrated for typical short-to-medium deploys with a low-exposure trade-off. Raise it for long deploys; lower it for security-tightened environments.
+
+### 6.1 When to raise
+
+If your deploys consistently exceed the TTL and you have already exhausted the option of restructuring them into shorter steps (§5.3 Option B), raise `default_ttl_seconds`. Edit `~/.autonomous-dev/cred-proxy/config.yaml`:
+
+```yaml
+cred_proxy:
+  default_ttl_seconds: 3600   # 60 minutes; up from the default 900 (15 minutes)
+```
+
+Then restart the daemon:
+
+```bash
+cred-proxy stop
+cred-proxy start
+```
+
+The cred-proxy daemon is **assumed to require a restart** for config reload. SIGHUP-for-reload is not a documented contract in TDD-024 §10; if your version supports it, the daemon's `man` page or `cred-proxy --help` will say so. Default to restart.
+
+### 6.2 Practical upper bound
+
+The hard upper bound depends on the cloud:
+
+- **AWS STS** — `GetFederationToken` issues credentials valid up to **36 hours** for IAM users, but **chained-role assumption** (the more-common case) is capped at **1 hour** for direct chain and ~**4 hours** for the federated session. The pragmatic ceiling for AWS deploys is **14400 seconds (4 hours)**.
+- **GCP OIDC** — short-lived tokens default to 1 hour; the practical ceiling for the cred-proxy is **3600 seconds**.
+- **Azure access tokens** — typically 1 hour; the practical ceiling is **3600 seconds**.
+- **K8s TokenRequest projection** — cluster-controlled; the cred-proxy will request `default_ttl_seconds` but the cluster may extend or cap. See §3.4.
+
+Setting `default_ttl_seconds` higher than the cloud's hard cap will result in the cred-proxy issuing tokens at the cloud's cap, not your requested value. The audit log records the *issued* TTL, not the *requested* TTL.
+
+### 6.3 When to lower
+
+In security-tightened environments where the exposure window must be minimized, lower `default_ttl_seconds`. Practical floor is **60 seconds** (the cred-proxy's own re-issuance overhead becomes significant below this). Note that lowering raises the issuance frequency, which raises the load on the cloud's short-lived-token API and the size of `audit.log`.
+
+### 6.4 Trade-off summary
+
+| Direction  | Pro                                          | Con                                                       |
+|------------|----------------------------------------------|-----------------------------------------------------------|
+| Higher TTL | Fewer issuances; longer deploys complete     | Larger exposure window if a token leaks                   |
+| Lower TTL  | Smaller exposure window                      | More issuances; larger audit log; higher API load         |
+
+Default `900` is the calibrated balance. Adjust only when you have a specific reason.
+
+---
+
+## 7. Audit-hash verification
+
+The audit log (`~/.autonomous-dev/cred-proxy/audit.log`) is HMAC-chained: each entry's hash is computed over the entry's content **and** the previous entry's hash, keyed by the audit key (named in `audit_key_env`). A break in the chain indicates either a benign cause (audit-key rotation without re-keying) or a security-significant cause (log tampering, integrity break).
+
+### 7.1 Routine verification
+
+Run periodically (or as part of incident response):
+
+```bash
+cred-proxy doctor --verify-audit
+```
+
+A clean run reports the chain length, the hash of the last entry, and "chain verified" (or equivalent verbatim per TDD-024 §10). The command exits zero.
+
+### 7.2 What a mismatch looks like
+
+A mismatch reports the entry index where the chain breaks, the expected hash, and the actual hash. The command exits non-zero. Example output (illustrative; verify against TDD-024 §10):
+
+```text
+audit-chain mismatch at entry 47
+  expected: 7a3f...e9b2
+  actual:   c81d...0440
+chain broken; do not edit or delete the log; escalate per runbook §9
+```
+
+### 7.3 Immediate response
+
+A mismatch is **security-significant**. The immediate response:
+
+1. **Do not delete the audit log.** Deletion destroys the only forensic record.
+2. **Do not edit the audit log.** Editing makes the mismatch worse and obscures the cause.
+3. Capture the diagnostic for escalation:
+
+   ```bash
+   cred-proxy doctor --verify-audit > /tmp/audit-mismatch-$(date +%s).log
+   ```
+
+4. Stop the daemon to prevent further issuance until resolved:
+
+   ```bash
+   cred-proxy stop
+   ```
+
+5. Escalate per §9.
+
+---
+
+## 8. Emergency revoke
+
+The `cred-proxy revoke <token-id>` subcommand immediately invalidates an outstanding token. Use it when you suspect a specific issued token has been compromised — for example, a process that should not have it has been observed using it, or the deploy worker holding the token has been confirmed compromised.
+
+### 8.1 Obtaining the token-id
+
+Token-ids are recorded in `audit.log`. To find a recent issuance:
+
+```bash
+cred-proxy audit.log | tail -20
+```
+
+Each entry records the token-id, cloud, scope, requesting process, and TTL. Identify the token-id of the suspected-compromised issuance.
+
+### 8.2 Revoke
+
+```bash
+cred-proxy revoke <token-id>
+```
+
+The command exits zero on success. The daemon closes any FD currently held for that token-id and the cloud-side credential is invalidated (subject to the cloud's own propagation; STS is near-instant, K8s TokenRequest depends on cluster policy).
+
+### 8.3 When *not* to use revoke
+
+- **TTL expired naturally.** No revoke needed; the token is already invalid (§5.3).
+- **Audit-hash mismatch on an *unrelated* token.** A mismatch is a chain-integrity event (§7), not a per-token revocation event. Escalate per §9.
+- **Suspected scoper misconfiguration.** Reinstall and reconfigure the scoper (§5.2). Revoking individual tokens does not address the scoper itself.
+
+If revoking everything is necessary (broad compromise scenario), `cred-proxy stop` invalidates *all* outstanding tokens and is the better option than iterating revokes.
+
+---
+
+## 9. Escalation
+
+The cred-proxy escalation contract: **audit-hash mismatch is always escalation. Never recover unilaterally.** This section codifies the contract that §4.4, §5.4, and §7 all reference.
+
+### 9.1 What requires escalation
+
+- Audit-hash mismatch (§4.4 / §5.4 / §7) — always.
+- Suspected token compromise where the impact is unclear (e.g., the deploy worker was running on a multi-tenant host).
+- Persistent failure of `cred-proxy doctor` after applying §5.1 / §5.2 recovery, where the cause is not obvious.
+- Any cred-proxy behaviour that does not match this runbook (the cred-proxy daemon is part of the trust boundary; unexpected behaviour is investigated, not patched-around).
+
+### 9.2 What does not require escalation
+
+- Routine TTL expiry (§5.3) — apply Option A or B.
+- Permission-denied with a clear cause (mode wrong, ownership wrong) — apply §5.1.
+- Scoper-not-installed — apply §5.2.
+- Routine audit verification with no mismatch — no action needed.
+
+### 9.3 How to escalate
+
+1. **Stop the daemon** if not already stopped. (For audit-hash mismatch and suspected-compromise cases.)
+
+   ```bash
+   cred-proxy stop
+   ```
+
+2. **Capture all relevant diagnostics**:
+
+   ```bash
+   cred-proxy doctor > /tmp/cred-proxy-doctor-$(date +%s).log 2>&1
+   cred-proxy doctor --verify-audit > /tmp/cred-proxy-audit-$(date +%s).log 2>&1
+   cp ~/.autonomous-dev/cred-proxy/audit.log /tmp/audit-snapshot-$(date +%s).log
+   ```
+
+3. **Contact your on-call security contact** with the captured diagnostics. Do not paste audit-log contents into chat or email; transfer files via the channel your security team specifies.
+
+4. **Do not attempt recovery** until the security contact directs it. The cred-proxy is part of the credential-issuance trust boundary; an out-of-contract recovery action can compromise the integrity of the audit log permanently.
+
+### 9.4 Post-escalation
+
+After the security contact resolves the issue, restart the daemon and re-verify:
+
+```bash
+cred-proxy start
+cred-proxy doctor
+cred-proxy doctor --verify-audit
+```
+
+A clean re-verification re-establishes the chain. The captured diagnostics from §9.3 are retained per your organization's incident-response retention policy.
