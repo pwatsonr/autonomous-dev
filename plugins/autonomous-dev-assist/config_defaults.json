@@ -1,0 +1,7 @@
+{
+  "wizard": {
+    "phase_08_module_enabled": true,
+    "phase_11_module_enabled": true,
+    "ordering_invariants_enforced": true
+  }
+}

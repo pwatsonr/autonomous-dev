@@ -586,72 +586,128 @@ Tell the user: "This shows your current spend. The test request should cost well
 
 ---
 
-# Phase 8: Notification Setup (Optional)
+<!-- BEGIN: phase-module orchestrator (TDD-033) -->
 
-Ask the user: "Would you like to set up notifications so autonomous-dev can reach you via Discord or Slack? Type 'discord', 'slack', or 'skip'."
+# Phase Modules (8, 11–16)
 
-## Option A: Discord
+This section is the **modular phase orchestrator** added by TDD-033 /
+AMENDMENT-002. It iterates the phase registry `[08, 11, 12, 13, 14, 15, 16]`,
+parses each module's YAML front-matter, evaluates skip predicates and
+idempotency probes, and executes the module body.
 
-### Step 8.1: Create a Discord webhook
+The orchestrator MUST follow this fixed pipeline for each phase NN:
+
+1. Locate `plugins/autonomous-dev-assist/skills/setup-wizard/phases/phase-NN-*.md`.
+   If missing, emit `phase NN module not found; skipping` and continue (forward-compat).
+2. Check feature flag `wizard.phase_NN_module_enabled` (default true).
+   If false, emit `Phase NN unavailable; will be re-enabled in next release`,
+   write `phases.NN.status="unavailable"`, and continue.
+3. Source helpers:
+   ```bash
+   source "$PLUGIN_DIR/skills/setup-wizard/lib/skip-predicates.sh"
+   source "$PLUGIN_DIR/skills/setup-wizard/lib/idempotency-checks.sh"
+   source "$PLUGIN_DIR/skills/setup-wizard/lib/cred-proxy-bridge.sh"
+   ```
+4. Parse the module's front-matter (yq if available; bash shim fallback).
+5. Verify `required_inputs.phases_complete`: each listed phase MUST be
+   `complete` in `~/.autonomous-dev/wizard-state.json`. If any are not,
+   emit `Cannot enter phase NN: requires phase MM to be complete` and write
+   `phases.NN.status="blocked"`.
+6. Verify `required_inputs.config_keys`: each listed key MUST resolve via
+   `has_config_key`. On missing, same blocked-emission as in step 5.
+7. Evaluate `skip_predicate`: if exit 0, emit `skip_consequence` verbatim
+   and write `phases.NN.status="skipped"`.
+8. Evaluate `idempotency_probe`:
+   - `already-complete` → write `phases.NN.status="complete"`, no body run.
+   - `resume-from:<step>` → export `WIZARD_RESUME_STEP=<step>` and run body.
+   - `start-fresh` → run body from step 1.
+9. Snapshot keys listed in `output_state.config_keys_written` to
+   `~/.autonomous-dev/wizard-snapshots/phase-NN-pre-<ISO8601>.json` (mode 0600,
+   directory mode 0700) atomically (tmp + rename); update the
+   `phase-NN-pre.json` symlink/pointer to the latest. Reused by
+   `wizard rollback --phase NN` (SPEC-033-4-04).
+10. Transclude module body (everything after the closing `---`); render the
+    `title` as a banner.
+11. Run the verification block from front-matter.
+12. Write `phases.NN = {status, started_at, completed_at, config_keys_written}`
+    to `wizard-state.json` atomically (tmp + rename).
+13. Emit a structured log line per TDD-033 §10.5 to
+    `~/.autonomous-dev/logs/wizard.log`:
+    `{"phase": NN, "step": "<name>", "status": "<state>", "duration_ms": N}`.
+
+### Migration banner (legacy 10-phase upgraders)
+
+On first orchestrator entry where no NN ∈ {08,11,12,13,14,15,16} has
+`status≠"not-run"` in `wizard-state.json`, emit:
 
 ```
-To get notifications in Discord:
-
-  1. Open your Discord server.
-  2. Go to Server Settings > Integrations > Webhooks.
-  3. Click "New Webhook".
-  4. Choose the channel where you want notifications.
-  5. Copy the webhook URL.
-
-It will look like: https://discord.com/api/webhooks/1234567890/abcdefg...
+====================================================================
+   AMENDMENT-002 phase modules (8, 11–16)
+====================================================================
+Phases 8, 11–16 are NEW in AMENDMENT-002. You may run any single
+phase via `autonomous-dev wizard --phase NN`. Skip predicates honor
+your existing config flags.
+====================================================================
 ```
 
-Ask: "Paste your Discord webhook URL here."
+Suppress on subsequent entries.
 
-### Step 8.2: Configure it
+### Registry and execution order
 
 ```bash
-jq '.notifications.delivery.discord.webhook_url = "<pasted_url>" | .notifications.delivery.default_method = "discord"' ~/.claude/autonomous-dev.json > /tmp/ad-config-tmp.json && mv /tmp/ad-config-tmp.json ~/.claude/autonomous-dev.json
+PHASE_REGISTRY=(08 11 12 13 14 15 16)
+for nn in "${PHASE_REGISTRY[@]}"; do
+  _wizard_run_phase "$nn"
+done
 ```
 
-### Step 8.3: Validate
+### Front-matter parser (bash shim fallback)
 
 ```bash
-autonomous-dev config validate
+parse_front_matter_top_level() {
+  local file="$1" key="$2"
+  awk '
+    /^---$/ { f++; next }
+    f == 1 { print }
+    f == 2 { exit }
+  ' "$file" | grep -E "^${key}:" | sed -E "s/^${key}:[[:space:]]*//; s/^\"(.*)\"\$/\\1/"
+}
 ```
 
-Tell the user: "Discord notifications are configured. You will receive messages for escalations, errors, and daily digests. You can adjust batching, do-not-disturb hours, and fatigue limits in the notifications config section. You can change this at any time."
+For nested keys (`output_state.config_keys_written`), prefer `yq`. The shim
+covers flat top-level keys only.
 
-## Option B: Slack
+### Per-phase modules
 
-### Step 8.1: Create a Slack incoming webhook
+The phase modules themselves live as separate files under `phases/`:
+- `phases/phase-08-chat-channels.md` (Discord/Slack intake)
+- `phases/phase-11-portal-install.md` (web portal, opt-in)
+- `phases/phase-12-ci-setup.md` (CI workflows + secrets + branch protection)
+- `phases/phase-13-request-types.md` (request type catalog + extension hooks)
+- `phases/phase-14-eng-standards.md` (standards bootstrap + meta-reviewer)
+- `phases/phase-15-reviewer-chains.md` (specialist reviewer chains, dry-run)
+- `phases/phase-16-deploy-backends.md` (deploy backends, cred-proxy, firewall)
 
-```
-To get notifications in Slack:
+Each module is self-contained with its own front-matter, body, and eval set.
+The orchestrator never inlines module content; it transcludes at runtime.
 
-  1. Go to https://api.slack.com/apps and create a new app (or use an existing one).
-  2. Under "Incoming Webhooks", activate and create a new webhook.
-  3. Choose the channel where you want notifications.
-  4. Copy the webhook URL.
+<!-- BEGIN-PHASE-17-19-DEFERRAL -->
+================================================================
+Phases 17-19 are deferred to the autonomous-dev-homelab repository.
 
-It will look like: https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXX...
-```
+  - Phase 17 (auth/identity): identity provider integration.
+  - Phase 18 (observability): metrics/traces/log shipping.
+  - Phase 19 (internal portal advanced provisioning): tenant
+    onboarding workflows.
 
-Ask: "Paste your Slack webhook URL here."
+These phases require infrastructure beyond what this wizard
+provisions and are tracked separately.
 
-### Step 8.2: Configure it
+See: https://github.com/pwatsonr/autonomous-dev-homelab
+================================================================
+<!-- END-PHASE-17-19-DEFERRAL -->
 
-```bash
-jq '.notifications.delivery.slack.webhook_url = "<pasted_url>" | .notifications.delivery.default_method = "slack"' ~/.claude/autonomous-dev.json > /tmp/ad-config-tmp.json && mv /tmp/ad-config-tmp.json ~/.claude/autonomous-dev.json
-```
-
-### Step 8.3: Validate
-
-```bash
-autonomous-dev config validate
-```
-
-Tell the user: "Slack notifications are configured. You can change this at any time."
+<!-- END: phase-module orchestrator -->
 
 ---
 
