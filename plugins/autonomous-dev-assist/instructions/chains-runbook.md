@@ -221,3 +221,89 @@ Extensions; do NOT skip the migration or attempt to regress to manifest-v1
   is undefined.
 - Versions: bump the `version` to a new major when migrating, so dependents
   can pin against the new schema.
+
+## 5. Approval flow
+
+The chain approval gate fires when `chains.approval.required_for_prod_egress`
+is `true` (default) AND a chain step's `egress_allowlist` resolves to a host
+classified as production. The chain enters `awaiting-approval` and emits a
+`REQ-NNNNNN` request ID — a six-digit zero-padded token (e.g., `REQ-000042`)
+operators reference in approve/reject commands.
+
+```bash
+# approve a pending request
+chains approve REQ-NNNNNN --comment "rollout per RFC-XYZ"
+
+# reject (with required reason)
+chains reject REQ-NNNNNN --reason "needs security review first"
+```
+
+Both commands write an audit-log entry covered by the HMAC chain in §3.
+Approval transitions `awaiting-approval` → `approved` → `executing`;
+rejection transitions to a terminal `rejected` state.
+
+The approval state-machine and policy semantics are defined in
+TDD-022 §11 Approval State Machine (the same trust-integration model used
+by the deploy framework — see deploy-runbook §2 for the parallel surface).
+
+## 6. Common errors
+
+The HMAC-mismatch and audit-key errors are covered in §3 Audit verification
+(see the error-pattern table there). The remaining six common errors that
+arise during day-to-day chain operation:
+
+| Error                                          | Cause                                                       | Action                                                                                                            |
+|------------------------------------------------|-------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
+| `cycle detected: A -> B -> A`                  | Two plugins consume each other's outputs                    | Run `chains graph` to locate the cycle; remove or split the offending plugin pair (see §2)                        |
+| `manifest schema error: missing 'produces'`    | A plugin upgraded without declaring produces                | Edit the plugin's `.claude-plugin/plugin.json` and add the artifact name; see §4                                   |
+| `manifest schema error: missing 'consumes'`    | A plugin upgraded without declaring consumes                | Edit the plugin's `.claude-plugin/plugin.json` and add the upstream artifact name; see §4                          |
+| `manifest schema error: invalid version`       | A plugin still on the legacy schema                         | Migrate the plugin to manifest-v2 per §4 (do NOT regress to manifest-v1 — the executor rejects the legacy schema) |
+| `approval-gate timeout: REQ-NNNNNN`            | Pending approval expired before operator acted              | Re-trigger the request; ensure on-call coverage; the audit log shows the timeout entry                            |
+| `unknown plugin in chains list`                | A registered plugin's manifest is missing or unreadable     | Re-install the plugin; check filesystem perms on `.claude-plugin/plugin.json` and the plugin install directory    |
+
+If the failure mode does not match any of the six rows above and is not
+covered by §3, it is likely a bug in shipped behavior — see §7 Escalation
+for the file-an-issue-vs-recover-locally decision.
+
+For chain-egress denials specifically (a request blocked because a host
+falls outside the plugin's `egress_allowlist`), the recovery is to update
+the manifest's allowlist via a deliberate, reviewable code change — not a
+runtime override. There is no per-invocation bypass.
+
+### Diagnostic order
+
+When a chain fails to start or fails mid-flight, work through the
+diagnostic order: (1) `chains list` to confirm every participant loaded
+and reports `manifest: v2`; (2) `chains graph` to confirm the DAG is
+acyclic and every artifact has a producer; (3) `chains audit verify` if
+the failure narrative mentions an integrity warning (covered in §3).
+
+Each step takes seconds and rules out an entire class of failure. Skipping
+to the audit verifier without first ruling out a manifest error wastes
+operator time and risks misattributing a load-time error to the audit log.
+
+## 7. Escalation
+
+**File a TDD-022 issue** when the failure is in shipped behavior:
+
+- HMAC-verification false positive (the log was not tampered, yet
+  `chains audit verify` reports a mismatch).
+- Manifest schema validator rejects a valid manifest-v2 document.
+- The chain executor enters an inconsistent state (e.g., a plugin reports
+  as both running and completed simultaneously).
+
+**Recover locally** without filing an issue when the failure is
+operator-fixable:
+
+- Missing `produces` or `consumes` declaration: edit the manifest (§4).
+- Cycle detected: remove or split a plugin (§2).
+- Approval-gate timeout: re-trigger the request (§5).
+
+## 8. See also
+
+- [deploy-runbook.md](./deploy-runbook.md) — the parallel deploy framework runbook (PLAN-026-3 ships this file)
+- [TDD-022 §5 Plugin Manifest Extensions](../../autonomous-dev/docs/tdd/TDD-022-plugin-chaining-engine.md#5-plugin-manifest-extensions)
+- [TDD-022 §11 Approval State Machine](../../autonomous-dev/docs/tdd/TDD-022-plugin-chaining-engine.md#11-approval-state-machine)
+- [TDD-022 §13 Audit Log](../../autonomous-dev/docs/tdd/TDD-022-plugin-chaining-engine.md#13-audit-log)
+- [help/SKILL.md Plugin Chains](../skills/help/SKILL.md#plugin-chains)
+- [config-guide/SKILL.md Section 19 chains](../skills/config-guide/SKILL.md#section-19-chains)
