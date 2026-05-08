@@ -56,7 +56,7 @@ jobs:
     outputs:
       version: ${{ steps.extract.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1 (pinned 2026-05-02)
 
       - id: extract
         name: Extract tag and manifest versions
@@ -85,7 +85,7 @@ jobs:
 
       - name: Upload spend artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # actions/upload-artifact@v4.6.2 (pinned 2026-05-02)
         with:
           name: spend-estimate-${{ github.run_id }}
           path: .github/budget/spend-${{ github.run_id }}.json
@@ -105,7 +105,7 @@ jobs:
     outputs:
       baseline-rate: ${{ steps.baseline.outputs.baseline-rate }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1 (pinned 2026-05-02)
         with:
           fetch-depth: 0
 
@@ -148,7 +148,7 @@ jobs:
     outputs:
       changelog-path: ${{ steps.locate.outputs.path }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1 (pinned 2026-05-02)
         with:
           fetch-depth: 0     # required for git describe --tags and git log <prev>..HEAD
 
@@ -182,7 +182,7 @@ jobs:
 
       - name: Generate changelog with Claude
         if: steps.trust.outputs.is-trusted == 'true'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@c3d45e8e941e1b2ad7b278c57482d9c5bf1f35b3  # anthropics/claude-code-action@v1.0.99 (pinned 2026-05-02)
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: "--attach /tmp/commits.txt --max-turns 5"
@@ -231,14 +231,14 @@ jobs:
 
       - name: Upload spend artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # actions/upload-artifact@v4.6.2 (pinned 2026-05-02)
         with:
           name: spend-estimate-${{ github.run_id }}-changelog
           path: .github/budget/spend-${{ github.run_id }}.json
           retention-days: 90
 
       - name: Upload changelog artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # actions/upload-artifact@v4.6.2 (pinned 2026-05-02)
         with:
           name: changelog-${{ github.ref_name }}
           path: /tmp/changelog.md
@@ -257,10 +257,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1 (pinned 2026-05-02)
 
       - name: Download changelog
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # actions/download-artifact@v4.3.0 (pinned 2026-05-02)
         with:
           name: changelog-${{ github.ref_name }}
           path: /tmp
@@ -276,7 +276,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # softprops/action-gh-release@v2.6.2 (pinned 2026-05-02)
         with:
           tag_name: ${{ github.ref_name }}
           body_path: /tmp/changelog.md
