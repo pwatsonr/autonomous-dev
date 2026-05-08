@@ -26,19 +26,20 @@ if [[ ! -f "${SCHEMA}" ]]; then
   exit 0  # informational
 fi
 
-if ! command -v yq >/dev/null 2>&1; then
-  echo "ERROR: yq not found on PATH; cannot run retroactive validation." >&2
-  exit 0
-fi
-
 if ! command -v python3 >/dev/null 2>&1; then
   echo "ERROR: python3 not found on PATH; cannot run retroactive validation." >&2
   exit 0
 fi
 
-# Probe jsonschema availability
-if ! python3 -c "import jsonschema" >/dev/null 2>&1; then
-  echo "WARNING: python3 jsonschema module not available; running structural check only." >&2
+if command -v yq >/dev/null 2>&1; then
+  HAS_YQ=1
+else
+  HAS_YQ=0
+fi
+
+# Probe jsonschema + yaml availability (python3 fallback path)
+if ! python3 -c "import jsonschema, yaml" >/dev/null 2>&1; then
+  echo "WARNING: python3 jsonschema or PyYAML module not available; running structural check only." >&2
   HAS_JSONSCHEMA=0
 else
   HAS_JSONSCHEMA=1
@@ -56,8 +57,18 @@ for yaml_file in "${TEST_CASES_DIR}"/*.yaml; do
   rel_path="test-cases/$(basename "${yaml_file}")"
   total_files=$((total_files + 1))
 
-  # Extract cases array as JSON
-  cases_json=$(yq -o=json '.cases // []' "${yaml_file}" 2>/dev/null || echo "[]")
+  # Extract cases array as JSON (yq preferred; python3+PyYAML fallback)
+  if [[ "${HAS_YQ}" -eq 1 ]]; then
+    cases_json=$(yq -o=json '.cases // []' "${yaml_file}" 2>/dev/null || echo "[]")
+  else
+    cases_json=$(python3 -c "
+import json, sys, yaml
+with open(sys.argv[1]) as f:
+    doc = yaml.safe_load(f) or {}
+cases = doc.get('cases', []) or []
+print(json.dumps(cases))
+" "${yaml_file}" 2>/dev/null || echo "[]")
+  fi
   case_count=$(echo "${cases_json}" | python3 -c "import json,sys;print(len(json.load(sys.stdin)))" 2>/dev/null || echo 0)
 
   violations_for_file="[]"
