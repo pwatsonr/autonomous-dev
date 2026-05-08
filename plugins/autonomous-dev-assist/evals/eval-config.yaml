@@ -33,6 +33,48 @@ suites:
     description: "Validates the onboarding skill walks new users through setup correctly."
     enabled: true  # 4 cases per TDD-027 §7.2
 
+  # --- New eval suites added under TDD-028 / SPEC-028-1-03 ---
+  chains:
+    file: test-cases/chains-eval.yaml
+    description: "Validates assist answers chain questions correctly (TDD-022 surface)."
+    enabled: true
+    case_minimum: 20
+    negative_minimum: 5
+
+  deploy:
+    file: test-cases/deploy-eval.yaml
+    description: "Validates assist answers deploy questions correctly (TDD-023 surface)."
+    enabled: true
+    case_minimum: 30
+    negative_minimum: 5
+
+  cred-proxy:
+    file: test-cases/cred-proxy-eval.yaml
+    description: "Validates assist answers cred-proxy questions correctly (TDD-024 §7-§10). Security-critical."
+    enabled: true
+    case_minimum: 15
+    negative_minimum: 5
+
+  firewall:
+    file: test-cases/firewall-eval.yaml
+    description: "Validates assist answers firewall questions correctly (TDD-024 §11-§13). Security-critical."
+    enabled: true
+    case_minimum: 15
+    negative_minimum: 5
+
+# ---------------------------------------------------------------------------
+# Default invocation order for `eval all` (TDD-028 §6.3)
+# ---------------------------------------------------------------------------
+default_invocation_order:
+  - help
+  - troubleshoot
+  - config
+  - onboarding
+  - chains
+  - deploy
+  - cred-proxy
+  - firewall
+
 # ---------------------------------------------------------------------------
 # Scoring criteria
 # ---------------------------------------------------------------------------
@@ -88,6 +130,15 @@ thresholds:
 
   # Maximum percentage of individual test cases allowed to fail per suite.
   max_case_failure_pct: 20
+
+  # Per-suite per-suite-score overrides (TDD-028 §6.2 / SPEC-028-1-03 / FR-1538).
+  # Security-critical (cred-proxy, firewall) and high-impact (chains, deploy)
+  # surfaces enforce a stricter 95% per-suite threshold.
+  per_suite_overrides:
+    chains: 95
+    deploy: 95
+    cred-proxy: 95
+    firewall: 95
 
 # ---------------------------------------------------------------------------
 # Runner settings
