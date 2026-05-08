@@ -1,19 +1,45 @@
-name: observe
-# Rename this file to observe.yml to activate the observation cycle workflow.
-# See PRD-017 FR-1711-1714 for the observation runtime contract.
+# Observe — autonomous-dev digest (opt-in)
+#
+# Copy this file into your repo as
+#   .github/workflows/observe.yml
+# Flip `if: false` → `if: true` on the digest job once configured.
+# Configure secret AUTONOMOUS_DEV_OBSERVE_TOKEN in repo settings.
+# See plugins/autonomous-dev/commands/observe.md for usage.
+#
+# Known limitation: marocchino/sticky-pull-request-comment posts to
+# PRs only — the scheduled cron-triggered run will not have a PR to
+# comment on. The action handles this gracefully (no-op on no PR).
+# Operators who want issue-based digests customize the action call
+# after copying.
+
+name: Observe (autonomous-dev digest)
+
 on:
   schedule:
-    - cron: '0 */4 * * *'
+    # Mondays 14:00 UTC. Customize as desired.
+    - cron: '0 14 * * 1'
   workflow_dispatch:
+
 permissions:
   contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
-  observe:
+  digest:
+    if: false  # FLIP TO `true` AFTER CONFIGURING SECRET
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Run observation cycle
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1 (pinned 2026-05-02)
+
+      - name: Generate observability digest
+        run: npx @autonomous-dev/observe digest --window 7d
         env:
-          AUTONOMOUS_DEV_TOKEN: ${{ secrets.AUTONOMOUS_DEV_TOKEN }}
-        run: |
-          echo "autonomous-dev observe: opt-in observation cycle"
+          AUTONOMOUS_DEV_OBSERVE_TOKEN: ${{ secrets.AUTONOMOUS_DEV_OBSERVE_TOKEN }}
+
+      - name: Post sticky comment
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405  # marocchino/sticky-pull-request-comment@v2.9.4 (pinned 2026-05-02)
+        with:
+          path: observe-digest.md
+          header: autonomous-dev-observe
