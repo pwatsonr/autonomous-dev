@@ -72,6 +72,71 @@ Request --> PRD --> review --> TDD --> review --> Plan --> review --> Spec --> r
 
 ---
 
+## Plugin Chains
+
+*Topic:* chains
+
+Plugin chains let one plugin consume the artifacts another plugin emits. The
+chain executor (TDD-022 §1 Plugin Chaining Engine) topologically orders
+chain-aware plugins by their declared `produces`/`consumes` artifact types and
+runs each in a sandboxed worker.
+
+### What chains are
+
+A chain is a directed acyclic graph of plugins where each node declares the
+artifact types it produces and the types it consumes. The chain executor
+(TDD-022 §1 Plugin Chaining Engine) builds the DAG at daemon start, validates
+it for cycles, and dispatches each plugin in topological order. Chains let
+operators compose specialized plugins (a security scanner, a doc generator, a
+deploy planner) without hard-coding the integration in any single plugin.
+
+### The four chain commands
+
+| Command                              | Purpose                                       |
+|--------------------------------------|-----------------------------------------------|
+| `chains list`                        | Enumerate registered chain-aware plugins      |
+| `chains graph`                       | Render the dependency DAG                     |
+| `chains audit verify`                | HMAC-validate the chain audit log             |
+| `chains approve\|reject REQ-NNNNNN`  | Resolve a pending approval gate               |
+
+### The audit log
+
+- Path: `~/.autonomous-dev/chains/audit.log`
+- Integrity: HMAC-chained — each entry's HMAC depends on the previous entry's HMAC.
+- Key custody: env var `CHAINS_AUDIT_KEY` (no rotation command exists in TDD-022 §13).
+- **WARNING: do NOT delete the audit log.** The record is irrecoverable; if
+  you hit a verification failure, see chains-runbook §3 Audit Verification.
+
+### Manifest-v2 fields
+
+Each plugin's `.claude-plugin/plugin.json` may declare three optional fields:
+
+```json
+{
+  "produces": ["findings/security"],
+  "consumes": ["source/code"],
+  "egress_allowlist": ["api.example.com:443"]
+}
+```
+
+See TDD-022 §5 Plugin Manifest Extensions for the full schema.
+
+### When chains pause
+
+| Cause                  | Next step                                                          |
+|------------------------|---------------------------------------------------------------------|
+| Cycle detected         | `chains graph` to find the loop; remove or split offending plugin   |
+| HMAC mismatch          | `chains audit verify --shadow`; do NOT delete the audit log         |
+| Approval pending       | `chains approve REQ-NNNNNN` or `chains reject REQ-NNNNNN`           |
+
+### See also
+
+- [chains-runbook.md](../../instructions/chains-runbook.md) — operator deep-dive
+- [TDD-022 §5 Plugin Manifest Extensions](../../../autonomous-dev/docs/tdd/TDD-022-plugin-chaining-engine.md#5-plugin-manifest-extensions)
+- [TDD-022 §13 Audit Log](../../../autonomous-dev/docs/tdd/TDD-022-plugin-chaining-engine.md#13-audit-log)
+
+---
+
 ## Trust Levels (L0-L3)
 
 Trust levels control how much human approval the system needs. Set per-repository; promote gradually as you build confidence.
