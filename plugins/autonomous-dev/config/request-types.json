@@ -1,0 +1,30 @@
+[
+  {
+    "id": "default",
+    "description": "Standard pipeline (PRD → TDD → plan → code → review → deploy)",
+    "default_cost_cap_usd": 50,
+    "default_trust_threshold": 0.7,
+    "default_reviewers": ["security-reviewer"]
+  },
+  {
+    "id": "hotfix",
+    "description": "Expedited fix path (skip exploration; trim PRD)",
+    "default_cost_cap_usd": 20,
+    "default_trust_threshold": 0.6,
+    "default_reviewers": ["security-reviewer"]
+  },
+  {
+    "id": "exploration",
+    "description": "Discovery / spike (no deploy; lower trust threshold)",
+    "default_cost_cap_usd": 30,
+    "default_trust_threshold": 0.5,
+    "default_reviewers": []
+  },
+  {
+    "id": "refactor",
+    "description": "Refactor-only path (no functional change; standards-aware)",
+    "default_cost_cap_usd": 40,
+    "default_trust_threshold": 0.7,
+    "default_reviewers": ["security-reviewer", "performance-reviewer"]
+  }
+]

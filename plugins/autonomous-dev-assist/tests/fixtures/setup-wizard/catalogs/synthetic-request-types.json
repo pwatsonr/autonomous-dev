@@ -1,0 +1,9 @@
+[
+  {
+    "id": "experimental-fast-path",
+    "description": "Synthetic catalog row for catalog-drivenness regression test",
+    "default_cost_cap_usd": 5,
+    "default_trust_threshold": 0.4,
+    "default_reviewers": []
+  }
+]

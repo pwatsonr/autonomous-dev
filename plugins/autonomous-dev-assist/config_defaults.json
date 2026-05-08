@@ -2,6 +2,11 @@
   "wizard": {
     "phase_08_module_enabled": true,
     "phase_11_module_enabled": true,
+    "phase_12_module_enabled": true,
+    "phase_13_module_enabled": true,
+    "phase_14_module_enabled": true,
+    "phase_15_module_enabled": true,
+    "phase_16_module_enabled": false,
     "ordering_invariants_enforced": true
   }
 }
