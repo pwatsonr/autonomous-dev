@@ -6,10 +6,12 @@
 - **Estimated effort**: 6 hours
 
 ## Description
-Comprehensive unit test suite for the State File Manager, covering all functions from SPEC-002-1-02 and SPEC-002-1-03: atomic writes, schema validation (valid and invalid), orphaned `.tmp` recovery, checkpointing (create, prune, restore), and permission enforcement. The test file is a self-contained bash script using only `jq` -- no external test framework. Minimum 25 test cases as specified in the plan.
+Comprehensive unit test suite for the State File Manager, covering all functions from SPEC-002-1-02 and SPEC-002-1-03: atomic writes, schema validation (valid and invalid), orphaned `.tmp` recovery, checkpointing (create, prune, restore), and permission enforcement. The test file was originally specified as a self-contained bash script using only `jq` -- no external test framework. Minimum 25 test cases as specified in the plan.
+
+**PRD-016 / TDD-031 reconciliation note:** This shell-based unit test surface was retired in the PRD-016 cleanup; no Jest replacement is currently planned. The acceptance criteria below are retained as historical specification of intent.
 
 ## Files to Create/Modify
-- **Path**: `tests/unit/test_state_file_manager.sh`
+- **Path**: a bash test script under `plugins/autonomous-dev/tests/unit/` (originally specified as `test_state_file_manager`; retired per PRD-016 / TDD-031 — see note below)
 - **Action**: Create
 - **Description**: Unit test script for `lib/state/state_file_manager.sh`. Self-contained, produces TAP-like output (test name + PASS/FAIL), returns exit 0 if all pass, exit 1 if any fail.
 
@@ -223,7 +225,7 @@ mutate_fixture() {
 ```
 
 ## Acceptance Criteria
-1. [ ] Test script is executable and runs with `bash tests/unit/test_state_file_manager.sh`
+1. [ ] (Historical — retired per PRD-016 / TDD-031) The test script was originally specified to be executable and runnable directly via `bash`; that bash unit-test surface has been retired and no Jest replacement is currently planned.
 2. [ ] All 28 tests pass on a clean system with `jq` 1.6+ and `bash` 4+
 3. [ ] Each test creates and tears down its own temporary directory (no test pollution)
 4. [ ] Test output clearly shows PASS/FAIL for each test with a descriptive name
@@ -235,6 +237,6 @@ mutate_fixture() {
 
 ## Test Cases
 These are meta-tests (tests about the test suite):
-1. **Test suite runs to completion** -- Execute `bash tests/unit/test_state_file_manager.sh`. Expected: exits 0, prints "28/28 passed".
+1. **Test suite runs to completion** *(Historical — retired per PRD-016 / TDD-031)* -- The original spec called for executing the bash test script; the bash unit-test surface has been retired with no Jest replacement currently planned.
 2. **Test suite catches regressions** -- Introduce a deliberate bug (e.g., remove a required field check from `_validate_state_schema`). Expected: at least one test fails, exit 1.
 3. **Test isolation** -- Run the suite twice in succession. Expected: both runs produce identical results (no stale temp files).

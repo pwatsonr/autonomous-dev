@@ -6,15 +6,17 @@
 - **Estimated effort**: 8 hours
 
 ## Description
-Comprehensive unit test suites for the Event Logger and Request Tracker, covering all functions from SPEC-002-2-01, SPEC-002-2-02, and SPEC-002-2-03. Two test files: one for the Event Logger (15+ tests), one for the Request Tracker (15+ tests). Both are self-contained bash scripts producing TAP-like output. Combined minimum: 30 test cases as specified in PLAN-002-2.
+Comprehensive unit test suites for the Event Logger and Request Tracker, covering all functions from SPEC-002-2-01, SPEC-002-2-02, and SPEC-002-2-03. Two test files were originally specified: one for the Event Logger (15+ tests), one for the Request Tracker (15+ tests), both as self-contained bash scripts producing TAP-like output. Combined minimum: 30 test cases as specified in PLAN-002-2.
+
+**PRD-016 / TDD-031 reconciliation note:** Both bash unit-test surfaces were retired in the PRD-016 cleanup; no Jest replacement is currently planned. The acceptance criteria below are retained as historical specification of intent.
 
 ## Files to Create/Modify
-- **Path**: `tests/unit/test_event_logger.sh`
-- **Action**: Create
+- **Path**: a bash test script under `plugins/autonomous-dev/tests/unit/` (originally specified as `test_event_logger`; retired per PRD-016 / TDD-031)
+- **Action**: Create (historical)
 - **Description**: Unit test script for `lib/state/event_logger.sh`. Tests append, read, torn-write recovery, size guard, and edge cases.
 
-- **Path**: `tests/unit/test_request_tracker.sh`
-- **Action**: Create
+- **Path**: a bash test script under `plugins/autonomous-dev/tests/unit/` (originally specified as `test_request_tracker`; retired per PRD-016 / TDD-031)
+- **Action**: Create (historical)
 - **Description**: Unit test script for `lib/state/request_tracker.sh`. Tests ID generation, discovery, scaffolding, validation, and sanitization.
 
 - **Path**: `tests/fixtures/events_valid.jsonl`
@@ -205,6 +207,6 @@ make_event() {
 
 ## Test Cases
 These are meta-tests:
-1. **Event Logger test suite passes** -- `bash tests/unit/test_event_logger.sh`. Expected: "18/18 passed".
-2. **Request Tracker test suite passes** -- `bash tests/unit/test_request_tracker.sh`. Expected: "17/17 passed".
+1. **Event Logger test suite passes** *(Historical — retired per PRD-016 / TDD-031)* -- The original spec called for executing the bash test script and observing 18/18 passed; the bash unit-test surface has been retired with no Jest replacement currently planned.
+2. **Request Tracker test suite passes** *(Historical — retired per PRD-016 / TDD-031)* -- The original spec called for executing the bash test script and observing 17/17 passed; the bash unit-test surface has been retired with no Jest replacement currently planned.
 3. **Shared harness reusable** -- Both test files source `test_harness.sh` without conflict.

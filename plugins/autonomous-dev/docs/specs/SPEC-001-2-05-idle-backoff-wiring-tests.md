@@ -14,8 +14,8 @@ Implement exponential idle backoff with cap and reset. Replace Plan 1's stub loo
   - **Action**: Modify
   - **Description**: Finalize `idle_backoff_sleep()`, `idle_backoff_reset()`. Replace the stub main loop body with the full operational wiring.
 
-- **Path**: `tests/test_loop_engine.bats`
-  - **Action**: Create
+- **Path**: bats suite at `plugins/autonomous-dev/tests/test_loop_engine` (PRD-016 / TDD-031: bats coverage was retained at this repo-rooted path; the original SPEC cited `tests/test_loop_engine` relative to plugin root)
+  - **Action**: Create / verify
   - **Description**: Unit and integration tests for all Plan 2 functions.
 
 - **Path**: `tests/mock-claude.sh`
@@ -319,7 +319,7 @@ setup_mock_claude() {
 13. [ ] Integration test: mock success -> state updated, cost tracked, crash counter reset
 14. [ ] Integration test: mock failure -> retry count incremented, crash counter incremented
 15. [ ] Integration test: no requests -> idle backoff sleep logged
-16. [ ] All tests pass (`bats tests/test_loop_engine.bats`)
+16. [ ] All tests pass (run via the bats CLI against the suite at `plugins/autonomous-dev/tests/test_loop_engine`; per PRD-016 / TDD-031 the file remains a bats suite — no Jest port currently planned)
 17. [ ] No shellcheck warnings at `--severity=warning` level
 
 ## Test Cases
