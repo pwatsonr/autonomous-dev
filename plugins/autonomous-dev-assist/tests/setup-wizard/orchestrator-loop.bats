@@ -10,9 +10,11 @@ DEFAULTS="${BATS_TEST_DIRNAME}/../../config_defaults.json"
   [ "$(grep -c '<!-- END: phase-module orchestrator -->' "$SKILL")" = "1" ]
 }
 
-@test "O-002 deferral notice anchors present once" {
-  [ "$(grep -c '<!-- BEGIN-PHASE-17-19-DEFERRAL -->' "$SKILL")" = "1" ]
-  [ "$(grep -c '<!-- END-PHASE-17-19-DEFERRAL -->' "$SKILL")" = "1" ]
+@test "O-002 deferral notice anchors present once at line-start" {
+  # Use line-anchored regex: the literal anchor also appears inside an awk
+  # pattern in the emit-once helper and that occurrence must not be counted.
+  [ "$(grep -cE '^<!-- BEGIN-PHASE-17-19-DEFERRAL -->$' "$SKILL")" = "1" ]
+  [ "$(grep -cE '^<!-- END-PHASE-17-19-DEFERRAL -->$' "$SKILL")" = "1" ]
 }
 
 @test "O-003 phase registry literal in fixed order" {
