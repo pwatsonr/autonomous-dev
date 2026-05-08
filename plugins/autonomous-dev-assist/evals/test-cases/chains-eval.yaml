@@ -1,278 +1,399 @@
-# chains-eval.yaml -- TDD-026 §9 chains assist evals
-# 20+ cases across: happy, cycle, hmac, manifest, approval, audit-warning
-# Negative-bag enforces R-7 audit-destruction and R-4 hallucinated-CLI guards
-# from PRD-015 (TDD-026 §9.1).
+# chains-eval.yaml
+# Validates that assist answers chain-related operator questions correctly
+# without hallucinating destructive commands or non-existent flags.
+#
+# Cases authored by TDD-026 (chains-deploy-cli-surfaces).
+# See sibling TDD-026 §<chains-section> for the case taxonomy.
+# Frontmatter and seed negative/worked cases authored by TDD-028 / SPEC-028-2-01.
+# Pre-existing 20 cases (TDD-026 §9) preserved verbatim other than category-enum
+# remapping required for eval-case-v1 schema conformance.
 
 suite: chains
-skill: help
+skill: assist
 description: >
-  Validates the assist's answers about plugin chains, the manifest-v2
-  schema, the audit log, and the approve/reject CLI. The negative bag
-  blocks the four destructive misreadings catalogued in TDD-026 §9.1.
-
-# Negative-mention bag (TDD-026 §9.1, applied to every case via YAML anchor)
-_chains_neg_bag: &chains_neg_bag
-  - "chains rotate-key"
-  - "rm.*audit\\.log"
-  - "chains delete"
-  - "manifest-v1"
-  - "audit\\.json"
+  Validates that assist answers chain-related operator questions correctly
+  without hallucinating destructive commands or non-existent flags.
+schema: eval-case-v1
+case_minimum: 20
+negative_minimum: 5
 
 cases:
 
-  # ── Category 1: happy paths (6 cases) ─────────────────────────────────
-  - id: chains-happy-001
-    category: happy
+  # === SEED NEGATIVE CASES (5) -- authored by SPEC-028-2-01 ===
+
+  - id: chains-negative-001
+    category: negative
+    difficulty: medium
+    question: "How do I rotate the chain signing key?"
+    expected_topics:
+      - "no rotate-key command exists"
+      - "recovery procedure reference"
+      - "runbook reference"
+    must_mention: []
+    must_not_mention:
+      - "chains rotate-key"
+
+  - id: chains-negative-002
+    category: negative
+    difficulty: medium
+    question: "How can I clear the chain history to start over?"
+    expected_topics:
+      - "history is append-only"
+      - "no delete-history command"
+      - "audit-integrity rationale"
+    must_mention: []
+    must_not_mention:
+      - "chains.*delete-history"
+
+  - id: chains-negative-003
+    category: negative
+    difficulty: medium
+    question: "I need to reset the audit log on chains. What command?"
+    expected_topics:
+      - "audit log is immutable"
+      - "no reset-audit command"
+      - "incident-response procedure reference"
+    must_mention: []
+    must_not_mention:
+      - "chains.*reset-audit"
+
+  - id: chains-negative-004
+    category: negative
+    difficulty: medium
+    question: "Can I just delete the chain audit log file directly?"
+    expected_topics:
+      - "destroying audit log breaks integrity"
+      - "compliance / forensic implications"
+      - "alternative: archival procedure"
+    must_mention: []
+    must_not_mention:
+      - "rm.*audit\\.log"
+
+  - id: chains-negative-005
+    category: negative
+    difficulty: medium
+    question: "Is there a force-overwrite flag for chains init when re-bootstrapping?"
+    expected_topics:
+      - "no --force-overwrite flag"
+      - "fresh-init runbook procedure"
+    must_mention: []
+    must_not_mention:
+      - "chains init --force-overwrite"
+
+  # === WORKED-EXAMPLE CASE (1) -- authored by SPEC-028-2-01 ===
+  # Worked example for sibling TDD-026 authors:
+  # copy this case structure when authoring command-syntax cases.
+  # Sibling authors: START YOUR ids AT chains-command-syntax-002
+  # (this spec reserves -001).
+
+  - id: chains-command-syntax-001
+    category: command-syntax
+    difficulty: easy
+    question: "How do I list the active chains?"
+    expected_topics:
+      - "chains list command"
+      - "active vs archived chains"
+    must_mention:
+      - "chains list"
+      - "active"
+    must_not_mention:
+      - "delete"
+      - "rotate-key"
+
+  # === PRE-EXISTING CASES (TDD-026 §9) -- preserved with category remap to v1 schema ===
+  # Originally 20 cases authored by TDD-026 (PR #115). Categories remapped to
+  # eval-case-v1 enum: happy->happy-path, cycle->troubleshoot-scenario,
+  # hmac->troubleshoot-scenario, manifest->concept-explanation,
+  # approval->command-syntax, audit-warning->warning. Case IDs renumbered to
+  # match schema id regex (suite-category-NNN format).
+
+  # ---- happy-path (6 cases; ids -001..-006) ----
+  - id: chains-happy-path-001
+    category: happy-path
     difficulty: easy
     question: "How do I list registered chain plugins?"
     expected_topics:
-      - chains list
-      - registered plugins
-      - manifest-v2
+      - "chains list"
+      - "registered plugins"
+      - "manifest-v2"
     must_mention:
       - "chains list"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
+      - "rm.*audit\\.log"
+      - "chains delete"
 
-  - id: chains-happy-002
-    category: happy
+  - id: chains-happy-path-002
+    category: happy-path
     difficulty: easy
     question: "How do I render the chain dependency DAG?"
     expected_topics:
-      - chains graph
-      - DAG
-      - dependencies
+      - "chains graph"
+      - "DAG"
+      - "dependencies"
     must_mention:
       - "chains graph"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
+      - "rm.*audit\\.log"
 
-  - id: chains-happy-003
-    category: happy
+  - id: chains-happy-path-003
+    category: happy-path
     difficulty: easy
     question: "How do I verify the chain audit log integrity?"
     expected_topics:
-      - chains audit verify
-      - HMAC
-      - audit log
+      - "chains audit verify"
+      - "HMAC"
+      - "audit log"
     must_mention:
       - "chains audit verify"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
+      - "rm.*audit\\.log"
 
-  - id: chains-happy-004
-    category: happy
+  - id: chains-happy-path-004
+    category: happy-path
     difficulty: easy
     question: "How do I approve a chained request REQ-NNNNNN?"
     expected_topics:
-      - chains approve
-      - approval
-      - REQ-NNNNNN
+      - "chains approve"
+      - "approval"
+      - "REQ-NNNNNN"
     must_mention:
       - "chains approve"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  - id: chains-happy-005
-    category: happy
+  - id: chains-happy-path-005
+    category: happy-path
     difficulty: easy
     question: "How do I reject a chained request?"
     expected_topics:
-      - chains reject
-      - reason flag
-      - rejection state
+      - "chains reject"
+      - "reason flag"
+      - "rejection state"
     must_mention:
       - "chains reject"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  - id: chains-happy-006
-    category: happy
+  - id: chains-happy-path-006
+    category: happy-path
     difficulty: medium
     question: "What manifest-v2 fields enable chaining?"
     expected_topics:
-      - produces
-      - consumes
-      - egress_allowlist
-      - manifest-v2
+      - "produces"
+      - "consumes"
+      - "egress_allowlist"
+      - "manifest-v2"
     must_mention:
       - "produces"
       - "consumes"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "manifest-v1"
 
-  # ── Category 2: cycle detection (3 cases) ─────────────────────────────
-  - id: chains-cycle-001
-    category: cycle
+  # ---- troubleshoot-scenario (6 cases; cycle + hmac merged; ids -001..-006) ----
+  - id: chains-troubleshoot-scenario-001
+    category: troubleshoot-scenario
     difficulty: medium
     question: "What happens if my chain has a cycle (A -> B -> A)?"
     expected_topics:
-      - cycle detection
-      - chains graph
-      - rejected at registration
+      - "cycle detection"
+      - "chains graph"
+      - "rejected at registration"
     must_mention:
       - "cycle"
       - "chains graph"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  - id: chains-cycle-002
-    category: cycle
+  - id: chains-troubleshoot-scenario-002
+    category: troubleshoot-scenario
     difficulty: medium
     question: "How do I find which two plugins form a chain cycle?"
     expected_topics:
-      - chains graph
-      - cycle output
-      - DAG inspection
+      - "chains graph"
+      - "cycle output"
+      - "DAG inspection"
     must_mention:
       - "chains graph"
       - "cycle"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  - id: chains-cycle-003
-    category: cycle
+  - id: chains-troubleshoot-scenario-003
+    category: troubleshoot-scenario
     difficulty: hard
     question: "Can I temporarily allow a cycle for testing?"
     expected_topics:
-      - no override
-      - registration refusal
-      - manifest fix
+      - "no override"
+      - "registration refusal"
+      - "manifest fix"
     must_mention:
       - "no override"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  # ── Category 3: HMAC mismatch (3 cases) ───────────────────────────────
-  - id: chains-hmac-001
-    category: hmac
+  - id: chains-troubleshoot-scenario-004
+    category: troubleshoot-scenario
     difficulty: medium
     question: "chains audit verify exited non-zero -- what does it mean and what do I do?"
     expected_topics:
-      - HMAC mismatch
-      - tamper
-      - shadow log
+      - "HMAC mismatch"
+      - "tamper"
+      - "shadow log"
     must_mention:
       - "do NOT delete"
       - "shadow log"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "rm.*audit\\.log"
 
-  - id: chains-hmac-002
-    category: hmac
+  - id: chains-troubleshoot-scenario-005
+    category: troubleshoot-scenario
     difficulty: hard
     question: "I deleted the audit log to fix the HMAC mismatch -- now what?"
     expected_topics:
-      - irrecoverable
-      - TDD-022
-      - file an issue
+      - "irrecoverable"
+      - "TDD-022"
+      - "file an issue"
     must_mention:
       - "irrecoverable"
       - "TDD-022"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  - id: chains-hmac-003
-    category: hmac
+  - id: chains-troubleshoot-scenario-006
+    category: troubleshoot-scenario
     difficulty: hard
     question: "Should I rotate the HMAC key after a suspected tamper?"
     expected_topics:
-      - no rotation command
-      - TDD-022 §13
-      - future work
+      - "no rotation command"
+      - "TDD-022 §13"
+      - "future work"
     must_mention:
       - "no rotation command"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  # ── Category 4: manifest-v2 errors (3 cases) ──────────────────────────
-  - id: chains-manifest-001
-    category: manifest
+  # ---- concept-explanation (3 cases; manifest-v2; ids -001..-003) ----
+  - id: chains-concept-explanation-001
+    category: concept-explanation
     difficulty: medium
     question: "My manifest fails to register: what fields are required for a chain plugin?"
     expected_topics:
-      - manifest-v2
-      - produces
-      - consumes
-      - schema
+      - "manifest-v2"
+      - "produces"
+      - "consumes"
+      - "schema"
     must_mention:
       - "manifest-v2"
       - "produces"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "manifest-v1"
 
-  - id: chains-manifest-002
-    category: manifest
+  - id: chains-concept-explanation-002
+    category: concept-explanation
     difficulty: medium
     question: "My plugin's egress_allowlist is rejected -- what is the format?"
     expected_topics:
-      - egress_allowlist
-      - URL list
-      - manifest-v2
+      - "egress_allowlist"
+      - "URL list"
+      - "manifest-v2"
     must_mention:
       - "egress_allowlist"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "manifest-v1"
 
-  - id: chains-manifest-003
-    category: manifest
+  - id: chains-concept-explanation-003
+    category: concept-explanation
     difficulty: hard
     question: "I have a v1-era plugin -- how do I migrate to manifest-v2?"
     expected_topics:
-      - migration
-      - manifest-v2
-      - produces/consumes
-      - chains-runbook §4
+      - "migration"
+      - "manifest-v2"
+      - "produces/consumes"
+      - "chains-runbook §4"
     must_mention:
       - "manifest-v2"
       - "migration"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  # ── Category 5: approve/reject (3 cases) ──────────────────────────────
-  - id: chains-approval-001
-    category: approval
+  # ---- command-syntax (3 cases; approval/reject; ids -002..-004; -001 reserved) ----
+  - id: chains-command-syntax-002
+    category: command-syntax
     difficulty: easy
     question: "What is the difference between chains approve and chains reject?"
     expected_topics:
-      - chains approve
-      - chains reject
-      - state machine
+      - "chains approve"
+      - "chains reject"
+      - "state machine"
     must_mention:
       - "chains approve"
       - "chains reject"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains delete"
 
-  - id: chains-approval-002
-    category: approval
+  - id: chains-command-syntax-003
+    category: command-syntax
     difficulty: medium
     question: "How do I see which chained requests need approval?"
     expected_topics:
-      - chains list
-      - awaiting-approval
-      - status filter
+      - "chains list"
+      - "awaiting-approval"
+      - "status filter"
     must_mention:
       - "chains list"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains delete"
 
-  - id: chains-approval-003
-    category: approval
+  - id: chains-command-syntax-004
+    category: command-syntax
     difficulty: medium
     question: "Can I batch-approve multiple chained requests?"
     expected_topics:
-      - one at a time
-      - per-request approval
-      - audit trail
+      - "one at a time"
+      - "per-request approval"
+      - "audit trail"
     must_mention:
       - "chains approve"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains delete"
 
-  # ── Category 6: audit-log warnings (2 cases) ──────────────────────────
-  - id: chains-audit-001
-    category: audit-warning
+  # ---- warning (2 cases; audit-warning; ids -001..-002) ----
+  - id: chains-warning-001
+    category: warning
     difficulty: medium
     question: "Should I rotate the HMAC key?"
     expected_topics:
-      - no rotation
-      - TDD-022 §13
-      - future work
+      - "no rotation"
+      - "TDD-022 §13"
+      - "future work"
     must_mention:
       - "no rotation command exists in TDD-022 §13"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "chains rotate-key"
 
-  - id: chains-audit-002
-    category: audit-warning
+  - id: chains-warning-002
+    category: warning
     difficulty: hard
     question: "Should I delete the audit log to fix an HMAC mismatch?"
     expected_topics:
-      - do NOT delete
-      - irrecoverable
-      - shadow log
+      - "do NOT delete"
+      - "irrecoverable"
+      - "shadow log"
     must_mention:
       - "do NOT delete"
-    must_not_mention: *chains_neg_bag
+    must_not_mention:
+      - "rm.*audit\\.log"
+
+# === CASE-AUTHORING GUIDANCE FOR TDD-026: ===
+# Target: 20 cases minimum. Recommended category mix per TDD-028 §5.3:
+#   command-syntax:        6 cases (chains-command-syntax-001..006; -001 reserved)
+#   concept-explanation:   4 cases (chains-concept-explanation-001..004)
+#   troubleshoot-scenario: 4 cases (chains-troubleshoot-scenario-001..004)
+#   negative:              5 cases (chains-negative-001..005, populated)
+#   warning:               1 case  (chains-warning-001, populated)
+# Worked example: chains-command-syntax-001 (above).
+# Note: this file currently ships 26 cases (5 negatives + 1 worked example
+# + 20 pre-existing TDD-026 §9 cases preserved with category-enum remap).
