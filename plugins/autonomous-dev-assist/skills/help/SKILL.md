@@ -137,6 +137,78 @@ See TDD-022 §5 Plugin Manifest Extensions for the full schema.
 
 ---
 
+## Deploy Framework
+
+*Topic:* deploy
+
+The deploy framework ships built artifacts to a backend (cloud or k8s). It is
+distinct from the daemon document-review pipeline; see TDD-023 §1 Deployment
+Backend Framework Core.
+
+### What the deploy framework is
+
+The deploy framework consumes a built artifact (container image, bundle, or
+manifest) and ships it to a registered backend (GCP, AWS, Azure, k8s) via the
+deploy CLI. It is the post-pipeline ship phase, distinct from the daemon
+document pipeline that produces and reviews PRDs/TDDs/Plans/Specs/Code. Each
+deploy is tracked through a four-state approval state machine, gated by
+per-environment cost caps, and observed by HealthMonitor for SLA regression.
+
+### The seven deploy commands
+
+| Command                                   | Purpose                                       |
+|-------------------------------------------|-----------------------------------------------|
+| `deploy backends list`                    | Enumerate registered backends                 |
+| `deploy backends describe <name>`         | Show backend capabilities and config schema   |
+| `deploy plan REQ-NNNNNN [--env <e>]`      | Stage a deploy plan; populates the ledger     |
+| `deploy approve REQ-NNNNNN`               | Move from awaiting-approval to approved       |
+| `deploy reject REQ-NNNNNN [--reason]`     | Reject a pending plan                         |
+| `deploy logs REQ-NNNNNN`                  | Stream execution and HealthMonitor output     |
+| `deploy cost REQ-NNNNNN`                  | Show ledger entries for the request           |
+| `deploy estimate --env <e> --backend <b>` | Pre-plan cost estimate                        |
+
+### The approval state machine
+
+```
+   pending ──> awaiting-approval ──> approved ──> executing ──> completed
+                       │                                          └─> failed
+                       └─────────────> rejected
+```
+
+Every environment with `is_prod: true` traverses `awaiting-approval` and
+requires human approval **regardless of trust level**. There is no bypass;
+trust elevation does not skip the gate (TDD-023 §11 Trust Integration).
+
+### The cost-cap ledger
+
+- Path: `~/.autonomous-dev/deploy/ledger.json`
+- Contract: append-only, Stripe-style. **do NOT edit by hand.**
+- Recovery: use `deploy ledger reset` (see deploy-runbook §3).
+- Trip behavior: when running tally would exceed `cost_cap_usd`, the plan
+  aborts with status `cost-cap-tripped`.
+
+### The HealthMonitor
+
+Post-deploy SLA tracking is reported via `deploy logs REQ-NNNNNN --health`.
+For the rollback decision tree see deploy-runbook §5.
+
+### When deploys stall
+
+| Cause                  | Recovery hint                                                            |
+|------------------------|---------------------------------------------------------------------------|
+| `awaiting-approval`    | `deploy approve REQ-NNNNNN` (prod requires this regardless of trust level) |
+| `cost-cap-tripped`     | See deploy-runbook §3 Cost-cap trip recovery                              |
+| Backend not registered | `claude plugin install autonomous-dev-deploy-<backend>`                   |
+
+### See also
+
+- [deploy-runbook.md](../../instructions/deploy-runbook.md) — operator deep-dive
+- [TDD-023 §5 Deploy CLI](../../../autonomous-dev/docs/tdd/TDD-023-deployment-backend-framework-core.md#5-deploy-cli)
+- [TDD-023 §11 Trust Integration](../../../autonomous-dev/docs/tdd/TDD-023-deployment-backend-framework-core.md#11-trust-integration)
+- [TDD-023 §14 Ledger Reset](../../../autonomous-dev/docs/tdd/TDD-023-deployment-backend-framework-core.md#14-ledger-reset)
+
+---
+
 ## Trust Levels (L0-L3)
 
 Trust levels control how much human approval the system needs. Set per-repository; promote gradually as you build confidence.
