@@ -1,13 +1,13 @@
-# SPEC-017-4-05: Vitest Unit Tests + Operator Documentation
+# SPEC-017-4-05: Jest Unit Tests + Operator Documentation
 
 ## Metadata
 - **Parent Plan**: PLAN-017-4
-- **Tasks Covered**: Task 12 (vitest unit tests for aggregation, HMAC verification, two-admin override), Task 13 (`docs/operators/budget-gate.md` operator documentation)
+- **Tasks Covered**: Task 12 (jest unit tests for aggregation, HMAC verification, two-admin override), Task 13 (`docs/operators/budget-gate.md` operator documentation)
 - **Estimated effort**: 6 hours
 - **Future location**: `/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/specs/SPEC-017-4-05-tests-operator-docs.md`
 
 ## Description
-Lock in correctness with vitest unit tests for the three CI scripts produced by SPEC-017-4-01/02/03 (`verify-spend-artifact.js`, `aggregate-spend.js`, `verify-two-admin-override.js`) and the canonical-JSON helper. Coverage target ≥90% on the four script files. Provide fixture artifacts that exercise every important branch: valid signed, tampered, unsigned, previous-month, >32-day-old, multi-admin distinct/same/same-email/non-admin scenarios. Tests run in CI on every PR and block merge on regression.
+Lock in correctness with jest unit tests for the three CI scripts produced by SPEC-017-4-01/02/03 (`verify-spend-artifact.js`, `aggregate-spend.js`, `verify-two-admin-override.js`) and the canonical-JSON helper. Coverage target ≥90% on the four script files. Provide fixture artifacts that exercise every important branch: valid signed, tampered, unsigned, previous-month, >32-day-old, multi-admin distinct/same/same-email/non-admin scenarios. Tests run in CI on every PR and block merge on regression.
 
 In parallel, deliver `docs/operators/budget-gate.md`: the single document an operator reads to understand what the gate does, how to apply overrides, how to rotate the HMAC key, and how to read the workflow summary. ≤200 lines, worked examples for every threshold, linked from `docs/operators/README.md`.
 
@@ -29,8 +29,8 @@ In parallel, deliver `docs/operators/budget-gate.md`: the single document an ope
 | `tests/ci/fixtures/admin-responses/null-email.json` | Create | One admin's `users/{login}` returns `email: null`. |
 | `docs/operators/budget-gate.md` | Create | Operator documentation; ≤200 lines. |
 | `docs/operators/README.md` | Modify | Add link to `budget-gate.md` in the index. |
-| `package.json` | Modify | Add `vitest` to devDependencies if not present; add `test:ci` script. |
-| `vitest.config.ts` | Modify or Create | Include `tests/ci/**/*.test.ts` and configure coverage to track the four script files. |
+| `package.json` | Modify | Add `jest` to devDependencies if not present; add `test:ci` script. |
+| `jest.config.ts` | Modify or Create | Include `tests/ci/**/*.test.ts` and configure coverage to track the four script files. |
 
 ## Implementation Details
 
@@ -38,7 +38,7 @@ In parallel, deliver `docs/operators/budget-gate.md`: the single document an ope
 
 ```ts
 // tests/ci/budget-gate.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'jest';
 import { canonicalize } from '../../scripts/ci/canonical-json.js';
 // ... imports for verify and aggregate as testable modules ...
 
@@ -84,7 +84,7 @@ describe('aggregate-spend', () => {
 
 ```ts
 // tests/ci/two-admin-override.test.ts
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'jest';
 
 describe('verify-two-admin-override', () => {
   it('exits 0 with two distinct admins and distinct emails', () => { /* fixture: two-distinct-admins.json */ });
@@ -100,16 +100,16 @@ describe('verify-two-admin-override', () => {
 ### Mocking strategy
 
 - `verify-spend-artifact` and `aggregate-spend` should be importable as modules (export their core logic). The thin CLI wrapper (`process.argv` parsing, `process.exit`) can be untested or smoke-tested via `child_process.spawnSync`.
-- `aggregate-spend`'s `gh api` calls should go through a thin `httpClient` interface that tests can mock with vitest's `vi.fn()`. Alternatively, intercept via `vi.spyOn(global, 'fetch')` if the implementation uses `fetch`.
-- `verify-two-admin-override` mocks via `vi.mock('node:https')` or by injecting an `httpClient`. Prefer dependency injection for cleaner tests.
-- Time-dependent tests (32-day age cap, current month) use `vi.useFakeTimers()` with `vi.setSystemTime(new Date('2026-04-29T00:00:00Z'))` so fixtures can be authored with stable absolute timestamps.
+- `aggregate-spend`'s `gh api` calls should go through a thin `httpClient` interface that tests can mock with jest's `jest.fn()`. Alternatively, intercept via `jest.spyOn(global, 'fetch')` if the implementation uses `fetch`.
+- `verify-two-admin-override` mocks via `jest.mock('node:https')` or by injecting an `httpClient`. Prefer dependency injection for cleaner tests.
+- Time-dependent tests (32-day age cap, current month) use `jest.useFakeTimers()` with `jest.setSystemTime(new Date('2026-04-29T00:00:00Z'))` so fixtures can be authored with stable absolute timestamps.
 
 ### Coverage configuration
 
-In `vitest.config.ts`:
+In `jest.config.ts`:
 
 ```ts
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from 'jest/config';
 
 export default defineConfig({
   test: {
@@ -134,7 +134,7 @@ export default defineConfig({
 });
 ```
 
-CI must invoke `npx vitest run --coverage` and fail if thresholds are not met.
+CI must invoke `npx jest run --coverage` and fail if thresholds are not met.
 
 ### `docs/operators/budget-gate.md` outline
 
@@ -191,14 +191,14 @@ Update `docs/operators/README.md` to add a link to `budget-gate.md` in the opera
 ## Acceptance Criteria
 
 ### Tests (Task 12)
-- [ ] `tests/ci/budget-gate.test.ts` and `tests/ci/two-admin-override.test.ts` exist and `npx vitest run` exits 0.
+- [ ] `tests/ci/budget-gate.test.ts` and `tests/ci/two-admin-override.test.ts` exist and `npx jest run` exits 0.
 - [ ] Coverage report (text and lcov) shows ≥90% lines, branches, functions, statements on each of the four script files.
 - [ ] Fixtures cover at minimum: 1 valid signed current-month artifact, 1 tampered artifact, 1 unsigned artifact, 1 previous-month artifact, 1 >32-day-old artifact (boundary: exactly 32 days old → excluded; 31 days old → included).
 - [ ] Two-admin override fixtures cover: 2 distinct admins distinct emails (pass), 1 admin labeling twice (fail), 2 admins same verified email (fail), labeler not in admin set (fail), admin with `email: null` (fail), 5xx retry (3 attempts then succeed).
-- [ ] Time-dependent tests use `vi.useFakeTimers()` with a fixed `vi.setSystemTime()` so they pass deterministically regardless of when CI runs.
+- [ ] Time-dependent tests use `jest.useFakeTimers()` with a fixed `jest.setSystemTime()` so they pass deterministically regardless of when CI runs.
 - [ ] Aggregator perf test asserts 500 synthetic artifacts complete in <60s on the CI runner. May be marked `it.concurrent` or gated behind an env flag if it slows local development.
-- [ ] HMAC tests verify `crypto.timingSafeEqual` is used (assert via `vi.spyOn(crypto, 'timingSafeEqual')`).
-- [ ] Test execution is wired into CI: `package.json` contains a `test:ci` script (or equivalent) that runs `vitest run --coverage` and the CI workflow invokes it on every PR.
+- [ ] HMAC tests verify `crypto.timingSafeEqual` is used (assert via `jest.spyOn(crypto, 'timingSafeEqual')`).
+- [ ] Test execution is wired into CI: `package.json` contains a `test:ci` script (or equivalent) that runs `jest run --coverage` and the CI workflow invokes it on every PR.
 
 ### Documentation (Task 13)
 - [ ] `docs/operators/budget-gate.md` exists at the documented path.
@@ -213,7 +213,7 @@ Update `docs/operators/README.md` to add a link to `budget-gate.md` in the opera
 ## Dependencies
 
 - Depends on SPEC-017-4-01 (canonical-json, verify-spend-artifact), SPEC-017-4-02 (aggregate-spend), SPEC-017-4-03 (verify-two-admin-override). Tests cannot exist without their subjects.
-- `vitest` and `@vitest/coverage-v8` packages added to devDependencies (or already present from another plugin spec — check before duplicating).
+- `jest` and `@jest/coverage-v8` packages added to devDependencies (or already present from another plugin spec — check before duplicating).
 - Node 20+ for the `node:` protocol imports.
 - `docs/operators/README.md` exists (created by an earlier PLAN-017 spec or the plugin's baseline). If it does not, this spec creates a minimal version with the new link.
 

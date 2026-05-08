@@ -27,7 +27,7 @@ A schema-validation unit test for the `hook-manifest-v1.json` schema (SPEC-019-1
 
 ### Test Runner
 
-The repo uses `vitest` (per PLAN-001-1). All test files use `describe` / `it` / `expect` with no global setup beyond what's in `vitest.config.ts`. Each file's tests run in isolated temp directories created in `beforeEach` and removed in `afterEach`.
+The repo uses `jest` (per PLAN-001-1). All test files use `describe` / `it` / `expect` with no global setup beyond what's in `jest.config.ts`. Each file's tests run in isolated temp directories created in `beforeEach` and removed in `afterEach`.
 
 ### `tests/helpers/plugin-fixtures.ts`
 
@@ -71,7 +71,7 @@ Uses Node's `JSON.parse` on the schema file plus a tiny home-grown match helper 
 - `scan skips files at top level (not directories)`
 - `scan skips hidden directories (name starts with .)`
 - `scan with 50 fixture plugins completes in < 100ms (perf assertion)` — generated programmatically in `beforeAll`
-- `scan does NOT require/execute any plugin entry-point file` — `vi.spyOn(Module, 'require')` (or equivalent) shows zero calls into fixture entry-points
+- `scan does NOT require/execute any plugin entry-point file` — `jest.spyOn(Module, 'require')` (or equivalent) shows zero calls into fixture entry-points
 - `parseManifest on bad JSON returns one PARSE_ERROR`
 - `validateManifest delegates to injected validator` — uses a mock validator returning a known error list and asserts identity
 - `path canonicalization rejects symlink escape` — create a symlink in temp dir pointing to `..`, assert the resulting candidate is skipped with IO_ERROR
@@ -132,8 +132,8 @@ The test must be deterministic: no `sleep N` waits — every wait is a poll-with
 
 ## Acceptance Criteria
 
-- [ ] All 5 test files exist and `vitest run` completes with zero failures.
-- [ ] Coverage report (`vitest run --coverage`) shows ≥ 90% line coverage on `src/hooks/discovery.ts`, `src/hooks/registry.ts`, `src/hooks/executor.ts`.
+- [ ] All 5 test files exist and `jest run` completes with zero failures.
+- [ ] Coverage report (`jest run --coverage`) shows ≥ 90% line coverage on `src/hooks/discovery.ts`, `src/hooks/registry.ts`, `src/hooks/executor.ts`.
 - [ ] No test reads or writes `~/.claude/plugins/` or `~/.autonomous-dev/` outside of the integration test's spawned daemon (which uses an env-var-overridden plugin dir; the socket path may still be the canonical one but the daemon must clean up its socket on shutdown).
 - [ ] Every test cleans up its temp directory in `afterEach`/`afterAll`. No test pollutes another's state.
 - [ ] The 50-plugin perf test in `test-discovery.test.ts` passes with `<100ms` p95 over 5 runs on local SSD; the test reports the actual ms in its output for visibility.
@@ -143,13 +143,13 @@ The test must be deterministic: no `sleep N` waits — every wait is a poll-with
 - [ ] Schema tests in `test-schema.test.ts` cover all 7 documented invariants (parses, accepts example, rejects 5 invalid shapes).
 - [ ] No use of AJV in any test file (deferred to PLAN-019-2). The schema-validator helper is < 50 lines.
 - [ ] Test fixtures from SPEC-019-1-02 (`simple`, `multi-hook`, `malformed`) are referenced by both unit and integration tests; no duplicate fixture trees.
-- [ ] `vitest run --reporter=verbose` shows descriptive test names that map 1:1 to the bullet lists in the Implementation Details section above.
+- [ ] `jest run --reporter=verbose` shows descriptive test names that map 1:1 to the bullet lists in the Implementation Details section above.
 - [ ] Linting (`npm run lint`) and type-check (`npm run typecheck`) pass against all new test files.
 
 ## Dependencies
 
 - SPEC-019-1-01, SPEC-019-1-02, SPEC-019-1-03, SPEC-019-1-04 — all consumed.
-- `vitest` (already in repo per PLAN-001-1).
+- `jest` (already in repo per PLAN-001-1).
 - Node ≥ 18 (`fs.mkdtemp`, `fs.rm` recursive).
 - Fixture plugins from SPEC-019-1-02 are required to exist on disk before these tests run.
 - No new npm dev-dependencies introduced.
@@ -160,5 +160,5 @@ The test must be deterministic: no `sleep N` waits — every wait is a poll-with
 - The 50-plugin perf test is the only test that may be marked `.skipIf(process.env.CI === 'true')` if CI hardware is unreliable; the perf budget is informational on shared CI runners but enforced on the maintainer's local SSD per PLAN-019-1's risk register.
 - Spawning the daemon in the integration test requires careful socket cleanup: the test's `afterAll` must `unlinkSync('~/.autonomous-dev/daemon.sock')` if the daemon failed to clean up on its own. This is a known race during test teardown.
 - The integration test deliberately exercises the CLI path (`autonomous-dev plugin list/reload` as child processes) rather than calling the IPC client in-process, because the CLI is the operator-facing surface and any regression there is more important to catch than a silent IPC contract change.
-- If `vitest`'s parallelism causes socket-path collisions across test files, set `test.fileParallelism: false` for `tests/integration/` only; unit tests can stay parallel.
+- If `jest`'s parallelism causes socket-path collisions across test files, set `test.fileParallelism: false` for `tests/integration/` only; unit tests can stay parallel.
 - Future plans (PLAN-019-2/3/4) will extend this suite. The structure here (one file per class + one integration scenario) is the template they should follow.

@@ -6,7 +6,7 @@
 - **Estimated effort**: 6 hours
 
 ## Description
-Provide automated test coverage for the routing layer (SPEC-013-3-01), the HTMX-aware rendering helpers (SPEC-013-3-02), and the layout/fragment templates (SPEC-013-3-03). Tests run under `vitest` (project default), use `app.fetch(new Request(...))` for end-to-end route assertions (no live network), and use Hono's testing utilities where appropriate. Snapshot tests cover all fragments + layout. Header-driven tests prove that fragment vs. full-page selection is correct across the documented HTMX header matrix. Heartbeat reads are tested via a temp directory and `XDG_STATE_HOME`-style env override.
+Provide automated test coverage for the routing layer (SPEC-013-3-01), the HTMX-aware rendering helpers (SPEC-013-3-02), and the layout/fragment templates (SPEC-013-3-03). Tests run under `jest` (project default), use `app.fetch(new Request(...))` for end-to-end route assertions (no live network), and use Hono's testing utilities where appropriate. Snapshot tests cover all fragments + layout. Header-driven tests prove that fragment vs. full-page selection is correct across the documented HTMX header matrix. Heartbeat reads are tested via a temp directory and `XDG_STATE_HOME`-style env override.
 
 ## Files to Create/Modify
 
@@ -35,14 +35,14 @@ export function buildTestApp(opts?: { daemonStatus?: DaemonStatus }): Hono {
   app.notFound(notFound);
   app.onError(serverError);
   if (opts?.daemonStatus) {
-    vi.spyOn(daemonModule, "readDaemonStatus").mockResolvedValue(opts.daemonStatus);
+    jest.spyOn(daemonModule, "readDaemonStatus").mockResolvedValue(opts.daemonStatus);
   }
   return app;
 }
 ```
 
 - MUST NOT bind a TCP port. Tests dispatch via `app.fetch(req)`.
-- Tests MUST clean up `vi.restoreAllMocks()` in `afterEach`.
+- Tests MUST clean up `jest.restoreAllMocks()` in `afterEach`.
 
 ### Route Registration Test (`registration.test.ts`)
 
@@ -124,11 +124,11 @@ Run the following matrix against `GET /repo/{repo}/request/{id}`:
 
 - Layout: render `BaseLayout` with `activePath="/"` and a `<p>hello</p>` child. Snapshot the string output.
 - Each fragment rendered with a stable, hand-crafted props object (no `Date.now()`, no random IDs). Use `toMatchInlineSnapshot()` to keep diffs reviewable in PRs.
-- Snapshots MUST be regenerated only via `vitest -u`; CI runs without `-u` and fails on drift.
+- Snapshots MUST be regenerated only via `jest -u`; CI runs without `-u` and fails on drift.
 
 ## Acceptance Criteria
 
-- [ ] `vitest run` passes locally and in CI with zero skipped tests
+- [ ] `jest run` passes locally and in CI with zero skipped tests
 - [ ] Route registration table (13 cases) all pass; failures pinpoint the offending route
 - [ ] `request-detail` validation matrix (9 cases) all pass
 - [ ] `isHtmxRequest` matrix (9 cases) all pass
@@ -139,11 +139,11 @@ Run the following matrix against `GET /repo/{repo}/request/{id}`:
 - [ ] No test creates real network sockets (verified by ensuring no `app.listen`/`serve` call in `tests/`)
 - [ ] No test depends on the user's actual `~/.autonomous-dev/heartbeat.json` (verified by env override usage)
 - [ ] Test runtime under 5 seconds total on a typical dev machine (no real timers, no real I/O outside tmpdirs)
-- [ ] `vitest -u` does not produce any unexpected snapshot churn after a clean run
+- [ ] `jest -u` does not produce any unexpected snapshot churn after a clean run
 
 ## Dependencies
 
-- `vitest` (already on the toolchain).
+- `jest` (already on the toolchain).
 - `tmp` or built-in `node:fs.mkdtemp` for tmpdir creation.
 - The `AUTONOMOUS_DEV_STATE_DIR` env override MUST be added to `server/lib/daemon-status.ts` (small change to SPEC-013-3-03's reader) so tests do not pollute the user's real home directory. If the SPEC-013-3-03 implementation is already merged without this hook, add it as a one-line patch and note the cross-spec change in the PR description.
 - All artifacts produced by SPEC-013-3-01, SPEC-013-3-02, SPEC-013-3-03.
@@ -152,5 +152,5 @@ Run the following matrix against `GET /repo/{repo}/request/{id}`:
 
 - The Playwright "browser snapshot" line item in the source plan's Test Plan is intentionally NOT in scope here — it belongs alongside the static-asset/CSS work in PLAN-013-4 where the visual rendering is meaningful. This spec covers only HTML/text-level assertions.
 - Inline snapshots are preferred over external `__snapshots__` files for fragments because diff review during PRs is cleaner. Layout snapshot is large enough to warrant an external file.
-- Tests MUST avoid timing flakiness: any time-based assertion MUST stub `Date.now()` (vitest fake timers) rather than relying on wall-clock comparisons.
+- Tests MUST avoid timing flakiness: any time-based assertion MUST stub `Date.now()` (jest fake timers) rather than relying on wall-clock comparisons.
 - The state-dir env override is a minor backdoor introduced solely for testability; production code reads it once at module load. Future security review (PLAN-014) will confirm the override is not honored when running under a daemon-managed UID.
