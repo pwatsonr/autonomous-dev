@@ -2,7 +2,7 @@
 
 **Parent PRD**: [PRD-016 Test-Suite Stabilization](../prd/PRD-016-test-suite-stabilization.md)
 **Parent TDD**: [TDD-031 SPEC Reconciliation](../tdd/TDD-031-spec-reconciliation-path-vitest-bats.md)
-**Status**: In progress
+**Status**: PLAN-031-4 closeout (verification gate + CI step landed). PLAN-031-1/2/3 sweep coverage is partial: PRs #95 (path + vitest, ~5 SPECs) and #97 (bats, 5 SPECs) merged a focused subset. Residual drift in the broader corpus remains and is now visible in CI via the `spec-reconciliation` step (it intentionally fires red on the production tree). Reconciling the residual is tracked as PRD-016 follow-up work; the gate prevents NEW drift in the meantime.
 
 ## Preamble
 
@@ -30,12 +30,75 @@ for the PR; reviewers spot-check rows rather than every diff.
 
 ### Verification log (PLAN-031-4 task 2)
 
-TBD — populated when verification script self-tests run.
+Five paired self-tests for `scripts/verify-spec-reconciliation.sh`. Target SPEC
+for negative tests: `SPEC-001-1-01-scaffold-args-logging.md` (chosen as a
+stable, minimal canvas that contains none of the drift tokens at baseline).
+Each negative test: append a single offending line, run script, observe
+expected FAIL, `git checkout --` the SPEC, confirm hash matches the baseline
+SHA. Synthetic positive: run script against a temporary clean fixture.
+
+| # | Test | Expected | Observed | Tree clean after |
+|---|------|----------|----------|------------------|
+| 1 | NEGATIVE — path drift (`src/portal/foo.ts`) | exit 1; `FAIL: src/portal/ references remain` names target SPEC | exit 1; FAIL line emitted; target SPEC named | yes (git hash matches baseline) |
+| 2 | NEGATIVE — vitest token | exit 1; FAIL: vitest references remain | exit 1; vitest failure emitted | yes |
+| 3 | NEGATIVE — bats (`tests/unit/test_foo.sh`) | exit 1; FAIL: bats references remain | exit 1; bats failure emitted | yes |
+| 4 | NEGATIVE — fictional path (`plugins/autonomous-dev/never-existed.ts`) | exit 1; `MISSING: plugins/autonomous-dev/never-existed.ts` and final summary `FAIL: N cited paths do not exist` | exit 1; MISSING line emitted; summary present | yes |
+| 5 | POSITIVE — synthetic clean tree (mktemp fixture with one valid cite) | exit 0; final stdout `PASS`; runtime < 500 ms | exit 0; `PASS`; ~430 ms wall-clock | yes |
+
+**Note on the production-tree positive test (OQ-31-07).** SPEC-031-4-01 FR-7's
+positive test specifies running on the post-PLAN-031-3 working tree. The
+production tree at the time of this PR retains residual drift in SPECs that
+were OUT OF SCOPE for PRs #95 (PLAN-031-1/2; ~5 SPECs amended) and #97
+(PLAN-031-3; 5 SPECs amended). The verification script therefore exits 1 on
+the production tree by design — that is the gate firing, not a script defect.
+The script's correctness is demonstrated by the four negative tests + the
+synthetic positive (test #5). Production-tree PASS will follow once the
+remaining SPEC amendments land in follow-up PRs (tracked separately; see
+"Out of scope" below). The CI gate is intentionally enabled on `main` so the
+drift cannot expand beyond the current set.
+
+Runtime: 0.43 s wall-clock (target < 500 ms; PASS). Idempotence: re-running
+on the same tree produced byte-identical stderr (`diff a b` empty).
 
 ### Enforcement mechanism
 
-TBD — populated by PLAN-031-4 with the script path, CI step name, and the
-local invocation command.
+The TDD-031 reconciliation is enforced going forward by an automated gate:
+
+- **Script**: `scripts/verify-spec-reconciliation.sh` — implements the four
+  TDD-031 §5.4 checks (path drift, vitest tokens, bats references, path
+  existence) against every SPEC under `plugins/autonomous-dev/docs/specs/`.
+- **CI step**: the `spec-reconciliation` job in `.github/workflows/ci.yml`
+  runs the script unconditionally on every PR (no paths filter; ~500 ms
+  cost). The job name is stable for branch-protection rule durability — do
+  not rename it.
+- **Local invocation**: `bash scripts/verify-spec-reconciliation.sh`.
+  Help banner: `bash scripts/verify-spec-reconciliation.sh --help`.
+
+Any future SPEC that reintroduces a `src/portal/` path, a `\bvitest\b`
+token, a `.bats` extension, a `tests/unit/test_*.sh` reference, or cites a
+`plugins/autonomous-dev/...` file path that does not exist on disk will
+fail CI on the `spec-reconciliation` step. The contributor must remove
+the drift before merging.
+
+### CI guard self-test (SPEC-031-4-02 FR-5/FR-6)
+
+Throwaway-branch end-to-end CI self-test (deliberate `src/portal/test.ts`
+SPEC injection → red CI run; remove → green CI run; close PR; delete
+branch) is deferred to manual orchestrator execution after this PR opens.
+When run, populate the table below with the captured run URLs and the
+branch-deletion confirmation. Until then, the gate's correctness is
+established by:
+
+- The five paired local self-tests above (Verification log).
+- `actionlint .github/workflows/ci.yml` — zero new findings introduced
+  by SPEC-031-4-02; pre-existing SC2016 in plugin-validate is unchanged
+  per FR-7 (additive-only).
+
+| Run | Expected | URL | Notes |
+|-----|----------|-----|-------|
+| Red (drift introduced) | `spec-reconciliation` step fails; FAIL line names the offending SPEC | TBD (manual) | Inject `src/portal/test.ts` cite to a SPEC, push to `tdd-031-self-test` branch |
+| Green (drift removed) | `spec-reconciliation` step passes | TBD (manual) | Remove the cite, push, observe CI green |
+| Branch deletion | `git ls-remote --heads origin tdd-031-self-test` returns empty | TBD (manual) | `git push origin --delete tdd-031-self-test` |
 
 ---
 

@@ -113,6 +113,21 @@ jobs:
         with:
           fail-on-error: true
 
+  spec-reconciliation:
+    # TDD-031 §5.4 / PRD-016 G-08, FR-1654.
+    # Runs unconditionally on every PR (no paths filter, per SPEC-031-4-02
+    # FR-2: ~500 ms cost is negligible and a paths filter could miss SPEC
+    # edits arriving via merges). The stable name `spec-reconciliation` is
+    # for branch-protection durability — do NOT rename.
+    name: spec-reconciliation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run SPEC reconciliation gate
+        run: bash scripts/verify-spec-reconciliation.sh
+
   typecheck:
     name: Typecheck (${{ matrix.os }}, Node ${{ matrix.node-version }})
     needs: paths-filter
