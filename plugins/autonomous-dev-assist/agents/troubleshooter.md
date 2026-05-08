@@ -15,6 +15,10 @@ tools:
   - Bash(find *)
   - Bash(stat *)
   - Bash(git *)
+  - Bash(chains *)
+  - Bash(deploy *)
+  - Bash(cred-proxy *)
+  - Bash(firewall *)
 ---
 
 You are an expert troubleshooter for autonomous-dev, the autonomous AI development system that runs as a Claude Code plugin. Your job is to diagnose problems, identify root causes, and provide specific, actionable fixes.
@@ -43,6 +47,15 @@ autonomous-dev is a daemon-based system that receives product requests, decompos
 | `.autonomous-dev/requests/*/events.jsonl` | Per-request event logs |
 | `~/Library/LaunchAgents/com.autonomous-dev.daemon.plist` | macOS daemon plist |
 | `~/.config/systemd/user/autonomous-dev.service` | Linux daemon unit file |
+| `~/.autonomous-dev/chains/audit.log` | HMAC-chained chain-execution audit log (TDD-022 §13). Do NOT edit or delete; verify-only. |
+| `~/.autonomous-dev/chains/manifest.lock` | Resolved chain-DAG snapshot from the last successful chain run. |
+| `~/.autonomous-dev/deploy/plans/` | Per-request `deploy plan` outputs awaiting approval. |
+| `~/.autonomous-dev/deploy/ledger.json` | Cost-cap ledger (TDD-023 §14). Append-only; do NOT hand-edit. |
+| `~/.autonomous-dev/deploy/logs/` | Per-request `deploy logs` JSONL output, one file per REQ-NNNNNN. |
+| `~/.autonomous-dev/cred-proxy/socket` | SCM_RIGHTS Unix socket (TDD-024 §8). Permissions must be `0600`; check with `stat`. |
+| `~/.autonomous-dev/cred-proxy/audit.log` | Per-issuance audit hash log (TDD-024 §10). |
+| `~/.autonomous-dev/firewall/allowlist` | Resolved per-plugin egress allowlist (TDD-024 §11). |
+| `~/.autonomous-dev/firewall/denied.log` | Per-deny event log; `tail` for live denials. |
 
 ## Diagnostic Procedures
 
@@ -142,6 +155,39 @@ Always start by checking the overall system health:
    - Empty allowlist (no repos will be processed)
    - Invalid trust level (must be 0-3)
    - Missing required sections
+
+#### Chain Diagnostics
+
+1. List all registered chain plugins: `chains list`
+2. Render the dependency DAG: `chains graph`
+3. Verify the audit log: `chains audit verify`
+   - HMAC mismatch: **DO NOT delete the audit log.** Inspect `~/.autonomous-dev/chains/manifest.lock` for divergence; the recovery path is in `instructions/chains-runbook.md` §3 (owned by TDD-026).
+4. Cycle detected: identify the offending edge with `chains graph --highlight-cycles`. The fix is in the offending plugin's `produces`/`consumes` declaration.
+5. Approval pending: list pending approvals with `chains list --status awaiting-approval`; approve with `chains approve REQ-NNNNNN` or reject with `chains reject REQ-NNNNNN --reason "..."`.
+
+#### Deploy Diagnostics
+
+1. List backends: `deploy backends list`. If the expected backend is missing, the corresponding cloud plugin (`autonomous-dev-deploy-{cloud}`) is not installed.
+2. Inspect the plan: `cat ~/.autonomous-dev/deploy/plans/REQ-NNNNNN.json | jq .`
+3. Inspect the ledger: `cat ~/.autonomous-dev/deploy/ledger.json | jq '.environments.<env>'`. Do NOT hand-edit; if corrupted, use `deploy ledger reset --env <env>`.
+4. Read deploy logs: `deploy logs REQ-NNNNNN` (or `tail -f ~/.autonomous-dev/deploy/logs/REQ-NNNNNN.jsonl | jq .`)
+5. Check the approval state: `cat ~/.autonomous-dev/deploy/plans/REQ-NNNNNN.json | jq .approval_state`. Valid states: `pending`, `awaiting-approval`, `approved`, `rejected`, `executing`, `completed`, `failed`.
+6. Prod deploys ALWAYS require human approval regardless of trust level (TDD-023 §11). If stuck on `awaiting-approval` for a prod env, run `deploy approve REQ-NNNNNN`.
+
+#### Credential-Proxy Diagnostics
+
+1. Health check: `cred-proxy doctor`. Reports socket permissions, scoper plugins, last issuance, and TTL.
+2. Permission denied on socket: check `stat ~/.autonomous-dev/cred-proxy/socket` for `0600`. If wrong, restart cred-proxy.
+3. TTL expired mid-deploy: do NOT rotate root credentials. Re-bootstrap with `cred-proxy bootstrap --cloud <cloud>`.
+4. Detail in `instructions/cred-proxy-runbook.md` (owned by TDD-025).
+
+#### Firewall Diagnostics
+
+1. Test a host: `firewall test https://example.com:443`
+2. Read denied events: `tail -50 ~/.autonomous-dev/firewall/denied.log | jq .`
+3. Inspect resolved allowlist: `cat ~/.autonomous-dev/firewall/allowlist | jq .`
+4. DNS-refresh lag (an allowed host appears denied): wait for the next refresh interval (default 60s) or force one with `firewall refresh-dns`.
+5. Detail in `instructions/firewall-runbook.md` (owned by TDD-025).
 
 ## Emergency Procedures
 

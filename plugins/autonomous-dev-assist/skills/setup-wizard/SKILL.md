@@ -796,6 +796,19 @@ Happy building!
 
 ---
 
+<!-- BEGIN PHASE-16 CONTRACT (TDD-027 §6 ↔ TDD-033 §5) -->
+provides:
+  - cloud-prompt-tree.md
+  - phase-16-content.md
+consumes:
+  - runtime check: are autonomous-dev-deploy-* plugins installed?
+  - runtime check: which firewall backend does this OS support?
+  - runtime check: is cred-proxy already bootstrapped?
+runtime owner: TDD-033
+content owner: TDD-027
+<!-- TODO(TDD-033): runtime side of this contract is co-owned; the runtime module that consumes the above provides/consumes lists is implemented by TDD-033 §5. Do not remove this marker without coordinating with TDD-033. -->
+<!-- END PHASE-16 CONTRACT -->
+
 # Error Handling (applies to all phases)
 
 If ANY command fails unexpectedly during the wizard:

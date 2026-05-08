@@ -1,0 +1,61 @@
+# onboarding-questions.yaml -- Test cases for the onboarding skill
+# 4 cases covering cloud onboarding and pipeline pause states (TDD-027 §7.2)
+
+suite: onboarding
+skill: onboarding
+description: >
+  Validates that the onboarding skill correctly answers questions about
+  cloud onboarding (setup-wizard --with-cloud) and pipeline pause states
+  (cost-cap-tripped, awaiting-approval, firewall-denied) per TDD-027 §7.2.
+
+cases:
+
+  - id: onboard-cloud-001
+    difficulty: easy
+    category: cloud-onboarding
+    severity: easy
+    scenario: "how do I onboard a new cloud backend?"
+    question: "how do I onboard a new cloud backend?"
+    must_mention:
+      - "setup-wizard --with-cloud"
+      - "phase 16"
+    must_not_mention:
+      - "pip install autonomous-dev-deploy"
+
+  - id: onboard-pause-001
+    difficulty: medium
+    category: pause-state
+    severity: medium
+    scenario: "what does cost-cap-tripped mean during onboarding?"
+    question: "what does cost-cap-tripped mean during onboarding?"
+    must_mention:
+      - "ledger.json"
+      - "raise cap"
+      - "do NOT hand-edit"
+    must_not_mention:
+      - "set --cost-cap 0"
+
+  - id: onboard-pause-002
+    difficulty: medium
+    category: pause-state
+    severity: medium
+    scenario: "pipeline paused on awaiting-approval — is something broken?"
+    question: "pipeline paused on awaiting-approval — is something broken?"
+    must_mention:
+      - "deploy approve"
+      - "expected for prod"
+    must_not_mention:
+      - "force-approve"
+
+  - id: onboard-pause-003
+    difficulty: medium
+    category: pause-state
+    severity: medium
+    scenario: "what is firewall-denied? did I install something wrong?"
+    question: "what is firewall-denied? did I install something wrong?"
+    must_mention:
+      - "denied.log"
+      - "allowlist"
+      - "expected for new plugins"
+    must_not_mention:
+      - "disable firewall"
