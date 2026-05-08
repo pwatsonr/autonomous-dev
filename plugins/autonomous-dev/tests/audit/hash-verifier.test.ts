@@ -466,39 +466,16 @@ async function test_nonexistent_file(): Promise<void> {
 // Test runner
 // ---------------------------------------------------------------------------
 
-const tests: Array<() => Promise<void>> = [
-  test_valid_10_event_chain_passes,
-  test_tampered_event_detected,
-  test_deleted_event_detected,
-  test_reordered_events_detected,
-  test_empty_log_file,
-  test_single_event_chain,
-  test_integrity_failure_logged_separately,
-  test_integrity_failure_does_not_halt,
-  test_chain_head_hash_returned,
-  test_streaming_verification,
-  test_nonexistent_file,
-];
-
-async function runTests(): Promise<void> {
-  let passed = 0;
-  let failed = 0;
-
-  for (const test of tests) {
-    try {
-      await test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
-}
-
-runTests().catch((err) => {
-  console.error('Test runner failed:', err);
-  process.exit(1);
+describe("HashVerifier", () => {
+  it("passes a valid 10-event chain", async () => { await test_valid_10_event_chain_passes(); });
+  it("detects a tampered event", async () => { await test_tampered_event_detected(); });
+  it("detects a deleted event", async () => { await test_deleted_event_detected(); });
+  it("detects reordered events", async () => { await test_reordered_events_detected(); });
+  it("handles an empty log file", async () => { await test_empty_log_file(); });
+  it("handles a single-event chain", async () => { await test_single_event_chain(); });
+  it("logs integrity failure separately", async () => { await test_integrity_failure_logged_separately(); });
+  it("does not halt on integrity failure", async () => { await test_integrity_failure_does_not_halt(); });
+  it("returns chain head hash", async () => { await test_chain_head_hash_returned(); });
+  it("supports streaming verification", async () => { await test_streaming_verification(); });
+  it("handles a nonexistent file", async () => { await test_nonexistent_file(); });
 });
