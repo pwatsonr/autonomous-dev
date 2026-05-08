@@ -305,34 +305,17 @@ function test_matched_tags_included(): void {
 // ---------------------------------------------------------------------------
 // Test runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_exact_match_single_tag,
-  test_exact_match_multiple_tags,
-  test_exact_match_case_insensitive,
-  test_semantic_fallback_no_exact_match,
-  test_domain_gap_no_match_above_threshold,
-  test_max_results_limit,
-  test_similarity_threshold_respected,
-  test_only_active_agents,
-  test_compute_similarity_identical,
-  test_compute_similarity_different,
-  test_compute_similarity_empty,
-  test_matched_tags_included,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('discovery', () => {
+  it('test_exact_match_single_tag', test_exact_match_single_tag);
+  it('test_exact_match_multiple_tags', test_exact_match_multiple_tags);
+  it('test_exact_match_case_insensitive', test_exact_match_case_insensitive);
+  it('test_semantic_fallback_no_exact_match', test_semantic_fallback_no_exact_match);
+  it('test_domain_gap_no_match_above_threshold', test_domain_gap_no_match_above_threshold);
+  it('test_max_results_limit', test_max_results_limit);
+  it('test_similarity_threshold_respected', test_similarity_threshold_respected);
+  it('test_only_active_agents', test_only_active_agents);
+  it('test_compute_similarity_identical', test_compute_similarity_identical);
+  it('test_compute_similarity_different', test_compute_similarity_different);
+  it('test_compute_similarity_empty', test_compute_similarity_empty);
+  it('test_matched_tags_included', test_matched_tags_included);
+});

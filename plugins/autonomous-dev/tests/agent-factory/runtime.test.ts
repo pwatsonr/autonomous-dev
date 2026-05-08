@@ -570,47 +570,25 @@ function test_non_file_tool_passes_path_filter(): void {
 // ---------------------------------------------------------------------------
 // Test runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  // ToolAccessEnforcer
-  test_authorized_tool_allowed,
-  test_unauthorized_tool_blocked,
-  test_reviewer_cannot_edit,
-  test_executor_can_edit,
-  // PathFilter
-  test_block_agents_directory,
-  test_block_agent_data_files,
-  test_block_metrics_directory,
-  test_allow_src_directory,
-  test_block_path_traversal,
-  test_block_bash_cd_to_agents,
-  test_allow_non_file_bash_commands,
-  // AgentRuntime
-  test_runtime_check_tool_call_allowed,
-  test_runtime_check_tool_call_tool_blocked,
-  test_runtime_check_tool_call_path_blocked,
-  test_runtime_intercept_log,
-  test_runtime_invoke,
-  // Security Integration
-  test_tool_enforcement_end_to_end,
-  test_path_enforcement_end_to_end,
-  test_path_traversal_end_to_end,
-  // Non-file tool
-  test_non_file_tool_passes_path_filter,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('runtime', () => {
+  it('test_authorized_tool_allowed', test_authorized_tool_allowed);
+  it('test_unauthorized_tool_blocked', test_unauthorized_tool_blocked);
+  it('test_reviewer_cannot_edit', test_reviewer_cannot_edit);
+  it('test_executor_can_edit', test_executor_can_edit);
+  it('test_block_agents_directory', test_block_agents_directory);
+  it('test_block_agent_data_files', test_block_agent_data_files);
+  it('test_block_metrics_directory', test_block_metrics_directory);
+  it('test_allow_src_directory', test_allow_src_directory);
+  it('test_block_path_traversal', test_block_path_traversal);
+  it('test_block_bash_cd_to_agents', test_block_bash_cd_to_agents);
+  it('test_allow_non_file_bash_commands', test_allow_non_file_bash_commands);
+  it('test_runtime_check_tool_call_allowed', test_runtime_check_tool_call_allowed);
+  it('test_runtime_check_tool_call_tool_blocked', test_runtime_check_tool_call_tool_blocked);
+  it('test_runtime_check_tool_call_path_blocked', test_runtime_check_tool_call_path_blocked);
+  it('test_runtime_intercept_log', test_runtime_intercept_log);
+  it('test_runtime_invoke', test_runtime_invoke);
+  it('test_tool_enforcement_end_to_end', test_tool_enforcement_end_to_end);
+  it('test_path_enforcement_end_to_end', test_path_enforcement_end_to_end);
+  it('test_path_traversal_end_to_end', test_path_traversal_end_to_end);
+  it('test_non_file_tool_passes_path_filter', test_non_file_tool_passes_path_filter);
+});

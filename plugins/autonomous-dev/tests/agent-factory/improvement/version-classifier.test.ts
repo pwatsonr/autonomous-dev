@@ -360,51 +360,28 @@ function assert(condition: boolean, message: string): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const tests = [
-  // Version bump classification
-  test_major_bump_role_change,
-  test_major_bump_new_expertise_tags,
-  test_major_bump_large_body_change,
-  test_minor_bump_rubric_change,
-  test_minor_bump_medium_body_change,
-  test_patch_bump_small_body_change,
-  test_boundary_50_percent_is_major,
-  test_boundary_10_percent_is_minor,
-  test_boundary_9_percent_is_patch,
-
-  // Body change percent
-  test_body_change_percent_empty_current,
-  test_body_change_percent_identical,
-  test_body_change_percent_completely_different,
-
-  // Frontmatter change detection
-  test_frontmatter_change_detection_excludes_version,
-  test_frontmatter_detects_temperature_change,
-  test_frontmatter_detects_model_change,
-  test_frontmatter_detects_turn_limit_change,
-  test_frontmatter_rubric_weight_small_change_no_flag,
-  test_frontmatter_rubric_dimension_added_flags,
-  test_frontmatter_expertise_case_insensitive,
-
-  // Semver increment
-  test_increment_major,
-  test_increment_minor,
-  test_increment_patch,
-  test_increment_from_zero,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('version classifier', () => {
+  it('test_major_bump_role_change', test_major_bump_role_change);
+  it('test_major_bump_new_expertise_tags', test_major_bump_new_expertise_tags);
+  it('test_major_bump_large_body_change', test_major_bump_large_body_change);
+  it('test_minor_bump_rubric_change', test_minor_bump_rubric_change);
+  it('test_minor_bump_medium_body_change', test_minor_bump_medium_body_change);
+  it('test_patch_bump_small_body_change', test_patch_bump_small_body_change);
+  it('test_boundary_50_percent_is_major', test_boundary_50_percent_is_major);
+  it('test_boundary_10_percent_is_minor', test_boundary_10_percent_is_minor);
+  it('test_boundary_9_percent_is_patch', test_boundary_9_percent_is_patch);
+  it('test_body_change_percent_empty_current', test_body_change_percent_empty_current);
+  it('test_body_change_percent_identical', test_body_change_percent_identical);
+  it('test_body_change_percent_completely_different', test_body_change_percent_completely_different);
+  it('test_frontmatter_change_detection_excludes_version', test_frontmatter_change_detection_excludes_version);
+  it('test_frontmatter_detects_temperature_change', test_frontmatter_detects_temperature_change);
+  it('test_frontmatter_detects_model_change', test_frontmatter_detects_model_change);
+  it('test_frontmatter_detects_turn_limit_change', test_frontmatter_detects_turn_limit_change);
+  it('test_frontmatter_rubric_weight_small_change_no_flag', test_frontmatter_rubric_weight_small_change_no_flag);
+  it('test_frontmatter_rubric_dimension_added_flags', test_frontmatter_rubric_dimension_added_flags);
+  it('test_frontmatter_expertise_case_insensitive', test_frontmatter_expertise_case_insensitive);
+  it('test_increment_major', test_increment_major);
+  it('test_increment_minor', test_increment_minor);
+  it('test_increment_patch', test_increment_patch);
+  it('test_increment_from_zero', test_increment_from_zero);
+});

@@ -302,32 +302,15 @@ function test_inspect_system_prompt_truncated(): void {
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_list_command_output_format,
-  test_list_empty_registry,
-  test_inspect_command_shows_full_config,
-  test_inspect_unknown_agent_shows_error,
-  test_reload_command_displays_results,
-  test_freeze_command,
-  test_unfreeze_command,
-  test_freeze_nonexistent_agent,
-  test_unfreeze_non_frozen_agent,
-  test_inspect_system_prompt_truncated,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('cli', () => {
+  it('test_list_command_output_format', test_list_command_output_format);
+  it('test_list_empty_registry', test_list_empty_registry);
+  it('test_inspect_command_shows_full_config', test_inspect_command_shows_full_config);
+  it('test_inspect_unknown_agent_shows_error', test_inspect_unknown_agent_shows_error);
+  it('test_reload_command_displays_results', test_reload_command_displays_results);
+  it('test_freeze_command', test_freeze_command);
+  it('test_unfreeze_command', test_unfreeze_command);
+  it('test_freeze_nonexistent_agent', test_freeze_nonexistent_agent);
+  it('test_unfreeze_non_frozen_agent', test_unfreeze_non_frozen_agent);
+  it('test_inspect_system_prompt_truncated', test_inspect_system_prompt_truncated);
+});

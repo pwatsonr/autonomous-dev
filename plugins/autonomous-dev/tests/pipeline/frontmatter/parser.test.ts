@@ -202,35 +202,18 @@ function assertParseError(err: unknown, expectedCode: string): void {
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_parses_valid_frontmatter_with_all_fields,
-  test_returns_body_after_frontmatter,
-  test_throws_no_frontmatter_when_no_delimiter,
-  test_throws_empty_frontmatter,
-  test_throws_malformed_yaml,
-  test_handles_frontmatter_no_body,
-  test_handles_multiline_yaml_strings,
-  test_preserves_raw_yaml,
-  test_handles_windows_line_endings,
-  test_handles_special_characters,
-  test_preserves_raw_content,
-  test_parses_arrays_with_values,
-  test_no_closing_delimiter,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('parser', () => {
+  it('test_parses_valid_frontmatter_with_all_fields', test_parses_valid_frontmatter_with_all_fields);
+  it('test_returns_body_after_frontmatter', test_returns_body_after_frontmatter);
+  it('test_throws_no_frontmatter_when_no_delimiter', test_throws_no_frontmatter_when_no_delimiter);
+  it('test_throws_empty_frontmatter', test_throws_empty_frontmatter);
+  it('test_throws_malformed_yaml', test_throws_malformed_yaml);
+  it('test_handles_frontmatter_no_body', test_handles_frontmatter_no_body);
+  it('test_handles_multiline_yaml_strings', test_handles_multiline_yaml_strings);
+  it('test_preserves_raw_yaml', test_preserves_raw_yaml);
+  it('test_handles_windows_line_endings', test_handles_windows_line_endings);
+  it('test_handles_special_characters', test_handles_special_characters);
+  it('test_preserves_raw_content', test_preserves_raw_content);
+  it('test_parses_arrays_with_values', test_parses_arrays_with_values);
+  it('test_no_closing_delimiter', test_no_closing_delimiter);
+});

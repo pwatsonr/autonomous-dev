@@ -251,31 +251,14 @@ function assert(condition: boolean, message: string): void {
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_parse_valid_agent_file,
-  test_parse_missing_frontmatter_delimiters,
-  test_parse_malformed_yaml,
-  test_parse_empty_body,
-  test_parse_extra_delimiters_in_body,
-  test_parse_missing_optional_fields,
-  test_parse_type_coercion,
-  test_parse_single_opening_delimiter_only,
-  test_parse_preserves_full_body_with_newlines,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('parser', () => {
+  it('test_parse_valid_agent_file', test_parse_valid_agent_file);
+  it('test_parse_missing_frontmatter_delimiters', test_parse_missing_frontmatter_delimiters);
+  it('test_parse_malformed_yaml', test_parse_malformed_yaml);
+  it('test_parse_empty_body', test_parse_empty_body);
+  it('test_parse_extra_delimiters_in_body', test_parse_extra_delimiters_in_body);
+  it('test_parse_missing_optional_fields', test_parse_missing_optional_fields);
+  it('test_parse_type_coercion', test_parse_type_coercion);
+  it('test_parse_single_opening_delimiter_only', test_parse_single_opening_delimiter_only);
+  it('test_parse_preserves_full_body_with_newlines', test_parse_preserves_full_body_with_newlines);
+});

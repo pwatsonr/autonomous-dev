@@ -399,32 +399,15 @@ function test_trigger_writes_audit_log_on_fire(): void {
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_trigger_fires_at_threshold,
-  test_trigger_does_not_fire_below_threshold,
-  test_trigger_skips_frozen_agent,
-  test_trigger_skips_under_review_agent,
-  test_trigger_skips_validating_agent,
-  test_trigger_respects_per_agent_override,
-  test_force_trigger_bypasses_threshold,
-  test_force_trigger_respects_frozen,
-  test_trigger_skips_canary_agent,
-  test_trigger_writes_audit_log_on_fire,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('observation trigger', () => {
+  it('test_trigger_fires_at_threshold', test_trigger_fires_at_threshold);
+  it('test_trigger_does_not_fire_below_threshold', test_trigger_does_not_fire_below_threshold);
+  it('test_trigger_skips_frozen_agent', test_trigger_skips_frozen_agent);
+  it('test_trigger_skips_under_review_agent', test_trigger_skips_under_review_agent);
+  it('test_trigger_skips_validating_agent', test_trigger_skips_validating_agent);
+  it('test_trigger_respects_per_agent_override', test_trigger_respects_per_agent_override);
+  it('test_force_trigger_bypasses_threshold', test_force_trigger_bypasses_threshold);
+  it('test_force_trigger_respects_frozen', test_force_trigger_respects_frozen);
+  it('test_trigger_skips_canary_agent', test_trigger_skips_canary_agent);
+  it('test_trigger_writes_audit_log_on_fire', test_trigger_writes_audit_log_on_fire);
+});

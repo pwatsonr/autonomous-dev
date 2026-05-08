@@ -542,76 +542,48 @@ function assertNoRuleError(
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  // RULE_001
-  test_rule_001_name_uniqueness_pass,
-  test_rule_001_name_uniqueness_fail,
-  // RULE_002
-  test_rule_002_name_filename_match_pass,
-  test_rule_002_name_filename_match_fail,
-  test_rule_002_skipped_without_filename,
-  // RULE_003
-  test_rule_003_valid_semver,
-  test_rule_003_invalid_semver_two_parts,
-  test_rule_003_invalid_semver_v_prefix,
-  test_rule_003_invalid_semver_alpha,
-  // RULE_004
-  test_rule_004_valid_role_author,
-  test_rule_004_valid_role_executor,
-  test_rule_004_valid_role_reviewer,
-  test_rule_004_valid_role_meta,
-  test_rule_004_invalid_role,
-  // RULE_005
-  test_rule_005_tool_allowlist_author_pass,
-  test_rule_005_tool_allowlist_author_fail,
-  test_rule_005_tool_allowlist_executor_pass,
-  test_rule_005_tool_allowlist_reviewer_fail,
-  test_rule_005_tool_allowlist_meta_fail,
-  test_rule_005_all_author_tools_allowed,
-  test_rule_005_all_executor_tools_allowed,
-  // RULE_006
-  test_rule_006_rubric_minimum_pass,
-  test_rule_006_rubric_minimum_fail,
-  test_rule_006_rubric_empty_fail,
-  // RULE_007
-  test_rule_007_version_history_consistency_pass,
-  test_rule_007_version_history_consistency_fail,
-  test_rule_007_empty_version_history_no_error,
-  // RULE_008
-  test_rule_008_turn_limit_min_pass,
-  test_rule_008_turn_limit_max_pass,
-  test_rule_008_turn_limit_zero_fail,
-  test_rule_008_turn_limit_over_max_fail,
-  // RULE_009
-  test_rule_009_model_registry_pass,
-  test_rule_009_model_registry_fail,
-  test_rule_009_uses_default_registry,
-  // RULE_010
-  test_rule_010_temperature_zero_pass,
-  test_rule_010_temperature_one_pass,
-  test_rule_010_temperature_negative_fail,
-  test_rule_010_temperature_over_one_fail,
-  // Cross-cutting
-  test_validator_returns_all_errors,
-  test_validation_rules_count,
-  test_tool_allowlist_shape,
-  test_valid_agent_passes_all_rules,
-  test_each_error_has_required_fields,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('validator', () => {
+  it('test_rule_001_name_uniqueness_pass', test_rule_001_name_uniqueness_pass);
+  it('test_rule_001_name_uniqueness_fail', test_rule_001_name_uniqueness_fail);
+  it('test_rule_002_name_filename_match_pass', test_rule_002_name_filename_match_pass);
+  it('test_rule_002_name_filename_match_fail', test_rule_002_name_filename_match_fail);
+  it('test_rule_002_skipped_without_filename', test_rule_002_skipped_without_filename);
+  it('test_rule_003_valid_semver', test_rule_003_valid_semver);
+  it('test_rule_003_invalid_semver_two_parts', test_rule_003_invalid_semver_two_parts);
+  it('test_rule_003_invalid_semver_v_prefix', test_rule_003_invalid_semver_v_prefix);
+  it('test_rule_003_invalid_semver_alpha', test_rule_003_invalid_semver_alpha);
+  it('test_rule_004_valid_role_author', test_rule_004_valid_role_author);
+  it('test_rule_004_valid_role_executor', test_rule_004_valid_role_executor);
+  it('test_rule_004_valid_role_reviewer', test_rule_004_valid_role_reviewer);
+  it('test_rule_004_valid_role_meta', test_rule_004_valid_role_meta);
+  it('test_rule_004_invalid_role', test_rule_004_invalid_role);
+  it('test_rule_005_tool_allowlist_author_pass', test_rule_005_tool_allowlist_author_pass);
+  it('test_rule_005_tool_allowlist_author_fail', test_rule_005_tool_allowlist_author_fail);
+  it('test_rule_005_tool_allowlist_executor_pass', test_rule_005_tool_allowlist_executor_pass);
+  it('test_rule_005_tool_allowlist_reviewer_fail', test_rule_005_tool_allowlist_reviewer_fail);
+  it('test_rule_005_tool_allowlist_meta_fail', test_rule_005_tool_allowlist_meta_fail);
+  it('test_rule_005_all_author_tools_allowed', test_rule_005_all_author_tools_allowed);
+  it('test_rule_005_all_executor_tools_allowed', test_rule_005_all_executor_tools_allowed);
+  it('test_rule_006_rubric_minimum_pass', test_rule_006_rubric_minimum_pass);
+  it('test_rule_006_rubric_minimum_fail', test_rule_006_rubric_minimum_fail);
+  it('test_rule_006_rubric_empty_fail', test_rule_006_rubric_empty_fail);
+  it('test_rule_007_version_history_consistency_pass', test_rule_007_version_history_consistency_pass);
+  it('test_rule_007_version_history_consistency_fail', test_rule_007_version_history_consistency_fail);
+  it('test_rule_007_empty_version_history_no_error', test_rule_007_empty_version_history_no_error);
+  it('test_rule_008_turn_limit_min_pass', test_rule_008_turn_limit_min_pass);
+  it('test_rule_008_turn_limit_max_pass', test_rule_008_turn_limit_max_pass);
+  it('test_rule_008_turn_limit_zero_fail', test_rule_008_turn_limit_zero_fail);
+  it('test_rule_008_turn_limit_over_max_fail', test_rule_008_turn_limit_over_max_fail);
+  it('test_rule_009_model_registry_pass', test_rule_009_model_registry_pass);
+  it('test_rule_009_model_registry_fail', test_rule_009_model_registry_fail);
+  it('test_rule_009_uses_default_registry', test_rule_009_uses_default_registry);
+  it('test_rule_010_temperature_zero_pass', test_rule_010_temperature_zero_pass);
+  it('test_rule_010_temperature_one_pass', test_rule_010_temperature_one_pass);
+  it('test_rule_010_temperature_negative_fail', test_rule_010_temperature_negative_fail);
+  it('test_rule_010_temperature_over_one_fail', test_rule_010_temperature_over_one_fail);
+  it('test_validator_returns_all_errors', test_validator_returns_all_errors);
+  it('test_validation_rules_count', test_validation_rules_count);
+  it('test_tool_allowlist_shape', test_tool_allowlist_shape);
+  it('test_valid_agent_passes_all_rules', test_valid_agent_passes_all_rules);
+  it('test_each_error_has_required_fields', test_each_error_has_required_fields);
+});

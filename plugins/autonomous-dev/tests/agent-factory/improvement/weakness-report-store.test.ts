@@ -391,33 +391,16 @@ function test_example_from_spec(): void {
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_weakness_report_serialization,
-  test_weakness_report_append_to_jsonl,
-  test_weakness_report_query_by_agent,
-  test_weakness_report_all_fields_present,
-  test_weakness_severity_enum,
-  test_overall_assessment_enum,
-  test_recommendation_enum,
-  test_malformed_lines_skipped,
-  test_nonexistent_file_returns_empty,
-  test_creates_parent_directory_on_write,
-  test_example_from_spec,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('weakness report store', () => {
+  it('test_weakness_report_serialization', test_weakness_report_serialization);
+  it('test_weakness_report_append_to_jsonl', test_weakness_report_append_to_jsonl);
+  it('test_weakness_report_query_by_agent', test_weakness_report_query_by_agent);
+  it('test_weakness_report_all_fields_present', test_weakness_report_all_fields_present);
+  it('test_weakness_severity_enum', test_weakness_severity_enum);
+  it('test_overall_assessment_enum', test_overall_assessment_enum);
+  it('test_recommendation_enum', test_recommendation_enum);
+  it('test_malformed_lines_skipped', test_malformed_lines_skipped);
+  it('test_nonexistent_file_returns_empty', test_nonexistent_file_returns_empty);
+  it('test_creates_parent_directory_on_write', test_creates_parent_directory_on_write);
+  it('test_example_from_spec', test_example_from_spec);
+});

@@ -273,43 +273,26 @@ function assert(condition: boolean, message: string): void {
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_returns_valid_for_complete_frontmatter,
-  test_returns_error_for_each_missing_required_field,
-  test_returns_error_when_id_does_not_match_regex,
-  test_returns_error_when_pipeline_id_does_not_match_regex,
-  test_returns_error_when_version_does_not_match_regex,
-  test_returns_error_when_type_is_invalid,
-  test_returns_error_when_status_is_invalid,
-  test_returns_error_when_depth_does_not_match_type,
-  test_returns_error_when_updated_at_before_created_at,
-  test_returns_error_when_depends_on_length_mismatch,
-  test_returns_error_when_sibling_index_gte_count,
-  test_returns_error_when_parent_id_null_and_depth_gt_0,
-  test_returns_error_when_parent_id_nonnull_and_depth_0,
-  test_returns_warning_for_unknown_fields,
-  test_returns_error_when_traces_from_empty_for_depth_gt_0,
-  test_valid_child_document,
-  test_accepts_all_valid_statuses,
-  test_accepts_all_valid_priorities,
-  test_accepts_all_valid_execution_modes,
-  test_valid_id_formats,
-  test_invalid_id_formats,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('validator', () => {
+  it('test_returns_valid_for_complete_frontmatter', test_returns_valid_for_complete_frontmatter);
+  it('test_returns_error_for_each_missing_required_field', test_returns_error_for_each_missing_required_field);
+  it('test_returns_error_when_id_does_not_match_regex', test_returns_error_when_id_does_not_match_regex);
+  it('test_returns_error_when_pipeline_id_does_not_match_regex', test_returns_error_when_pipeline_id_does_not_match_regex);
+  it('test_returns_error_when_version_does_not_match_regex', test_returns_error_when_version_does_not_match_regex);
+  it('test_returns_error_when_type_is_invalid', test_returns_error_when_type_is_invalid);
+  it('test_returns_error_when_status_is_invalid', test_returns_error_when_status_is_invalid);
+  it('test_returns_error_when_depth_does_not_match_type', test_returns_error_when_depth_does_not_match_type);
+  it('test_returns_error_when_updated_at_before_created_at', test_returns_error_when_updated_at_before_created_at);
+  it('test_returns_error_when_depends_on_length_mismatch', test_returns_error_when_depends_on_length_mismatch);
+  it('test_returns_error_when_sibling_index_gte_count', test_returns_error_when_sibling_index_gte_count);
+  it('test_returns_error_when_parent_id_null_and_depth_gt_0', test_returns_error_when_parent_id_null_and_depth_gt_0);
+  it('test_returns_error_when_parent_id_nonnull_and_depth_0', test_returns_error_when_parent_id_nonnull_and_depth_0);
+  it('test_returns_warning_for_unknown_fields', test_returns_warning_for_unknown_fields);
+  it('test_returns_error_when_traces_from_empty_for_depth_gt_0', test_returns_error_when_traces_from_empty_for_depth_gt_0);
+  it('test_valid_child_document', test_valid_child_document);
+  it('test_accepts_all_valid_statuses', test_accepts_all_valid_statuses);
+  it('test_accepts_all_valid_priorities', test_accepts_all_valid_priorities);
+  it('test_accepts_all_valid_execution_modes', test_accepts_all_valid_execution_modes);
+  it('test_valid_id_formats', test_valid_id_formats);
+  it('test_invalid_id_formats', test_invalid_id_formats);
+});

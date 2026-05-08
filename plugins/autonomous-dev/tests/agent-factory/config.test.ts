@@ -233,29 +233,12 @@ function test_default_config_values_match_spec(): void {
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_load_valid_config,
-  test_load_config_with_defaults,
-  test_load_missing_config_file,
-  test_model_registry_populated,
-  test_paths_are_relative,
-  test_per_agent_overrides,
-  test_default_config_values_match_spec,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('config', () => {
+  it('test_load_valid_config', test_load_valid_config);
+  it('test_load_config_with_defaults', test_load_config_with_defaults);
+  it('test_load_missing_config_file', test_load_missing_config_file);
+  it('test_model_registry_populated', test_model_registry_populated);
+  it('test_paths_are_relative', test_paths_are_relative);
+  it('test_per_agent_overrides', test_per_agent_overrides);
+  it('test_default_config_values_match_spec', test_default_config_values_match_spec);
+});

@@ -261,30 +261,13 @@ function test_get_log_path(): void {
 // ---------------------------------------------------------------------------
 // Test runner
 // ---------------------------------------------------------------------------
-
-const tests = [
-  test_append_single_event,
-  test_append_multiple_events,
-  test_creates_file_on_first_write,
-  test_never_truncates,
-  test_valid_json_per_line,
-  test_timestamp_is_iso8601,
-  test_create_audit_logger_factory,
-  test_get_log_path,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe('audit', () => {
+  it('test_append_single_event', test_append_single_event);
+  it('test_append_multiple_events', test_append_multiple_events);
+  it('test_creates_file_on_first_write', test_creates_file_on_first_write);
+  it('test_never_truncates', test_never_truncates);
+  it('test_valid_json_per_line', test_valid_json_per_line);
+  it('test_timestamp_is_iso8601', test_timestamp_is_iso8601);
+  it('test_create_audit_logger_factory', test_create_audit_logger_factory);
+  it('test_get_log_path', test_get_log_path);
+});

@@ -148,34 +148,14 @@ function assert(condition: boolean, message: string): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const tests: Array<() => Promise<void>> = [
-  test_generates_prd_id_as_prd_seq_format,
-  test_generates_tdd_id_as_tdd_seq_docseq_format,
-  test_generates_plan_spec_code_ids,
-  test_sequential_calls_produce_incrementing_sequences,
-  test_different_types_have_independent_counters,
-  test_pads_sequences_with_leading_zeros,
-  test_in_memory_counter_starts_at_1,
-  test_no_collisions_across_10000_ids,
-  test_extracts_pipe_seq_from_various_pipeline_ids,
-];
-
-async function main(): Promise<void> {
-  let passed = 0;
-  let failed = 0;
-
-  for (const test of tests) {
-    try {
-      await test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
-}
-
-main();
+describe('id generator', () => {
+  it('test_generates_prd_id_as_prd_seq_format', test_generates_prd_id_as_prd_seq_format);
+  it('test_generates_tdd_id_as_tdd_seq_docseq_format', test_generates_tdd_id_as_tdd_seq_docseq_format);
+  it('test_generates_plan_spec_code_ids', test_generates_plan_spec_code_ids);
+  it('test_sequential_calls_produce_incrementing_sequences', test_sequential_calls_produce_incrementing_sequences);
+  it('test_different_types_have_independent_counters', test_different_types_have_independent_counters);
+  it('test_pads_sequences_with_leading_zeros', test_pads_sequences_with_leading_zeros);
+  it('test_in_memory_counter_starts_at_1', test_in_memory_counter_starts_at_1);
+  it('test_no_collisions_across_10000_ids', test_no_collisions_across_10000_ids);
+  it('test_extracts_pipe_seq_from_various_pipeline_ids', test_extracts_pipe_seq_from_various_pipeline_ids);
+});
