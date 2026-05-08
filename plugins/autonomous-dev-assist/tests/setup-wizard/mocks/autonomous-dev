@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+# Mock `autonomous-dev` CLI shim for SPEC-033-4-01 / SPEC-033-4-02 tests.
+#
+# Configure behavior via env vars:
+#   MOCK_CRED_PROXY_MODE   = success | invalid-shape | network-error | empty
+#   MOCK_CRED_PROXY_HANDLE = <handle string>  (default cph_<32 alnum>)
+#   MOCK_CRED_PROXY_VALIDATE = ok | expired | unknown
+#   MOCK_CRED_PROXY_REVOKE = ok | already | unknown
+#
+#   MOCK_PLUGIN_INSTALL_MODE = success | network-fail | version-mismatch
+#   MOCK_PLUGIN_INFO_VERSION = <semver>
+#   MOCK_FIREWALL_MODE = applied | idempotent | error
+#   MOCK_DEPLOY_MODE = ok | bad-cost | nan | error
+#
+# Counters are written to ${MOCK_COUNTER_DIR:-/tmp/mock-counters}.
+
+set -euo pipefail
+
+_counter_dir="${MOCK_COUNTER_DIR:-/tmp/mock-counters}"
+mkdir -p "$_counter_dir"
+_inc() {
+  local name="$1" file="$_counter_dir/$1"
+  local n=0
+  [[ -f "$file" ]] && n="$(cat "$file")"
+  echo "$((n + 1))" > "$file"
+}
+
+cmd="${1:-}"; shift || true
+sub="${1:-}"; shift || true
+
+case "$cmd" in
+  cred-proxy)
+    _inc "cred-proxy-${sub}"
+    case "$sub" in
+      provision)
+        case "${MOCK_CRED_PROXY_MODE:-success}" in
+          success)
+            handle="${MOCK_CRED_PROXY_HANDLE:-cph_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
+            # Mock writes a benign chatter line to stderr (no credential bytes)
+            # then the handle on stdout. The bridge captures last stdout line.
+            echo "[mock-cred-proxy] interactive prompt would go here" >&2
+            echo "$handle"
+            exit 0
+            ;;
+          invalid-shape)
+            echo "not-a-handle"
+            exit 0
+            ;;
+          empty)
+            exit 0
+            ;;
+          network-error)
+            echo "[mock] network failure" >&2
+            exit 1
+            ;;
+          *)
+            exit 1 ;;
+        esac
+        ;;
+      validate)
+        case "${MOCK_CRED_PROXY_VALIDATE:-ok}" in
+          ok) exit 0 ;;
+          expired) exit 2 ;;
+          unknown) exit 3 ;;
+          *) exit 1 ;;
+        esac
+        ;;
+      revoke)
+        case "${MOCK_CRED_PROXY_REVOKE:-ok}" in
+          ok) exit 0 ;;
+          already) exit 2 ;;
+          unknown) exit 3 ;;
+          *) exit 1 ;;
+        esac
+        ;;
+      *)
+        echo "[mock] unknown cred-proxy sub: $sub" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  plugin)
+    _inc "plugin-${sub}"
+    case "$sub" in
+      install)
+        case "${MOCK_PLUGIN_INSTALL_MODE:-success}" in
+          success) echo '{"installed":true}'; exit 0 ;;
+          network-fail) echo "[mock] network fail" >&2; exit 1 ;;
+          version-mismatch)
+            echo '{"installed":false,"available":"1.2.3","current":"1.2.2"}'
+            exit 4
+            ;;
+          *) exit 1 ;;
+        esac
+        ;;
+      info)
+        printf '{"version":"%s"}\n' "${MOCK_PLUGIN_INFO_VERSION:-1.2.3}"
+        exit 0
+        ;;
+      *)
+        echo "[mock] unknown plugin sub: $sub" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  firewall)
+    _inc "firewall-${sub}"
+    case "$sub" in
+      apply)
+        case "${MOCK_FIREWALL_MODE:-applied}" in
+          applied)    echo '{"status":"applied","template":"aws-default"}';   exit 0 ;;
+          idempotent) echo '{"status":"idempotent","template":"aws-default"}'; exit 0 ;;
+          error)      echo "[mock] firewall apply failed" >&2; exit 1 ;;
+          *) exit 1 ;;
+        esac
+        ;;
+      rollback)
+        echo '{"status":"rolled-back"}'
+        exit 0
+        ;;
+      *)
+        exit 1
+        ;;
+    esac
+    ;;
+  deploy)
+    _inc "deploy"
+    case "${MOCK_DEPLOY_MODE:-ok}" in
+      ok)
+        # Emit a structured cost estimate AND a structured plan in one JSON.
+        cat <<'JSON'
+{"estimated_monthly_cost_usd": 12.34, "plan_steps":[{"id":"step-1","action":"noop"}]}
+JSON
+        exit 0
+        ;;
+      bad-cost)
+        echo '{"estimated_monthly_cost_usd": null}'
+        exit 0
+        ;;
+      nan)
+        echo '{"estimated_monthly_cost_usd": "n/a"}'
+        exit 0
+        ;;
+      error)
+        echo "[mock] deploy failed" >&2
+        exit 1
+        ;;
+      *)
+        exit 1 ;;
+    esac
+    ;;
+  *)
+    echo "[mock] unknown command: $cmd" >&2
+    exit 2
+    ;;
+esac
