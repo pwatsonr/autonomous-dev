@@ -16,7 +16,11 @@
  * @module intake/deploy/orchestrator
  */
 
-import { CostCapExceededError } from './errors';
+import {
+  CostCapExceededError,
+  DailyCostCapExceededError,
+  AdminOverrideRequiredError,
+} from './errors';
 import { checkCostCap, recordCost } from './cost-cap';
 import { CostCapEnforcer } from './cost-cap-enforcer';
 import { CostLedger } from './cost-ledger';
@@ -194,6 +198,19 @@ export function __resetCostCapEnforcerCacheForTest(): void {
 }
 
 /**
+ * Returns true when the operator has opted into the legacy cost-cap
+ * code path (SPEC-032-1-02 FR-1/FR-2). Default OFF — the new path
+ * (legacy per-env pre-check PLUS `CostCapEnforcer.check()` for the
+ * operator-wide daily cap) is active. Setting
+ * `AUTONOMOUS_DEV_COST_CAP_LEGACY=1` skips the enforcer call and
+ * routes only through the legacy `checkCostCap` / `recordCost` pair
+ * (the deprecation shim shipped in SPEC-032-1-03).
+ */
+function useLegacyCostCapPath(): boolean {
+  return process.env.AUTONOMOUS_DEV_COST_CAP_LEGACY === '1';
+}
+
+/**
  * Run one deploy through the full pipeline. Returns a status and
  * optional `DeploymentRecord` on success.
  *
@@ -202,6 +219,20 @@ export function __resetCostCapEnforcerCacheForTest(): void {
  *   - paused:    waiting on approval; orchestrator emitted an escalation
  *   - rejected:  approval state has decision === 'rejected'
  *   - failed:    backend threw or returned status !== 'deployed'
+ *
+ * Cost-cap routing (SPEC-032-1-02):
+ *   - Default (`AUTONOMOUS_DEV_COST_CAP_LEGACY` unset or != '1'): the
+ *     legacy per-env `checkCostCap` pre-check still runs (SPEC-023-2-04
+ *     contract); on success, `CostCapEnforcer.check()` then enforces the
+ *     operator-wide daily cap. On `DailyCostCapExceededError` /
+ *     `AdminOverrideRequiredError` the orchestrator emits a
+ *     `deploy.completion` telemetry event with `outcome:'cost-cap-exceeded'`
+ *     and `reason: '${ErrorClassName}: ${message}'`, then re-throws
+ *     `CostCapExceededError(reason)`. Any other error from the enforcer
+ *     re-throws verbatim.
+ *   - Legacy (`AUTONOMOUS_DEV_COST_CAP_LEGACY=1`): the enforcer is NOT
+ *     invoked; only the legacy `checkCostCap` / `recordCost` pair runs.
+ *     Cross-references the deprecation shim in SPEC-032-1-03.
  */
 export async function runDeploy(args: RunDeployArgs): Promise<RunDeployResult> {
   const startedAt = Date.now();
@@ -298,6 +329,45 @@ export async function runDeploy(args: RunDeployArgs): Promise<RunDeployResult> {
       ts: new Date().toISOString(),
     });
     throw new CostCapExceededError(capCheck.reason);
+  }
+
+  // --- Operator-wide daily cap via CostCapEnforcer (SPEC-032-1-02) ----
+  // The legacy `checkCostCap` above enforces the per-env cap from
+  // `deploy.yaml` (SPEC-023-2-04). The enforcer below adds the
+  // operator-wide daily cap layer (SPEC-023-3-03). Both gates must
+  // permit the deploy. The legacy flag (`AUTONOMOUS_DEV_COST_CAP_LEGACY=1`)
+  // skips the enforcer entirely and routes through the legacy path only.
+  if (!useLegacyCostCapPath()) {
+    const enforcer = getOrCreateCostCapEnforcer(args.requestDir);
+    try {
+      await enforcer.check({
+        actor: args.actor,
+        estimated_cost_usd: estimatedCost,
+        deployId: args.deployId,
+        env: resolved.envName,
+        backend: selection.backendName,
+      });
+    } catch (err) {
+      if (
+        err instanceof DailyCostCapExceededError ||
+        err instanceof AdminOverrideRequiredError
+      ) {
+        const reason = `${err.constructor.name}: ${err.message}`;
+        emitDeployCompletion({
+          type: 'deploy.completion',
+          requestId: args.deployId,
+          envName: resolved.envName,
+          selectedBackend: selection.backendName,
+          outcome: 'cost-cap-exceeded',
+          durationMs: Date.now() - startedAt,
+          actualCostUsd: 0,
+          reason,
+          ts: new Date().toISOString(),
+        });
+        throw new CostCapExceededError(reason);
+      }
+      throw err;
+    }
   }
 
   // --- Backend invocation ---------------------------------------------
