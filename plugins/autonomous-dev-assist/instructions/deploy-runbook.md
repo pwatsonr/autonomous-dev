@@ -113,3 +113,280 @@ For trust-level semantics (which gates auto-approve at staging vs. which
 always require human action) see TDD-023 §11 Trust Integration. The
 prod-override holds at every trust level: L0, L1, L2, and L3 all enter
 `awaiting-approval` for `is_prod: true` environments.
+
+To inspect the live state of any request, run
+`deploy logs REQ-NNNNNN` — the event stream prints each transition with
+its timestamp. To list all in-flight requests for one env, run
+`deploy logs --env <env> --status awaiting-approval`. These are
+read-only commands and do not advance the state machine.
+
+## 3. Cost-cap trip recovery
+
+> **Safety.** `~/.autonomous-dev/deploy/ledger.json` is the cost-tracking
+> invariant. **do NOT edit by hand**. **do NOT rm the ledger**. The
+> supported recovery is `deploy ledger reset` — see below.
+
+### How the cost cap works
+
+The deploy executor maintains a running per-environment tally in the
+append-only `ledger.json`. Each completed deploy appends one entry. When
+the NEXT planned deploy's estimated cost would push the tally past
+`cost_cap_usd` (from `deploy.yaml`), the executor refuses to enter
+`executing` and emits `cost-cap-tripped` instead. The request is held;
+no money is spent.
+
+The ledger is a Stripe-style append-only contract. Manual edits corrupt
+the cost-tracking invariant — **do NOT edit by hand**. Use
+`deploy ledger reset` for every recovery path described below.
+
+### Recovery procedure
+
+1. Read the most recent ledger entries:
+
+   ```bash
+   cat ~/.autonomous-dev/deploy/ledger.json | jq '.entries[-5:]'
+   ```
+
+2. Identify the offending entry — the most recent `cost-cap-tripped`
+   request, or any duplicate / impossible entry.
+3. Decide between `deploy ledger reset --request REQ-NNNNNN` (reconcile
+   one entry), `deploy ledger reset --since <ISO-timestamp>` (truncate
+   from a point), or waiting for the billing-period reset (the cap is
+   per-period; check `deploy.yaml`).
+4. Re-run `deploy plan REQ-NNNNNN --env <env>` and proceed through the
+   §2 state machine.
+
+### Common causes
+
+#### (a) Crash mid-deploy
+
+The executor crashed between writing the ledger entry and completing the
+deploy, leaving the tally inconsistent. Use:
+
+```bash
+deploy ledger reset --request REQ-NNNNNN
+```
+
+#### (b) Clock skew across hosts
+
+A duplicate entry appears with a near-identical timestamp. Truncate from
+the earliest skewed entry:
+
+```bash
+deploy ledger reset --since 2026-05-02T14:00:00Z
+```
+
+#### (c) Genuine cost overrun
+
+The deploys are landing as planned; the cap is too low. Edit
+`deploy.yaml` to raise `cost_cap_usd`, commit the change, and re-plan.
+Every change to `cost_cap_usd` is reviewable in version control — that
+is the supported way to extend the cap.
+
+### What NOT to do
+
+- **do NOT edit by hand** any field in `ledger.json`. Signatures break,
+  the tally diverges, and the audit trail loses integrity.
+- **do NOT rm the ledger** — there is no recovery from a deleted ledger;
+  the cost tally is irrecoverable.
+- Do NOT use `vi`, `sed`, or any in-place editor on the file. The
+  supported recovery is always `deploy ledger reset`.
+
+## 4. Ledger inspection
+
+The ledger schema (per TDD-023 §14 Ledger Reset) is a single
+`entries[]` array of records:
+
+```json
+{
+  "entries": [
+    {
+      "request_id": "REQ-NNNNNN",
+      "env": "staging",
+      "backend": "gcp",
+      "cost_usd": 12.40,
+      "timestamp": "2026-05-02T14:32:11Z",
+      "signature": "<HMAC>"
+    }
+  ]
+}
+```
+
+Three read-only inspection recipes follow. Each is safe to run against a
+production ledger.
+
+### Recipe 1 — last-7-days total cost
+
+```bash
+jq '[.entries[]
+     | select((.timestamp | fromdateiso8601) > (now - 604800))
+     | .cost_usd] | add' ~/.autonomous-dev/deploy/ledger.json
+```
+
+### Recipe 2 — per-environment breakdown
+
+```bash
+jq '.entries
+    | group_by(.env)
+    | map({env: .[0].env, total: (map(.cost_usd) | add)})' \
+  ~/.autonomous-dev/deploy/ledger.json
+```
+
+### Recipe 3 — signature-violation finder
+
+```bash
+jq '.entries[] | select(.signature == null or .signature == "")' \
+  ~/.autonomous-dev/deploy/ledger.json
+```
+
+If any signature-violation entry appears, file a TDD-023 issue —
+the entry is read-only evidence of tampering or a runtime bug.
+
+## 5. HealthMonitor + SLA tracker
+
+After a deploy enters `completed`, HealthMonitor watches the post-deploy
+SLA window for the configured duration (per TDD-023 §11). Inspect the
+live state:
+
+```bash
+deploy logs REQ-NNNNNN --health
+```
+
+Output includes latency p50/p95, error-rate, and the SLA window
+remaining. The `degraded` state activates when latency or error-rate
+breaches the threshold from `deploy.yaml`; HealthMonitor reports
+`degraded` and starts a duration timer.
+
+### Rollback decision tree
+
+When HealthMonitor reports `degraded`, decide based on duration:
+
+1. **Degraded for < 5 minutes:** monitor; transient blips are common
+   during warm-up. Do nothing yet — the timer may clear on its own.
+2. **Degraded for 5–30 minutes:** prepare for rollback. Alert on-call.
+   Capture metrics
+   (`deploy logs REQ-NNNNNN --health > /tmp/health.txt`). Run a dry-run
+   rollback (`deploy rollback REQ-NNNNNN --dry-run --to <prev>`) to
+   validate the target before executing.
+3. **Degraded for > 30 minutes:** execute rollback per §6.
+
+The thresholds are advisory — if the failure mode is unambiguous
+(for example, 5xx-rate at 100% from the first sample), skip directly to
+step 3 and execute the rollback. The rollback procedure itself lives in
+§6; do NOT duplicate it here.
+
+### What HealthMonitor does NOT do
+
+- HealthMonitor does NOT auto-rollback. The decision to roll back is
+  always operator-driven; the rollback decision tree above is the
+  authority.
+- HealthMonitor does NOT mutate the ledger. Health-check results are
+  written to a separate event stream (`deploy logs --health`); the cost
+  ledger only gains entries from `deploy plan` and from rollback.
+- HealthMonitor does NOT reach across environments. A `degraded` signal
+  on staging never triggers any action against prod.
+
+The `degraded → ok` transition is automatic once the SLA window closes
+without further breach. The duration timer resets at that point.
+
+## 6. Rollback
+
+When HealthMonitor's `degraded` state crosses the > 30-minute threshold
+(see §5), execute a rollback. The detailed mitigation playbook —
+pre-flight checks, communication template, post-mortem template —
+lives in PRD-014 §17.R7. This section documents the invocation surface
+and what the runtime preserves; do NOT duplicate the procedure here.
+
+### Invocation
+
+```bash
+deploy rollback REQ-NNNNNN --to <previous-deploy-id>
+```
+
+The `<previous-deploy-id>` is the request ID of the last `completed`
+deploy in the same env. Find it via:
+
+```bash
+deploy logs --env <env> --status completed
+```
+
+A dry-run is supported via `--dry-run`; it validates the target without
+mutating any state. Always dry-run before executing in prod.
+
+### What rollback preserves
+
+- **Logs.** `deploy logs REQ-NNNNNN` continues to return the failed
+  deploy's full event history. Rollback does NOT redact log content.
+- **Ledger entries.** Rollback APPENDS a new entry to
+  `~/.autonomous-dev/deploy/ledger.json` describing the rollback action;
+  the cost is recorded. **do NOT edit by hand** to suppress the entry —
+  the ledger discipline from §3 still applies during rollback.
+- **Audit history.** Both the failed deploy and the rollback action are
+  visible via `deploy logs --request REQ-NNNNNN`; the audit trail is
+  cumulative across the rollback boundary.
+
+The full mitigation playbook (pre-flight, comms template, post-mortem
+template) is in PRD-014 §17.R7. Read it before invoking rollback in
+prod for the first time.
+
+## 7. Common errors
+
+The eight mappings below cover the full set of operator-visible failure
+modes. Each row gives the symptom, the cause, and the action. For
+deeper context, follow the cross-reference in the action column.
+
+| Error / symptom | Cause | Action |
+|---|---|---|
+| Stuck on `awaiting-approval` | `deploy approve` was never run | `deploy approve REQ-NNNNNN` (or `deploy reject REQ-NNNNNN --reason "..."`) |
+| `cost-cap-tripped` after a crash | Inconsistent ledger entry from a mid-deploy crash | See §3 — `deploy ledger reset --request REQ-NNNNNN`; **do NOT edit by hand** |
+| `cost-cap-tripped` from duplicate entries | Clock skew across hosts produced a duplicate entry | See §3 — `deploy ledger reset --since <ISO-timestamp>` |
+| `backend not registered: gcp` (or `aws` / `azure` / `k8s`) | The cloud-backend plugin is not installed | Install the plugin: `claude plugin install autonomous-dev-deploy-gcp` (substitute the backend name); see TDD-025 for the cloud-plugin catalog |
+| HealthMonitor reports `degraded` | Latency or error-rate breach post-deploy | See §5 decision tree; rollback per §6 if duration exceeds 30 minutes |
+| `deploy.yaml: schema error` | Config does not validate against `deploy-config-v1` | Validate per TDD-023 §9; common causes are an `is_prod` typo, a missing `cost_cap_usd`, or a wrong `default_backend` |
+| "Prod skipped approval" — operator concern | Misread of the logs; this is **impossible by design** | Every env with `is_prod: true` requires approval **regardless of trust level**; see §2 + TDD-023 §11. Walk back through `deploy logs REQ-NNNNNN` — the `awaiting-approval` event IS there. Confirm `is_prod: true` is set in `deploy.yaml` for the env in question. |
+| Unknown `REQ-NNNNNN` | Request was rejected, expired, or never existed | `deploy logs REQ-NNNNNN` returns the historical state; if the result is empty, the ID is invalid — confirm it against the original `deploy plan` output |
+
+### How to read the table
+
+Each row maps a single observed symptom to the canonical recovery. The
+"Action" column is authoritative — do NOT improvise a recovery if the
+table prescribes one. The cost-cap rows in particular forward to §3
+because manual ledger edits are unsafe; follow the §3 procedure.
+
+### Notes on the "Prod skipped approval" mapping
+
+This is the single mapping operators most often arrive at after a
+shift-handover misread. The deploy framework's prod-override rule
+(see §2 callout) is enforced unconditionally; there is no path to
+`executing` for an `is_prod: true` env that bypasses
+`awaiting-approval`. If the logs appear to show otherwise, the most
+common explanation is that the request landed against a non-prod env
+that shares a similar name, OR the operator is reading
+`deploy logs --env staging` while believing it is prod. Confirm the
+env via `deploy logs REQ-NNNNNN | jq '.env'` (read-only, safe).
+
+### Notes on the "backend not registered" mapping
+
+The cloud-backend plugins ship via TDD-025 as separate Claude plugins
+(autonomous-dev-deploy-gcp, autonomous-dev-deploy-aws, etc.). They are
+not bundled with the assist plugin to keep the install lightweight. If
+the plugin is not installed, `deploy plan` returns a clear error; the
+recovery is `claude plugin install autonomous-dev-deploy-<backend>`
+followed by a fresh `deploy plan`.
+
+If the symptom does not match any row above, escalate per §8 See also —
+specifically, check whether the chains-runbook documents a parallel
+behavior (chain-aware deploys cross-reference both runbooks). When in
+doubt, the §3 ledger discipline and the §2 prod-override rule are the
+two invariants that always hold; do not improvise around them.
+
+## 8. See also
+
+- [`chains-runbook.md` §3 Audit verification](./chains-runbook.md#3-audit-verification) — the parallel safety-critical section
+- TDD-023 §5 (Deploy CLI), §11 (Trust integration), §14 (Ledger reset)
+- [`help/SKILL.md` Deploy Framework](../skills/help/SKILL.md#deploy-framework) — the quick reference
+- PRD-014 §17.R7 — Rollback mitigation playbook
+
+For broader operator concerns (daemon, kill-switch, circuit-breaker,
+config validation), see `runbook.md` — the top-level operator runbook
+linked from the See-also block at the end of that file.
