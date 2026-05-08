@@ -1,0 +1,19 @@
+name: observe
+# Rename this file to observe.yml to activate the observation cycle workflow.
+# See PRD-017 FR-1711-1714 for the observation runtime contract.
+on:
+  schedule:
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run observation cycle
+        env:
+          AUTONOMOUS_DEV_TOKEN: ${{ secrets.AUTONOMOUS_DEV_TOKEN }}
+        run: |
+          echo "autonomous-dev observe: opt-in observation cycle"
