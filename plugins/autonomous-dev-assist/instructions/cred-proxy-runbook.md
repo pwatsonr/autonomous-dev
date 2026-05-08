@@ -304,3 +304,106 @@ This is the most-misunderstood point about the K8s scoper. There are **two indep
 The cred-proxy will set the projected token's `expirationSeconds` to match `default_ttl_seconds`, but the cluster may extend it to its own minimum. **A K8s TokenRequest token is therefore typically a no-op to revoke client-side after expiry** — the cluster has its own view of the token's lifetime. If you suspect a token compromise on K8s, use `kubectl delete serviceaccount <name>` to invalidate the cluster-side, not just `cred-proxy revoke`.
 
 For deep coverage of the TokenRequest projection, audience-binding, and bound-service-account-token-volume semantics, see **TDD-024 §8 cred-proxy-scoper-k8s**. This runbook intentionally keeps K8s coverage shallow per TDD-025 NG-07.
+
+---
+
+## 4. Common failures
+
+The cred-proxy fails in four canonical ways. The detection signals below let you triage which failure mode applies before consulting §5 for the recovery procedure.
+
+### 4.1 Permission denied on the Unix socket
+
+The deploy worker (or any other client) cannot connect to `~/.autonomous-dev/cred-proxy/socket`. Symptom is `EACCES` or "Permission denied" on the connect call. Two root causes:
+
+- **Socket mode is not `0600`.** Verify with `ls -l ~/.autonomous-dev/cred-proxy/socket`. The file should be `srw-------`.
+- **Socket ownership does not match the running user.** Verify with `stat` (use `stat -f "%Sp %u %g"` on macOS, `stat -c "%a %u %g"` on Linux). The owner must match the user that runs both the daemon and the deploy worker.
+
+### 4.2 Scoper missing
+
+`cred-proxy issue <cloud> ...` fails with a "scoper not found" diagnostic, or `cred-proxy doctor` reports the requested cloud's scoper as missing. Detection: `ls ~/.autonomous-dev/cred-proxy/scopers/<cloud>` returns no such file. The scoper plugin has not been installed for that cloud.
+
+### 4.3 TTL expired mid-deploy
+
+A long-running deploy fails with an auth error (typically a 401, 403, or token-expired diagnostic from the cloud API) approximately 15 minutes after deploy start. The cred-proxy `audit.log` shows the issuance entry was issued well before the failure. Detection: `cred-proxy audit.log | tail` shows the issuance, and the elapsed time from issuance to failure exceeds `default_ttl_seconds` (default `900`).
+
+This is the **most-misdiagnosed failure mode**. Operators routinely interpret the auth error as a credential compromise and rotate root credentials. That is the wrong action. See §5.3.
+
+### 4.4 Audit-hash mismatch
+
+`cred-proxy doctor --verify-audit` reports a chain-hash mismatch. Some entry in `~/.autonomous-dev/cred-proxy/audit.log` has a hash that does not match the previous-entry hash chained through the audit key. Detection: the verbatim diagnostic output of `cred-proxy doctor --verify-audit` includes "chain mismatch" or "audit chain broken" (exact phrasing per TDD-024 §10).
+
+This is a **security-significant** event. The audit chain breaks for one of three reasons: (a) the audit log was edited or truncated outside the daemon; (b) the audit key changed mid-stream; (c) an actual integrity break worth investigating. In all three cases, the response is the same: **escalate**. Do not unilaterally "fix" the audit log. See §5.4 and §9.
+
+---
+
+## 5. Recovery
+
+For each failure in §4, the recovery procedure below. Read the §4 detection signal first to confirm which failure applies — applying the wrong recovery makes the situation worse (especially for §5.3).
+
+### 5.1 Permission denied on the Unix socket
+
+If the socket mode is wrong:
+
+```bash
+chmod 0600 ~/.autonomous-dev/cred-proxy/socket
+```
+
+If the socket ownership is wrong, restart the cred-proxy daemon as the deploying user (the user that runs the deploy worker, **not** root):
+
+```bash
+cred-proxy stop
+cred-proxy start
+cred-proxy doctor
+```
+
+If the daemon is not running at all, start it:
+
+```bash
+cred-proxy start
+```
+
+**Do not chown the socket to root.** The cred-proxy daemon enforces ownership at startup; chown-to-root will cause the daemon to refuse to start (and even if you bypass that check, the deploy worker, which runs as a non-root user, will still get `EACCES`). The socket *must* be owned by the deploying user.
+
+### 5.2 Scoper missing
+
+Install the missing scoper plugin for the affected cloud, then restart the daemon and re-verify:
+
+```bash
+claude plugin install cred-proxy-scoper-<cloud>   # one of aws, gcp, azure, k8s
+cred-proxy stop
+cred-proxy start
+cred-proxy doctor
+```
+
+`doctor` should now list the scoper as discoverable. Re-run the deploy.
+
+If you do not actually deploy to that cloud, check that the deploy command's target was correct — a typo in `--cloud` can request a scoper you never installed.
+
+### 5.3 TTL expired mid-deploy
+
+The auth failure is **expected** for any deploy whose wall-clock duration exceeds `default_ttl_seconds`. There are two correct recovery paths:
+
+- **Option A: Raise the TTL.** Edit `~/.autonomous-dev/cred-proxy/config.yaml` and increase `cred_proxy.default_ttl_seconds`. The practical upper bound for AWS STS chained roles is ~4 hours (14400 seconds); see §6 for the full TTL-tuning trade-off. After editing, restart the daemon (`cred-proxy stop && cred-proxy start`) and retry the deploy.
+- **Option B: Restructure the deploy** into shorter steps that each complete within `default_ttl_seconds`. This is the preferred long-term fix for deploys whose duration grows over time.
+
+**Do not rotate root credentials.** The auth failure is a TTL expiry, not a credential compromise. Rotating root credentials does not fix the underlying cause (the deploy still exceeds the TTL on the next attempt) and creates unnecessary downstream work (every other consumer of those credentials must be updated). The cred-proxy `audit.log` (§4.3 detection signal) confirms the issuance is legitimate.
+
+### 5.4 Audit-hash mismatch
+
+A chain-hash mismatch is a security-significant event. The recovery is **always escalation**, not a unilateral fix.
+
+```bash
+# Capture the diagnostic output for escalation:
+cred-proxy doctor --verify-audit > /tmp/audit-mismatch-$(date +%s).log
+
+# Stop the daemon to prevent further issuance until the mismatch is resolved:
+cred-proxy stop
+```
+
+Then escalate per §9. The on-call security contact will:
+
+- Compare the captured diagnostic against the operational audit-key rotation history.
+- Determine whether the mismatch is a benign cause (audit-key rotation without re-keying the chain) or a security-significant cause (log tampering, integrity break).
+- Decide on the recovery path (re-key the chain from a known-good entry; restore from a backup; investigate further).
+
+**Do not delete the audit log.** Deleting the log destroys the only forensic record of what was issued and when. **Do not edit the audit log.** Editing the log makes the chain-hash mismatch worse and obscures the original cause. **Do not attempt unilateral recovery.** Escalate and let the security contact decide.
