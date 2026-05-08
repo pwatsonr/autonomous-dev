@@ -30,7 +30,35 @@ for the PR; reviewers spot-check rows rather than every diff.
 
 ### Verification log (PLAN-031-4 task 2)
 
-TBD — populated when verification script self-tests run.
+Five paired self-tests for `scripts/verify-spec-reconciliation.sh`. Target SPEC
+for negative tests: `SPEC-001-1-01-scaffold-args-logging.md` (chosen as a
+stable, minimal canvas that contains none of the drift tokens at baseline).
+Each negative test: append a single offending line, run script, observe
+expected FAIL, `git checkout --` the SPEC, confirm hash matches the baseline
+SHA. Synthetic positive: run script against a temporary clean fixture.
+
+| # | Test | Expected | Observed | Tree clean after |
+|---|------|----------|----------|------------------|
+| 1 | NEGATIVE — path drift (`src/portal/foo.ts`) | exit 1; `FAIL: src/portal/ references remain` names target SPEC | exit 1; FAIL line emitted; target SPEC named | yes (git hash matches baseline) |
+| 2 | NEGATIVE — vitest token | exit 1; FAIL: vitest references remain | exit 1; vitest failure emitted | yes |
+| 3 | NEGATIVE — bats (`tests/unit/test_foo.sh`) | exit 1; FAIL: bats references remain | exit 1; bats failure emitted | yes |
+| 4 | NEGATIVE — fictional path (`plugins/autonomous-dev/never-existed.ts`) | exit 1; `MISSING: plugins/autonomous-dev/never-existed.ts` and final summary `FAIL: N cited paths do not exist` | exit 1; MISSING line emitted; summary present | yes |
+| 5 | POSITIVE — synthetic clean tree (mktemp fixture with one valid cite) | exit 0; final stdout `PASS`; runtime < 500 ms | exit 0; `PASS`; ~430 ms wall-clock | yes |
+
+**Note on the production-tree positive test (OQ-31-07).** SPEC-031-4-01 FR-7's
+positive test specifies running on the post-PLAN-031-3 working tree. The
+production tree at the time of this PR retains residual drift in SPECs that
+were OUT OF SCOPE for PRs #95 (PLAN-031-1/2; ~5 SPECs amended) and #97
+(PLAN-031-3; 5 SPECs amended). The verification script therefore exits 1 on
+the production tree by design — that is the gate firing, not a script defect.
+The script's correctness is demonstrated by the four negative tests + the
+synthetic positive (test #5). Production-tree PASS will follow once the
+remaining SPEC amendments land in follow-up PRs (tracked separately; see
+"Out of scope" below). The CI gate is intentionally enabled on `main` so the
+drift cannot expand beyond the current set.
+
+Runtime: 0.43 s wall-clock (target < 500 ms; PASS). Idempotence: re-running
+on the same tree produced byte-identical stderr (`diff a b` empty).
 
 ### Enforcement mechanism
 
