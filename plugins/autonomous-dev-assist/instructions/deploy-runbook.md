@@ -113,3 +113,9 @@ For trust-level semantics (which gates auto-approve at staging vs. which
 always require human action) see TDD-023 §11 Trust Integration. The
 prod-override holds at every trust level: L0, L1, L2, and L3 all enter
 `awaiting-approval` for `is_prod: true` environments.
+
+To inspect the live state of any request, run
+`deploy logs REQ-NNNNNN` — the event stream prints each transition with
+its timestamp. To list all in-flight requests for one env, run
+`deploy logs --env <env> --status awaiting-approval`. These are
+read-only commands and do not advance the state machine.
