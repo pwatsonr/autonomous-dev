@@ -3,7 +3,10 @@ module.exports = {
   displayName: 'autonomous-dev-portal:auth',
   rootDir: __dirname,
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/server/auth/__tests__/**/*.test.ts'],
+  testMatch: [
+    '<rootDir>/server/auth/__tests__/**/*.test.ts',
+    '<rootDir>/server/integration/__tests__/**/*.test.ts',
+  ],
   // ts-jest is resolved from the parent autonomous-dev plugin so the portal
   // does not need its own copy (TDD-030 §5.4 Option A: jest gate is the
   // autonomous-dev plugin's, not the portal's).
