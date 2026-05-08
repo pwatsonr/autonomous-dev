@@ -12,9 +12,12 @@ Implement defense-in-depth CSRF protection for the autonomous-dev portal combini
 
 | File | Action | Notes |
 |------|--------|-------|
-| `src/portal/security/types.ts` | Create | Shared interfaces (`CSRFConfig`, `CSRFToken`, `OriginValidationResult`) and Express request augmentation |
-| `src/portal/security/crypto-utils.ts` | Create | `randomToken(bytes)`, `hmacSign(secret, payload)`, `timingSafeCompare(a, b)` |
-| `src/portal/security/csrf-protection.ts` | Create | `CSRFProtection` class with `generateTokenForSession`, `validateToken`, `invalidateToken`, `cleanupExpiredTokens`, `middleware()` |
+<!-- moved-from: src/portal/security/types.ts -->
+| `plugins/autonomous-dev-portal/server/security/types.ts` | Create | Shared interfaces (`CSRFConfig`, `CSRFToken`, `OriginValidationResult`) and Express request augmentation |
+<!-- moved-from: src/portal/security/crypto-utils.ts -->
+| `plugins/autonomous-dev-portal/server/security/crypto-utils.ts` | Create | `randomToken(bytes)`, `hmacSign(secret, payload)`, `timingSafeCompare(a, b)` |
+<!-- moved-from: src/portal/security/csrf-protection.ts -->
+| `plugins/autonomous-dev-portal/server/security/csrf-protection.ts` | Create | `CSRFProtection` class with `generateTokenForSession`, `validateToken`, `invalidateToken`, `cleanupExpiredTokens`, `middleware()` |
 | `src/portal/security/origin-validation.ts` | Create | `OriginValidator` class with `validateRequest(req)` returning `{valid, reason}`; LRU cache for parsed origins |
 | `src/portal/config/security-config.ts` | Create | Centralized security config loader with env-var overrides and Zod schema validation |
 | `src/portal/middleware/csrf-middleware.ts` | Create | Express middleware wiring CSRF + Origin validators with HTMX-aware error responses |

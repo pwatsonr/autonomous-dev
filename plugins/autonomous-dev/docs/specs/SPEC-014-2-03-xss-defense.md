@@ -13,10 +13,13 @@ Build a multi-layer XSS defense for any user-influenced content rendered by the 
 | File | Action | Notes |
 |------|--------|-------|
 | `package.json` | Modify | Add deps: `marked@~5.1.2`, `dompurify@~3.0.5`, `jsdom@~22.1.0`, `@types/dompurify`, `@types/jsdom` |
-| `src/portal/security/sanitization-pipeline.ts` | Create | `MarkdownSanitizationPipeline` class; pure function `sanitizeMarkdown(md) -> SanitizationResult` |
-| `src/portal/security/sanitization-config.ts` | Create | Allowlists (tags, attributes, URL schemes), TTL/size limits, default config |
+<!-- moved-from: src/portal/security/sanitization-pipeline.ts -->
+| `plugins/autonomous-dev-portal/server/security/sanitization-pipeline.ts` | Create | `MarkdownSanitizationPipeline` class; pure function `sanitizeMarkdown(md) -> SanitizationResult` |
+<!-- moved-from: src/portal/security/sanitization-config.ts -->
+| `plugins/autonomous-dev-portal/server/security/sanitization-config.ts` | Create | Allowlists (tags, attributes, URL schemes), TTL/size limits, default config |
 | `src/portal/security/secure-diff-renderer.ts` | Create | `renderSecureDiff(unifiedDiff, opts) -> string` returning HTML built from entity-encoded content + CSS classes |
-| `src/portal/security/escape-helpers.ts` | Create | `escapeHtml`, `escapeAttr`, `escapeJsString`, `escapeUrl` pure helpers |
+<!-- moved-from: src/portal/security/escape-helpers.ts -->
+| `plugins/autonomous-dev-portal/server/security/escape-helpers.ts` | Create | `escapeHtml`, `escapeAttr`, `escapeJsString`, `escapeUrl` pure helpers |
 | `src/portal/helpers/markdown-helpers.ts` | Create | Handlebars helpers: `{{{md content}}}`, `{{{safeHtml content}}}`, `{{escape content}}`, `{{diff content}}` |
 | `src/portal/helpers/diff-helpers.ts` | Create | Handlebars helper integration for diff rendering, syntax-class assignment |
 | `src/portal/public/css/secure-syntax-highlighting.css` | Create | CSS-only syntax highlighting classes (`.tok-keyword`, `.tok-string`, etc.) for major languages |

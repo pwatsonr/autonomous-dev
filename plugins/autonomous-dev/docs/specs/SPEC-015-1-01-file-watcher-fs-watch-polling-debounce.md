@@ -15,10 +15,14 @@ The watcher is a pure infrastructure primitive: it emits typed change events to 
 
 | File | Action | Notes |
 |------|--------|-------|
-| `src/portal/watchers/FileWatcher.ts` | Create | Core class with native + polling backends, debounce, lifecycle |
-| `src/portal/watchers/types.ts` | Create | `FileChangeEvent`, `FileWatcherOptions`, `WatchMode` enum |
-| `src/portal/watchers/glob-resolver.ts` | Create | Pattern resolution helper (wraps `Bun.glob` / `glob` library) |
-| `src/portal/watchers/index.ts` | Create | Barrel export of `FileWatcher`, types |
+<!-- moved-from: src/portal/watchers/FileWatcher.ts -->
+| `plugins/autonomous-dev-portal/server/watchers/FileWatcher.ts` | Create | Core class with native + polling backends, debounce, lifecycle |
+<!-- moved-from: src/portal/watchers/types.ts -->
+| `plugins/autonomous-dev-portal/server/watchers/types.ts` | Create | `FileChangeEvent`, `FileWatcherOptions`, `WatchMode` enum |
+<!-- moved-from: src/portal/watchers/glob-resolver.ts -->
+| `plugins/autonomous-dev-portal/server/watchers/glob-resolver.ts` | Create | Pattern resolution helper (wraps `Bun.glob` / `glob` library) |
+<!-- moved-from: src/portal/watchers/index.ts -->
+| `plugins/autonomous-dev-portal/server/watchers/index.ts` | Create | Barrel export of `FileWatcher`, types |
 | `package.json` | Modify | Add `glob` dep if not already present from PLAN-013-2 |
 
 ## Implementation Details
