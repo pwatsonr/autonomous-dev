@@ -136,15 +136,12 @@ else
     fail "runbook: $bad 'manifest-v1' line(s) outside do-NOT context"
 fi
 
-# FR-21: markdown-link-check with deploy-runbook XFAIL
-# XFAIL: PLAN-026-3 lands the deploy-runbook target; remove this whitelist in SPEC-026-3-04
+# FR-21: markdown-link-check
 if command -v markdown-link-check >/dev/null 2>&1; then
-    out=$(markdown-link-check --quiet "$RUNBOOK_MD" 2>&1 || true)
-    filtered=$(echo "$out" | grep -E '^\s*\[✖\]' | grep -v 'deploy-runbook\.md' || true)
-    if [[ -z "$filtered" ]]; then
-        ok "link-check chains-runbook.md (deploy-runbook XFAIL whitelisted)"
+    if markdown-link-check --quiet "$RUNBOOK_MD" >/dev/null 2>&1; then
+        ok "link-check chains-runbook.md"
     else
-        fail "link-check chains-runbook.md: unexpected dead links: $filtered"
+        fail "link-check chains-runbook.md"
     fi
     for f in "$ASSIST_MD" "$QUICKSTART_MD"; do
         if markdown-link-check --quiet "$f" >/dev/null 2>&1; then
