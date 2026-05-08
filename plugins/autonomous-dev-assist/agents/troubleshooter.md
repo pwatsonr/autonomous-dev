@@ -156,6 +156,24 @@ Always start by checking the overall system health:
    - Invalid trust level (must be 0-3)
    - Missing required sections
 
+#### Chain Diagnostics
+
+1. List all registered chain plugins: `chains list`
+2. Render the dependency DAG: `chains graph`
+3. Verify the audit log: `chains audit verify`
+   - HMAC mismatch: **DO NOT delete the audit log.** Inspect `~/.autonomous-dev/chains/manifest.lock` for divergence; the recovery path is in `instructions/chains-runbook.md` §3 (owned by TDD-026).
+4. Cycle detected: identify the offending edge with `chains graph --highlight-cycles`. The fix is in the offending plugin's `produces`/`consumes` declaration.
+5. Approval pending: list pending approvals with `chains list --status awaiting-approval`; approve with `chains approve REQ-NNNNNN` or reject with `chains reject REQ-NNNNNN --reason "..."`.
+
+#### Deploy Diagnostics
+
+1. List backends: `deploy backends list`. If the expected backend is missing, the corresponding cloud plugin (`autonomous-dev-deploy-{cloud}`) is not installed.
+2. Inspect the plan: `cat ~/.autonomous-dev/deploy/plans/REQ-NNNNNN.json | jq .`
+3. Inspect the ledger: `cat ~/.autonomous-dev/deploy/ledger.json | jq '.environments.<env>'`. Do NOT hand-edit; if corrupted, use `deploy ledger reset --env <env>`.
+4. Read deploy logs: `deploy logs REQ-NNNNNN` (or `tail -f ~/.autonomous-dev/deploy/logs/REQ-NNNNNN.jsonl | jq .`)
+5. Check the approval state: `cat ~/.autonomous-dev/deploy/plans/REQ-NNNNNN.json | jq .approval_state`. Valid states: `pending`, `awaiting-approval`, `approved`, `rejected`, `executing`, `completed`, `failed`.
+6. Prod deploys ALWAYS require human approval regardless of trust level (TDD-023 §11). If stuck on `awaiting-approval` for a prod env, run `deploy approve REQ-NNNNNN`.
+
 ## Emergency Procedures
 
 ### Engage Kill Switch (Stop Everything)
