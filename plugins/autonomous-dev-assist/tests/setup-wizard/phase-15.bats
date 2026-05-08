@@ -121,3 +121,72 @@ teardown() {
   [ "$status" -eq 0 ]
   [ "$output" = "true" ]
 }
+
+# --- Catalog data-drivenness (FR-7) -----------------------------------------
+
+@test "P15-301 specialist-reviewers.json catalog exists and is a valid JSON array" {
+  local catalog="${BATS_TEST_DIRNAME}/../../../autonomous-dev/config/specialist-reviewers.json"
+  [ -f "$catalog" ]
+  run jq -e 'type == "array" and length > 0' "$catalog"
+  [ "$status" -eq 0 ]
+}
+
+@test "P15-302 every catalog entry declares the five contract fields" {
+  local catalog="${BATS_TEST_DIRNAME}/../../../autonomous-dev/config/specialist-reviewers.json"
+  # required: id, description, default_weight, default_threshold, requires_standards
+  run jq -e 'all(.[]; has("id") and has("description") and has("default_weight") and has("default_threshold") and has("requires_standards"))' "$catalog"
+  [ "$status" -eq 0 ]
+}
+
+# --- Sort determinism (FR-9) ------------------------------------------------
+
+@test "P15-401 reviewer-chain-render produces deterministic byte-identical output across replays" {
+  local renderer="$LIB_DIR/reviewer-chain-render.sh"
+  [ -f "$renderer" ]
+  local input='{"id":"security","weight":2,"threshold":0.8}
+{"id":"performance","weight":1,"threshold":0.7}
+{"id":"accessibility","weight":2,"threshold":0.6}'
+  local out1 out2
+  out1="$(printf '%s' "$input" | bash "$renderer")"
+  out2="$(printf '%s' "$input" | bash "$renderer")"
+  [ "$out1" = "$out2" ]
+}
+
+@test "P15-402 reviewer-chain-render: weight asc, ties broken by id asc" {
+  local renderer="$LIB_DIR/reviewer-chain-render.sh"
+  local input='{"id":"security","weight":2,"threshold":0.8}
+{"id":"performance","weight":1,"threshold":0.7}
+{"id":"accessibility","weight":2,"threshold":0.6}'
+  local out
+  out="$(printf '%s' "$input" | bash "$renderer")"
+  # Expect: performance (w=1) first, then accessibility (w=2 id<security), then security (w=2 id>access).
+  echo "$out" | grep -q '^  - id: performance$'
+  echo "$out" | grep -q '^  - id: accessibility$'
+  echo "$out" | grep -q '^  - id: security$'
+  # Order check
+  local i_perf i_acc i_sec
+  i_perf="$(echo "$out" | grep -n '^  - id: performance$' | head -1 | cut -d: -f1)"
+  i_acc="$(echo "$out" | grep -n '^  - id: accessibility$' | head -1 | cut -d: -f1)"
+  i_sec="$(echo "$out" | grep -n '^  - id: security$' | head -1 | cut -d: -f1)"
+  [ "$i_perf" -lt "$i_acc" ]
+  [ "$i_acc" -lt "$i_sec" ]
+}
+
+@test "P15-403 reviewer-chain-render: empty input emits empty specialist list" {
+  local renderer="$LIB_DIR/reviewer-chain-render.sh"
+  local out
+  out="$(printf '' | bash "$renderer")"
+  echo "$out" | grep -q '^specialists: \[\]$'
+}
+
+# --- Feature-flag override (FR-25) ------------------------------------------
+
+@test "P15-C02 phase_15_module_enabled override path documented in SKILL.md" {
+  # The orchestrator emits "Phase NN unavailable" per SPEC-033-1-03 FR-4.
+  # SKILL.md documents this contract.
+  local skill="${BATS_TEST_DIRNAME}/../../skills/setup-wizard/SKILL.md"
+  run grep -F 'Phase NN unavailable' "$skill"
+  [ "$status" -eq 0 ]
+  run grep -F 'phase_NN_module_enabled' "$skill"
+  [ "$status" -eq 0 ]
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "id": "security",
+    "description": "Security reviewer (auth, secrets, injection, common CVEs)",
+    "default_weight": 10,
+    "default_threshold": 0.8,
+    "requires_standards": false
+  },
+  {
+    "id": "performance",
+    "description": "Performance reviewer (allocations, hot loops, N+1, big-O)",
+    "default_weight": 20,
+    "default_threshold": 0.7,
+    "requires_standards": false
+  },
+  {
+    "id": "accessibility",
+    "description": "Accessibility reviewer (a11y, WCAG, ARIA, semantic HTML)",
+    "default_weight": 30,
+    "default_threshold": 0.7,
+    "requires_standards": false
+  },
+  {
+    "id": "db-migration",
+    "description": "Database migration reviewer (forward/back compat, lock-time)",
+    "default_weight": 40,
+    "default_threshold": 0.8,
+    "requires_standards": false
+  },
+  {
+    "id": "dependency-update",
+    "description": "Dependency-update reviewer (CVEs, breaking changes, license)",
+    "default_weight": 50,
+    "default_threshold": 0.7,
+    "requires_standards": false
+  },
+  {
+    "id": "engineering-standards",
+    "description": "Engineering-standards reviewer (TDD-021 standards.yaml)",
+    "default_weight": 60,
+    "default_threshold": 0.7,
+    "requires_standards": true
+  }
+]
