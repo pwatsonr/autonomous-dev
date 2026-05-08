@@ -273,6 +273,21 @@ cat .autonomous-dev/requests/REQ-*/state.json | jq '{id, status, title, cost_acc
 
 ---
 
+### Pipeline Pause States
+
+When a request pauses, the `status` field will indicate why. The four most common pause states for a fresh installation:
+
+| Pause state               | What it means                                                                | Operator action                                                                          |
+|---------------------------|------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| `awaiting-approval`       | A deploy plan or chain run is waiting for a human approval gate.             | `deploy approve REQ-NNNNNN` (or `chains approve`); for prod environments this is mandatory and expected for prod deploys. |
+| `cost-cap-tripped`        | The cumulative cost would exceed the per-environment cap.                    | Inspect `~/.autonomous-dev/deploy/ledger.json`; raise the cap in `deploy.yaml` or revert. do NOT hand-edit the ledger. |
+| `firewall-denied`         | The egress firewall denied an outbound connection a backend tried to make.    | Inspect `~/.autonomous-dev/firewall/denied.log`; update the per-plugin allowlist. This is expected for new plugins until their allowlist is configured. |
+| `cred-proxy-ttl-expired`  | The credential proxy's STS token (default 15 min) expired mid-deploy.        | Run `cred-proxy bootstrap --cloud <cloud>` to refresh; do NOT rotate root credentials.   |
+
+Each of these has a deeper troubleshooting walkthrough in the corresponding instruction runbook (`deploy-runbook.md`, `firewall-runbook.md`, `cred-proxy-runbook.md`).
+
+---
+
 ## After Onboarding
 
 Once all seven steps are verified, summarize what was set up and point the user to next steps:
@@ -291,3 +306,24 @@ Once all seven steps are verified, summarize what was set up and point the user 
 - After each step, give a brief "what we just did" summary so the user builds a mental model.
 - Number your steps clearly. Use checkmarks or explicit "Step N complete" confirmations.
 - Do not dump all seven steps at once. Do one step at a time, verify, then move on.
+
+## Appendix: First Cloud Deploy
+
+If you intend to use autonomous-dev with a cloud target (GCP, AWS, Azure, or Kubernetes), the local-only steps above are not sufficient. The cloud deploy path requires:
+
+1. The matching cloud plugin (`autonomous-dev-deploy-gcp`, `-aws`, `-azure`, or `-k8s`) to be installed.
+2. A bootstrapped credential proxy (`cred-proxy bootstrap --cloud <cloud>`).
+3. A configured egress firewall backend (`firewall init` on Linux/macOS; or explicit opt-out for development).
+4. A dry-run deploy to confirm end-to-end connectivity.
+
+For a guided walkthrough of all four prerequisites, run:
+
+```
+/autonomous-dev-assist:setup-wizard --with-cloud
+```
+
+The wizard's phase 16 ("Deploy Backends") covers cloud-plugin selection, cred-proxy bootstrap, firewall configuration, and a dry-run deploy. It is **opt-in**: the local-only path you completed in steps 1-7 above is unaffected.
+
+For the underlying surfaces:
+- Plugin chains and deploy: see `instructions/chains-runbook.md`, `instructions/deploy-runbook.md` (owned by TDD-026).
+- Credential proxy and firewall: see `instructions/cred-proxy-runbook.md`, `instructions/firewall-runbook.md` (owned by TDD-025).
