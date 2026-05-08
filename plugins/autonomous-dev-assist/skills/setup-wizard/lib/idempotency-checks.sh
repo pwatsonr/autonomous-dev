@@ -284,11 +284,73 @@ phase-13-probe() {
 }
 
 phase-14-probe() {
-  wizard_state_phase_complete 14
+  # Compose standards_yaml_exists_at + today's dry-run file presence.
+  # Layout:
+  #   start-fresh             → standards.yaml missing
+  #   resume-from:offer-pack  → standards.yaml present but invalid (resume-with-diff)
+  #   resume-from:meta-reviewer-dry-run → valid yaml but no today's dry-run file
+  #   already-complete        → valid yaml + today's dry-run file present
+  local repo="${WIZARD_REPO:-$PWD}"
+  local target="$repo/.autonomous-dev/standards.yaml"
+  local probe
+  probe="$(standards_yaml_exists_at "$target")" || return $?
+  case "$probe" in
+    start-fresh)
+      echo "start-fresh"; return 0 ;;
+    resume-with-diff)
+      echo "resume-from:offer-pack"; return 0 ;;
+    already-complete)
+      local today
+      today="$(date -u +%Y-%m-%d)"
+      if [[ -f "$repo/.autonomous-dev/standards-dry-run-${today}.json" ]]; then
+        echo "already-complete"
+      else
+        echo "resume-from:meta-reviewer-dry-run"
+      fi
+      return 0 ;;
+  esac
+  echo "start-fresh"
+  return 0
 }
 
 phase-15-probe() {
-  wizard_state_phase_complete 15
+  # SPEC-033-3-03: chain.yaml present + dry-run within 7 days → already-complete.
+  # No file → start-fresh; file present but dry-run stale or absent →
+  # resume-from:enumerate.
+  local repo="${WIZARD_REPO:-$PWD}"
+  local target="$repo/.autonomous-dev/reviewer-chains.yaml"
+  if [[ ! -f "$target" ]]; then
+    echo "start-fresh"; return 0
+  fi
+  local cfg="${AUTONOMOUS_DEV_CONFIG:-$HOME/.autonomous-dev/config.json}"
+  if [[ ! -f "$cfg" ]]; then
+    echo "resume-from:enumerate"; return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    _idem_err "jq not on PATH"
+  fi
+  local last
+  last="$(jq -r '.reviewer_chains.last_dry_run_at // empty' "$cfg" 2>/dev/null)"
+  if [[ -z "$last" ]]; then
+    echo "resume-from:enumerate"; return 0
+  fi
+  # Compare wall-clock dates: stale if older than 7 days. Use date to compute
+  # epoch seconds in a portable way; on macOS shasum-style date -j is needed,
+  # but date -d works on Linux. We try both.
+  local last_epoch now_epoch age_days
+  if last_epoch="$(date -u -d "$last" +%s 2>/dev/null)"; then :
+  elif last_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$last" +%s 2>/dev/null)"; then :
+  else
+    echo "resume-from:enumerate"; return 0
+  fi
+  now_epoch="$(date -u +%s)"
+  age_days=$(( (now_epoch - last_epoch) / 86400 ))
+  if (( age_days > 7 )); then
+    echo "resume-from:enumerate"
+  else
+    echo "already-complete"
+  fi
+  return 0
 }
 
 phase-16-probe() {

@@ -102,6 +102,41 @@ teardown() {
   [ "$output" = "start-fresh" ]
 }
 
+@test "IC-702 standards_yaml_exists_at: file exists + validate exit 0 → already-complete" {
+  mkdir -p "$TMPDIR_BATS/repo/.autonomous-dev"
+  local f="$TMPDIR_BATS/repo/.autonomous-dev/standards.yaml"
+  printf 'rules: []\n' > "$f"
+  # Stub `autonomous-dev` to return 0 for `standards validate ...`.
+  local stubdir="$TMPDIR_BATS/stubdir"
+  mkdir -p "$stubdir"
+  cat > "$stubdir/autonomous-dev" <<'EOF'
+#!/usr/bin/env bash
+[[ "$1 $2" == "standards validate" ]] && exit 0
+exit 0
+EOF
+  chmod +x "$stubdir/autonomous-dev"
+  PATH="$stubdir:$PATH" run bash "$LIB" standards_yaml_exists_at "$f"
+  [ "$status" -eq 0 ]
+  [ "$output" = "already-complete" ]
+}
+
+@test "IC-703 standards_yaml_exists_at: file exists + validate non-zero → resume-with-diff" {
+  mkdir -p "$TMPDIR_BATS/repo/.autonomous-dev"
+  local f="$TMPDIR_BATS/repo/.autonomous-dev/standards.yaml"
+  printf 'rules: []\n' > "$f"
+  local stubdir="$TMPDIR_BATS/stubdir"
+  mkdir -p "$stubdir"
+  cat > "$stubdir/autonomous-dev" <<'EOF'
+#!/usr/bin/env bash
+[[ "$1 $2" == "standards validate" ]] && exit 1
+exit 0
+EOF
+  chmod +x "$stubdir/autonomous-dev"
+  PATH="$stubdir:$PATH" run bash "$LIB" standards_yaml_exists_at "$f"
+  [ "$status" -eq 0 ]
+  [ "$output" = "resume-with-diff" ]
+}
+
 @test "IC-704 standards_yaml_exists_at: CLI missing + file present → exit 2" {
   mkdir -p "$TMPDIR_BATS/repo/.autonomous-dev"
   local f="$TMPDIR_BATS/repo/.autonomous-dev/standards.yaml"
