@@ -19,6 +19,8 @@ You describe what you want -- in plain English, through the Claude App, Discord,
 
 You stay in control. The system asks for your approval at key checkpoints (you choose how many via trust levels), and you can hit a kill switch at any time to stop everything.
 
+This plugin was extended under PRD-015 to cover plugin chains, deployment backends, cloud onboarding, credential proxy, and egress firewall. See [PRD-015 §11 Launch Plan](../../../autonomous-dev/docs/prd/PRD-015-assist-extension-for-chains-deploy-cloud.md#11-launch-plan) for the four-TDD breakdown (TDD-025, TDD-026, TDD-027, TDD-028).
+
 ---
 
 ## The Document Pipeline (PRD > TDD > Plan > Spec > Code)
@@ -257,7 +259,7 @@ The daemon only operates on repositories listed in the `repositories.allowlist` 
 
 ## Agent Factory
 
-The system ships with 13 specialist agents:
+The system ships with 18 specialist agents:
 
 | Agent | Role |
 |---|---|
@@ -274,6 +276,16 @@ The system ships with 13 specialist agents:
 | doc-reviewer | Reviews documents |
 | performance-analyst | Reviews performance |
 | agent-meta-reviewer | Reviews agent improvements |
+| standards-meta-reviewer | Audits standards.yaml changes for rule conflicts and impact (read-only) |
+<!-- verbatim: Audits proposed changes to standards.yaml for rule conflicts, unworkability, impact on existing code, and overly broad predicates. Read-only. -->
+| qa-edge-case-reviewer | Hunts edge cases, race conditions, null handling, and resource leaks |
+<!-- verbatim: Specialist reviewer that hunts edge cases, boundary conditions, race conditions, error paths, null handling, and resource leaks. -->
+| ux-ui-reviewer | Reviews UX/UI heuristics: density, color, state coverage, responsiveness |
+<!-- verbatim: Specialist reviewer for UX/UI heuristics: density, color signaling, state coverage, responsiveness, form/button labels. -->
+| accessibility-reviewer | Reviews WCAG 2.2 AA conformance (contrast, keyboard, focus, ARIA, alt) |
+<!-- verbatim: Specialist reviewer for WCAG 2.2 AA conformance: contrast (4.5:1 / 3:1), keyboard accessibility, focus order, ARIA, alt text. -->
+| rule-set-enforcement-reviewer | Enforces project standards.yaml; one finding per violation, tagged rule_id |
+<!-- verbatim: Specialist reviewer that enforces project-defined standards from .autonomous-dev/standards.yaml; one finding per rule violation, each tagged with rule_id. -->
 
 The Agent Factory is a self-improvement subsystem that:
 

@@ -1,9 +1,19 @@
 # Eval-Case-v1 Schema Fixtures
 
 This directory contains canonical valid and invalid examples for the
-`eval-case-v1.json` schema (SPEC-028-1-01). The fixture set is the regression
-corpus for `meta-lint.sh` (SPEC-028-1-02) and the copy-and-edit starting point
-for sibling TDD-025 and TDD-026 case authors.
+`eval-case-v1.json` schema (SPEC-028-1-01). Fixture authoring and the
+fixtures index in this README are owned by **SPEC-028-1-05**. The fixture
+set is the regression corpus for `meta-lint.sh` (SPEC-028-1-02) and the
+copy-and-edit starting point for sibling TDD-025 and TDD-026 case authors.
+
+## Status
+
+- 10 valid fixtures, one per `category` enum value (FR-6 of SPEC-028-1-05).
+- 10 invalid fixtures, one per documented violation (FR-7 of SPEC-028-1-05).
+- Validator outcomes match the table below: 10 PASS, 10 FAIL with the
+  documented error path. Re-verify with `bash evals/meta-lint.sh` or with
+  the standalone Python loop documented in SPEC-028-1-05 §Validation
+  procedure.
 
 ## Valid fixtures (PASS)
 
