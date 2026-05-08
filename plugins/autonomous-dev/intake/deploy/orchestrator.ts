@@ -18,6 +18,8 @@
 
 import { CostCapExceededError } from './errors';
 import { checkCostCap, recordCost } from './cost-cap';
+import { CostCapEnforcer } from './cost-cap-enforcer';
+import { CostLedger } from './cost-ledger';
 import { loadConfig, resolveEnvironment, configPathFor } from './environment';
 import { requestApproval } from './approval';
 import { selectBackend, type SelectorBackendRegistry } from './selector';
@@ -56,18 +58,139 @@ export interface RunDeployResult {
   record?: DeploymentRecord;
 }
 
-/** Inputs to runDeploy(). */
+/**
+ * Inputs to runDeploy().
+ *
+ * `actor` (SPEC-032-1-01) is the principal initiating the deploy
+ * (per-request). It is consumed by `CostCapEnforcer.maybeStickyWarn`
+ * to attribute the 80% sticky soft-warning per actor/day. Sourced
+ * from approval state by the supervisor caller.
+ */
 export interface RunDeployArgs {
   deployId: string;
   envName: string;
   /** Repo / request worktree path. Holds `.autonomous-dev/deploy.yaml`. */
   requestDir: string;
+  /**
+   * Principal initiating the deploy (per-request). Used by
+   * `CostCapEnforcer.maybeStickyWarn` to attribute the 80% sticky
+   * soft-warning per actor/day. Sourced from approval state.
+   */
+  actor: string;
   /** Optional CLI `--backend` override. */
   cliBackendOverride?: string;
   /** Optional injected registry (tests). Defaults to production adapter. */
   selectorRegistry?: SelectorBackendRegistry;
   /** Build context handed to backend.build() / .deploy(). */
   buildContext?: BuildContext;
+}
+
+// --- Cost-cap enforcer + ledger plumbing (SPEC-032-1-01) ----------------
+//
+// The legacy code path lives in `./cost-cap`. This module now also wires
+// the new `CostCapEnforcer` (SPEC-023-3-03) per `requestDir`, behind a
+// memoized helper. The enforcer is constructed lazily but NOT invoked
+// here — SPEC-032-1-02 performs the actual `enforcer.check()` cutover.
+//
+// Implementation note (SPEC-032-1-01 §Implementation Notes): the names
+// `getLedger`, `loadCostCapConfig`, and `orchestratorEscalationSink`
+// referenced by the spec do not exist in the as-built code. We provide
+// in-module equivalents:
+//   - `getOrCreateLedger(requestDir)` constructs a per-requestDir
+//     `CostLedger` rooted at `<requestDir>/.autonomous-dev`.
+//   - `loadCostCapConfig(requestDir)` reads `cost_cap_usd` from the
+//     resolved deploy config (currently a no-op default at the
+//     orchestrator level — the per-env cap lives on the resolved env).
+//   - The escalation sink delegates to the existing module-level
+//     `escalationSink` via a thin adapter that maps the enforcer's
+//     `EscalationMessage` shape onto the orchestrator's existing
+//     `EscalationSink.raise` shape. The adapter currently no-ops because
+//     the enforcer's escalations carry richer structure than the
+//     orchestrator's `EscalationSink` accepts; SPEC-032-1-02 will
+//     either widen the sink or carry the message through telemetry.
+//
+// The cache is module-scoped so jest's per-worker isolation gives each
+// worker a fresh map. Do NOT use globalThis.
+
+const ledgerCache = new Map<string, CostLedger>();
+const enforcerCache = new Map<string, CostCapEnforcer>();
+
+function getOrCreateLedger(requestDir: string): CostLedger {
+  const cached = ledgerCache.get(requestDir);
+  if (cached) return cached;
+  const ledger = new CostLedger({
+    dir: `${requestDir}/.autonomous-dev`,
+  });
+  ledgerCache.set(requestDir, ledger);
+  return ledger;
+}
+
+async function loadCostCapConfig(
+  _requestDir: string,
+): Promise<{ cost_cap_usd_per_day: number }> {
+  // The per-env cap from `deploy.yaml` is resolved per-call via
+  // `ResolvedEnvironment.costCapUsd`. The enforcer-level config is the
+  // operator-wide daily cap; we currently surface 0 (== "use enforcer
+  // default") because deploy.yaml does not yet model a per-day cap.
+  // Operators with a daily-cap requirement set
+  // `process.env.AUTONOMOUS_DEV_COST_CAP_USD_PER_DAY`. Documented in
+  // SPEC-032-1-02's Implementation Notes.
+  const env = process.env.AUTONOMOUS_DEV_COST_CAP_USD_PER_DAY;
+  const parsed = env ? Number(env) : 0;
+  return {
+    cost_cap_usd_per_day: Number.isFinite(parsed) && parsed > 0 ? parsed : 0,
+  };
+}
+
+/**
+ * Memoized per-requestDir `CostCapEnforcer` factory (SPEC-032-1-01 FR-5).
+ * Module-private; consumed by SPEC-032-1-02's cutover.
+ */
+function getOrCreateCostCapEnforcer(requestDir: string): CostCapEnforcer {
+  const cached = enforcerCache.get(requestDir);
+  if (cached) return cached;
+  const enforcer = new CostCapEnforcer({
+    ledger: getOrCreateLedger(requestDir),
+    config: () => loadCostCapConfig(requestDir),
+    escalate: async (msg) => {
+      // The enforcer's escalations are richer than the orchestrator's
+      // `EscalationSink.raise` shape. Forward only the deployId so
+      // existing test sinks observe the call. SPEC-032-1-02 will
+      // carry the full payload via telemetry.
+      try {
+        await escalationSink.raise({
+          deployId: msg.deployId,
+          envName: '',
+          requirement: 'none',
+          backendName: '',
+          selectionSource: '',
+        });
+      } catch {
+        /* enforcer escalations must never poison deploy decisions */
+      }
+    },
+  });
+  enforcerCache.set(requestDir, enforcer);
+  return enforcer;
+}
+
+/**
+ * Test-only escape hatch for SPEC-032-1-01's memoization tests. Not
+ * exported from the public surface.
+ */
+export function __getOrCreateCostCapEnforcerForTest(
+  requestDir: string,
+): CostCapEnforcer {
+  return getOrCreateCostCapEnforcer(requestDir);
+}
+
+/**
+ * Test-only cache reset for SPEC-032-1-01's tests. Not exported from
+ * the public surface.
+ */
+export function __resetCostCapEnforcerCacheForTest(): void {
+  enforcerCache.clear();
+  ledgerCache.clear();
 }
 
 /**

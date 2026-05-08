@@ -193,6 +193,7 @@ describe('SPEC-023-2-05 dev -> staging -> prod promotion', () => {
       deployId: args.deployId,
       envName: args.envName,
       requestDir,
+      actor: 'test-actor',
       selectorRegistry,
       buildContext: args.buildContext ?? ({
         repoPath: requestDir,
