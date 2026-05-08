@@ -1,7 +1,7 @@
 ---
 name: eval
-description: Run the autonomous-dev-assist eval harness to validate skill accuracy. Optionally specify a suite (help, troubleshoot, config).
-argument-hint: "[help|troubleshoot|config|all]"
+description: Run the autonomous-dev-assist eval harness to validate skill accuracy. Optionally specify a suite (help, troubleshoot, config, chains, deploy, cred-proxy, firewall).
+argument-hint: "[help|troubleshoot|config|chains|deploy|cred-proxy|firewall|all]"
 allowed-tools: Read(*), Bash(*)
 model: claude-sonnet-4-6
 user-invocable: true
@@ -15,7 +15,16 @@ The user may specify a suite argument:
 - `help` -- Run only the help/usage question evals
 - `troubleshoot` -- Run only the troubleshooting evals
 - `config` -- Run only the configuration evals
-- `all` or no argument -- Run all suites
+- `chains` -- Run only the chain-surface evals (TDD-022)
+- `deploy` -- Run only the deploy-surface evals (TDD-023)
+- `cred-proxy` -- Run only the credential-proxy evals (TDD-024 §7-§10)
+- `firewall` -- Run only the egress-firewall evals (TDD-024 §11-§13)
+- `all` or no argument -- Run all eight suites in invocation order
+
+**Per-PR vs. nightly invocation:**
+
+- Per-PR CI: invoke single suites with `--suite <name>` to keep CI cost low (one suite ≈ $1.50).
+- Nightly: invoke `--suite all` to catch cross-suite drift (~$8.50).
 
 ## Step 2: Load eval cases
 

@@ -115,6 +115,23 @@ load_config() {
 }
 
 # ---------------------------------------------------------------------------
+# suite_threshold SUITE_NAME
+#   Returns the per-suite score threshold for a given suite, honoring
+#   thresholds.per_suite_overrides.<suite> when present (SPEC-028-1-03 FR-6).
+#   Falls back to THRESHOLD_PER_SUITE when no override is configured.
+# ---------------------------------------------------------------------------
+suite_threshold() {
+  local suite="$1"
+  local override
+  override=$(yq -r ".thresholds.per_suite_overrides.\"${suite}\" // \"\"" "${CONFIG_FILE}" 2>/dev/null || echo "")
+  if [[ -n "${override}" && "${override}" != "null" ]]; then
+    echo "${override}"
+  else
+    echo "${THRESHOLD_PER_SUITE}"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # invoke_skill SKILL_NAME QUESTION
 #   Sends the question to the skill via `claude -p` and captures the response.
 #
@@ -226,8 +243,10 @@ run_help_suite() {
     suite_avg=$((suite_total_score / case_count))
   fi
 
+  local effective_threshold
+  effective_threshold=$(suite_threshold "help")
   local suite_status="PASS"
-  if [[ "$suite_avg" -lt "$THRESHOLD_PER_SUITE" ]]; then
+  if [[ "$suite_avg" -lt "$effective_threshold" ]]; then
     suite_status="FAIL"
     EXIT_CODE=1
   fi
@@ -252,7 +271,7 @@ run_help_suite() {
   if [[ "$suite_status" == "PASS" ]]; then
     pass "help suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed)"
   else
-    fail "help suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed) -- BELOW THRESHOLD ${THRESHOLD_PER_SUITE}"
+    fail "help suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed) -- BELOW THRESHOLD ${effective_threshold}"
   fi
 }
 
@@ -347,8 +366,10 @@ run_troubleshoot_suite() {
     suite_avg=$((suite_total_score / case_count))
   fi
 
+  local effective_threshold
+  effective_threshold=$(suite_threshold "troubleshoot")
   local suite_status="PASS"
-  if [[ "$suite_avg" -lt "$THRESHOLD_PER_SUITE" ]]; then
+  if [[ "$suite_avg" -lt "$effective_threshold" ]]; then
     suite_status="FAIL"
     EXIT_CODE=1
   fi
@@ -373,7 +394,7 @@ run_troubleshoot_suite() {
   if [[ "$suite_status" == "PASS" ]]; then
     pass "troubleshoot suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed)"
   else
-    fail "troubleshoot suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed) -- BELOW THRESHOLD ${THRESHOLD_PER_SUITE}"
+    fail "troubleshoot suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed) -- BELOW THRESHOLD ${effective_threshold}"
   fi
 }
 
@@ -491,8 +512,10 @@ run_config_suite() {
     suite_avg=$((suite_total_score / case_count))
   fi
 
+  local effective_threshold
+  effective_threshold=$(suite_threshold "config")
   local suite_status="PASS"
-  if [[ "$suite_avg" -lt "$THRESHOLD_PER_SUITE" ]]; then
+  if [[ "$suite_avg" -lt "$effective_threshold" ]]; then
     suite_status="FAIL"
     EXIT_CODE=1
   fi
@@ -517,7 +540,7 @@ run_config_suite() {
   if [[ "$suite_status" == "PASS" ]]; then
     pass "config suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed)"
   else
-    fail "config suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed) -- BELOW THRESHOLD ${THRESHOLD_PER_SUITE}"
+    fail "config suite: avg ${suite_avg}/100 (${suite_passed}/${case_count} passed) -- BELOW THRESHOLD ${effective_threshold}"
   fi
 }
 
