@@ -4,7 +4,11 @@
   "private": true,
   "description": "Autonomous development pipeline plugin for Claude Code",
   "type": "module",
+  "bin": {
+    "reload-plugins": "./bin/reload-plugins.js"
+  },
   "scripts": {
+    "prepare": "node -e \"try{require('fs').chmodSync('./bin/reload-plugins.js', 0o755)}catch{}\"",
     "test": "jest --passWithNoTests",
     "test:slack": "jest tests/adapters/slack-setup.test.ts",
     "test:cli": "jest intake/adapters/cli_adapter.test.ts",
