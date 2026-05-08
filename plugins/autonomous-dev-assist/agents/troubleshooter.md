@@ -54,6 +54,7 @@ autonomous-dev is a daemon-based system that receives product requests, decompos
 | `~/.autonomous-dev/deploy/logs/` | Per-request `deploy logs` JSONL output, one file per REQ-NNNNNN. |
 | `~/.autonomous-dev/cred-proxy/socket` | SCM_RIGHTS Unix socket (TDD-024 §8). Permissions must be `0600`; check with `stat`. |
 | `~/.autonomous-dev/cred-proxy/audit.log` | Per-issuance audit hash log (TDD-024 §10). |
+| `~/.autonomous-dev/cred-proxy/scopers/<cloud>` | Per-cloud scoper plugin install path (`<cloud>` = `aws`, `gcp`, `azure`, or `k8s`). The scoper translates root credentials into a scoped short-lived token. |
 | `~/.autonomous-dev/firewall/allowlist` | Resolved per-plugin egress allowlist (TDD-024 §11). |
 | `~/.autonomous-dev/firewall/denied.log` | Per-deny event log; `tail` for live denials. |
 
@@ -176,10 +177,12 @@ Always start by checking the overall system health:
 
 #### Credential-Proxy Diagnostics
 
-1. Health check: `cred-proxy doctor`. Reports socket permissions, scoper plugins, last issuance, and TTL.
-2. Permission denied on socket: check `stat ~/.autonomous-dev/cred-proxy/socket` for `0600`. If wrong, restart cred-proxy.
-3. TTL expired mid-deploy: do NOT rotate root credentials. Re-bootstrap with `cred-proxy bootstrap --cloud <cloud>`.
-4. Detail in `instructions/cred-proxy-runbook.md` (owned by TDD-025).
+1. Health check: `cred-proxy doctor`. Full cred-proxy diagnostic: socket perms, scoper plugin presence, root-cred reachability per cloud. Use as the first response to any cred-proxy `permission denied` or `scoper not found` symptom.
+2. Audit-chain verification: `cred-proxy doctor --verify-audit`. Verifies the HMAC-chain integrity of `~/.autonomous-dev/cred-proxy/audit.log`. A mismatch is **always** an escalation, never a unilateral recovery.
+3. Permission denied on socket: check `stat ~/.autonomous-dev/cred-proxy/socket` for `0600`. If wrong, restart cred-proxy as the deploying user. Do NOT chown the socket to root; the proxy enforces ownership at startup and a root-owned socket breaks the ownership invariant.
+4. TTL expired mid-deploy: do NOT rotate root credentials. Re-bootstrap with `cred-proxy bootstrap --cloud <cloud>`.
+5. Audit log integrity: `~/.autonomous-dev/cred-proxy/audit.log` is HMAC-chained. **Do not delete the audit log.** Deletion breaks the chain and forfeits forensic capability.
+6. Detail in `instructions/cred-proxy-runbook.md` (owned by TDD-025).
 
 #### Firewall Diagnostics
 

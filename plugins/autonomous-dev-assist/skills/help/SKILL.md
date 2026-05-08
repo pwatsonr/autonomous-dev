@@ -383,3 +383,91 @@ Run the Production Intelligence observation cycle (Claude Code slash command).
 ```
 
 Executes the full 4-phase observation lifecycle: Initialize, Triage, Service Loop (collect, scrub, analyze, deduplicate, govern, report), Finalize.
+
+---
+
+## Cloud Backends
+
+The `autonomous-dev-deploy-*` plugin family provides cloud-specific deploy backends. Each plugin registers a backend with the deploy framework and is independently installable.
+
+### What are the cloud backends?
+
+Four plugins, one per cloud, each declaring `provides: deploy-backend` and a `backend-name`. The deploy framework's `BackendRegistry` discovers them at daemon start; `deploy backends` lists installed backends.
+
+### Installation
+
+Install per cloud with the marketplace command:
+
+```
+claude plugin install autonomous-dev-deploy-gcp
+claude plugin install autonomous-dev-deploy-aws
+claude plugin install autonomous-dev-deploy-azure
+claude plugin install autonomous-dev-deploy-k8s
+```
+
+Operators install only the clouds they target. No cloud is installed by default.
+
+### Capability declarations
+
+| Plugin                          | Backend  | Targets                              | Tool dependency |
+|---------------------------------|----------|--------------------------------------|-----------------|
+| `autonomous-dev-deploy-gcp`     | `gcp`    | GCE, Cloud Run, GKE                  | `gcloud`        |
+| `autonomous-dev-deploy-aws`     | `aws`    | EC2, ECS, EKS, Lambda                | `aws`           |
+| `autonomous-dev-deploy-azure`   | `azure`  | App Service, AKS                     | `az`            |
+| `autonomous-dev-deploy-k8s`     | `k8s`    | Generic Kubernetes (any provider)    | `kubectl`       |
+
+### Egress allowlist defaults
+
+Each cloud-backend plugin declares an `egress-allowlist-defaults` field in its manifest (e.g., `*.googleapis.com`, `*.gcr.io` for GCP). The egress firewall enforces these defaults when enabled. See TDD-028 for the firewall runtime.
+
+### See also
+
+- Deploy runbook: `plugins/autonomous-dev-assist/instructions/deploy-runbook.md`
+- Credential Proxy section below
+
+---
+
+## Credential Proxy
+
+The credential proxy issues short-lived, scope-narrowed credentials to the deploy framework so root credentials never reach the deploy worker process.
+
+### What is the credential proxy?
+
+A daemon listening on a Unix-domain socket at `~/.autonomous-dev/cred-proxy/socket` (mode `0600`, owner-only). The deploy worker requests a scoped credential; the proxy invokes the per-cloud scoper to mint a short-lived token; the token is passed to the worker via SCM_RIGHTS file-descriptor passing. The worker never sees root credentials.
+
+### The six CLI subcommands
+
+| Subcommand                           | Purpose                                                              |
+|--------------------------------------|----------------------------------------------------------------------|
+| `cred-proxy start`                   | Launch the proxy daemon                                              |
+| `cred-proxy stop`                    | Stop the daemon (revokes outstanding tokens)                         |
+| `cred-proxy status`                  | Daemon health and active token count                                 |
+| `cred-proxy doctor`                  | Diagnostic: socket perms, scoper presence, root-cred reachability    |
+| `cred-proxy issue <cloud> <scope>`   | Manual token issuance (typically for testing)                        |
+| `cred-proxy revoke <token-id>`       | Emergency revoke                                                     |
+
+### The four scopers
+
+Each cloud has its own scoper plugin (installed independently of the cloud-backend plugin):
+
+- `cred-proxy-scoper-aws` — translates root credentials to STS short-term credentials with IAM-policy-narrowed scope.
+- `cred-proxy-scoper-gcp` — translates a service-account keyfile to a short-lived OIDC token.
+- `cred-proxy-scoper-azure` — uses `az account get-access-token --resource <scope>`.
+- `cred-proxy-scoper-k8s` — projects a service-account token via the TokenRequest API.
+
+### TTL and auto-revoke
+
+The default TTL is **15 minutes** (`900` seconds). On expiry, the proxy closes the deploy worker's file descriptor immediately; the worker's next API call against the cloud fails with the cloud's standard auth-expired error. Long-running deploys must either raise `default_ttl_seconds` (see the `cred_proxy` config-guide section) or restructure into shorter steps.
+
+### The per-issuance audit hash
+
+Every issuance writes an HMAC-chained entry to `~/.autonomous-dev/cred-proxy/audit.log` recording token-id, cloud, scope, requester process, TTL, and chain-hash. Verify the chain with `cred-proxy doctor --verify-audit`. **Do not delete the audit log.** Deletion breaks the chain and forfeits forensic capability.
+
+### SCM_RIGHTS in plain English
+
+SCM_RIGHTS is the Unix socket mechanism for file-descriptor passing between processes via the socket's ancillary-data channel. The deploy worker receives an open file descriptor it can read tokens from but cannot use to recover root credentials.
+
+### See also
+
+- Credential proxy runbook: `plugins/autonomous-dev-assist/instructions/cred-proxy-runbook.md`
+- Configuration: `cred_proxy` section in `plugins/autonomous-dev-assist/skills/config-guide/SKILL.md`

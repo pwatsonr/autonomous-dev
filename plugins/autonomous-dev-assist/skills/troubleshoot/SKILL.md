@@ -1172,3 +1172,128 @@ autonomous-dev config show | jq '.config.intake'
 - Run `autonomous-dev config validate` after every configuration change.
 - Monitor intake logs (`~/.autonomous-dev/logs/intake.log`) for unexpected repository references.
 - Use per-repository trust level overrides (set new or unknown repos to L0) for maximum oversight.
+
+---
+
+## Scenario 14: `cred-proxy: permission denied on Unix socket`
+
+### Symptoms
+- The deploy worker (or any other client of the cred-proxy) reports "Permission denied" or `EACCES` when connecting to `~/.autonomous-dev/cred-proxy/socket`.
+- Deploys fail before any cloud API is called.
+- `cred-proxy doctor` reports a socket-permissions or ownership problem.
+
+### Diagnostic Steps
+
+Walk the four checks in order:
+
+**Step 1: Verify the socket mode is `0600`.**
+
+```bash
+ls -l ~/.autonomous-dev/cred-proxy/socket
+```
+
+The mode line should read `srw-------`. Any other mode is the cause.
+
+**Step 2: Verify socket ownership matches the running user.**
+
+Use the platform-aware `stat` invocation:
+
+```bash
+# macOS:
+stat -f "%Sp %u %g" ~/.autonomous-dev/cred-proxy/socket
+# Linux:
+stat -c "%a %u %g" ~/.autonomous-dev/cred-proxy/socket
+```
+
+The owner UID must match the user that runs both the cred-proxy daemon and the deploy worker.
+
+**Step 3: Verify the daemon is running.**
+
+```bash
+cred-proxy status
+```
+
+Non-zero exit means the daemon is not running.
+
+**Step 4: Run the full diagnostic.**
+
+```bash
+cred-proxy doctor
+```
+
+`doctor` reports socket permissions, scoper presence, and root-credential reachability in one call. Use as the canonical first-response.
+
+### Resolution Steps
+
+1. **If the socket mode is wrong:**
+   ```bash
+   chmod 0600 ~/.autonomous-dev/cred-proxy/socket
+   ```
+
+2. **If the socket ownership is wrong:** restart the cred-proxy daemon as the deploying user (the user that runs the deploy worker, **not** root):
+   ```bash
+   cred-proxy stop
+   cred-proxy start
+   cred-proxy doctor
+   ```
+
+3. **If the daemon is not running:**
+   ```bash
+   cred-proxy start
+   ```
+
+**Do not chown the socket to root.** The cred-proxy daemon enforces ownership at startup and chown-to-root will cause it to refuse to start. Even if the daemon ownership check were bypassed, the deploy worker (running as a non-root user) would still get `EACCES`. The socket *must* be owned by the deploying user.
+
+### Prevention
+- Always start the cred-proxy as the deploying user, never with `sudo`.
+- Do not run manual `chown` or `chmod` on the socket; the daemon re-applies `0600` and ownership at every restart.
+- See also: `instructions/cred-proxy-runbook.md` §4.1 (failure detection) and §5.1 (recovery procedure).
+
+---
+
+## Scenario 15: My deploy died at the 15-minute mark with an auth error
+
+### Symptoms
+- A long-running deploy fails with an authentication error (typically a 401, 403, or "token expired" diagnostic from the cloud API) approximately 15 minutes after the deploy started.
+- The cloud-side credential validation reports the token is expired.
+- Subsequent deploys from a fresh issuance succeed but die at the same 15-minute mark.
+
+### Diagnostic Steps
+
+TTL expiry mid-deploy is **the most common explanation** for a 15-minute-mark auth failure. The cred-proxy issues credentials with a default TTL of `900` seconds (15 minutes); deploys that exceed this duration will see the credential expire mid-flight.
+
+**Step 1: Confirm by inspecting the audit log.**
+
+```bash
+cred-proxy audit.log | tail
+```
+
+The most recent issuance entry shows the token-id, cloud, scope, and the issued TTL. If the elapsed time from issuance to your auth failure is approximately equal to (or exceeds) the issued TTL, this is a TTL expiry, not a credential compromise.
+
+**Step 2: Confirm the daemon's configured TTL.**
+
+```bash
+grep default_ttl_seconds ~/.autonomous-dev/cred-proxy/config.yaml
+```
+
+Default is `900`. If you have not changed it and your deploy exceeds 15 minutes, this scenario applies.
+
+### Resolution Steps
+
+Two options, both correct:
+
+1. **Option A: Raise the TTL.** Edit `~/.autonomous-dev/cred-proxy/config.yaml` and increase `cred_proxy.default_ttl_seconds`. The practical upper bound is cloud-dependent (AWS pragmatic ceiling: `14400` seconds / 4 hours; GCP and Azure: ~`3600` seconds / 1 hour). After editing, restart the daemon and retry the deploy:
+   ```bash
+   cred-proxy stop
+   cred-proxy start
+   ```
+   See runbook §6 for the full TTL-tuning trade-off.
+
+2. **Option B: Restructure the deploy** into shorter steps that each complete within `default_ttl_seconds`. This is the preferred long-term fix for deploys whose duration grows over time.
+
+**Do not rotate root credentials. The auth failure is a TTL expiry, not a credential compromise.** Rotating root credentials does not fix the underlying cause (the deploy still exceeds the TTL on the next attempt) and creates unnecessary downstream work for every other consumer of those credentials. The cred-proxy `audit.log` confirms the issuance is legitimate.
+
+### Prevention
+- Calibrate `default_ttl_seconds` to match your typical deploy duration plus a margin.
+- Keep deploys under 15 minutes when possible; long deploys are also more fragile to network and rate-limit issues.
+- See also: `instructions/cred-proxy-runbook.md` §4.3 (failure detection), §5.3 (recovery procedure), §6 (TTL tuning).

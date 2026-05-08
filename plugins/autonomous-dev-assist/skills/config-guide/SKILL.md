@@ -744,6 +744,77 @@ Controls emergency stop and restart behavior.
 
 ---
 
+## Section 21: cred_proxy
+
+Configuration for the credential proxy daemon. The proxy issues short-lived, scope-narrowed credentials to the deploy framework so root credentials never reach the deploy worker process. See the **Credential Proxy** section in `skills/help/SKILL.md` for the operator overview and `instructions/cred-proxy-runbook.md` for the deep walkthrough.
+
+### Example
+
+```yaml
+cred_proxy:
+  socket_path: ~/.autonomous-dev/cred-proxy/socket
+  default_ttl_seconds: 900            # 15 minutes
+  audit_log: ~/.autonomous-dev/cred-proxy/audit.log
+  audit_key_env: CRED_PROXY_AUDIT_KEY  # env var NAME, not the key itself
+  scopers:
+    aws:   ~/.autonomous-dev/cred-proxy/scopers/aws
+    gcp:   ~/.autonomous-dev/cred-proxy/scopers/gcp
+    azure: ~/.autonomous-dev/cred-proxy/scopers/azure
+    k8s:   ~/.autonomous-dev/cred-proxy/scopers/k8s
+  max_concurrent_tokens: 32
+```
+
+### Field reference
+
+#### `socket_path` (string, required)
+
+Path to the Unix-domain socket the proxy listens on. The proxy enforces mode `0600` (owner-only read/write) on this socket at startup. Default: `~/.autonomous-dev/cred-proxy/socket`. Do not chmod this socket manually; the proxy re-applies the permission on every restart and bootstraps it on first run.
+
+#### `default_ttl_seconds` (integer, required)
+
+Default TTL applied to every issued credential, in seconds. Default: `900` (15 minutes). On expiry, the proxy closes the deploy worker's file descriptor immediately. Raise this value for long-running deploys; the practical upper bound is the upstream cloud cap (e.g., AWS STS chained-role tops out at ~4 hours). See `cred-proxy-runbook.md` §6 for tuning guidance.
+
+#### `audit_log` (string, required)
+
+Path to the HMAC-chained audit log. Every issuance writes a chained entry recording token-id, cloud, scope, requester process, TTL, and chain-hash. Verify with `cred-proxy doctor --verify-audit`. Default: `~/.autonomous-dev/cred-proxy/audit.log`. **Do not delete this file.** Deletion breaks the chain and forfeits forensic capability.
+
+#### `audit_key_env` (string, required)
+
+Stores the *name* of an environment variable, not the key itself. The proxy reads the named variable at startup to obtain the HMAC key. Worked example:
+
+```bash
+# Generate a 256-bit key and export it from your shell rc, NOT into your config:
+export CRED_PROXY_AUDIT_KEY="$(openssl rand -hex 32)"
+```
+
+```yaml
+# Then reference the env var by NAME in the config:
+audit_key_env: CRED_PROXY_AUDIT_KEY
+```
+
+If you put the raw key into the YAML, the key will end up in any repo or backup that includes the config file. Pasting a real HMAC key into this field is the single highest-stakes mistake in cred-proxy configuration. See "Common pitfalls" below.
+
+#### `scopers` (map, required)
+
+Per-cloud scoper plugin install paths. The proxy looks up the scoper by cloud name (`aws`, `gcp`, `azure`, `k8s`) and invokes it to translate root credentials into a scoped short-lived token. Each path corresponds to a separately installed scoper plugin (`cred-proxy-scoper-aws`, etc.). Omit clouds you do not target.
+
+#### `max_concurrent_tokens` (integer, optional, default `32`)
+
+Upper bound on simultaneously outstanding tokens. New issuance requests above this cap block until a TTL expiry frees a slot. Raise for high-parallelism deploy fleets; lower for security-tightened environments.
+
+### Common pitfalls
+
+- **Do not commit the audit key.** The `audit_key_env` field stores an environment variable *name*; the actual key lives in your shell environment or a `0600` file outside the repo. Add `~/.autonomous-dev/cred-proxy/audit-key` (if you store the key in a file) to `.gitignore`. Never paste the raw key into the YAML.
+- **Do not chmod the socket as root.** The proxy enforces mode `0600` on its own socket. Running `sudo chmod` or `sudo chown` on the socket breaks the ownership invariant and triggers the permission-denied failure mode. If you see permission errors, restart the proxy as the deploying user instead.
+- **Do not run `cred-proxy start` as root.** The proxy is designed to run as the deploying user. Running it as root makes every issued credential reachable by any process running as that user and breaks the per-process audit-log requester-process attribution.
+
+### See also
+
+- `cred-proxy` overview: `skills/help/SKILL.md` Credential Proxy section
+- Deep walkthrough: `instructions/cred-proxy-runbook.md`
+
+---
+
 ## Full Example Configuration
 
 A complete example combining common customizations:
