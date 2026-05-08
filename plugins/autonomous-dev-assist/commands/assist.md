@@ -11,14 +11,26 @@ You are the autonomous-dev expert assistant. The user has asked a question about
 
 ## Step 1: Parse the question
 
-Read the user's question carefully. Classify it into one of these categories:
+Read the user's question carefully. Classify it into one or more of these categories:
 
-- **help** -- General usage questions about commands, agents, pipeline phases, concepts, or features
-- **troubleshoot** -- Something is broken, failing, or behaving unexpectedly
-- **config** -- Questions about configuration, settings, environment variables, or customization
-- **security** -- Questions about the credential proxy, the per-cloud scopers, the Unix-domain socket transport, TTL semantics, audit-log verification, or any topic touching credentials at deploy time.
+- **help** -- General usage questions about commands, agents, pipeline phases, concepts, or features.
+- **troubleshoot** -- Something is broken, failing, or behaving unexpectedly.
+- **config** -- Questions about configuration, settings, environment variables, or customization.
+- **chains** -- Questions about plugin chains, the manifest-v2 schema, the chain audit log, or chains CLI.
+- **deploy** -- Questions about the deploy framework, backends, the approval state machine, the ledger, cost caps, or deploy CLI.
+- **security** -- Questions about HMAC keys, audit logs, credential proxy, egress firewall, or denied-permission errors.
 
-  Subclass by keyword. If the question contains any of `cred-proxy`, `socket`, `TTL`, or `scoper`, route to `security/cred-proxy`. Worked example: "I'm getting permission denied on the cred-proxy socket" -> `security/cred-proxy`. The `security/cred-proxy` subclass triggers the cred-proxy-specific Glob and Bash probes in Step 2.
+A question may match **multiple categories**. When that happens, load context from **all matched** categories. If no category matches, fall back to `help`.
+
+For the `security` category, subclass by keyword. If the question contains any of `cred-proxy`, `socket`, `TTL`, or `scoper`, route to `security/cred-proxy`. Worked example: "I'm getting permission denied on the cred-proxy socket" -> `security/cred-proxy`. The `security/cred-proxy` subclass triggers the cred-proxy-specific Glob and Bash probes in Step 2.
+
+### Trigger keywords
+
+| Category   | Keywords                                                                                  |
+|------------|-------------------------------------------------------------------------------------------|
+| chains     | chain, chains, produces, consumes, manifest-v2, audit.log, egress_allowlist               |
+| deploy     | deploy, backend, approval, approve, ledger, cost cap, estimate, rollout                   |
+| security   | HMAC, key rotation, audit, denied, permission denied, credentials, scoper                 |
 
 ## Step 2: Gather context
 
@@ -101,7 +113,27 @@ Based on the category, load the relevant information:
    Read: plugins/autonomous-dev-assist/instructions/cred-proxy-runbook.md
    ```
 
+### For chains, deploy, and cloud-deploy questions
+
+Discover chain manifests, deploy intake, cloud-backend plugins, and the parallel runbooks:
+
+```
+Glob: plugins/autonomous-dev/intake/chains/*
+Glob: plugins/autonomous-dev/intake/deploy/*
+Glob: plugins/autonomous-dev/intake/cred-proxy/*
+Glob: plugins/autonomous-dev/intake/firewall/*
+Glob: plugins/autonomous-dev-deploy-gcp/**
+Glob: plugins/autonomous-dev-deploy-aws/**
+Glob: plugins/autonomous-dev-deploy-azure/**
+Glob: plugins/autonomous-dev-deploy-k8s/**
+Glob: plugins/autonomous-dev-assist/instructions/*-runbook.md
+```
+
+The four cloud-backend Globs return zero matches when the corresponding cloud plugin is not installed; that is expected and non-fatal.
+
 ## Step 3: Provide a clear answer
+
+If the question matches multiple categories, load context from all matched categories and synthesise a single answer. If a Glob target returns no files (for example, the cloud-deploy plugins are not installed), proceed with the available context and surface the install pointer: `claude plugin install autonomous-dev-deploy-<backend>` (substitute the relevant backend: gcp, aws, azure, or k8s).
 
 Structure your response as follows:
 
