@@ -7,26 +7,31 @@
  *
  * Tests are intentionally co-located next to source under `intake/` and
  * also live under `tests/`. The `testMatch` glob picks up both.
+ *
+ * SPEC-030-1-01 introduces a second project for the portal's auth tests.
+ * The portal's tsconfig differs (ESM, bundler resolution); using `projects`
+ * lets each project supply its own `transform` and `testEnvironment`.
  */
 module.exports = {
-  preset: 'ts-jest',
-  testEnvironment: 'node',
-  // Co-located tests under intake/, plus the deploy plugin trees, plus the
-  // sibling cloud-deploy plugin packages. Each cloud plugin lives in its
-  // own directory so we extend `roots` rather than dumping their tests
-  // under autonomous-dev/tests/.
-  roots: [
-    '<rootDir>',
-    '<rootDir>/../autonomous-dev-deploy-gcp',
-    '<rootDir>/../autonomous-dev-deploy-aws',
-    '<rootDir>/../autonomous-dev-deploy-azure',
-    '<rootDir>/../autonomous-dev-deploy-k8s',
+  projects: [
+    {
+      displayName: 'autonomous-dev',
+      rootDir: __dirname,
+      preset: 'ts-jest',
+      testEnvironment: 'node',
+      roots: [
+        '<rootDir>',
+        '<rootDir>/../autonomous-dev-deploy-gcp',
+        '<rootDir>/../autonomous-dev-deploy-aws',
+        '<rootDir>/../autonomous-dev-deploy-azure',
+        '<rootDir>/../autonomous-dev-deploy-k8s',
+      ],
+      testMatch: ['**/?(*.)+(spec|test).ts'],
+      testPathIgnorePatterns: ['/node_modules/'],
+      transform: {
+        '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
+      },
+    },
+    '<rootDir>/../autonomous-dev-portal/jest.config.cjs',
   ],
-  testMatch: ['**/?(*.)+(spec|test).ts'],
-  // Ignore node_modules + the not-yet-runnable parallel suite (no source yet).
-  testPathIgnorePatterns: ['/node_modules/'],
-  // ts-jest reads tsconfig.json from this directory.
-  transform: {
-    '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
-  },
 };
