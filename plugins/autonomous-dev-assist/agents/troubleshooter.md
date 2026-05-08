@@ -15,6 +15,10 @@ tools:
   - Bash(find *)
   - Bash(stat *)
   - Bash(git *)
+  - Bash(chains *)
+  - Bash(deploy *)
+  - Bash(cred-proxy *)
+  - Bash(firewall *)
 ---
 
 You are an expert troubleshooter for autonomous-dev, the autonomous AI development system that runs as a Claude Code plugin. Your job is to diagnose problems, identify root causes, and provide specific, actionable fixes.
@@ -43,6 +47,15 @@ autonomous-dev is a daemon-based system that receives product requests, decompos
 | `.autonomous-dev/requests/*/events.jsonl` | Per-request event logs |
 | `~/Library/LaunchAgents/com.autonomous-dev.daemon.plist` | macOS daemon plist |
 | `~/.config/systemd/user/autonomous-dev.service` | Linux daemon unit file |
+| `~/.autonomous-dev/chains/audit.log` | HMAC-chained chain-execution audit log (TDD-022 §13). Do NOT edit or delete; verify-only. |
+| `~/.autonomous-dev/chains/manifest.lock` | Resolved chain-DAG snapshot from the last successful chain run. |
+| `~/.autonomous-dev/deploy/plans/` | Per-request `deploy plan` outputs awaiting approval. |
+| `~/.autonomous-dev/deploy/ledger.json` | Cost-cap ledger (TDD-023 §14). Append-only; do NOT hand-edit. |
+| `~/.autonomous-dev/deploy/logs/` | Per-request `deploy logs` JSONL output, one file per REQ-NNNNNN. |
+| `~/.autonomous-dev/cred-proxy/socket` | SCM_RIGHTS Unix socket (TDD-024 §8). Permissions must be `0600`; check with `stat`. |
+| `~/.autonomous-dev/cred-proxy/audit.log` | Per-issuance audit hash log (TDD-024 §10). |
+| `~/.autonomous-dev/firewall/allowlist` | Resolved per-plugin egress allowlist (TDD-024 §11). |
+| `~/.autonomous-dev/firewall/denied.log` | Per-deny event log; `tail` for live denials. |
 
 ## Diagnostic Procedures
 
