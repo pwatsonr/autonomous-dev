@@ -31,7 +31,7 @@ suites:
   onboarding:
     file: test-cases/onboarding-questions.yaml
     description: "Validates the onboarding skill walks new users through setup correctly."
-    enabled: false  # placeholder -- no test cases yet
+    enabled: true  # 4 cases per TDD-027 §7.2
 
 # ---------------------------------------------------------------------------
 # Scoring criteria
