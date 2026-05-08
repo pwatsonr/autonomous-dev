@@ -193,29 +193,13 @@ function assert(condition: boolean, message: string): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const tests = [
-  test_cooldown_active_within_window,
-  test_cooldown_expired,
-  test_cooldown_exact_boundary,
-  test_no_deployment_found,
-  test_multiple_deployments_uses_most_recent,
-  test_deployment_metadata_unreadable,
-  test_cooldown_days_zero,
-  test_cooldown_active_just_before_expiry,
-];
-
-let passed = 0;
-let failed = 0;
-
-for (const test of tests) {
-  try {
-    test();
-    passed++;
-  } catch (err) {
-    console.log(`FAIL: ${test.name} -- ${err}`);
-    failed++;
-  }
-}
-
-console.log(`\nResults: ${passed}/${tests.length} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+describe("CooldownGovernance", () => {
+  it("treats cooldown as active within window", () => { test_cooldown_active_within_window(); });
+  it("treats cooldown as expired after window", () => { test_cooldown_expired(); });
+  it("handles cooldown exact boundary", () => { test_cooldown_exact_boundary(); });
+  it("handles no deployment found", () => { test_no_deployment_found(); });
+  it("uses most recent of multiple deployments", () => { test_multiple_deployments_uses_most_recent(); });
+  it("handles unreadable deployment metadata", () => { test_deployment_metadata_unreadable(); });
+  it("handles cooldown days zero", () => { test_cooldown_days_zero(); });
+  it("treats cooldown active just before expiry", () => { test_cooldown_active_just_before_expiry(); });
+});
