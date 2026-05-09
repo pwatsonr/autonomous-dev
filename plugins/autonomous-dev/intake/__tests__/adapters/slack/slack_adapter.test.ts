@@ -338,6 +338,12 @@ describe('SlackAdapter (SPEC-008-4-05, Tasks 14-16)', () => {
       },
     );
 
+    // Allow promptUser's awaited postMessage + pendingPrompts.set() to run.
+    // (PRD-016 triage: promptUser awaits chat.postMessage before registering
+    // the pending prompt, so we must flush microtasks before resolvePrompt.)
+    await Promise.resolve();
+    await Promise.resolve();
+
     // Verify prompt was posted
     expect(webClient.chat.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -396,6 +402,12 @@ describe('SlackAdapter (SPEC-008-4-05, Tasks 14-16)', () => {
       },
     );
 
+    // Flush microtasks so the awaited chat.postMessage resolves and the
+    // setTimeout is registered before we advance fake timers.
+    // (PRD-016 triage)
+    await Promise.resolve();
+    await Promise.resolve();
+
     // Advance time past the timeout
     jest.advanceTimersByTime(6000);
 
@@ -445,6 +457,11 @@ describe('SlackAdapter (SPEC-008-4-05, Tasks 14-16)', () => {
         timeoutSeconds: 300,
       },
     );
+
+    // Flush microtasks so promptUser's awaited postMessage resolves and
+    // pendingPrompts.set() runs. (PRD-016 triage)
+    await Promise.resolve();
+    await Promise.resolve();
 
     expect(adapter.pendingPromptCount).toBe(1);
 
