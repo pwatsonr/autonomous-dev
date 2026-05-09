@@ -39,7 +39,10 @@ describe('Document Lifecycle Integration', () => {
   }
 
   beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'doc-lifecycle-integ-'));
+    // Canonicalize via realpath so /var/folders/... matches /private/var/folders/...
+    // on macOS where os.tmpdir() returns the un-resolved symlink form.
+    const rawTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'doc-lifecycle-integ-'));
+    tmpDir = await fs.realpath(rawTmpDir);
     dm = new DirectoryManager(tmpDir);
     templateEngine = new TemplateEngine();
     idCounter = new InMemoryIdCounter();
