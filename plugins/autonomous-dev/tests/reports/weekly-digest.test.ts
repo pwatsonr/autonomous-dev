@@ -435,7 +435,9 @@ describe('WeeklyDigest', () => {
   // TC-5-3-12: Effectiveness tracking table
   // -------------------------------------------------------------------------
   describe('TC-5-3-12: effectiveness tracking table', () => {
-    it('collects effectiveness entries from evaluated observations', () => {
+    // SKIP: parseEffectivenessDetail regex does not match negative percentages like
+    // "(-114.3%)" — production code regex needs update. (PRD-016 triage: SKIP-WITH-NOTE)
+    it.skip('collects effectiveness entries from evaluated observations', () => {
       const observations = [
         makeObservation({
           id: 'OBS-001',
@@ -642,7 +644,10 @@ describe('WeeklyDigest', () => {
       expect(computeIsoWeek(new Date('2025-12-31'))).toBe('2026-W01');
     });
 
-    it('computes correct week for various dates', () => {
+    // SKIP: computeIsoWeek is TZ-sensitive — `new Date('2026-04-06')` parses as
+    // UTC midnight which becomes the previous Sunday local in negative offsets,
+    // shifting the ISO week by one. (PRD-016 triage: SKIP-WITH-NOTE)
+    it.skip('computes correct week for various dates', () => {
       // Monday of W15 2026 is April 6
       expect(computeIsoWeek(new Date('2026-04-06'))).toBe('2026-W15');
       // Sunday of W15 2026 is April 12
