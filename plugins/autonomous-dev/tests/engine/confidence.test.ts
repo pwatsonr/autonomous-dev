@@ -189,10 +189,11 @@ describe('computeHistoryScore', () => {
 
   // TC-3-5-10: mostly promoted -> 1.0
   it('TC-3-5-10: returns 1.0 for >80% promote rate', () => {
+    // Use 9/10 (90%) to be strictly > 80% threshold; 8/10 is exactly 80% which falls in mixed bucket
     const history = buildHistory({
       total_similar: 10,
-      promoted_count: 8,
-      dismissed_count: 1,
+      promoted_count: 9,
+      dismissed_count: 0,
       deferred_count: 1,
     });
     expect(computeHistoryScore(history)).toBe(1.0);
