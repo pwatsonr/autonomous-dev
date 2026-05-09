@@ -117,8 +117,8 @@ describe('ConvergenceTracker - Extended tests', () => {
 
     expect(result.stagnation_detected).toBe(true);
     expect(result.score_trend).toBe('declining');
-    expect(result.stagnation_reasons).toContain(
-      expect.stringContaining('declined')
+    expect(result.stagnation_reasons).toEqual(
+      expect.arrayContaining([expect.stringContaining('declined')])
     );
   });
 
@@ -153,8 +153,8 @@ describe('ConvergenceTracker - Extended tests', () => {
 
     expect(result.recurred_findings.length).toBeGreaterThan(0);
     expect(result.stagnation_detected).toBe(true);
-    expect(result.stagnation_reasons).toContain(
-      expect.stringContaining('recurred')
+    expect(result.stagnation_reasons).toEqual(
+      expect.arrayContaining([expect.stringContaining('recurred')])
     );
   });
 

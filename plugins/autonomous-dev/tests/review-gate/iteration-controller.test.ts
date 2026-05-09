@@ -99,32 +99,36 @@ describe('IterationController', () => {
     const controller = new IterationController({ max_iterations: 3 });
     let state = controller.initializeGate('gate-3', 'doc-3');
 
-    // Iteration 1
+    // Iteration 1: 3 findings, score 60
     state = controller.startIteration(state);
     controller.recordReviewOutcome(
       state,
       60,
-      [makeFinding('f1', 's1', 'c1')],
+      [
+        makeFinding('f1', 's1', 'c1'),
+        makeFinding('f2', 's2', 'c2'),
+        makeFinding('f3', 's3', 'c3'),
+      ],
       computeContentHash('v1'),
       'changes_requested'
     );
 
-    // Iteration 2
+    // Iteration 2: 2 findings (decreasing), score 65 (improving)
     state = controller.startIteration(state);
     controller.recordReviewOutcome(
       state,
       65,
-      [makeFinding('f2', 's2', 'c2')],
+      [makeFinding('f1', 's1', 'c1'), makeFinding('f2', 's2', 'c2')],
       computeContentHash('v2'),
       'changes_requested'
     );
 
-    // Iteration 3 (max)
+    // Iteration 3 (max): 1 finding (decreasing), score 70 (improving)
     state = controller.startIteration(state);
     const decision = controller.recordReviewOutcome(
       state,
       70,
-      [makeFinding('f3', 's3', 'c3')],
+      [makeFinding('f1', 's1', 'c1')],
       computeContentHash('v3'),
       'changes_requested'
     );
@@ -368,12 +372,19 @@ describe('IterationController', () => {
     let state = controller.initializeGate('gate-11', 'doc-11');
 
     // Iterations 1-4: should_continue true
+    // Use decreasing finding count + improving scores so stagnation doesn't fire.
     for (let i = 1; i <= 4; i++) {
       state = controller.startIteration(state);
+      const findingsThisIter = [];
+      // 6 findings on iter1, 5 on iter2, 4 on iter3, 3 on iter4 (decreasing)
+      const findingCount = 7 - i;
+      for (let j = 1; j <= findingCount; j++) {
+        findingsThisIter.push(makeFinding(`f${i}-${j}`, `s${j}`, `c${j}`));
+      }
       const decision = controller.recordReviewOutcome(
         state,
         60 + i * 2, // incrementing scores to avoid stagnation
-        [makeFinding(`f${i}`, `s-new-${i}`, `c-new-${i}`)],
+        findingsThisIter,
         computeContentHash(`v${i}`),
         'changes_requested'
       );
@@ -383,10 +394,11 @@ describe('IterationController', () => {
 
     // Iteration 5: max reached, should_continue false
     state = controller.startIteration(state);
+    // 2 findings (still decreasing from 3)
     const decision5 = controller.recordReviewOutcome(
       state,
       72,
-      [makeFinding('f5', 's-new-5', 'c-new-5')],
+      [makeFinding('f5-1', 's1', 'c1'), makeFinding('f5-2', 's2', 'c2')],
       computeContentHash('v5'),
       'changes_requested'
     );
