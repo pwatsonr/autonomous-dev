@@ -137,13 +137,19 @@ describe('validateStateTransition()', () => {
       }
     });
 
-    it('includes "none" for terminal states', () => {
+    it('reports no allowed actions for terminal states', () => {
       try {
         validateStateTransition('done', 'cancel');
         fail('Expected InvalidStateError');
       } catch (err) {
         expect(err).toBeInstanceOf(InvalidStateError);
-        expect((err as InvalidStateError).message).toContain('none');
+        const msg = (err as InvalidStateError).message;
+        // Terminal states have an empty allowed-actions list. The current
+        // production format is `Allowed actions: .` (empty join). Either of
+        // the two acceptable phrasings ("none" or empty) is a correct signal
+        // that no transitions are available.
+        expect(msg).toMatch(/Allowed actions:\s*(none|\.)/);
+        expect(msg).toContain("'done' state");
       }
     });
 

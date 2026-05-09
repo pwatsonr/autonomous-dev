@@ -66,28 +66,6 @@ function writeAuthConfig(config: AuthConfig): string {
   return configPath;
 }
 
-function createMockSlackWebClient(): SlackWebClient & {
-  ephemeralCalls: Array<Record<string, unknown>>;
-  viewsOpenCalls: Array<Record<string, unknown>>;
-} {
-  return {
-    ephemeralCalls: [],
-    viewsOpenCalls: [],
-    chat: {
-      async postEphemeral(params: { channel: string; user: string; text: string }) {
-        this.ephemeralCalls.push(params);
-        return { ok: true };
-      }.bind({ ephemeralCalls: [] as Array<Record<string, unknown>> }),
-    },
-    views: {
-      async open(params: { trigger_id: string; view: Record<string, unknown> }) {
-        return { ok: true };
-      },
-    },
-  };
-}
-
-// Re-create with proper binding
 function createMockWebClient() {
   const mock = {
     ephemeralCalls: [] as Array<Record<string, unknown>>,

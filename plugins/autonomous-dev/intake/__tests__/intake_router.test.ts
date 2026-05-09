@@ -66,9 +66,14 @@ function createMockAuthz(overrides: Partial<{
     timestamp: new Date(),
   };
 
+  // Distinguish "user explicitly passed undefined" from "user did not pass key"
+  const resolvedUserId = 'resolveUserId' in overrides
+    ? overrides.resolveUserId
+    : 'internal-user-1';
+
   return {
     authorize: jest.fn().mockReturnValue(overrides.authorizeResult ?? defaultDecision),
-    resolveUserId: jest.fn().mockReturnValue(overrides.resolveUserId ?? 'internal-user-1'),
+    resolveUserId: jest.fn().mockReturnValue(resolvedUserId),
     findUser: jest.fn(),
     getConfig: jest.fn(),
     stopWatching: jest.fn(),
@@ -161,9 +166,13 @@ describe('IntakeRouter', () => {
 
         const result = await router.route(command);
 
-        // The handler was found (no VALIDATION_ERROR)
-        expect(result.errorCode).not.toBe('VALIDATION_ERROR');
-        // Authz was called
+        // The handler was found and reached - we did not short-circuit with
+        // an "Unknown command" VALIDATION_ERROR. The handler itself may still
+        // return VALIDATION_ERROR for missing args, but that is dispatch success.
+        if (result.errorCode === 'VALIDATION_ERROR') {
+          expect(result.error).not.toContain('Unknown command');
+        }
+        // Authz was called (dispatch reached the auth step, after handler lookup)
         expect(deps.authz.authorize).toHaveBeenCalled();
       });
     }

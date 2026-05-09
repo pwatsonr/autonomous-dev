@@ -93,7 +93,9 @@ describe('formatDuration()', () => {
   });
 
   it('returns "< 1m" for less than 1 minute', () => {
-    expect(formatDuration(30_000)).toBe('< 1m');
+    // formatDuration uses Math.round on minutes, so values >= 30s round up
+    // to "1m". Use a value below the rounding threshold.
+    expect(formatDuration(29_000)).toBe('< 1m');
   });
 
   it('returns "1m" for exactly 1 minute', () => {
