@@ -96,25 +96,27 @@ function getSubcommandOptions(name: string): Array<Record<string, unknown>> {
 
 describe('Discord Slash Command Payload (SPEC-008-3-05, Task 14)', () => {
   // -----------------------------------------------------------------------
-  // Test 1: 1 top-level command with 10 subcommands
+  // Test 1: 1 top-level command with 12 subcommands
+  // (PRD-016 triage: refreshed for added submit-bug + hotfix subcommands)
   // -----------------------------------------------------------------------
-  test('payload has exactly 1 top-level command /ad with 10 subcommands', () => {
+  test('payload has exactly 1 top-level command /ad with 12 subcommands', () => {
     expect(DISCORD_COMMANDS).toHaveLength(1);
 
     const adCommand = DISCORD_COMMANDS[0];
     expect(adCommand.name).toBe('ad');
     expect(adCommand.description).toBe('Autonomous Dev pipeline commands');
     expect(adCommand.type).toBe(1); // CHAT_INPUT
-    expect(adCommand.options).toHaveLength(10);
+    expect(adCommand.options).toHaveLength(12);
   });
 
   // -----------------------------------------------------------------------
-  // Test 2: All 10 subcommand names
+  // Test 2: All 12 subcommand names
   // -----------------------------------------------------------------------
   test('each subcommand has correct name and type SUB_COMMAND', () => {
     const expectedNames = [
       'submit', 'status', 'list', 'cancel', 'pause',
       'resume', 'priority', 'logs', 'feedback', 'kill',
+      'submit-bug', 'hotfix',
     ];
 
     const actualNames = DISCORD_COMMANDS[0].options!.map(

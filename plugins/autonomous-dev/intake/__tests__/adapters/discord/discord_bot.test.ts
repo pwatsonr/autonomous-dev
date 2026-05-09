@@ -174,22 +174,23 @@ describe('Discord Bot Setup (SPEC-008-3-01, Task 1)', () => {
 
 describe('Slash Command Payload (SPEC-008-3-01, Task 2)', () => {
   // -----------------------------------------------------------------------
-  // Test 3: Payload structure -- 1 top-level command, 10 subcommands
+  // Test 3: Payload structure -- 1 top-level command, 12 subcommands
+  // (PRD-016 triage: refreshed assertions for added submit-bug + hotfix)
   // -----------------------------------------------------------------------
-  test('payload has exactly 1 top-level command named "ad" with 10 subcommands', () => {
+  test('payload has exactly 1 top-level command named "ad" with 12 subcommands', () => {
     expect(DISCORD_COMMANDS).toHaveLength(1);
 
     const adCommand = DISCORD_COMMANDS[0];
     expect(adCommand.name).toBe('ad');
     expect(adCommand.description).toBe('Autonomous Dev pipeline commands');
     expect(adCommand.type).toBe(1); // CHAT_INPUT
-    expect(adCommand.options).toHaveLength(10);
+    expect(adCommand.options).toHaveLength(12);
   });
 
   // -----------------------------------------------------------------------
-  // Test 4: All 10 subcommand names
+  // Test 4: All 12 subcommand names
   // -----------------------------------------------------------------------
-  test('all 10 subcommand names are present', () => {
+  test('all 12 subcommand names are present', () => {
     const expectedNames = [
       'submit',
       'status',
@@ -201,6 +202,8 @@ describe('Slash Command Payload (SPEC-008-3-01, Task 2)', () => {
       'logs',
       'feedback',
       'kill',
+      'submit-bug',
+      'hotfix',
     ];
 
     const actualNames = DISCORD_COMMANDS[0].options!.map(
@@ -441,7 +444,7 @@ describe('Command Registration (SPEC-008-3-01, Task 2)', () => {
     expect(logCalls[0].message).toBe('Discord slash commands registered');
     expect(logCalls[0].context).toEqual({
       guildId: '111222333444555666',
-      commandCount: 10,
+      commandCount: 12,
     });
   });
 });
