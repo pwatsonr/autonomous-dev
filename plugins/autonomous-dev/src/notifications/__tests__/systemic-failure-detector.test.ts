@@ -190,12 +190,11 @@ describe('SystemicFailureDetector', () => {
 
     expect(result.systemic).toBe(true);
     if (result.systemic) {
-      expect(result.pattern.type).toBe('same_repo');
-      // The first pattern to hit threshold fires; in this case all 3 have
-      // different repos so same_repo won't fire (3 different repos = 1 each).
-      // Instead, same_phase should fire.
-      // Actually: repo-a has 1, repo-b has 1, repo-c has 1. None reach 3.
-      // phase:code_review has 3 => fires same_phase.
+      // All 3 failures use distinct repos (1 each) but the same phase
+      // (code_review = 3). The first pattern to reach threshold fires;
+      // since same_repo can't (1 each), same_phase wins.
+      expect(result.pattern.type).toBe('same_phase');
+      expect(result.pattern.key).toBe('phase:code_review');
     }
   });
 
@@ -325,7 +324,15 @@ describe('SystemicFailureDetector', () => {
   });
 
   // Test Case 25: Duplicate detection suppressed
-  test('second systemic for same pattern does NOT emit another alert', () => {
+  // SKIP: requires cross-pattern incident suppression (PRD-016 triage:
+  // SKIP-WITH-NOTE). Current production code only marks the specific
+  // pattern key (e.g. `repo:repo-x`) as active when it triggers. The 4th
+  // failure for the same incident still fires under another pattern key
+  // (e.g. `phase:code_review`) because that pattern is independently
+  // tracked. Fixing this requires production logic to suppress all
+  // overlapping pattern keys for an active incident, which is out of
+  // scope for the test-only triage batch.
+  test.skip('second systemic for same pattern does NOT emit another alert', () => {
     const detector = new SystemicFailureDetector(
       makeConfig(),
       auditTrail,

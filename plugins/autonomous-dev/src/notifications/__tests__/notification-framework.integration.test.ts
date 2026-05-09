@@ -617,7 +617,10 @@ describe('NotificationFramework - Integration Scenarios', () => {
     expect(systemicAlert).toBeDefined();
     expect(systemicAlert!.urgency).toBe('immediate');
     expect(systemicAlert!.title).toContain('Systemic issue detected');
-    expect(systemicAlert!.body).toContain('repo-x');
+    // The repository is encoded in the pattern key (title) and the
+    // payload.repository field; the body string lists the affected requests.
+    expect(systemicAlert!.title).toContain('repo-x');
+    expect(systemicAlert!.repository).toBe('repo-x');
 
     // The third individual pipeline_failed notification should be suppressed
     // (replaced by the systemic alert)
