@@ -21,7 +21,7 @@ import {
   sanitize,
   type InjectionRule,
   type SanitizationResult,
-} from '../../core/sanitizer';
+} from '../core/sanitizer';
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -29,7 +29,6 @@ import {
 
 const RULES_PATH = path.resolve(
   __dirname,
-  '..',
   '..',
   'config',
   'injection-rules.yaml',

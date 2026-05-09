@@ -22,7 +22,7 @@ import {
   type EnqueueResult,
   type EnqueueSuccess,
   type EnqueueFailure,
-} from '../../queue/request_queue';
+} from '../queue/request_queue';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -21,14 +21,14 @@ import {
   ROLE_HIERARCHY,
   type AuthConfigUser,
   type Role,
-} from '../../authz/authz_engine';
-import { AuditLogger } from '../../authz/audit_logger';
+} from '../authz/authz_engine';
+import { AuditLogger } from '../authz/audit_logger';
 import type {
   AuthzAction,
   AuthzContext,
   AuthzDecision,
   ChannelType,
-} from '../../adapters/adapter_interface';
+} from '../adapters/adapter_interface';
 
 // ---------------------------------------------------------------------------
 // Test configuration YAML

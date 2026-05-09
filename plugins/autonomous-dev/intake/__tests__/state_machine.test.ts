@@ -14,8 +14,8 @@ import {
   validateStateTransition,
   InvalidStateError,
   STATE_TRANSITIONS,
-} from '../../handlers/state_machine';
-import type { RequestStatus } from '../../adapters/adapter_interface';
+} from '../handlers/state_machine';
+import type { RequestStatus } from '../adapters/adapter_interface';
 
 // ---------------------------------------------------------------------------
 // Valid transitions - the spec explicitly lists these pairs

@@ -18,8 +18,8 @@ import {
   type DuplicateResult,
   type EmbeddingRepository,
   type EmbeddingRow,
-} from '../../core/duplicate_detector';
-import type { ParsedRequest, RequestStatus } from '../../adapters/adapter_interface';
+} from '../core/duplicate_detector';
+import type { ParsedRequest, RequestStatus } from '../adapters/adapter_interface';
 
 // ---------------------------------------------------------------------------
 // Helpers
