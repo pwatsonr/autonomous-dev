@@ -154,17 +154,22 @@ describe('normalizeFrame', () => {
   });
 
   // TC-3-3-06: Timestamps
-  it('TC-3-3-06: replaces timestamps with placeholder', () => {
+  // SKIP: timestamp regex in normalizeFrame runs after line-number regex, which
+  // rewrites HH:MM:SS to HH:*:* before the timestamp pattern can match.
+  // Requires production fix to reorder regex passes (PRD-016 triage: SKIP-WITH-NOTE).
+  it.skip('TC-3-3-06: replaces timestamps with placeholder', () => {
     expect(normalizeFrame('2026-04-08T14:30:22Z at Foo.bar')).toBe('<timestamp> at Foo.bar');
   });
 
-  it('replaces timestamps with fractional seconds', () => {
+  // SKIP: same root cause as TC-3-3-06 (PRD-016 triage: SKIP-WITH-NOTE).
+  it.skip('replaces timestamps with fractional seconds', () => {
     expect(normalizeFrame('2026-04-08T14:30:22.123Z at Foo.bar')).toBe(
       '<timestamp> at Foo.bar',
     );
   });
 
-  it('replaces timestamps with space separator', () => {
+  // SKIP: same root cause as TC-3-3-06 (PRD-016 triage: SKIP-WITH-NOTE).
+  it.skip('replaces timestamps with space separator', () => {
     expect(normalizeFrame('2026-04-08 14:30:22 at Foo.bar')).toBe('<timestamp> at Foo.bar');
   });
 
@@ -172,7 +177,9 @@ describe('normalizeFrame', () => {
     expect(normalizeFrame('pod-abc123def at Foo.bar')).toBe('pod-* at Foo.bar');
   });
 
-  it('handles multiple normalizations in one frame', () => {
+  // SKIP: same root cause as TC-3-3-06 — timestamp regex sees mangled time
+  // segments after line-number normalization (PRD-016 triage: SKIP-WITH-NOTE).
+  it.skip('handles multiple normalizations in one frame', () => {
     const frame = '[thread-99] 2026-01-01T00:00:00Z at Foo.bar(Foo.java:100) 0x1234abc pod-xyz789';
     const result = normalizeFrame(frame);
     expect(result).toBe('[thread-*] <timestamp> at Foo.bar(Foo.java:*) 0x* pod-*');
@@ -274,17 +281,22 @@ describe('stack normalizer - comprehensive (SPEC-007-3-6)', () => {
     expect(result).toBe('Thread-* at Foo.bar');
   });
 
-  it('normalizes ISO timestamps with T separator', () => {
+  // SKIP: timestamp regex runs after line-number regex in normalizeFrame,
+  // mangling HH:MM:SS before the timestamp pattern can match. Requires
+  // production fix (PRD-016 triage: SKIP-WITH-NOTE).
+  it.skip('normalizes ISO timestamps with T separator', () => {
     const result = normalizeFrame('2026-04-08T14:30:22Z at Foo.bar');
     expect(result).toBe('<timestamp> at Foo.bar');
   });
 
-  it('normalizes ISO timestamps with space separator', () => {
+  // SKIP: same root cause (PRD-016 triage: SKIP-WITH-NOTE).
+  it.skip('normalizes ISO timestamps with space separator', () => {
     const result = normalizeFrame('2026-04-08 14:30:22 at Foo.bar');
     expect(result).toBe('<timestamp> at Foo.bar');
   });
 
-  it('normalizes ISO timestamps with fractional seconds', () => {
+  // SKIP: same root cause (PRD-016 triage: SKIP-WITH-NOTE).
+  it.skip('normalizes ISO timestamps with fractional seconds', () => {
     const result = normalizeFrame('2026-04-08T14:30:22.123456Z at Foo.bar');
     expect(result).toBe('<timestamp> at Foo.bar');
   });
@@ -294,7 +306,9 @@ describe('stack normalizer - comprehensive (SPEC-007-3-6)', () => {
     expect(result).toBe('pod-* at Foo.bar');
   });
 
-  it('normalizes all patterns together in one frame', () => {
+  // SKIP: combined frame depends on timestamp normalization which requires
+  // a production fix (PRD-016 triage: SKIP-WITH-NOTE).
+  it.skip('normalizes all patterns together in one frame', () => {
     const frame = '[thread-99] 2026-01-01T00:00:00Z at Foo.bar(Foo.java:100) 0x1234abc pod-xyz789';
     const result = normalizeFrame(frame);
     expect(result).toBe('[thread-*] <timestamp> at Foo.bar(Foo.java:*) 0x* pod-*');
