@@ -209,11 +209,13 @@ describe('Slack App Manifest', () => {
   // TC-4-01-08: Manifest command count
   // -------------------------------------------------------------------------
 
-  test('TC-4-01-08: defines exactly 10 slash commands', () => {
+  test('TC-4-01-08: defines exactly 12 slash commands', () => {
+    // SKIP-WITH-NOTE (PRD-016 batch 6): manifest grew to include
+    // /ad-submit-bug and /ad-hotfix; updating expected count from 10 -> 12.
     const features = manifest.features as Record<string, unknown>;
     const commands = features.slash_commands as Array<Record<string, unknown>>;
 
-    expect(commands).toHaveLength(10);
+    expect(commands).toHaveLength(12);
   });
 
   // -------------------------------------------------------------------------
@@ -265,6 +267,8 @@ describe('Slack App Manifest', () => {
     const commands = features.slash_commands as Array<Record<string, unknown>>;
     const commandNames = commands.map((c) => c.command);
 
+    // SKIP-WITH-NOTE (PRD-016 batch 6): manifest expanded to include
+    // /ad-submit-bug and /ad-hotfix; updating expected list to match.
     expect(commandNames).toEqual([
       '/ad-submit',
       '/ad-status',
@@ -276,6 +280,8 @@ describe('Slack App Manifest', () => {
       '/ad-logs',
       '/ad-feedback',
       '/ad-kill',
+      '/ad-submit-bug',
+      '/ad-hotfix',
     ]);
   });
 });
