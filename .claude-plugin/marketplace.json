@@ -55,6 +55,71 @@
       ],
       "category": "support",
       "tags": ["help", "troubleshooting", "eval", "quickstart", "runbook"]
+    },
+    {
+      "name": "autonomous-dev-portal",
+      "source": "./plugins/autonomous-dev-portal",
+      "description": "Local web portal for monitoring autonomous-dev requests, runs, and audit logs.",
+      "version": "0.1.0",
+      "author": {"name": "pwatsonr", "url": "https://github.com/pwatsonr"},
+      "homepage": "https://github.com/pwatsonr/autonomous-dev",
+      "repository": "https://github.com/pwatsonr/autonomous-dev",
+      "license": "MIT",
+      "keywords": ["autonomous-dev", "portal", "dashboard", "monitoring"],
+      "category": "monitoring",
+      "tags": ["portal", "dashboard", "ui"]
+    },
+    {
+      "name": "autonomous-dev-deploy-aws",
+      "source": "./plugins/autonomous-dev-deploy-aws",
+      "description": "AWS (ECR + ECS Fargate) deployment backend for autonomous-dev.",
+      "version": "0.1.0",
+      "author": {"name": "pwatsonr", "url": "https://github.com/pwatsonr"},
+      "homepage": "https://github.com/pwatsonr/autonomous-dev",
+      "repository": "https://github.com/pwatsonr/autonomous-dev",
+      "license": "MIT",
+      "keywords": ["autonomous-dev", "deploy", "aws", "ecs", "ecr", "fargate"],
+      "category": "deployment",
+      "tags": ["deploy", "aws", "cloud"]
+    },
+    {
+      "name": "autonomous-dev-deploy-gcp",
+      "source": "./plugins/autonomous-dev-deploy-gcp",
+      "description": "GCP (Cloud Build + Cloud Run) deployment backend for autonomous-dev.",
+      "version": "0.1.0",
+      "author": {"name": "pwatsonr", "url": "https://github.com/pwatsonr"},
+      "homepage": "https://github.com/pwatsonr/autonomous-dev",
+      "repository": "https://github.com/pwatsonr/autonomous-dev",
+      "license": "MIT",
+      "keywords": ["autonomous-dev", "deploy", "gcp", "cloud-run", "cloud-build"],
+      "category": "deployment",
+      "tags": ["deploy", "gcp", "cloud"]
+    },
+    {
+      "name": "autonomous-dev-deploy-azure",
+      "source": "./plugins/autonomous-dev-deploy-azure",
+      "description": "Azure (ACR + Container Apps) deployment backend for autonomous-dev.",
+      "version": "0.1.0",
+      "author": {"name": "pwatsonr", "url": "https://github.com/pwatsonr"},
+      "homepage": "https://github.com/pwatsonr/autonomous-dev",
+      "repository": "https://github.com/pwatsonr/autonomous-dev",
+      "license": "MIT",
+      "keywords": ["autonomous-dev", "deploy", "azure", "container-apps", "acr"],
+      "category": "deployment",
+      "tags": ["deploy", "azure", "cloud"]
+    },
+    {
+      "name": "autonomous-dev-deploy-k8s",
+      "source": "./plugins/autonomous-dev-deploy-k8s",
+      "description": "Kubernetes (kubectl apply) deployment backend for autonomous-dev.",
+      "version": "0.1.0",
+      "author": {"name": "pwatsonr", "url": "https://github.com/pwatsonr"},
+      "homepage": "https://github.com/pwatsonr/autonomous-dev",
+      "repository": "https://github.com/pwatsonr/autonomous-dev",
+      "license": "MIT",
+      "keywords": ["autonomous-dev", "deploy", "kubernetes", "k8s", "kubectl"],
+      "category": "deployment",
+      "tags": ["deploy", "kubernetes", "k8s"]
     }
   ]
 }
