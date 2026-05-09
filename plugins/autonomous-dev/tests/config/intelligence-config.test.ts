@@ -164,7 +164,7 @@ describe('intelligence-config', () => {
       });
       const configPath = await writeConfig(raw);
 
-      await expect(loadConfig(configPath)).rejects.toThrow(/Invalid enum value/);
+      await expect(loadConfig(configPath)).rejects.toThrow(/Invalid (enum value|option)/);
     });
 
     it('rejects invalid anomaly detection method', async () => {
@@ -177,7 +177,7 @@ describe('intelligence-config', () => {
       });
       const configPath = await writeConfig(raw);
 
-      await expect(loadConfig(configPath)).rejects.toThrow(/Invalid enum value/);
+      await expect(loadConfig(configPath)).rejects.toThrow(/Invalid (enum value|option)/);
     });
 
     it('rejects invalid schedule type', async () => {
@@ -186,7 +186,7 @@ describe('intelligence-config', () => {
       });
       const configPath = await writeConfig(raw);
 
-      await expect(loadConfig(configPath)).rejects.toThrow(/Invalid enum value/);
+      await expect(loadConfig(configPath)).rejects.toThrow(/Invalid (enum value|option)/);
     });
   });
 

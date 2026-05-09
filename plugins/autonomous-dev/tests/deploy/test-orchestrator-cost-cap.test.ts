@@ -335,7 +335,11 @@ describe('SPEC-032-1-04 orchestrator cost-cap integration matrix', () => {
     expect(comp?.outcome).toBe('cost-cap-exceeded');
     expect(typeof comp?.reason).toBe('string');
     // SPEC-032-1-02 FR-4: reason carries the enforcer's error class.
-    expect(comp?.reason).toMatch(/^DailyCostCapExceededError: /);
+    // The enforcer emits DailyCostCapExceededError for normal breaches and
+    // AdminOverrideRequiredError when the projected spend is >= 110% of the
+    // cap (this fixture: $50 estimate vs $1 cap = 5000%, well over the
+    // override threshold).
+    expect(comp?.reason).toMatch(/^(DailyCostCapExceededError|AdminOverrideRequiredError): /);
   });
 
   it('Case C: two runDeploy() calls with the same deployId record exactly one ledger entry', async () => {

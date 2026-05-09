@@ -141,6 +141,12 @@ async function findObservationsForOscillation(
           if (ci === -1) continue;
           const key = line.substring(0, ci).trim();
           let val: any = line.substring(ci + 1).trim();
+          // Strip YAML double-quotes that buildMockObservationFile adds
+          // around values containing ':' (e.g. ISO-8601 timestamps).
+          if (typeof val === 'string' && val.length >= 2 &&
+              val.startsWith('"') && val.endsWith('"')) {
+            val = val.slice(1, -1);
+          }
           if (val === 'null' || val === '') val = null;
           else if (val === 'true') val = true;
           else if (val === 'false') val = false;
