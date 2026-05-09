@@ -1,4 +1,5 @@
-import * as fs from 'fs';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const fs = require('fs') as typeof import('fs');
 import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
