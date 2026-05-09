@@ -710,68 +710,29 @@ function test_parse_invalid_verdict_returns_null(): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const syncTests = [
-  test_review_prompt_includes_proposal_details,
-  test_review_prompt_includes_diff,
-  test_review_prompt_includes_both_definitions,
-  test_review_prompt_includes_6_point_checklist,
-  test_parse_approved_output,
-  test_parse_rejected_output,
-  test_parse_json_in_code_block,
-  test_parse_invalid_output_returns_null,
-  test_parse_missing_verdict_returns_null,
-  test_parse_invalid_verdict_returns_null,
-];
-
-const asyncTests = [
-  test_meta_review_all_pass,
-  test_meta_review_blocker_finding_rejects,
-  test_meta_review_warning_does_not_reject,
-  test_hard_override_blocker_always_rejects,
-  test_meta_review_updates_proposal_status_approved,
-  test_meta_review_updates_proposal_status_rejected,
-  test_meta_review_audit_log,
-  test_meta_review_parse_failure,
-  test_schema_compliance_check,
-  test_meta_reviewer_not_found_throws,
-  test_self_review_bypass_detected,
-  test_self_review_status_pending_human,
-  test_self_review_bypass_logged,
-  test_non_self_proposal_not_bypassed,
-];
-
-async function run(): Promise<void> {
-  let passed = 0;
-  let failed = 0;
-  const total = syncTests.length + asyncTests.length;
-
-  // Run sync tests
-  for (const test of syncTests) {
-    try {
-      test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  // Run async tests
-  for (const test of asyncTests) {
-    try {
-      await test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  console.log(`\nResults: ${passed}/${total} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
-}
-
-run().catch((err) => {
-  console.error('Test runner error:', err);
-  process.exit(1);
+describe('meta reviewer', () => {
+  it('test_review_prompt_includes_proposal_details', test_review_prompt_includes_proposal_details);
+  it('test_review_prompt_includes_diff', test_review_prompt_includes_diff);
+  it('test_review_prompt_includes_both_definitions', test_review_prompt_includes_both_definitions);
+  it('test_review_prompt_includes_6_point_checklist', test_review_prompt_includes_6_point_checklist);
+  it('test_parse_approved_output', test_parse_approved_output);
+  it('test_parse_rejected_output', test_parse_rejected_output);
+  it('test_parse_json_in_code_block', test_parse_json_in_code_block);
+  it('test_parse_invalid_output_returns_null', test_parse_invalid_output_returns_null);
+  it('test_parse_missing_verdict_returns_null', test_parse_missing_verdict_returns_null);
+  it('test_parse_invalid_verdict_returns_null', test_parse_invalid_verdict_returns_null);
+  it('test_meta_review_all_pass', async () => await test_meta_review_all_pass());
+  it('test_meta_review_blocker_finding_rejects', async () => await test_meta_review_blocker_finding_rejects());
+  it('test_meta_review_warning_does_not_reject', async () => await test_meta_review_warning_does_not_reject());
+  it('test_hard_override_blocker_always_rejects', async () => await test_hard_override_blocker_always_rejects());
+  it('test_meta_review_updates_proposal_status_approved', async () => await test_meta_review_updates_proposal_status_approved());
+  it('test_meta_review_updates_proposal_status_rejected', async () => await test_meta_review_updates_proposal_status_rejected());
+  it('test_meta_review_audit_log', async () => await test_meta_review_audit_log());
+  it('test_meta_review_parse_failure', async () => await test_meta_review_parse_failure());
+  it('test_schema_compliance_check', async () => await test_schema_compliance_check());
+  it('test_meta_reviewer_not_found_throws', async () => await test_meta_reviewer_not_found_throws());
+  it('test_self_review_bypass_detected', async () => await test_self_review_bypass_detected());
+  it('test_self_review_status_pending_human', async () => await test_self_review_status_pending_human());
+  it('test_self_review_bypass_logged', async () => await test_self_review_bypass_logged());
+  it('test_non_self_proposal_not_bypassed', async () => await test_non_self_proposal_not_bypassed());
 });

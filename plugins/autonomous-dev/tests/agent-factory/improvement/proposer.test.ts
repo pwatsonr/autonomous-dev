@@ -757,84 +757,36 @@ function assert(condition: boolean, message: string): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const syncTests = [
-  // Constraint enforcement
-  test_tools_field_change_rejected,
-  test_role_field_change_rejected,
-  test_new_expertise_tag_rejected,
-  test_expertise_refinement_allowed,
-  test_rubric_dimension_removal_rejected,
-  test_rubric_dimension_addition_allowed,
-  test_rubric_weight_change_allowed,
-  test_multiple_violations_all_reported,
-  test_no_violations_when_identical,
-
-  // Response extraction
-  test_extraction_from_markdown_code_block,
-  test_extraction_from_plain_code_block,
-  test_extraction_from_md_code_block,
-  test_extraction_failure_no_code_block,
-
-  // Improvement prompt
-  test_prompt_includes_weakness_report,
-  test_prompt_includes_current_definition,
-  test_prompt_includes_constraints,
-  test_prompt_includes_agent_identity,
-
-  // Unified diff
-  test_diff_contains_file_headers,
-  test_diff_shows_changes,
-  test_diff_identical_content,
-
-  // Hard-coded enforcement verification
-  test_constraint_check_is_hard_coded,
-];
-
-const asyncTests = [
-  test_generate_proposal_success,
-  test_proposal_links_to_weakness_report,
-  test_proposal_status_pending_meta_review,
-  test_proposal_version_incremented,
-  test_proposal_includes_diff,
-  test_proposal_extraction_failure,
-  test_agent_not_found,
-  test_llm_invocation_failure,
-  test_constraint_violation_rejects_before_meta_review,
-  test_violation_logged_to_audit,
-];
-
-async function run(): Promise<void> {
-  let passed = 0;
-  let failed = 0;
-  const total = syncTests.length + asyncTests.length;
-
-  // Run sync tests
-  for (const test of syncTests) {
-    try {
-      test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  // Run async tests
-  for (const test of asyncTests) {
-    try {
-      await test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  console.log(`\nResults: ${passed}/${total} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
-}
-
-run().catch((err) => {
-  console.error('Test runner error:', err);
-  process.exit(1);
+describe('proposer', () => {
+  it('test_tools_field_change_rejected', test_tools_field_change_rejected);
+  it('test_role_field_change_rejected', test_role_field_change_rejected);
+  it('test_new_expertise_tag_rejected', test_new_expertise_tag_rejected);
+  it('test_expertise_refinement_allowed', test_expertise_refinement_allowed);
+  it('test_rubric_dimension_removal_rejected', test_rubric_dimension_removal_rejected);
+  it('test_rubric_dimension_addition_allowed', test_rubric_dimension_addition_allowed);
+  it('test_rubric_weight_change_allowed', test_rubric_weight_change_allowed);
+  it('test_multiple_violations_all_reported', test_multiple_violations_all_reported);
+  it('test_no_violations_when_identical', test_no_violations_when_identical);
+  it('test_extraction_from_markdown_code_block', test_extraction_from_markdown_code_block);
+  it('test_extraction_from_plain_code_block', test_extraction_from_plain_code_block);
+  it('test_extraction_from_md_code_block', test_extraction_from_md_code_block);
+  it('test_extraction_failure_no_code_block', test_extraction_failure_no_code_block);
+  it('test_prompt_includes_weakness_report', test_prompt_includes_weakness_report);
+  it('test_prompt_includes_current_definition', test_prompt_includes_current_definition);
+  it('test_prompt_includes_constraints', test_prompt_includes_constraints);
+  it('test_prompt_includes_agent_identity', test_prompt_includes_agent_identity);
+  it('test_diff_contains_file_headers', test_diff_contains_file_headers);
+  it('test_diff_shows_changes', test_diff_shows_changes);
+  it('test_diff_identical_content', test_diff_identical_content);
+  it('test_constraint_check_is_hard_coded', test_constraint_check_is_hard_coded);
+  it('test_generate_proposal_success', async () => await test_generate_proposal_success());
+  it('test_proposal_links_to_weakness_report', async () => await test_proposal_links_to_weakness_report());
+  it('test_proposal_status_pending_meta_review', async () => await test_proposal_status_pending_meta_review());
+  it('test_proposal_version_incremented', async () => await test_proposal_version_incremented());
+  it('test_proposal_includes_diff', async () => await test_proposal_includes_diff());
+  it('test_proposal_extraction_failure', async () => await test_proposal_extraction_failure());
+  it('test_agent_not_found', async () => await test_agent_not_found());
+  it('test_llm_invocation_failure', async () => await test_llm_invocation_failure());
+  it('test_constraint_violation_rejects_before_meta_review', async () => await test_constraint_violation_rejects_before_meta_review());
+  it('test_violation_logged_to_audit', async () => await test_violation_logged_to_audit());
 });

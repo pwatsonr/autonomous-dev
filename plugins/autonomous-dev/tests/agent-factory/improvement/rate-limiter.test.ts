@@ -446,49 +446,22 @@ function test_next_monday_from_sunday(): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-const syncTests = [
-  // Rate limiter
-  test_first_modification_allowed,
-  test_second_modification_blocked,
-  test_modification_allowed_next_week,
-  test_calendar_week_boundary_monday,
-  test_configurable_limit,
-  test_rate_limit_logged,
-  test_deferred_not_rejected,
-  test_rate_limit_per_agent,
-  test_rate_limit_persistence,
-  test_record_modification,
-  test_empty_state_file_handled,
-
-  // Calendar week utilities
-  test_week_start_is_monday,
-  test_week_start_on_monday_itself,
-  test_week_start_on_sunday,
-  test_week_end_is_sunday,
-  test_next_monday,
-  test_next_monday_from_sunday,
-];
-
-async function run(): Promise<void> {
-  let passed = 0;
-  let failed = 0;
-  const total = syncTests.length;
-
-  for (const test of syncTests) {
-    try {
-      test();
-      passed++;
-    } catch (err) {
-      console.log(`FAIL: ${test.name} -- ${err}`);
-      failed++;
-    }
-  }
-
-  console.log(`\nResults: ${passed}/${total} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
-}
-
-run().catch((err) => {
-  console.error('Test runner error:', err);
-  process.exit(1);
+describe('rate limiter', () => {
+  it('test_first_modification_allowed', test_first_modification_allowed);
+  it('test_second_modification_blocked', test_second_modification_blocked);
+  it('test_modification_allowed_next_week', test_modification_allowed_next_week);
+  it('test_calendar_week_boundary_monday', test_calendar_week_boundary_monday);
+  it('test_configurable_limit', test_configurable_limit);
+  it('test_rate_limit_logged', test_rate_limit_logged);
+  it('test_deferred_not_rejected', test_deferred_not_rejected);
+  it('test_rate_limit_per_agent', test_rate_limit_per_agent);
+  it('test_rate_limit_persistence', test_rate_limit_persistence);
+  it('test_record_modification', test_record_modification);
+  it('test_empty_state_file_handled', test_empty_state_file_handled);
+  it('test_week_start_is_monday', test_week_start_is_monday);
+  it('test_week_start_on_monday_itself', test_week_start_on_monday_itself);
+  it('test_week_start_on_sunday', test_week_start_on_sunday);
+  it('test_week_end_is_sunday', test_week_end_is_sunday);
+  it('test_next_monday', test_next_monday);
+  it('test_next_monday_from_sunday', test_next_monday_from_sunday);
 });
