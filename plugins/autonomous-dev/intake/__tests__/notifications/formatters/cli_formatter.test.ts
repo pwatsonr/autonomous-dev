@@ -57,6 +57,7 @@ function makeRequest(overrides: Partial<RequestEntity> = {}): RequestEntity {
     paused_at_phase: null,
     created_at: new Date(Date.now() - 8_040_000).toISOString(), // ~2h 14m ago
     updated_at: new Date().toISOString(),
+    ...overrides,
   };
 }
 
