@@ -216,7 +216,12 @@ describe('AuditEventWriter', () => {
   // -------------------------------------------------------------------------
 
   it('calls fsyncSync after each write', async () => {
-    const fsyncSpy = jest.spyOn(fs, 'fsyncSync');
+    // Node 22+/ts-jest exposes `fs` as a getter-only namespace when imported
+    // via `import * as fs`. Use `require('fs')` here so jest.spyOn can swap
+    // the property (PRD-016 triage batch 3).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fsCjs = require('fs');
+    const fsyncSpy = jest.spyOn(fsCjs, 'fsyncSync');
     const writer = new AuditEventWriter(logPath);
 
     await writer.append(makePartialEvent());
@@ -236,10 +241,13 @@ describe('AuditEventWriter', () => {
   it('retries on write failure and succeeds on second attempt', async () => {
     const writer = new AuditEventWriter(logPath);
 
+    // See note above re: `require('fs')` for jest.spyOn compatibility.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fsCjs = require('fs');
     // Mock openSync to fail once, then succeed
-    const originalOpenSync = fs.openSync;
+    const originalOpenSync = fsCjs.openSync;
     let callCount = 0;
-    const openSpy = jest.spyOn(fs, 'openSync').mockImplementation((...args: any[]) => {
+    const openSpy = jest.spyOn(fsCjs, 'openSync').mockImplementation((...args: any[]) => {
       callCount++;
       // Fail on first call to open the log file (not the lock file)
       // The lock file uses O_CREAT | O_EXCL, the log file uses O_APPEND
