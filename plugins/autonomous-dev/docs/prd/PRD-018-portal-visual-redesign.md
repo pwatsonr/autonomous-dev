@@ -4,7 +4,7 @@
 |-------------|------------------------------------------------|
 | **Title**   | Portal Visual Redesign — Design System Adoption|
 | **PRD ID**  | PRD-018                                        |
-| **Version** | 0.1                                            |
+| **Version** | 0.2 (review pass 1)                            |
 | **Date**    | 2026-05-09                                     |
 | **Author**  | Patrick Watson                                 |
 | **Status**  | Draft                                          |
@@ -54,7 +54,8 @@ The user has commissioned a complete design system (`autonomous-dev-design-syste
 | NG-05 | Not a brand identity exercise. The wordmark and bracket motif as supplied in the design bundle are accepted as-is; we do not run a separate brand exploration in scope of this PRD. |
 | NG-06 | Not a mobile/responsive overhaul. The kit targets desktop/laptop with the 220px left rail + 1280px content max-width as designed. Tablet looks acceptable; phone is explicitly not supported. |
 | NG-07 | Not an accessibility re-audit. Existing accessibility behaviors must be preserved (keyboard focus, ARIA labels, semantic HTML); the design kit's `:focus-visible` 2px outline and underlined links inherit that posture, but a full a11y audit is a follow-up. |
-| NG-08 | Not a revisit of PRD-009 NG-04 ("not a SPA / framework-heavy UI"). The supplied kit is React JSX but the components are simple enough to port to HTMX-rendered server templates. The TDD picks the path. |
+| NG-08 | Not a revisit of PRD-009 NG-04 ("not a SPA / framework-heavy UI"). PRD-009 NG-04 stands. Decision below — see Section 4.5. |
+| NG-09 | Not a redesign of the login / authentication surface. Today's portal is localhost-only by default (auth_mode=localhost) and there is no login UI. The two non-localhost auth modes (tailscale, oauth) reuse upstream provider chrome, which is not in scope of this redesign. The brand wordmark on those upstream surfaces is out of our control. |
 
 ---
 
@@ -83,6 +84,22 @@ The new dashboard implements this via:
 
 ---
 
+## 4.5 Framework decision (resolves prior OQ-01)
+
+The supplied kit is written in React JSX. The portal currently renders with **Hono JSX server-side templates** (per `plugins/autonomous-dev-portal/server/`). PRD-009 NG-04 forbids a SPA / framework-heavy client UI, and that constraint stands.
+
+**Decision: port the kit's React JSX components to Hono JSX server-side templates.** No client-side React, no client build chain, no SPA. The kit's components are pattern-light (function components, no hooks beyond simple state, no React-specific lifecycles in the surfaces we're adopting) and the JSX shape is structurally compatible with Hono's `tsx` renderer. Where the kit uses small client interactions (theme toggle, form validation, accordion disclosure), they ship as **vanilla JS modules** loaded with `<script type="module">` — no framework, no bundler. Server-sent events continue to drive live state, as they do today.
+
+**Why this option over the alternatives:**
+
+- *Port to plain template helpers in another templating engine* (rejected) — would require throwing away the existing Hono JSX pipeline, larger blast radius, no benefit.
+- *Accept a small client-side React bundle scoped to primitives* (rejected) — violates PRD-009 NG-04 in spirit and adds a build chain the portal does not have today.
+- *Port to Hono JSX server templates + vanilla JS modules* (chosen) — preserves PRD-009 NG-04 fully, reuses the existing rendering pipeline, the JSX-to-JSX port is structurally trivial, and the kit's state needs are small enough to handle without a framework.
+
+This decision is binding on the TDD. The TDD details *how* the port is staged, not *whether* a framework lands.
+
+---
+
 ## 5. Requirements
 
 ### 5.1 Tokens & Theming
@@ -106,7 +123,7 @@ The new dashboard implements this via:
 
 | ID   | Requirement                                                                                                                                                |
 |------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| R-08 | The kit's `Primitives.jsx` is ported into the portal as either JSX (if framework retained) or template helpers (if HTMX) — exposing: `Btn`, `Chip` (status / phase variants), `Dot` (live / static), `Score` (0-100 bar), `CostRing`, `Card`, `KillSwitch`. |
+| R-08 | The kit's `Primitives.jsx` is ported to Hono JSX server-side components (per §4.5) at `plugins/autonomous-dev-portal/server/components/primitives.tsx`, exposing the following named exports with the props specified — these are the binding API the surfaces consume: `Btn({ kind?: 'primary'|'secondary'|'ghost'|'destructive'; size?: 'sm'|'md'; disabled?: boolean; children })`, `Chip({ variant: 'status'|'phase'; tone?: 'ok'|'warn'|'err'|'info'|'muted' \| phase name; children })`, `Dot({ tone?: 'ok'|'warn'|'err'|'info'|'muted'; live?: boolean })`, `Score({ value: 0..100; threshold?: number; label?: string })`, `CostRing({ spent: number; cap: number; label?: string })`, `Card({ leftBar?: phase; padding?: 'sm'|'md'|'lg'; children })`, `KillSwitch({ engaged: boolean; onConfirm: action-url; armed?: boolean })`. The TDD specifies the rendered HTML shape; this PRD pins the prop surface. |
 | R-09 | Buttons follow the kit: primary (`--brand` background), secondary (transparent w/ border), ghost (no border, fills on hover), destructive (`--err` background). All have hover, active, focus-visible states matching `colors_and_type.css`. |
 | R-10 | Status communication uses dot + UPPERCASE word badge (e.g. `● RUNNING`, `● ENGAGED`, `● TRIPPED`). Emoji are forbidden anywhere in the portal. CI lint rejects emoji in template strings. |
 | R-11 | Phase chips render the phase name UPPERCASE (`PRD`, `TDD`, `PLAN`, `SPEC`, `CODE`, `REVIEW`, `DEPLOY`, `OBSERVE`) on the corresponding `--phase-*` background. |
@@ -114,6 +131,7 @@ The new dashboard implements this via:
 | R-13 | The kill switch surface uses the `KillSwitch` primitive — distinct from any other button — with `--err` palette when armed-to-engage and a flat-warning treatment when engaged. Confirmation requires typing `CONFIRM` per existing safety pattern. |
 | R-14 | Tables use horizontal hairlines only — no zebra by default, no outer card frame. Sticky headers, hover-row highlight in `--bg-2`, active-selection 2px left bar in `--brand`. |
 | R-15 | A pulsing `.dot.live` indicator replaces every spinner / skeleton / loader. SSE-streamed surfaces use it on the heartbeat, the in-flight phase chip, and the cost-ring center dot. |
+| R-15a | **Hairline-driven elevation system.** Default elevation is a 1px rule (`var(--line-1)`); the next step adds a 2px ambient shadow. Modals and pop-overs use `--shadow-pop`. No glassmorphism, no backdrop-blur on data screens. Cards: 1px border + 3px radius + no shadow. Tables: horizontal hairlines only, no outer card frame. CI lint rejects `box-shadow:` declarations in non-token CSS that don't reference `--shadow-*` variables. |
 
 ### 5.4 Surface-by-Surface Adoption
 
@@ -140,8 +158,8 @@ The new dashboard implements this via:
 | ID   | Metric                                                                                                                                                     |
 |------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | M-01 | 100% of design tokens used. CI grep for hex colors / px sizes / hardcoded font names in non-token CSS returns zero matches outside `design-tokens.css`. |
-| M-02 | Operator can identify the phase of any in-flight request by color alone (no text), verified in user testing with 1 operator. |
-| M-03 | Visual regression tests on `/design-system` cover all 17 component clusters from `preview/`, fail on any token-level diff. |
+| M-02 | All 8 phase colors meet WCAG 2.1 SC 1.4.11 non-text contrast (≥3:1) against `--bg-0` (light theme) AND `--bg-0` (dark theme), AND ≥3:1 between any two adjacent phase colors when used as side-by-side chips. Verified by `scripts/check-phase-contrast.ts` run in CI on every PR that touches `design-tokens.css`. |
+| M-03 | Visual regression tests on `/design-system` cover all 20 preview cards from `preview/`, fail on any token-level diff. |
 | M-04 | Before/after screenshot pairs for all 6 surfaces ship with the PR; reviewer can see the kit applied pixel-faithfully. |
 | M-05 | Zero emoji and zero hex-color literals in user-facing portal templates after the sweep. CI enforces. |
 | M-06 | Light + dark themes have feature parity. The same screenshots in dark match the kit's dark expectation. |
@@ -150,13 +168,14 @@ The new dashboard implements this via:
 
 ## 7. Open Questions
 
-| ID    | Question                                                                                                                                                                                                                                       |
-|-------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| OQ-01 | The supplied kit is React JSX. PRD-009 NG-04 forbids a SPA / framework-heavy UI. Options: (a) port the JSX components to the existing Hono JSX server-render pipeline; (b) port to plain template helpers in whatever templating the portal currently uses; (c) accept a small client-side React bundle scoped to component primitives only. The TDD must pick one with a tradeoff write-up. |
-| OQ-02 | The brand wordmark and bracket motif are original to the design bundle and have no upstream blessing. Confirm before we ship them publicly. |
-| OQ-03 | Lucide icons via CDN: acceptable for v1, or do we vendor up front? CDN gives faster iteration; vendoring removes a runtime external dep. |
-| OQ-04 | Theme default: light or dark? The design system says "Dark mode is a true dark, not gray-900" — implying dark is the spec. README implies light is default. Pick one. |
-| OQ-05 | Does the `/design-system` reference page ship with the redesign or come as a follow-up? Recommendation: ship together; it doubles as the regression-test surface. |
+| ID    | Status     | Owner    | Question / decision                                                                                                                                                                                |
+|-------|------------|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| OQ-01 | RESOLVED   | —        | Framework choice — closed in §4.5. Port React JSX kit to Hono JSX server templates + vanilla JS modules. Binding on TDD. |
+| OQ-02 | OPEN       | Patrick Watson — must close before TDD brand-asset integration begins | Wordmark / bracket motif is original to the design bundle and has no upstream blessing. Confirm or replace. Blocks asset vendoring in TDD-018-B (see §11 decomposition). |
+| OQ-03 | OPEN       | TDD author | Lucide icons via CDN: keep CDN for v1, or vendor up-front? CDN gives faster iteration; vendoring removes a runtime external dep and reduces CSP surface. The TDD picks. |
+| OQ-04 | RESOLVED   | —        | Theme default = light. R-03 binds. |
+| OQ-05 | RESOLVED   | —        | `/design-system` page ships with the redesign. R-21 binds. |
+| OQ-06 | OPEN       | TDD author | Google Fonts (`fonts.googleapis.com`) and Lucide CDN (`unpkg.com/lucide-static`) are external origins that the portal's existing CSP (PRD-009 FR-S32) may not allow. The TDD must either widen the CSP with rationale OR self-host both. Default recommendation: self-host both at first port; CDN was a design-bundle convenience, not a production constraint. |
 
 ---
 
@@ -189,11 +208,25 @@ The redesign work in this PRD does not depend on any of these bugs being fixed. 
 
 ---
 
-## 10. References
+## 10. Recommended TDD decomposition
+
+This PRD is large enough to warrant decomposition. Recommended split:
+
+- **TDD-018-A — Foundations.** Vendoring `colors_and_type.css`, light + dark theme switcher, voice/copy sweep across the existing portal, CSP / font / icon hosting decisions (closes OQ-03 and OQ-06), CI lints (no hex literals, no emoji, no untokened box-shadow). Covers R-01..R-04, R-22, R-23, R-15a, M-01, M-05, M-06.
+- **TDD-018-B — Shell + primitives + reference page.** Left rail, brand wordmark, global ops bar, the seven primitive components from R-08, the `/design-system` reference route. Covers R-05..R-15, R-21, M-02, M-03. **Blocks on OQ-02** (wordmark IP confirmation).
+- **TDD-018-C — Surface-by-surface adoption.** Re-skin Dashboard, Approvals, Request Detail, Settings, Costs, Ops to match the kit. Covers R-16..R-20, M-04. **Sequenced after TDD-018-B** (uses the primitives and shell).
+
+This decomposition is non-binding — the TDD authors are free to merge or split further as they see fit, but it represents the natural seams.
+
+---
+
+## 11. References
 
 - Source design bundle: `claude.ai/design`, handle `1Pk1tLTNNUgKR8opZBCUeg`. Extracted to (gitignored) developer machine for reading. Authoritative copy lives at the URL.
-- `autonomous-dev-design-system/README.md` — content fundamentals + visual foundations.
-- `autonomous-dev-design-system/project/SKILL.md` — agent-skill manifest.
+- `autonomous-dev-design-system/README.md` — top-level handoff README ("CODING AGENTS: READ THIS FIRST").
+- `autonomous-dev-design-system/project/README.md` — content fundamentals + visual foundations.
+- `autonomous-dev-design-system/project/SKILL.md` — agent-skill manifest used to invoke the design system as a Claude skill.
+- `autonomous-dev-design-system/chats/chat1.md` — the iteration transcript with the user (910 lines). Read this before the TDD work — the kit is the *output*; the chat shows where the user landed.
 - `autonomous-dev-design-system/project/colors_and_type.css` — token source-of-truth.
 - `autonomous-dev-design-system/project/ui_kits/portal/*.jsx` — reference component implementations.
 - `autonomous-dev-design-system/project/preview/*.html` — token + component preview cards.
