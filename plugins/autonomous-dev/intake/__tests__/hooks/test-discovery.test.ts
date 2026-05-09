@@ -13,7 +13,14 @@ import * as path from 'node:path';
 import { PluginDiscovery, type DiscoveryError } from '../../hooks/discovery';
 import { validateManifest } from '../../../tests/helpers/schema-validator';
 
-const FIXTURES = path.resolve(__dirname, '../../../tests/fixtures/plugins');
+const FIXTURES_ROOT = path.resolve(__dirname, '../../../tests/fixtures/plugins');
+// SPEC-019-1-05 was authored when the fixtures dir held only three plugins
+// (simple, multi-hook, malformed). Later specs (SPEC-022-1, SPEC-022-2) added
+// more sibling fixtures (audit-logger, code-fixer, orphan-consumer,
+// security-reviewer). To keep this suite focused on the original three, we
+// stage an isolated fixtures root via symlinks for tests that scan FIXTURES.
+const FIXTURE_SUBSET = ['simple', 'multi-hook', 'malformed'] as const;
+let FIXTURES: string;
 
 async function mkTemp(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), 'ad-discovery-'));
@@ -25,6 +32,21 @@ async function rmTemp(dir: string): Promise<void> {
 
 describe('PluginDiscovery.scan', () => {
   let discovery: PluginDiscovery;
+  let fixturesStaged: string;
+
+  beforeAll(async () => {
+    fixturesStaged = await mkTemp();
+    for (const name of FIXTURE_SUBSET) {
+      await fs.symlink(path.join(FIXTURES_ROOT, name), path.join(fixturesStaged, name), 'dir');
+    }
+    FIXTURES = fixturesStaged;
+  });
+
+  afterAll(async () => {
+    if (fixturesStaged) {
+      await rmTemp(fixturesStaged);
+    }
+  });
 
   beforeEach(() => {
     discovery = new PluginDiscovery(validateManifest);
