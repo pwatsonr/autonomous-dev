@@ -50,8 +50,11 @@ describe('WorktreeManager', () => {
   let wm: WorktreeManager;
 
   beforeEach(async () => {
-    // Create a temp directory with a real git repo
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wm-test-'));
+    // Create a temp directory with a real git repo.
+    // Canonicalize via realpathSync so paths match what `git worktree list`
+    // emits on macOS (where /var -> /private/var). Otherwise health validation
+    // can't match registered worktrees against the configured worktree root.
+    tmpDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'wm-test-')));
     repoRoot = path.join(tmpDir, 'repo');
     worktreeRoot = path.join(tmpDir, 'worktrees');
 
