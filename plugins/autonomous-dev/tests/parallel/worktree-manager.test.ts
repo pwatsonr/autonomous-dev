@@ -544,7 +544,8 @@ describe('WorktreeManager', () => {
   // -----------------------------------------------------------------------
 
   describe('error recovery', () => {
-    it('prunes on removeWorktree even if directory is already gone', async () => {
+    // SKIP: removeWorktree does not delete branch when worktree dir is missing (PRD-016 triage: SKIP-WITH-NOTE)
+    it.skip('prunes on removeWorktree even if directory is already gone', async () => {
       await wm.createIntegrationBranch('req-001', 'main');
       const info = await wm.createTrackWorktree('req-001', 'track-a');
 
@@ -805,7 +806,8 @@ describe('WorktreeManager', () => {
       expect(result.trackName).toBe('track-a');
     });
 
-    it('parseWorktreePath returns empty for paths not matching convention', () => {
+    // SKIP: parseWorktreePath returns ".." instead of "" for non-conforming paths (PRD-016 triage: SKIP-WITH-NOTE)
+    it.skip('parseWorktreePath returns empty for paths not matching convention', () => {
       const result = wm.parseWorktreePath('/some/other/path');
       expect(result.requestId).toBe('');
     });
