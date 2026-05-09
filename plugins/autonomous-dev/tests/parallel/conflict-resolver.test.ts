@@ -67,8 +67,7 @@ function cleanupTempRepo(dir: string): void {
  */
 function setupMergeConflict(repoRoot: string): void {
   // Create file on main
-  fs.writeFileSync(path.join(repoRoot, 'src', 'service.ts'), 'line1\nline2\nline3\n');
-  execSync('mkdir -p src', { cwd: repoRoot, stdio: 'pipe' });
+  fs.mkdirSync(path.join(repoRoot, 'src'), { recursive: true });
   fs.writeFileSync(path.join(repoRoot, 'src', 'service.ts'), 'line1\nline2\nline3\n');
   execSync('git add . && git commit -m "add service"', { cwd: repoRoot, stdio: 'pipe' });
 
