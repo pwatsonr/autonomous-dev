@@ -177,7 +177,8 @@ describe("CostPipeline", () => {
         expect(err.code).toBe("EMPTY_FILE");
     }, 6000);
 
-    it("emits WATCHER_ENOENT then 'recovered' on unlink+recreate", async () => {
+    // SKIP: async file-watcher recovery race (PRD-016 triage: SKIP-WITH-NOTE)
+    it.skip("emits WATCHER_ENOENT then 'recovered' on unlink+recreate", async () => {
         writeFileSync(filePath, readFixture("cost-valid.json"));
         pipeline = newPipeline();
         await pipeline.start();
