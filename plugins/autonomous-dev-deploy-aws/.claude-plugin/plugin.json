@@ -2,8 +2,13 @@
   "name": "autonomous-dev-deploy-aws",
   "version": "0.1.0",
   "description": "AWS (ECR + ECS Fargate) deployment backend for autonomous-dev.",
-  "author": "autonomous-dev contributors",
-  "extends": ["autonomous-dev"],
+  "author": {
+    "name": "pwatsonr",
+    "url": "https://github.com/pwatsonr"
+  },
+  "extends": [
+    "autonomous-dev"
+  ],
   "deployment_backend": {
     "name": "aws",
     "regions_supported": [
@@ -18,7 +23,11 @@
       "ap-southeast-1",
       "ap-southeast-2"
     ],
-    "services_supported": ["ecs-fargate", "ecr", "alb"],
+    "services_supported": [
+      "ecs-fargate",
+      "ecr",
+      "alb"
+    ],
     "credential_provider": "credential-proxy"
   }
 }

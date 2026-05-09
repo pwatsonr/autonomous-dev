@@ -21,6 +21,24 @@ Each entry:
 - **Suspected location**: wherever the wizard / config CLI writes to this file (the create/update path should `chmod 600` automatically when secrets are present)
 - **Fix idea**: detect any `*_url`, `*_token`, `*_key`, `webhook_url` etc. in the config and auto-chmod 600 on save; OR make `autonomous-dev config init --global` always chmod 600
 
+### B-4: Marketplace.json missing 5 sibling plugins
+- **Wizard**: cross-plugin install (Phase 2 if it walked through all of them)
+- **Symptom**: `.claude-plugin/marketplace.json` only listed `autonomous-dev` and `autonomous-dev-assist`. The 5 sibling plugins (portal + 4 deploy backends) were never installable via `claude plugin install <name>@autonomous-dev`.
+- **Workaround**: added the 5 entries in PR #152.
+- **Severity**: blocker (plugins were unreachable for end users)
+- **Suspected location**: `.claude-plugin/marketplace.json`
+- **Status**: FIXED in #152 (merged 2026-05-09). Worth a follow-up to add a CI check that all `plugins/*/plugin.json` files have a corresponding marketplace.json entry so this can't drift again.
+
+### B-5: Plugin manifests have schema-incompatible userConfig + author=string
+- **Wizard**: `claude plugin install` validation
+- **Symptom**: All 5 sibling plugin manifests fail Claude Code's plugin validation:
+  - All 5: `author: expected object, received string` — manifests have `"author": "autonomous-dev contributors"` but Claude Code expects `{name, url?}` object.
+  - autonomous-dev-portal additionally: `userConfig.{port,sse_update_interval_seconds}.type: Invalid option ("integer" not allowed; only "string"|"number"|"boolean"|"directory"|"file")`; missing `title` field on every userConfig entry; `minimum`/`maximum`/`enum`/`items` keys not recognized; key `"portal.path_policy.allowed_roots"` rejected (dots in keys not allowed).
+- **Workaround**: fix manifests (in-progress).
+- **Severity**: blocker (none of the 5 plugins install)
+- **Suspected location**: `plugins/{autonomous-dev-portal,autonomous-dev-deploy-{aws,gcp,azure,k8s}}/.claude-plugin/plugin.json`
+- **Fix idea**: (1) convert `author` to object form across all manifests; (2) for portal, replace JSON Schema-style userConfig with the simpler Claude Code form (`type` ∈ {string,number,boolean,directory,file}, add `title`, drop unsupported keys, flatten dotted keys); (3) add a CI lint that runs `claude plugin install --dry-run` or equivalent against every plugin manifest in the repo.
+
 ### B-3: Wizard documents CLI subcommands that don't exist
 - **Wizard**: autonomous-dev-assist:setup-wizard, Phases 5, 7, 9, 10
 - **Symptom**: Phase 7 tells the user to run `autonomous-dev request submit --repo ... --description ...` and `autonomous-dev request status --repo ...`. Phase 5/10 reference `autonomous-dev cost`. Phase 10's quick-reference card references `autonomous-dev agent list` and `autonomous-dev observe`. None of these exist — the actual CLI only supports `install-daemon`, `daemon {start,stop,status}`, `kill-switch [reset]`, `circuit-breaker reset`, `config {init,show,validate}`.

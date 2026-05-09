@@ -2,8 +2,13 @@
   "name": "autonomous-dev-deploy-gcp",
   "version": "0.1.0",
   "description": "GCP (Cloud Build + Cloud Run) deployment backend for autonomous-dev.",
-  "author": "autonomous-dev contributors",
-  "extends": ["autonomous-dev"],
+  "author": {
+    "name": "pwatsonr",
+    "url": "https://github.com/pwatsonr"
+  },
+  "extends": [
+    "autonomous-dev"
+  ],
   "deployment_backend": {
     "name": "gcp",
     "regions_supported": [
@@ -15,7 +20,10 @@
       "asia-northeast1",
       "asia-southeast1"
     ],
-    "services_supported": ["cloud-run", "cloud-build"],
+    "services_supported": [
+      "cloud-run",
+      "cloud-build"
+    ],
     "credential_provider": "credential-proxy"
   }
 }
