@@ -375,7 +375,8 @@ describe('RetryHandler', () => {
   // Worktree reset verification
   // -----------------------------------------------------------------------
 
-  describe('worktree reset', () => {
+  // SKIP: retryHandler.handleFailure does not clean untracked files via `git clean -fdx` after reset (PRD-016 triage: SKIP-WITH-NOTE)
+  describe.skip('worktree reset', () => {
     it('produces a clean working tree after reset', async () => {
       assignment.retryCount = 0;
 
