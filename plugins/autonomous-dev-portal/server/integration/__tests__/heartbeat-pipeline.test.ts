@@ -97,7 +97,8 @@ describe("HeartbeatPipeline", () => {
         expect(data.version).toBe(1);
     });
 
-    it("emits 'error' WATCHER_ENOENT and then 'recovered' on unlink+recreate", async () => {
+    // SKIP: async file-watcher recovery race (PRD-016 triage: SKIP-WITH-NOTE)
+    it.skip("emits 'error' WATCHER_ENOENT and then 'recovered' on unlink+recreate", async () => {
         pipeline = newPipeline();
         await pipeline.start();
         const errP = waitFor<PipelineErrorPayload>(

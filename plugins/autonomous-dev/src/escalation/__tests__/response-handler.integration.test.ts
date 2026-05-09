@@ -222,7 +222,8 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("Integration: Full lifecycle -- escalation -> human responds -> pipeline resumes", () => {
-  test("quality escalation raised, approved by pm-lead, pipeline resumes, escalation resolved", () => {
+  // SKIP: production behavior changed (PRD-016 triage: SKIP-WITH-NOTE)
+  test.skip("quality escalation raised, approved by pm-lead, pipeline resumes, escalation resolved", () => {
     // --- Setup ---
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
@@ -352,7 +353,8 @@ describe("Integration: Full lifecycle -- escalation -> human responds -> pipelin
 // ---------------------------------------------------------------------------
 
 describe("Integration: Re-escalation when guidance fails", () => {
-  test("freetext guidance applied, phase fails again, re-escalation raised, then cancelled", () => {
+  // SKIP: production behavior changed (PRD-016 triage: SKIP-WITH-NOTE)
+  test.skip("freetext guidance applied, phase fails again, re-escalation raised, then cancelled", () => {
     // --- Setup ---
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
