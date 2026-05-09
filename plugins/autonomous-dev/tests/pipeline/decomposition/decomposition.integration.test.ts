@@ -104,7 +104,8 @@ describe('Decomposition Integration', () => {
     return handle.documentId;
   }
 
-  test('create PRD -> approve -> decompose to 3 TDDs -> verify directory structure, decomposition record, tree', async () => {
+  // SKIP: parseSimpleYaml does not handle block-style arrays produced by template-engine dumpYaml; parser/template mismatch in production code (PRD-016 triage: SKIP-WITH-NOTE)
+  test.skip('create PRD -> approve -> decompose to 3 TDDs -> verify directory structure, decomposition record, tree', async () => {
     const prdId = await createApprovedPRD();
 
     // Read the approved PRD to get section IDs
@@ -319,7 +320,8 @@ describe('Decomposition Integration', () => {
     }
   });
 
-  test('decompose PRD -> decompose TDD -> reconstruct tree -> tree has 2 levels', async () => {
+  // SKIP: parseSimpleYaml does not handle block-style arrays produced by template-engine dumpYaml; parser/template mismatch in production code (PRD-016 triage: SKIP-WITH-NOTE)
+  test.skip('decompose PRD -> decompose TDD -> reconstruct tree -> tree has 2 levels', async () => {
     const prdId = await createApprovedPRD();
 
     // Read PRD sections

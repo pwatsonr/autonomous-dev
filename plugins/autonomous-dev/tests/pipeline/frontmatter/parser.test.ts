@@ -15,7 +15,7 @@ function validDocument(body?: string): string {
     'pipeline_id: PIPE-2026-0408-001',
     'type: PRD',
     'status: draft',
-    'version: 1.0',
+    "version: '1.0'",
     'created_at: 2026-04-08T10:00:00Z',
     'updated_at: 2026-04-08T10:00:00Z',
     'author_agent: agent-planner-v1',
