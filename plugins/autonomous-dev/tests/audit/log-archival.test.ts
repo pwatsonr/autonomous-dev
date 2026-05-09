@@ -403,16 +403,21 @@ async function test_atomic_active_log_rewrite(): Promise<void> {
   ];
   writeEvents(logPath, events);
 
-  // Track fs.renameSync calls to verify temp+rename pattern
-  const originalRename = fs.renameSync;
+  // Track fs.renameSync calls to verify temp+rename pattern.
+  // Node 22+/ts-jest exposes `fs` as getter-only namespace via `import * as fs`.
+  // Use `require('fs')` so we can reassign the property
+  // (PRD-016 triage batch 3).
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fsCjs = require("fs");
+  const originalRename = fsCjs.renameSync;
   const renameCalls: Array<{ oldPath: string; newPath: string }> = [];
 
-  fs.renameSync = function (oldPath: fs.PathLike, newPath: fs.PathLike) {
+  fsCjs.renameSync = function (oldPath: fs.PathLike, newPath: fs.PathLike) {
     renameCalls.push({
       oldPath: String(oldPath),
       newPath: String(newPath),
     });
-    return originalRename.call(fs, oldPath, newPath);
+    return originalRename.call(fsCjs, oldPath, newPath);
   } as typeof fs.renameSync;
 
   try {
@@ -451,7 +456,7 @@ async function test_atomic_active_log_rewrite(): Promise<void> {
       "Active log rename source should be a temp file",
     );
   } finally {
-    fs.renameSync = originalRename;
+    fsCjs.renameSync = originalRename;
   }
 
   cleanupDir(tmpDir);
