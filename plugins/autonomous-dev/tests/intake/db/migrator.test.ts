@@ -65,8 +65,10 @@ describe('Migrator', () => {
 
     expect(result.applied).toContain('001_initial.sql');
 
+    // NOTE: SQLite LIKE treats '_' as a single-char wildcard. Use ESCAPE so
+    // we filter out only true underscore-prefixed names (e.g. _migrations).
     const tables: Array<{ name: string }> = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_%'")
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'")
       .all();
     const tableNames = tables.map((t) => t.name).sort();
 
