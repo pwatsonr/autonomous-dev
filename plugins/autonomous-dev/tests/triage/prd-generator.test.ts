@@ -238,7 +238,8 @@ describe('buildPrdContent', () => {
   // TC-4-3-13: pipeline-compatible frontmatter
   it('TC-4-3-13: has pipeline-compatible frontmatter fields', () => {
     expect(prdContent).toContain('title:');
-    expect(prdContent).toContain(`version: ${PRD_VERSION}`);
+    // Note: serializer quotes the version string in YAML frontmatter ("1.0")
+    expect(prdContent).toMatch(new RegExp(`version:\\s*"?${PRD_VERSION}"?`));
     expect(prdContent).toContain('date:');
     expect(prdContent).toContain('author:');
     expect(prdContent).toContain('status:');

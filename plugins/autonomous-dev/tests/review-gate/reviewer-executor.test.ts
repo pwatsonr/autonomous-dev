@@ -248,7 +248,12 @@ describe('ReviewerExecutor', () => {
       throw new Error('Request timed out');
     });
     const pool = createMockPool();
-    const executor = new ReviewerExecutor(adapter, outputValidator, pool);
+    // Override default escalation threshold (2) so a single sole-reviewer
+    // failure escalates as the test scenario describes.
+    const executor = new ReviewerExecutor(adapter, outputValidator, pool, {
+      ...DEFAULT_EXECUTOR_CONFIG,
+      max_total_failures_before_escalation: 1,
+    });
 
     const assignments = [makeAssignment('reviewer-a', 100)];
     const prompts = new Map<string, AssembledPrompt>([
