@@ -17,8 +17,8 @@ import {
   IntakeRouter,
   type IntakeRouterDeps,
   type IntakeEventEmitter,
-} from '../../core/intake_router';
-import { InvalidStateError } from '../../handlers/state_machine';
+} from '../core/intake_router';
+import { InvalidStateError } from '../handlers/state_machine';
 import type {
   AuthzAction,
   AuthzContext,
@@ -28,10 +28,10 @@ import type {
   CommandResult,
   CommandSource,
   IncomingCommand,
-} from '../../adapters/adapter_interface';
-import type { AuthzEngine } from '../../authz/authz_engine';
-import type { RateLimiter } from '../../rate_limit/rate_limiter';
-import type { Repository } from '../../db/repository';
+} from '../adapters/adapter_interface';
+import type { AuthzEngine } from '../authz/authz_engine';
+import type { RateLimiter } from '../rate_limit/rate_limiter';
+import type { Repository } from '../db/repository';
 
 // ---------------------------------------------------------------------------
 // Helpers

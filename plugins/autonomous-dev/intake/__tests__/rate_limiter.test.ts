@@ -20,7 +20,7 @@ import {
   type RateLimitRepository,
   type RateLimitResult,
   type ActionType,
-} from '../../rate_limit/rate_limiter';
+} from '../rate_limit/rate_limiter';
 
 // ---------------------------------------------------------------------------
 // Mock repository factory

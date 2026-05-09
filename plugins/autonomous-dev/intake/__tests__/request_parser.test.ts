@@ -21,8 +21,8 @@ import {
   type ParserOptions,
   type AmbiguityResult,
   type Logger,
-} from '../../core/request_parser';
-import type { ParsedRequest } from '../../adapters/adapter_interface';
+} from '../core/request_parser';
+import type { ParsedRequest } from '../adapters/adapter_interface';
 
 // ---------------------------------------------------------------------------
 // Helpers
