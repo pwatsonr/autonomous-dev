@@ -316,7 +316,8 @@ function simulateModalSubmit(
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe('Discord E2E (SPEC-008-3-05, Task 15)', () => {
+// SKIP: DiscordAdapter.start() requires DISCORD_GUILD_ID env var; integration test has no real Discord guild fixture (PRD-016 triage: SKIP-WITH-NOTE)
+describe.skip('Discord E2E (SPEC-008-3-05, Task 15)', () => {
   const DEFAULT_AUTH_CONFIG: AuthConfig = {
     version: 1,
     users: [
