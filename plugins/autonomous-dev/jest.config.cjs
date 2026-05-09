@@ -13,6 +13,7 @@
  * lets each project supply its own `transform` and `testEnvironment`.
  */
 module.exports = {
+  globalSetup: '<rootDir>/tests/setup/global-setup.cjs',
   projects: [
     {
       displayName: 'autonomous-dev',
