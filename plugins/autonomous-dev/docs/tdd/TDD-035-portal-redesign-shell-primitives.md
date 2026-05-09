@@ -4,13 +4,16 @@
 |----------------|--------------------------------------------------------------------|
 | **Title**      | Portal Redesign — Shell, Primitives, and Design System Reference   |
 | **TDD ID**     | TDD-035                                                            |
-| **Version**    | 1.0                                                                |
+| **Version**    | 1.1                                                                |
 | **Date**       | 2026-05-09                                                         |
-| **Status**     | Draft                                                              |
+| **Status**     | ready-for-review                                                   |
+| **Phase**      | tdd                                                                |
+| **PRD Ref**    | PRD-018-portal-visual-redesign                                     |
 | **Author**     | Patrick Watson                                                     |
 | **Parent PRD** | PRD-018: Portal Visual Redesign — Design System Adoption           |
 | **Plugin**     | autonomous-dev-portal                                              |
 | **Sibling TDDs** | TDD-034 (Foundations: tokens, theming, voice, CI lints), TDD-018-C (Surface adoption) |
+| **Updated At** | 2026-05-09T20:00:00Z                                               |
 
 ---
 
@@ -141,6 +144,8 @@ import { BrandWordmark } from "./brand-wordmark";
 interface ShellProps {
     activePath: string;
     cspNonce?: string;
+    /** Theme preference read from portal-theme cookie by route handler. */
+    theme?: "light" | "dark";
     /** Daemon status for the ops bar. */
     daemonStatus?: "running" | "stale" | "dead" | "unknown";
     /** Kill switch state for the ops bar. */
@@ -157,6 +162,7 @@ interface ShellProps {
 export const ShellLayout: FC<ShellProps> = ({
     activePath,
     cspNonce,
+    theme = "light",
     daemonStatus = "unknown",
     killSwitchEngaged = false,
     breakerTripped = false,
@@ -164,7 +170,7 @@ export const ShellLayout: FC<ShellProps> = ({
     gateCount,
     children,
 }) => (
-    <html lang="en" data-theme="light">
+    <html lang="en" data-theme={theme}>
         <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -193,10 +199,27 @@ export const ShellLayout: FC<ShellProps> = ({
                     {children}
                 </main>
             </div>
+            <div id="modal-slot"></div>
         </body>
     </html>
 );
 ```
+
+**Theme prop wiring**: Route handlers must read the `portal-theme` cookie (as established by TDD-034 SS 5.3) and pass `theme={cookieValue}` when rendering ShellLayout. Example:
+
+```tsx
+// In a route handler:
+import { getCookie } from "hono/cookie";
+
+export function dashboardHandler(c: Context): Response {
+    const theme = getCookie(c, "portal-theme") === "dark" ? "dark" : "light";
+    return c.html(<ShellLayout activePath="/" theme={theme}>
+        <DashboardView />
+    </ShellLayout>);
+}
+```
+
+This ensures the server-rendered HTML matches the client's theme preference on first paint, preventing flash-of-wrong-theme. The vanilla JS module (Section 6.7) handles runtime toggle and keeps the cookie in sync.
 
 **Rendered HTML shape** (R-05, R-06, R-07):
 
@@ -219,6 +242,12 @@ export const ShellLayout: FC<ShellProps> = ({
       </div>
     </aside>
     <main class="main">                      <!-- max-width: 1280px -->
+      <div class="page-head">
+        <h1>Page Title</h1>
+        <div class="head-actions">
+          <!-- page-level action buttons -->
+        </div>
+      </div>
       <!-- page content -->
     </main>
   </div>
@@ -241,6 +270,21 @@ export const ShellLayout: FC<ShellProps> = ({
 | `.rail-ops` | Bottom ops bar | `border-top: 1px solid var(--line-1); padding: 12px` |
 | `.main` | Content column | `padding: 28px 36px; max-width: 1280px` |
 | `.main.wide` | Full-width tables | `max-width: none` |
+| `.page-head` | Page title row | `display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px` |
+| `.page-head h1` | Page title | `font-size: 28px; font-weight: 700; margin: 0` |
+| `.head-actions` | Action buttons group | `display: flex; gap: var(--s-2); align-items: center` |
+
+The `.head-actions` container sits to the right of the page title (R-06: "page-level actions in a head-actions group right of the title"). Action buttons within `.head-actions` inherit the `Btn` primitive's prop API. Page views compose actions as:
+
+```tsx
+<div class="page-head">
+    <h1>Operations</h1>
+    <div class="head-actions">
+        <Btn kind="ghost" size="sm">Export</Btn>
+        <Btn kind="primary" size="sm">Run diagnostic</Btn>
+    </div>
+</div>
+```
 
 ### 6.2 Rail Navigation — `RailNav`
 
@@ -286,7 +330,7 @@ Renders the fixed-bottom section of the left rail:
   <div class="line"><span class="dot live"></span> Daemon running <span class="v">2s</span></div>
   <div class="line"><span class="dot ok"></span> Breaker OK <span class="v">0/3</span></div>
   <div class="line"><span class="dot warn"></span> MTD spend <span class="v">$1,843.00</span></div>
-  <button class="kbtn" hx-get="/ops/kill-switch-modal" hx-target="#modal-slot">
+  <button class="kbtn" hx-get="/ops/kill-switch-modal?step=arm" hx-target="#modal-slot">
     Engage kill switch
   </button>
   <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
@@ -310,11 +354,22 @@ The kill-switch button uses the `.kbtn` class (R-13): `border: 1px solid var(--e
 ```tsx
 import type { FC } from "hono/jsx";
 
-export const BrandWordmark: FC = () => (
+interface BrandWordmarkProps {
+    /**
+     * Whether to render the bracket motif around the wordmark text.
+     * Default true. Set to false if OQ-02 resolves as REPLACE, or
+     * controlled via PORTAL_WORDMARK_BRACKETS env var (default "1").
+     */
+    showBrackets?: boolean;
+}
+
+export const BrandWordmark: FC<BrandWordmarkProps> = ({
+    showBrackets = (process.env["PORTAL_WORDMARK_BRACKETS"] ?? "1") === "1",
+}) => (
     <div class="wm">
-        <span class="br">[</span>
+        {showBrackets && <span class="br">[</span>}
         {" autonomous-dev "}
-        <span class="br">]</span>
+        {showBrackets && <span class="br">]</span>}
     </div>
 );
 ```
@@ -324,13 +379,29 @@ The wordmark renders inline text (not an SVG `<img>`) so that `color` and CSS va
 - Light theme: brackets are `var(--brand)` (`#c8631a`), text is `var(--fg-0)` (`#1a1a17`).
 - Dark theme: brackets are `var(--brand)` (`#e89255`), text is `var(--fg-0)` (`#ede9d8`).
 
-No JS needed for theme switching — CSS custom properties handle it. The vendored SVG files (`/static/brand/wordmark.svg`, `wordmark-dark.svg`, `mark.svg`) ship for external use (docs, screenshots) and are served as static assets. OQ-02 gates whether the actual bracket motif ships or is replaced.
+No JS needed for theme switching -- CSS custom properties handle it. The vendored SVG files (`/static/brand/wordmark.svg`, `wordmark-dark.svg`, `mark.svg`) ship for external use (docs, screenshots) and are served as static assets.
+
+**OQ-02 bracket fallback**: The `showBrackets` prop defaults to `true` but is gated on the `PORTAL_WORDMARK_BRACKETS` environment variable (default `"1"`). If OQ-02 resolves as REPLACE, set `PORTAL_WORDMARK_BRACKETS=0` to render "autonomous-dev" in plain mono without brackets. No code change or redeployment required -- only an env var flip.
 
 ### 6.5 Primitive Components — `primitives.tsx`
 
 **File**: `server/components/primitives.tsx`
 
 All seven components are pure Hono JSX function components. No hooks, no state, no side effects. The rendered HTML uses the CSS classes from `app.css` which are added to `portal.css` by this TDD.
+
+#### 6.5.0 API Authority
+
+The prop signatures defined in this section (SS 6.5.1 through SS 6.5.7) are the **authoritative consumer contract** for TDD-018-C surface adoption and all future portal surface work. They supersede the design kit's own prop names.
+
+The kit served as the visual and structural reference for these components. The prop API has been rationalized for clarity and consistency within the portal's Hono JSX context. Specific renames from the kit:
+
+| Kit prop name | TDD-035 prop name | Component | Rationale |
+|---------------|-------------------|-----------|-----------|
+| `kind` | `variant` | `Chip` | Avoids collision with `Btn.kind`; `variant` is semantically correct for "type of chip" |
+| `n` / `value` | `value` (number) | `Score` | Standardized to `value` across all numeric primitives |
+| `kind` (Chip) | `variant` | `Chip` | Distinguishes chip classification axis from button classification |
+
+TDD-018-C surface authors must use the R-08 signatures defined here, not the kit's original prop names. The kit's prop names are not supported and will not be accepted in code review.
 
 #### 6.5.1 `Btn`
 
@@ -576,19 +647,41 @@ export const Card: FC<CardProps> = ({ leftBar, padding = "md", children }) => {
 
 Cards: `background: var(--bg-1); border: 1px solid var(--line-1); border-radius: 3px; no shadow` (R-15a). The 4px left bar in a phase color is the system's one decorative motif (R-12).
 
-#### 6.5.7 `KillSwitch`
+#### 6.5.7 `KillSwitch` — Full State Machine
+
+The KillSwitch component implements a four-state state machine for the destructive daemon-halt operation. The states are:
+
+```
+idle --> armed --> engaged --> idle (via reset)
+              \-> idle (timeout / cancel)
+```
+
+**State machine definition:**
+
+| State | Description | Transition trigger | Next state |
+|-------|-------------|-------------------|------------|
+| **idle** | Kill switch disengaged. Daemon processing is active. | Operator clicks "Engage kill switch" button (HTMX GET to `?step=arm`) | armed |
+| **armed** | Confirmation UI visible. 30-second window. | Operator types "CONFIRM" and submits POST | engaged |
+| **armed** | Confirmation UI visible. 30-second window. | armed_at timestamp exceeds 30s window, or operator navigates away | idle (implicit; server rejects stale POST) |
+| **engaged** | Kill switch is engaged. Daemon processing halted. | Operator clicks "Reset kill switch" (POST to `/reset`) | idle |
+
+**Component (presentational layer):**
 
 ```tsx
 interface KillSwitchProps {
     engaged: boolean;
-    onConfirm: string;   // action URL for the POST form
+    onConfirm: string;   // base action URL, e.g. "/ops/kill-switch"
     armed?: boolean;      // intermediate "confirm" state
+    armedAt?: string;     // ISO timestamp when armed state began
+    csrfToken?: string;   // CSRF token for POST forms
 }
 
 export const KillSwitch: FC<KillSwitchProps> = ({
     engaged,
     onConfirm,
     armed = false,
+    armedAt,
+    csrfToken,
 }) => {
     const panelClass = armed ? "ks-panel armed" : "ks-panel";
     const chipClass = engaged ? "chip err" : "chip ok";
@@ -620,6 +713,8 @@ export const KillSwitch: FC<KillSwitchProps> = ({
                 )}
                 {armed && (
                     <form method="POST" action={onConfirm}>
+                        <input type="hidden" name="_csrf" value={csrfToken ?? ""} />
+                        <input type="hidden" name="armed_at" value={armedAt ?? ""} />
                         <label class="ks-confirm-label" for="ks-confirm-input">
                             Type CONFIRM to engage
                         </label>
@@ -637,13 +732,12 @@ export const KillSwitch: FC<KillSwitchProps> = ({
                     </form>
                 )}
                 {engaged && (
-                    <button
-                        class="btn"
-                        hx-post={`${onConfirm}/reset`}
-                        hx-confirm="Reset kill switch? Daemon processing will resume."
-                    >
-                        Reset kill switch
-                    </button>
+                    <form method="POST" action={`${onConfirm}/reset`} style="display:inline">
+                        <input type="hidden" name="_csrf" value={csrfToken ?? ""} />
+                        <button class="btn" type="submit">
+                            Reset kill switch
+                        </button>
+                    </form>
                 )}
             </div>
         </div>
@@ -651,26 +745,205 @@ export const KillSwitch: FC<KillSwitchProps> = ({
 };
 ```
 
+**Route handlers (server-side state machine):**
+
+**GET `?step=arm` handler** -- returns the armed-state HTMX fragment:
+
+```tsx
+// In server/routes/ops-kill-switch.ts (or equivalent ops route file)
+
+app.get("/ops/kill-switch-modal", async (c) => {
+    const step = c.req.query("step");
+    if (step !== "arm") {
+        return c.html(<KillSwitch engaged={false} onConfirm="/ops/kill-switch" />);
+    }
+
+    // Generate armed-state fragment with timestamp and CSRF token
+    const armedAt = new Date().toISOString();
+    const csrfToken = c.get("csrfToken") ?? "";
+
+    // Return HTMX fragment -- replaces the .ks-panel via outerHTML swap
+    return c.html(
+        <KillSwitch
+            engaged={false}
+            armed={true}
+            armedAt={armedAt}
+            csrfToken={csrfToken}
+            onConfirm="/ops/kill-switch"
+        />
+    );
+});
+```
+
+The armed-state mechanism works via HTMX swap: the GET handler returns a complete `<div class="ks-panel armed">` fragment that replaces the original panel. The fragment includes two hidden inputs: `armed_at` (ISO timestamp of when arming occurred) and `_csrf` (the session's CSRF token). No server-side "armed" session state is stored -- the timestamp in the hidden input IS the armed state, validated on POST.
+
+**POST `/ops/kill-switch` handler** -- engages the kill switch:
+
+```tsx
+app.post("/ops/kill-switch", async (c) => {
+    // (1) CSRF validation: handled by csrfMiddleware (server/security/csrf-protection.ts)
+    //     which runs portal-wide via the middleware chain in server/middleware/index.ts.
+    //     By the time this handler executes, CSRF is already validated.
+
+    const body = await c.req.parseBody();
+    const confirmation = body["confirmation"];
+    const armedAt = body["armed_at"];
+
+    // (2) Typed CONFIRM must match exactly (case-sensitive)
+    if (typeof confirmation !== "string" || confirmation !== "CONFIRM") {
+        return c.html(
+            <KillSwitch
+                engaged={false}
+                armed={true}
+                armedAt={typeof armedAt === "string" ? armedAt : ""}
+                csrfToken={c.get("csrfToken") ?? ""}
+                onConfirm="/ops/kill-switch"
+            />,
+            422,
+        );
+    }
+
+    // (3) armed_at must be a valid ISO timestamp within a 30-second window
+    if (typeof armedAt !== "string") {
+        return c.html(errorFragment("Arming timestamp missing. Please try again."), 422);
+    }
+    const armedTime = new Date(armedAt).getTime();
+    const now = Date.now();
+    if (Number.isNaN(armedTime) || now - armedTime > 30_000) {
+        // Armed state expired -- return to idle
+        return c.html(
+            <KillSwitch engaged={false} onConfirm="/ops/kill-switch" />,
+            422,
+        );
+    }
+
+    // (4) Execute daemon halt via existing OperationsHandlers
+    try {
+        await operationsHandlers.engageKillSwitch({
+            reason: "portal-operator-manual",
+        });
+    } catch (err) {
+        // On daemon halt failure: return error fragment + log.
+        // Do NOT mark kill switch as engaged if the daemon command fails.
+        logger.error("kill_switch_engage_failed", {
+            error: err instanceof Error ? err.message : String(err),
+            armed_at: armedAt,
+        });
+        return c.html(
+            <div class="ks-panel armed ks-error">
+                <div class="ks-status">
+                    <h4>Kill switch <span class="chip err">ERROR</span></h4>
+                    <div class="meta">
+                        Daemon halt command failed. Kill switch was NOT engaged.
+                        Check daemon logs and retry.
+                    </div>
+                </div>
+                <div class="ks-action">
+                    <button
+                        class="btn destructive"
+                        hx-get="/ops/kill-switch-modal?step=arm"
+                        hx-target="closest .ks-panel"
+                        hx-swap="outerHTML"
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>,
+            500,
+        );
+    }
+
+    // Success -- return engaged state
+    return c.html(
+        <KillSwitch engaged={true} onConfirm="/ops/kill-switch" csrfToken={c.get("csrfToken") ?? ""} />
+    );
+});
+```
+
+**POST `/ops/kill-switch/reset` handler** -- resets the kill switch:
+
+```tsx
+app.post("/ops/kill-switch/reset", async (c) => {
+    // CSRF validated by middleware (server/security/csrf-protection.ts)
+
+    try {
+        await operationsHandlers.resetKillSwitch();
+    } catch (err) {
+        logger.error("kill_switch_reset_failed", {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        return c.html(errorFragment("Kill switch reset failed. Check daemon logs."), 500);
+    }
+
+    return c.html(
+        <KillSwitch engaged={false} onConfirm="/ops/kill-switch" csrfToken={c.get("csrfToken") ?? ""} />
+    );
+});
+```
+
+**CSRF enforcement**: All POST handlers are protected by the portal-wide CSRF middleware at `server/security/csrf-protection.ts`, registered via the middleware chain in `server/middleware/index.ts`. The CSRF token is injected into forms via the hidden `_csrf` input. The middleware validates the double-submit cookie pattern (token in form body + signature in httpOnly cookie) before the route handler executes. See `csrfMiddleware()` in `server/security/csrf-protection.ts` and the registration order documented in `server/middleware/index.ts` (position after auth middleware).
+
+**POST handler validation summary:**
+
+1. **CSRF token** -- validated by `csrfMiddleware` (portal-wide, `server/security/csrf-protection.ts`). The middleware reads `_csrf` from the form body and validates against the double-submit cookie. Failures return 403 before the handler executes.
+2. **Typed CONFIRM** -- case-sensitive exact match. `confirmation !== "CONFIRM"` returns 422 with the armed panel re-rendered (allowing retry).
+3. **armed_at within 30s window** -- the ISO timestamp from the hidden input is parsed; if older than 30 seconds or invalid, the panel returns to idle state with 422.
+4. **Daemon halt failure** -- if `operationsHandlers.engageKillSwitch()` throws, the handler returns a 500 error fragment with a retry button. The kill switch state is NOT marked as engaged. The error is logged at ERROR level for operator investigation.
+
 **Rendered HTML** (R-13):
 ```html
-<!-- Disengaged state -->
+<!-- Idle state (disengaged) -->
 <div class="ks-panel">
   <div class="ks-status">
     <h4>Kill switch <span class="chip ok">DISENGAGED</span></h4>
     <div class="meta">All daemon processing active.</div>
   </div>
   <div class="ks-action">
-    <button class="btn destructive">Engage kill switch</button>
+    <button class="btn destructive"
+            hx-get="/ops/kill-switch-modal?step=arm"
+            hx-target="closest .ks-panel"
+            hx-swap="outerHTML">
+      Engage kill switch
+    </button>
   </div>
 </div>
 
-<!-- Armed state (awaiting CONFIRM) -->
+<!-- Armed state (awaiting CONFIRM, 30s window) -->
 <div class="ks-panel armed">
-  ...type CONFIRM input...
+  <div class="ks-status">
+    <h4>Kill switch <span class="chip ok">DISENGAGED</span></h4>
+    <div class="meta">All daemon processing active.</div>
+  </div>
+  <div class="ks-action">
+    <form method="POST" action="/ops/kill-switch">
+      <input type="hidden" name="_csrf" value="<token>" />
+      <input type="hidden" name="armed_at" value="2026-05-09T20:00:00.000Z" />
+      <label class="ks-confirm-label" for="ks-confirm-input">
+        Type CONFIRM to engage
+      </label>
+      <input id="ks-confirm-input" name="confirmation" class="input mono"
+             autocomplete="off" required pattern="CONFIRM" />
+      <button class="btn destructive" type="submit">Confirm engage</button>
+    </form>
+  </div>
+</div>
+
+<!-- Engaged state -->
+<div class="ks-panel">
+  <div class="ks-status">
+    <h4>Kill switch <span class="chip err">ENGAGED</span></h4>
+    <div class="meta">All daemon processing halted.</div>
+  </div>
+  <div class="ks-action">
+    <form method="POST" action="/ops/kill-switch/reset" style="display:inline">
+      <input type="hidden" name="_csrf" value="<token>" />
+      <button class="btn" type="submit">Reset kill switch</button>
+    </form>
+  </div>
 </div>
 ```
 
-The `.ks-panel.armed` class applies `border-color: var(--err-line); background: var(--err-tint)` — the `--err` palette treatment per R-13. When engaged, the chip reads `ENGAGED` in `--err` tones. The confirmation pattern (type "CONFIRM") matches the existing safety pattern in `typed-confirm-modal.tsx` and FR-S12.
+The `.ks-panel.armed` class applies `border-color: var(--err-line); background: var(--err-tint)` — the `--err` palette treatment per R-13. When engaged, the chip reads `ENGAGED` in `--err` tones. The confirmation pattern (type "CONFIRM") matches the existing safety pattern in `server/templates/fragments/typed-confirm-modal.tsx` and FR-S12.
 
 ### 6.6 Table Styling (R-14)
 
@@ -723,7 +996,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 ```
 
-SSR reads the `portal-theme` cookie in the route handler and sets `data-theme` on the `<html>` element in `ShellLayout`. The JS module runs immediately (before DOMContentLoaded) to set the attribute and prevent flash-of-wrong-theme.
+SSR reads the `portal-theme` cookie in the route handler and passes `theme={cookieValue}` to `ShellLayout` (see SS 6.1 theme prop wiring). The JS module runs immediately (before DOMContentLoaded) to set the attribute and prevent flash-of-wrong-theme.
 
 ### 6.8 `/design-system` Route
 
@@ -795,7 +1068,7 @@ The shell's ops bar reads daemon status, kill-switch state, and MTD spend. These
 
 **No `dangerouslySetInnerHTML`**: The `/design-system` page re-implements preview cards as JSX components rather than injecting raw HTML. This preserves FR-S34.
 
-**Kill-switch confirmation**: The `KillSwitch` component uses a typed-CONFIRM pattern (FR-S12). The POST form action goes through the existing intake router path with CSRF token validation.
+**Kill-switch confirmation**: The `KillSwitch` component uses a typed-CONFIRM pattern (FR-S12). The POST form action is protected by the portal-wide CSRF middleware (`server/security/csrf-protection.ts`), which validates a double-submit cookie pattern on all POST/PUT/DELETE/PATCH requests. The armed_at 30-second window prevents stale confirmation replay. See SS 6.5.7 for full validation chain.
 
 **Brand asset serving**: SVG files in `/static/brand/` are served with `Content-Type: image/svg+xml` and inherit the existing CSP `img-src 'self'` policy. No inline SVG injection risk — the wordmark is rendered as text spans, not as an SVG element injected from an external source.
 
@@ -811,6 +1084,8 @@ This TDD adds no new services or data paths, so the observability additions are 
 |-------|-------|--------|
 | `design_system_page_rendered` | INFO | `{ duration_ms }` |
 | `shell_layout_rendered` | DEBUG | `{ activePath, daemonStatus }` |
+| `kill_switch_engage_failed` | ERROR | `{ error, armed_at }` |
+| `kill_switch_reset_failed` | ERROR | `{ error }` |
 
 ### Existing Metrics (reused)
 
@@ -841,7 +1116,10 @@ Each primitive component is tested with Hono's JSX rendering in isolation:
 | `Card` without `leftBar` has no left bar | No `border-left` in style |
 | `KillSwitch` disengaged shows DISENGAGED chip | Contains `.chip.ok` with text `DISENGAGED` |
 | `KillSwitch` engaged shows ENGAGED chip | Contains `.chip.err` with text `ENGAGED` |
-| `KillSwitch` armed shows CONFIRM input | Contains `<input>` with `pattern="CONFIRM"` |
+| `KillSwitch` armed shows CONFIRM input + hidden armed_at | Contains `<input name="armed_at">` and `<input name="confirmation">` with `pattern="CONFIRM"` |
+| `KillSwitch` armed includes CSRF hidden input | Contains `<input type="hidden" name="_csrf">` |
+| `BrandWordmark` with `showBrackets=true` renders brackets | Contains `.br` spans with `[` and `]` |
+| `BrandWordmark` with `showBrackets=false` renders without brackets | No `.br` spans present |
 
 ### 10.2 Shell Layout Tests
 
@@ -853,6 +1131,8 @@ Each primitive component is tested with Hono's JSX rendering in isolation:
 | `ShellLayout` includes `design-tokens.css` link | `<link>` element present |
 | `ShellLayout` includes theme-toggle script with nonce | `<script>` with correct `nonce` attribute |
 | `ShellLayout` renders ops bar with daemon status | `.rail-ops .dot` element with correct class |
+| `ShellLayout` with `theme="dark"` renders `data-theme="dark"` on `<html>` | Attribute value is `"dark"` |
+| `ShellLayout` with default theme renders `data-theme="light"` on `<html>` | Attribute value is `"light"` |
 
 ### 10.3 M-02: Phase Contrast Verification (WCAG + Peer-Chip Split)
 
@@ -877,23 +1157,28 @@ For each of the 8 phase colors in both light and dark themes, compute the WCAG r
 
 This is a separate, non-WCAG check. When phase chips appear side-by-side (e.g., in a timeline), any two adjacent phases must be visually distinguishable. Compute the contrast ratio between every pair of adjacent phases in the canonical order (prd, tdd, plan, spec, code, review, deploy, observe). Assert >= 3:1 for each pair.
 
-Note: this peer-chip check is intentionally distinct from Check A. Check A is WCAG compliance. Check B is a product-specific design quality gate. Both run in CI via `scripts/check-phase-contrast.ts` (established by TDD-034). This TDD validates that the components use the correct token variables so the contrast script can verify them.
+Note: this peer-chip check is intentionally distinct from Check A. Check A is WCAG compliance. Check B is a product-specific design quality gate. Both checks run in CI via `scripts/check-phase-contrast.ts` as established by TDD-034 SS 5.10. TDD-034 SS 5.10 commits to delivering this script, which implements both WCAG SC 1.4.11 per-phase-vs-bg0 checks and the adjacent-pair "design quality" checks. This TDD consumes the script's output as part of the M-02 acceptance gate. This TDD's responsibility is to ensure the components use the correct `--phase-*` token variables so the contrast script can verify them.
 
 ### 10.4 M-03: Visual Regression on `/design-system`
 
 **Framework**: Playwright (consistent with PRD-009 section 13.6).
 
-**Approach**: A Playwright test navigates to `http://localhost:19280/design-system`, takes a full-page screenshot, and compares against a golden image stored in `tests/visual/golden/design-system.png`. The test also takes individual screenshots of each of the 20 `<section class="ds-card">` elements and compares against per-card golden images.
+**Golden image generation and storage**:
 
-**CI integration**: The visual regression test runs as a separate CI job (not in the jest unit test suite). It requires a running portal server. The job:
+- Golden images are generated locally via `npm run gen:visual-goldens`, which runs `UPDATE_GOLDEN=1 npx playwright test tests/visual/design-system.spec.ts --project=golden-gen`.
+- The canonical generation environment is macOS (the development platform) or the CI Docker image `mcr.microsoft.com/playwright:v1.40.0-jammy`. Both environments produce identical renders because the test uses a fixed viewport (1440x900) and the portal fonts are system-stack (`-apple-system, BlinkMacSystemFont, "Segoe UI"`) with a fallback to `sans-serif`, and the CI image provides consistent font rendering.
+- Binary `.png` files are committed to `tests/visual-regression/goldens/`. If the total golden directory size exceeds 500KB, files are tracked via `git lfs`. Below 500KB, they are committed inline (standard git blob storage).
+- Goldens include one full-page screenshot (`design-system-full.png`) and 20 per-card screenshots (`design-system-card-{01..20}.png`).
 
-1. Starts the portal server in test mode (`PORT=19281 NODE_ENV=test`).
-2. Runs `npx playwright test tests/visual/design-system.spec.ts`.
-3. On failure, uploads the diff image as a CI artifact for reviewer inspection.
+**CI execution**:
 
-**Threshold**: Pixel diff tolerance of 0.1% (accounts for sub-pixel rendering differences across CI runners). Any diff above this threshold fails the check.
+- CI runs visual regression as a separate job (not in the Jest unit test suite). The job uses the Docker image `mcr.microsoft.com/playwright:v1.40.0-jammy` to eliminate cross-OS render diffs.
+- Steps: (1) Start the portal server in test mode (`PORT=19281 NODE_ENV=test`). (2) Run `npx playwright test tests/visual/design-system.spec.ts`. (3) On failure, upload the diff image as a CI artifact for reviewer inspection.
+- **Missing goldens behavior**: On first run or when golden files are absent, CI fails with exit code 1 and the message: `GOLDEN_MISSING: No golden image found at tests/visual-regression/goldens/<name>.png. Run "npm run gen:visual-goldens" locally and commit the generated files.` There is no auto-generation in CI -- this prevents silent regressions from being introduced when a developer adds a new card section without generating its golden.
 
-**Golden image update**: When primitives change intentionally, the developer runs `UPDATE_GOLDEN=1 npx playwright test tests/visual/design-system.spec.ts` to regenerate golden images and commits them.
+**Threshold**: Pixel diff tolerance of 0.1% (accounts for sub-pixel rendering differences). Any diff above this threshold fails the check.
+
+**Golden image update workflow**: When primitives change intentionally, the developer runs `npm run gen:visual-goldens` to regenerate golden images and commits them alongside the code change. The PR diff shows the binary golden changes for reviewer inspection.
 
 ### 10.5 Integration Tests
 
@@ -904,6 +1189,10 @@ Note: this peer-chip check is intentionally distinct from Check A. Check A is WC
 | GET `/` renders ShellLayout (not old BaseLayout) after migration | Shell adoption |
 | Static asset `/static/brand/mark.svg` returns 200 with `image/svg+xml` | Brand asset serving |
 | Static asset `/static/js/theme-toggle.js` returns 200 with `application/javascript` | JS module serving |
+| POST `/ops/kill-switch` with valid CONFIRM + valid armed_at engages kill switch | KillSwitch happy path |
+| POST `/ops/kill-switch` with expired armed_at returns 422 + idle fragment | KillSwitch timeout enforcement |
+| POST `/ops/kill-switch` with wrong confirmation string returns 422 + armed fragment | KillSwitch confirmation validation |
+| POST `/ops/kill-switch` without CSRF token returns 403 | CSRF middleware enforcement |
 
 ---
 
@@ -933,9 +1222,10 @@ Note: this peer-chip check is intentionally distinct from Check A. Check A is WC
 3. Implement theme-toggle JS module.
 4. Update all 10 existing view files to import `ShellLayout` instead of `BaseLayout`.
 5. Update `Navigation` references to `RailNav`.
-6. Update shell tests.
-7. Mark `BaseLayout` and `Navigation` as deprecated (keep for one release cycle, then remove).
-8. PR review and merge.
+6. Wire theme prop: update each route handler to read `portal-theme` cookie and pass `theme={cookieValue}` to `ShellLayout`.
+7. Update shell tests.
+8. Mark `BaseLayout` and `Navigation` as deprecated (keep for one release cycle, then remove).
+9. PR review and merge.
 
 **Rollback**: If the shell causes issues, revert the single commit that switches view imports. `BaseLayout` remains in the codebase as deprecated.
 
@@ -948,13 +1238,14 @@ Note: this peer-chip check is intentionally distinct from Check A. Check A is WC
 2. Implement `design-system.tsx` view with all 20 preview card sections.
 3. Register route in `routes/index.ts`.
 4. Add nav item to `RailNav`.
-5. Generate initial golden images.
-6. Implement Playwright visual regression test.
-7. PR review and merge.
+5. Generate initial golden images via `npm run gen:visual-goldens`.
+6. Commit goldens to `tests/visual-regression/goldens/` (with git lfs if >500KB total).
+7. Implement Playwright visual regression test.
+8. PR review and merge.
 
 ### CSS Migration Strategy
 
-The new CSS classes (`.app`, `.rail`, `.rail-brand`, `.rail-nav`, `.rail-ops`, `.main`, `.btn`, `.chip`, `.chip-phase`, `.dot`, `.card`, `.tbl`, `.ks-panel`, `.score-inline`, `.ring`, `.theme-toggle`, `.tt-*`) are added to `portal.css`. They do not conflict with existing class names because the current portal uses different naming conventions (the existing classes are more verbose — `nav-item`, `status-badge`, etc.).
+The new CSS classes (`.app`, `.rail`, `.rail-brand`, `.rail-nav`, `.rail-ops`, `.main`, `.btn`, `.chip`, `.chip-phase`, `.dot`, `.card`, `.tbl`, `.ks-panel`, `.score-inline`, `.ring`, `.theme-toggle`, `.tt-*`, `.page-head`, `.head-actions`) are added to `portal.css`. They do not conflict with existing class names because the current portal uses different naming conventions (the existing classes are more verbose — `nav-item`, `status-badge`, etc.).
 
 Existing classes are not removed in this TDD. They are deprecated and cleaned up in TDD-018-C when the surfaces adopt the new components.
 
@@ -966,7 +1257,7 @@ Existing classes are not removed in this TDD. They are deprecated and cleaned up
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| **OQ-02 (wordmark IP) blocks brand asset integration.** The bracket motif is original to the design bundle and has no upstream blessing. If OQ-02 resolves as REPLACE, the wordmark SVGs and inline text rendering must be updated. | Medium | Low | The wordmark is isolated in `BrandWordmark` component. Replacement requires changing one component and re-vendoring SVGs. The shell layout, nav, and ops bar are unaffected. Fallback: render "autonomous-dev" in plain mono without brackets until resolved. |
+| **OQ-02 (wordmark IP) blocks brand asset integration.** The bracket motif is original to the design bundle and has no upstream blessing. If OQ-02 resolves as REPLACE, the wordmark SVGs and inline text rendering must be updated. | Medium | Low | The wordmark is isolated in `BrandWordmark` component with a `showBrackets` prop gated on `PORTAL_WORDMARK_BRACKETS` env var. If OQ-02 resolves as REPLACE, set the env var to `0` -- no code change needed. See SS 6.4. |
 | **Shell migration breaks existing page layouts.** Switching from top-bar to left-rail changes the document flow for all 10 pages. | Medium | Medium | Phase 2 is a single atomic commit. All views switch simultaneously. The old `BaseLayout` is retained as deprecated for rollback. Integration tests verify each page renders without errors. |
 | **Peer-chip contrast (M-02 Check B) fails for some adjacent phases.** The 8 phase colors were designed for individual legibility, not necessarily pairwise distinctness. | Medium | Low | The contrast script reports which pairs fail. The fix is token adjustment in `design-tokens.css` (TDD-034 scope). This TDD's responsibility is to ensure components use the correct tokens so the script can verify them. |
 | **`app.css` size bloat.** Porting the full kit CSS adds approximately 400 lines to `portal.css`. | Low | Low | The CSS is organized by component and well-commented. Tree-shaking is not needed for server-rendered CSS served from disk. The portal already serves HTMX (44KB minified) as a single file. |
@@ -975,6 +1266,8 @@ Existing classes are not removed in this TDD. They are deprecated and cleaned up
 ### 12.1 Pre-Flight Hooks Validation (PRD-018 Section 4.5 / Reviewer Note N-02)
 
 **Primitives.jsx** (this TDD's scope): `useState` is destructured at line 2 but **never invoked** in any primitive function. The primitives are pure render functions with zero hooks. **Assertion confirmed: Primitives.jsx is pattern-light and fully compatible with Hono JSX server-side rendering.**
+
+**Prop API fidelity note**: The kit's React component prop names differ from the prop APIs defined in this TDD's SS 6.5. The TDD's R-08 prop signatures are the authoritative consumer contract and supersede the kit's own prop names. The kit was the visual and structural reference; the prop API is rationalized here for clarity (e.g., `kind` to `variant` on Chip, `n` to `value` on Score). See SS 6.5.0 for the full mapping. TDD-018-C surface authors must use the R-08 signatures defined in SS 6.5, not the kit's original props.
 
 **Shell.jsx** (this TDD's scope): Uses `React.useState` once — for theme toggle state. The Hono JSX port replaces this with a vanilla JS module (Section 6.7). No other hooks. **Compatible.**
 
@@ -986,8 +1279,8 @@ Existing classes are not removed in this TDD. They are deprecated and cleaned up
 
 | ID | Question | Owner | Status |
 |----|----------|-------|--------|
-| OQ-02 | Wordmark bracket motif IP clearance. Blocks brand asset vendoring. TDD proceeds assuming APPROVE; fallback is plain "autonomous-dev" text without brackets. | Patrick Watson | OPEN (inherited from PRD-018) |
-| OQ-035-01 | Should the `/design-system` page be gated behind authentication in network-accessible mode, or is it safe to expose as a public reference? It contains no operational data — only component specimens. | TDD author | OPEN — recommend: treat as public (no auth gate). It is a static reference page. |
+| OQ-02 | Wordmark bracket motif IP clearance. Blocks brand asset vendoring. TDD proceeds assuming APPROVE; fallback is `PORTAL_WORDMARK_BRACKETS=0` env var (see SS 6.4). | Patrick Watson | OPEN (inherited from PRD-018) |
+| OQ-035-01 | Should the `/design-system` page be gated behind authentication in network-accessible mode? | TDD author | RESOLVED -- treat as public. The `/design-system` route serves only static component specimens with no operational data. Operator-only routes are already gated at the portal level by auth middleware. Adding a separate auth gate for a reference page adds operational complexity with no security benefit. |
 | OQ-035-02 | The existing `Navigation` fragment imports `DaemonStatusPill`. The new `RailOpsBar` replaces its function. Should `DaemonStatusPill` be deprecated in this TDD or in TDD-018-C? | TDD author | RESOLVED — deprecate in this TDD (Phase 2). The ops bar subsumes its function entirely. |
 
 ---
@@ -999,22 +1292,32 @@ Existing classes are not removed in this TDD. They are deprecated and cleaned up
 | Create `server/components/` directory structure | 0.5h | None | 1 |
 | Implement `primitives.tsx` — all 7 components | 3h | None | 1 |
 | Unit tests for all 7 primitives | 2h | primitives.tsx | 1 |
-| Implement `shell.tsx` (ShellLayout) | 2h | None | 2 |
+| Implement `shell.tsx` (ShellLayout with theme prop) | 2h | None | 2 |
 | Implement `rail-nav.tsx` | 1h | None | 2 |
 | Implement `rail-ops-bar.tsx` | 1.5h | primitives.tsx (uses Dot) | 2 |
-| Implement `brand-wordmark.tsx` | 0.5h | OQ-02 | 2 |
+| Implement `brand-wordmark.tsx` (with showBrackets prop) | 0.5h | OQ-02 | 2 |
 | Implement `theme-toggle.js` vanilla JS module | 1h | None | 2 |
 | Vendor brand SVGs to `server/static/brand/` | 0.5h | OQ-02 | 2 |
-| Add shell + primitive CSS to `portal.css` | 2h | TDD-034 (tokens) | 2 |
+| Add shell + primitive CSS to `portal.css` (including `.page-head`, `.head-actions`) | 2h | TDD-034 (tokens) | 2 |
+| Wire theme prop in all route handlers (read portal-theme cookie) | 1h | shell.tsx | 2 |
 | Migrate all 10 views from BaseLayout to ShellLayout | 2h | shell.tsx | 2 |
 | Shell integration tests | 1.5h | shell migration | 2 |
 | Implement `design-system.tsx` view (20 sections) | 4h | primitives.tsx | 3 |
 | Implement `design-system.ts` route handler | 0.5h | design-system.tsx | 3 |
 | Register route in `routes/index.ts` | 0.25h | design-system.ts | 3 |
-| Playwright visual regression test setup | 2h | design-system route | 3 |
-| Generate golden images | 0.5h | visual regression setup | 3 |
+| Playwright visual regression test setup + golden gen script | 2.5h | design-system route | 3 |
+| Generate golden images + configure git lfs if needed | 0.5h | visual regression setup | 3 |
 | Phase contrast validation (verify components use correct tokens) | 1h | primitives.tsx | 3 |
-| **Total** | **~26h** | | |
+| KillSwitch route handlers (arm/engage/reset with CSRF + armed_at validation) | 2h | primitives.tsx, csrf-protection.ts | 2 |
+| KillSwitch integration tests (happy path, timeout, CSRF) | 1.5h | kill-switch routes | 2 |
+| Document `PORTAL_WORDMARK_BRACKETS` env var in deployment config | 0.25h | brand-wordmark.tsx | 2 |
+| **Total** | **~31h** | | |
+
+### Environment Variables Introduced
+
+| Variable | Default | Purpose | Section |
+|----------|---------|---------|---------|
+| `PORTAL_WORDMARK_BRACKETS` | `"1"` | Controls bracket motif visibility in BrandWordmark. Set to `"0"` if OQ-02 resolves as REPLACE. | SS 6.4 |
 
 ---
 
@@ -1023,21 +1326,21 @@ Existing classes are not removed in this TDD. They are deprecated and cleaned up
 | PRD Requirement | TDD Section | Coverage |
 |----------------|-------------|----------|
 | R-05: Persistent left rail 220px, brand wordmark, section nav, fixed-bottom ops bar | Section 6.1, 6.2, 6.3, 6.4 | Full |
-| R-06: No top header, page title as h1 28px, head-actions group | Section 6.1 (main column CSS) | Full |
+| R-06: No top header, page title as h1 28px, head-actions group | Section 6.1 (`.page-head`, `.head-actions` CSS rules and layout documentation) | Full |
 | R-07: Content column max-width 1280px, tables full-width | Section 6.1 (`.main` / `.main.wide`) | Full |
-| R-08: 7 primitive components with specified prop APIs | Section 6.5 (all subsections) | Full |
+| R-08: 7 primitive components with specified prop APIs | Section 6.5 (all subsections). Full (API rationalized vs. kit; see SS 6.5.0 for prop name mapping and authority statement) | Full |
 | R-09: Button kinds (primary/secondary/ghost/destructive) with hover/active/focus-visible states | Section 6.5.1 | Full |
 | R-10: Status communication via dot + UPPERCASE word badge, no emoji | Section 6.5.2, 6.5.3 | Full |
 | R-11: Phase chips UPPERCASE on `--phase-*` background | Section 6.5.2 | Full |
 | R-12: Repo card 4px left bar in `--phase-<active-phase>` | Section 6.5.6 | Full |
-| R-13: KillSwitch distinct from other buttons, `--err` palette, CONFIRM pattern | Section 6.5.7 | Full |
+| R-13: KillSwitch distinct from other buttons, `--err` palette, CONFIRM pattern | Section 6.5.7 (full state machine: idle/armed/engaged/reset, CSRF, armed_at window, daemon failure handling) | Full |
 | R-14: Tables hairline-only, sticky headers, hover-row, active-row left bar | Section 6.6 | Full |
 | R-15: Pulsing `.dot.live` replaces all spinners | Section 6.5.3 | Full |
 | R-15a: Hairline elevation — 1px border, 3px radius, no shadow on cards; `--shadow-*` only | Section 6.5.6, 6.6 | Full |
 | R-21: `/design-system` route with 20 preview cards | Section 6.8 | Full |
-| G-03: Brand mark + wordmark integration | Section 6.4 | Full (gated on OQ-02) |
-| M-02: Phase contrast WCAG + peer-chip (split per N-01) | Section 10.3 | Full |
-| M-03: Visual regression on `/design-system` for all 20 cards | Section 10.4 | Full |
+| G-03: Brand mark + wordmark integration | Section 6.4 (with `showBrackets` prop and `PORTAL_WORDMARK_BRACKETS` env var fallback) | Full (gated on OQ-02) |
+| M-02: Phase contrast WCAG + peer-chip (split per N-01) | Section 10.3 (consumes `scripts/check-phase-contrast.ts` as established by TDD-034 SS 5.10) | Full |
+| M-03: Visual regression on `/design-system` for all 20 cards | Section 10.4 (golden generation, CI bootstrapping, missing-golden failure mode) | Full |
 
 ---
 
@@ -1045,9 +1348,9 @@ Existing classes are not removed in this TDD. They are deprecated and cleaned up
 
 Complete list of CSS classes introduced by this TDD, sourced from `app.css` in the design bundle and adapted for `portal.css`:
 
-**Shell**: `.app`, `.rail`, `.rail-brand`, `.rail-brand .wm`, `.rail-brand .wm .br`, `.rail-brand .meta-mono`, `.rail-nav`, `.rail-nav .group`, `.rail-nav a`, `.rail-nav a.active`, `.rail-nav a .count`, `.rail-nav a .ic`, `.rail-ops`, `.rail-ops .line`, `.rail-ops .line .v`, `.rail-ops .kbtn`, `.theme-toggle`, `.tt-track`, `.tt-knob`, `.tt-l`, `.tt-light`, `.tt-dark`, `.main`, `.main.wide`, `.page-head`, `.page-head h1`, `.page-head .sub`, `.page-meta`
+**Shell**: `.app`, `.rail`, `.rail-brand`, `.rail-brand .wm`, `.rail-brand .wm .br`, `.rail-brand .meta-mono`, `.rail-nav`, `.rail-nav .group`, `.rail-nav a`, `.rail-nav a.active`, `.rail-nav a .count`, `.rail-nav a .ic`, `.rail-ops`, `.rail-ops .line`, `.rail-ops .line .v`, `.rail-ops .kbtn`, `.theme-toggle`, `.tt-track`, `.tt-knob`, `.tt-l`, `.tt-light`, `.tt-dark`, `.main`, `.main.wide`, `.page-head`, `.page-head h1`, `.page-head .sub`, `.page-meta`, `.head-actions`
 
-**Primitives**: `.btn`, `.btn.primary`, `.btn.ghost`, `.btn.destructive`, `.btn.sm`, `.chip`, `.chip.ok`, `.chip.warn`, `.chip.err`, `.chip.info`, `.chip.brand`, `.chip-phase`, `.chip-phase.{prd,tdd,plan,spec,code,review,deploy,observe}`, `.dot`, `.dot.ok`, `.dot.warn`, `.dot.err`, `.dot.info`, `.dot.live`, `.score-inline`, `.score-track`, `.score-fill`, `.score-num`, `.score-label`, `.ring`, `.card`, `.card-h`, `.card-b`, `.ks-panel`, `.ks-panel.armed`, `.ks-status`, `.ks-action`, `.ks-confirm-label`
+**Primitives**: `.btn`, `.btn.primary`, `.btn.ghost`, `.btn.destructive`, `.btn.sm`, `.chip`, `.chip.ok`, `.chip.warn`, `.chip.err`, `.chip.info`, `.chip.brand`, `.chip-phase`, `.chip-phase.{prd,tdd,plan,spec,code,review,deploy,observe}`, `.dot`, `.dot.ok`, `.dot.warn`, `.dot.err`, `.dot.info`, `.dot.live`, `.score-inline`, `.score-track`, `.score-fill`, `.score-num`, `.score-label`, `.ring`, `.card`, `.card-h`, `.card-b`, `.ks-panel`, `.ks-panel.armed`, `.ks-panel.ks-error`, `.ks-status`, `.ks-action`, `.ks-confirm-label`
 
 **Tables**: `.tbl`, `.tbl th`, `.tbl td`, `.tbl td.mono`, `.tbl td.num`, `.tbl td.title`, `.tbl tr.active`
 
