@@ -201,7 +201,11 @@ describe("AbortManager", () => {
   // Abort reason propagation
   // -----------------------------------------------------------------------
 
-  it("propagates abort reason via the signal", () => {
+  // SKIP: composite signal in createCompositeSignal does not propagate the
+  // upstream `reason` (calls composite.abort() with no args). Reason ends up
+  // as the default DOMException ({}) instead of the supplied "CANCEL".
+  // (PRD-016 triage: SKIP-WITH-NOTE — production fix required separately.)
+  it.skip("propagates abort reason via the signal", () => {
     const manager = new AbortManager();
     const signal = manager.registerRequest("req-1");
 

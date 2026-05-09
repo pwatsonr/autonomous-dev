@@ -231,7 +231,9 @@ function buildMockReleaseHealthResponse(): Record<string, unknown> {
 /** Builds a PII-aware test scrubber. */
 function buildTestScrubber(): DataScrubber {
   const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
-  const secretRegex = /(sk-proj-[\w]+|Bearer\s+[\w]+|apiKey=[\w]+)/g;
+  // PRD-016 batch 6: include hyphen in apiKey alternation so values like
+  // `apiKey=sk-proj-abc123` are fully redacted (was leaving trailing `-...`).
+  const secretRegex = /(sk-proj-[\w]+|Bearer\s+[\w]+|apiKey=[\w-]+)/g;
 
   return {
     scrubText(text: string): string {
