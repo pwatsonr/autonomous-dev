@@ -65,8 +65,13 @@ describe('Migrator', () => {
 
     expect(result.applied).toContain('001_initial.sql');
 
+    // NOTE: `_` is a SQL LIKE single-char wildcard, so `'_%'` matches every
+    // table. Use ESCAPE so we only filter the migration tracking table
+    // (`_migrations`) and any other underscore-prefixed internal tables.
     const tables: Array<{ name: string }> = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_%'")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\'",
+      )
       .all();
     const tableNames = tables.map((t) => t.name).sort();
 
