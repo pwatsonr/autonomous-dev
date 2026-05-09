@@ -2,45 +2,47 @@
   "name": "autonomous-dev-portal",
   "version": "0.1.0",
   "description": "Local web portal for monitoring autonomous-dev requests, runs, and audit logs.",
-  "author": "autonomous-dev contributors",
+  "author": {
+    "name": "pwatsonr",
+    "url": "https://github.com/pwatsonr"
+  },
   "extends": ["autonomous-dev"],
   "userConfig": {
     "port": {
-      "type": "integer",
+      "type": "number",
+      "title": "Portal port",
       "default": 19280,
-      "minimum": 1024,
-      "maximum": 65535,
-      "description": "TCP port the portal binds to (loopback by default)."
+      "description": "TCP port the portal binds to (loopback by default; valid range 1024-65535)."
     },
     "auth_mode": {
       "type": "string",
-      "enum": ["localhost", "tailscale", "oauth"],
+      "title": "Auth mode",
       "default": "localhost",
-      "description": "Authentication mode for incoming portal connections."
+      "description": "Authentication mode for incoming portal connections. One of: localhost, tailscale, oauth."
     },
     "tailscale_tailnet": {
       "type": "string",
+      "title": "Tailscale tailnet",
       "default": "",
       "description": "Required when auth_mode=tailscale. Tailnet name (e.g. 'tail-abc123.ts.net')."
     },
     "oauth_provider": {
       "type": "string",
-      "enum": ["", "github", "google"],
+      "title": "OAuth provider",
       "default": "",
-      "description": "Required when auth_mode=oauth. OAuth provider identifier."
+      "description": "Required when auth_mode=oauth. OAuth provider identifier: '', github, or google."
     },
     "sse_update_interval_seconds": {
-      "type": "integer",
+      "type": "number",
+      "title": "SSE update interval (seconds)",
       "default": 5,
-      "minimum": 1,
-      "maximum": 60,
-      "description": "Server-sent events update cadence."
+      "description": "Server-sent events update cadence (valid range 1-60 seconds)."
     },
-    "portal.path_policy.allowed_roots": {
-      "type": "array",
-      "items": { "type": "string" },
-      "default": [],
-      "description": "Absolute paths the portal is permitted to read. Empty list disables file access."
+    "portal_path_policy_allowed_roots": {
+      "type": "string",
+      "title": "Path policy allowed roots",
+      "default": "",
+      "description": "Comma-separated absolute paths the portal is permitted to read. Empty disables file access."
     }
   }
 }
