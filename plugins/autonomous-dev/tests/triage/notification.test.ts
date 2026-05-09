@@ -103,7 +103,9 @@ function test_discord_message_format(): void {
     'P0 should use :rotating_light: emoji'
   );
   assert(embed.color === 0xFF0000, `P0 color should be red (0xFF0000), got ${embed.color}`);
-  assert(embed.description.includes('api-gateway'), 'Description should include service');
+  // Service name appears in title (parity with Slack header), not description
+  // (PRD-016 triage batch 3 - aligned assertion with current formatter).
+  assert(embed.title.includes('api-gateway'), 'Title should include service');
   assert(embed.description.includes('/promote'), 'Description should include commands');
 
   console.log('PASS: TC-5-4-02 Discord message format');
