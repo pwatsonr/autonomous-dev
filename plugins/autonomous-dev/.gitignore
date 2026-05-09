@@ -2,3 +2,11 @@
 # The precision report is a per-run forensic artifact uploaded as a CI
 # artifact, not a committed source file.
 tests/standards/precision-report.json
+
+# Required by tests/integration/scrub-integration.test.ts (TC-2-3-10).
+# Per-run forensic artifacts produced by the data-safety pipeline; never
+# committed to source.
+.autonomous-dev/observations/
+.autonomous-dev/logs/
+.autonomous-dev/baselines/
+.autonomous-dev/fingerprints/
