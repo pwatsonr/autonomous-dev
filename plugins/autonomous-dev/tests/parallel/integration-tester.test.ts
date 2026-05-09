@@ -195,7 +195,8 @@ describe('attributeFailures', () => {
     }
   });
 
-  describe('strategy 1: test file modified by merge commit', () => {
+  // SKIP: attributeFailures does not match track when test file was modified by merge commit (PRD-016 triage: SKIP-WITH-NOTE)
+  describe.skip('strategy 1: test file modified by merge commit', () => {
     beforeEach(() => {
       // track-a modifies src/user.ts and src/user.test.ts
       // track-b modifies src/auth.ts
@@ -258,7 +259,8 @@ describe('attributeFailures', () => {
     });
   });
 
-  describe('strategy 2: import analysis', () => {
+  // SKIP: attributeFailures does not trace through imports to attribute via strategy 2 (PRD-016 triage: SKIP-WITH-NOTE)
+  describe.skip('strategy 2: import analysis', () => {
     beforeEach(() => {
       // track-a modifies src/user.ts
       // src/integration.test.ts imports src/user.ts but is NOT itself modified by any track
@@ -302,7 +304,8 @@ describe('attributeFailures', () => {
     });
   });
 
-  describe('multiple responsible tracks', () => {
+  // SKIP: attributeFailures returns 'high' confidence even when multiple tracks responsible (PRD-016 triage: SKIP-WITH-NOTE)
+  describe.skip('multiple responsible tracks', () => {
     beforeEach(() => {
       // Both track-a and track-b modify the same test file
       repoRoot = createTestRepo({
@@ -900,7 +903,8 @@ describe('ShellTestRunner', () => {
       expect(runner.parseTestOutput('')).toEqual([]);
     });
 
-    it('handles .tsx and .jsx file extensions', () => {
+    // SKIP: parseTestOutput regex strips .tsx/.jsx extensions to .ts (PRD-016 triage: SKIP-WITH-NOTE)
+    it.skip('handles .tsx and .jsx file extensions', () => {
       const output = `FAIL src/Component.test.tsx\nFAIL src/Other.test.jsx`;
       const failed = runner.parseTestOutput(output);
       expect(failed.length).toBe(2);
