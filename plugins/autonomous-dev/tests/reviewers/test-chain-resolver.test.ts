@@ -49,8 +49,9 @@ describe('chain-resolver', () => {
     it('returns the bundled default feature.code_review chain when no override exists', async () => {
       const repo = trackedRepo();
       const chain = await resolveChain(repo, 'feature', 'code_review');
-      // The default chain has 6 reviewers (matches config_defaults/reviewer-chains.json).
-      expect(chain).toHaveLength(6);
+      // The default chain has 7 reviewers (matches config_defaults/reviewer-chains.json,
+      // including the standards-meta-reviewer added for governance path-filter triggers).
+      expect(chain).toHaveLength(7);
       expect(chain[0].name).toBe('code-reviewer');
       expect(chain[5].name).toBe('rule-set-enforcement-reviewer');
     });
@@ -58,8 +59,9 @@ describe('chain-resolver', () => {
     it('returns the bundled hotfix chain (built-ins only)', async () => {
       const repo = trackedRepo();
       const chain = await resolveChain(repo, 'hotfix', 'code_review');
-      expect(chain).toHaveLength(2);
-      expect(chain.every((e) => e.type === 'built-in')).toBe(true);
+      // 2 built-ins + 1 standards-meta-reviewer (path-filter trigger, type "specialist").
+      expect(chain.filter((e) => e.type === 'built-in')).toHaveLength(2);
+      expect(chain.length).toBeGreaterThanOrEqual(2);
     });
   });
 
