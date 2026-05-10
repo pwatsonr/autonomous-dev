@@ -1,4 +1,7 @@
 // SPEC-013-3-01 §Path Parameter Validation — `GET /repo/:repo/request/:id`.
+// SPEC-036-3-01 — Request Detail re-skin: column-layout composition root
+// hosting all 11 regions; threads `cache-control: no-store` and `csrfToken`
+// (from request context) into the view.
 //
 // Validates both path parameters with strict regexes BEFORE touching the
 // stub. Any mismatch yields a 404 via notFound(c) so attackers can't probe
@@ -31,5 +34,9 @@ export const requestDetailHandler = async (c: Context): Promise<Response> => {
         return notFound(c);
     }
 
-    return renderPage(c, "request-detail", { request });
+    // SPEC-036-3-01 AC-1 — cache-control: no-store on the live detail page.
+    c.header("Cache-Control", "no-store");
+    const csrfToken =
+        (c.get("csrfToken") as string | undefined) ?? "";
+    return renderPage(c, "request-detail", { request, csrfToken });
 };

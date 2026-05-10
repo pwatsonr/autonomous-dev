@@ -126,6 +126,101 @@ export interface RequestRecord {
     repo: string;
     summary: string;
     phases: Phase[];
+    // SPEC-036-3-01..06 — Request Detail re-skin (PLAN-036-3). All optional
+    // for back-compat with the existing stub & 015-* consumers.
+    /** Active variant id (e.g. `"prd"`, `"code"`, `"deploy"`). */
+    variant?: string;
+    /** Pre-resolved variant label for display. */
+    variantLabel?: string;
+    /** Pipeline phase list in canonical order (variant-aware). */
+    pipelinePhases?: string[];
+    /** Currently-active phase name (must appear in `pipelinePhases`). */
+    currentPhase?: string;
+    /** Top-level lifecycle status — `"gate"` activates the gate-detail card. */
+    status?: "running" | "gate";
+    /** Active gate type when `status === "gate"`. */
+    gateType?: string;
+    /** Free-form gate description rendered in the gate detail card body. */
+    gateDetail?: string;
+    /** Minutes elapsed at the gate. */
+    waitedMin?: number;
+    /** Reviewer chain (review/code phases). */
+    reviewers?: RequestReviewer[];
+    /** Deploy stage when `currentPhase === "deploy"`. */
+    deployStage?: string;
+    /** Deploy target label (e.g. `"prod-cluster"`). */
+    deployTarget?: string;
+    /** SPEC-036-3-02 — persistent reading surface artifact. */
+    currentArtifact?: RequestArtifact;
+    /** SPEC-036-3-05 — past daemon iterations against this request. */
+    runs?: RequestRunRef[];
+}
+
+/**
+ * SPEC-036-3-04 §Reviewer chain detail — per-reviewer card content.
+ *
+ * `dimensions` are rubric scores rendered via the `Score` primitive; each
+ * dimension links to the reviewer agent run via the `runId` on the parent.
+ */
+export interface RequestReviewerDimension {
+    /** Rubric dimension label (e.g. `"correctness"`). */
+    name: string;
+    /** Score numerator. */
+    num: number;
+    /** Score denominator. */
+    den: number;
+    /** Pass threshold; tone-mapping is server-derived. */
+    threshold?: number;
+}
+
+export interface RequestReviewer {
+    /** Reviewer agent name (e.g. `"qa-edge-case-reviewer"`). */
+    name: string;
+    /** Agent semver (rendered `meta-mono`). */
+    version: string;
+    /** When `true` the reviewer is in a blocking state — finding lines
+     *  attached on this card will block the gate. */
+    blocking: boolean;
+    /** Free-form finding summary (one line). */
+    finding: string;
+    /** Reviewer agent run id; powers `/agents/{name}/runs/{runId}` links. */
+    runId: string;
+    /** Rubric dimensions — each rendered as a `Score` row. */
+    dimensions: RequestReviewerDimension[];
+}
+
+/**
+ * SPEC-036-3-02 §RequestArtifact — persistent inline reading surface.
+ *
+ * The artifact pane consumes this shape to render PRD/TDD prose (markdown),
+ * code diffs (per-line tinted `<pre>`), or plain text. Trust boundary: the
+ * daemon is authoritative for `content`; the renderer escapes diff/text
+ * branches and runs a minimal markdown subset for the prose branch.
+ */
+export interface RequestArtifact {
+    /** Phase name the artifact belongs to (uppercased in the section head). */
+    phase: string;
+    /** Render branch — drives format-aware rendering. */
+    format: "markdown" | "diff" | "text";
+    /** Daemon-authored artifact body. */
+    content: string;
+    /** Optional artifact identifier shown `meta-mono dim` next to the head. */
+    artifactId?: string;
+}
+
+/**
+ * SPEC-036-3-05 §RequestRunRef — past daemon iteration row in run-history.
+ */
+export interface RequestRunRef {
+    runId: string;
+    /** ISO-8601 UTC timestamp; rendered `meta-mono dim` verbatim. */
+    timestamp: string;
+    /** Phase the run executed (drives the phase chip). */
+    phase: string;
+    /** Run outcome → outcomeTone() picks the chip tone. */
+    outcome: "pass" | "fail" | "block";
+    /** Cost in USD. */
+    cost: number;
 }
 
 export interface ApprovalItem {
@@ -259,9 +354,61 @@ export interface CostPoint {
     value: number;
 }
 
+// SPEC-036-2-01 §FR-9 — Costs surface extensions. All optional for back-compat.
+
+export interface PhaseSpend {
+    /** Lowercase phase name (matches `PhaseName`). */
+    phase: string;
+    /** Cost in USD. */
+    cost: number;
+    /** Percentage of total spend (0-100). */
+    pct: number;
+}
+
+export interface ReviewerSpend {
+    /** Reviewer agent name (e.g. "qa-edge-case"). */
+    name: string;
+    /** "generic" or "specialist" — drives chip tone. */
+    role: "generic" | "specialist";
+    /** Number of dispatches MTD. */
+    runs: number;
+    /** False-positive rate 0..1, or null when unknown. */
+    fpRate: number | null;
+    /** Cost in USD. */
+    cost: number;
+}
+
+export interface DeploySpend {
+    /** Environment label (prod, staging, dev, ...). */
+    env: string;
+    /** Backend tag (gcp, aws, k8s, github-pages, ...). */
+    backend: string;
+    /** Number of deploys MTD. */
+    deploys: number;
+    /** Last deploy time, free-form (e.g. "14:31", "2h ago"). */
+    lastDeploy: string;
+    /** Health tone: ok / warn / err / muted. */
+    health: "ok" | "warn" | "err";
+    /** Cost in USD. */
+    cost: number;
+}
+
 export interface CostSeries {
     points: CostPoint[];
     budgetUsd: number;
+    // SPEC-036-2-01 §FR-9 extensions.
+    /** Per-phase spend rows for the "Spend by phase" table. */
+    phaseSpend?: PhaseSpend[];
+    /** Per-reviewer spend rows. */
+    reviewerSpend?: ReviewerSpend[];
+    /** Per-(env,backend) deploy spend rows. */
+    deploySpend?: DeploySpend[];
+    /** MTD total cost in USD. */
+    totalMtd?: number;
+    /** Number of requests MTD (denominator for avg/request KPI). */
+    requestCount?: number;
+    /** Monthly cost cap in USD (denominator for ring + KPI sub-line). */
+    costCap?: number;
 }
 
 export interface LogLine {
@@ -270,9 +417,106 @@ export interface LogLine {
     message: string;
 }
 
+// SPEC-036-2-04 §FR-9 — Ops surface extensions. All optional for back-compat.
+
+export interface McpServer {
+    /** Server name (filesystem, github, prometheus, ...). */
+    name: string;
+    /** Health tone. */
+    status: "ok" | "warn" | "err";
+    /** Free-form latency / state detail (e.g. "12ms", "retry 1/3"). */
+    detail: string;
+}
+
+export interface PluginChainCategory {
+    /** Display label (CORE, REVIEWERS, VARIANTS, DEPLOY, ORG). */
+    name: string;
+    /** Optional accent — `core` or `org` get a tinted chrome on the chip. */
+    accent?: "core" | "org";
+    /** Package@version strings; may be empty (renders header only). */
+    packages: string[];
+}
+
+export interface LogEntry {
+    /** ISO8601 or short-format ts (e.g. "14:32:04Z"). Rendered as-is. */
+    ts: string;
+    /** INFO / WARN / ERROR / DEBUG / TRACE. DEBUG/TRACE are filtered out. */
+    level: string;
+    /** Message text. Phase/deploy/agent markers handled by the fragment. */
+    message: string;
+}
+
+export interface DeployEvent {
+    /** Time label ("14:31", "2d ago", ...). */
+    time: string;
+    /** Backend tag. */
+    backend: string;
+    /** Environment. */
+    env: string;
+    /** Status tone. */
+    status: "ok" | "warn" | "err";
+    /** Display text ("ok", "degraded", "rolled back"). */
+    statusLabel: string;
+}
+
+export interface StandardsChange {
+    /** Time label ("2h ago"). */
+    time: string;
+    /** Body text — fragment renders this verbatim with sentence case. */
+    text: string;
+}
+
+export interface HeartbeatSample {
+    /** ISO timestamp or 5-minute-bucket label. */
+    ts: string;
+    /** Bar height encoder. */
+    latencyMs: number;
+    /** Sample tone. */
+    status: "ok" | "slow" | "miss";
+}
+
+export interface CircuitBreakerState {
+    /** "closed" (healthy), "open" (tripped), "half-open" (probing). */
+    state: "closed" | "open" | "half-open";
+    /** Number of failures observed in the current window. */
+    failureCount: number;
+    /** ISO timestamp of the most recent state change. */
+    changedAt: string | null;
+}
+
+export interface KillSwitchState {
+    engaged: boolean;
+    armed: boolean;
+    /** Server-minted ISO arm timestamp. */
+    armedAt?: string;
+}
+
 export interface OpsHealth {
     daemon: { status: string; pid: number | null };
     components: Record<string, string>;
+    // SPEC-036-2-04 §FR-9 / SPEC-036-2-05 / SPEC-036-2-06 extensions.
+    /** MCP server health rows. */
+    mcpServers?: McpServer[];
+    /** Plugin chain visualization categories (5 columns). */
+    pluginChain?: PluginChainCategory[];
+    /** Recent log entries (last 50, server-trimmed; INFO/WARN/ERROR only). */
+    recentLog?: LogEntry[];
+    /** Deploy events for the right-hand column table. */
+    deployEvents?: DeployEvent[];
+    /** Recent standards changes feed. */
+    standardsChanges?: StandardsChange[];
+    /** Total standards rules in catalog (for KPI strip). */
+    standardsCount?: number;
+    /** Subset of `standardsCount` flagged as immutable. */
+    immutableCount?: number;
+    /** 24-hour heartbeat samples (5-minute buckets, max 288). */
+    heartbeat?: HeartbeatSample[];
+    /** Circuit breaker state for the daemon control plane. */
+    circuitBreaker?: CircuitBreakerState;
+    /** Kill switch idle/armed/engaged state. */
+    killSwitch?: KillSwitchState;
+    /** Daemon uptime label ("4d 12h"). */
+    uptime?: string;
 }
 
 export interface AuditRow {
@@ -310,12 +554,20 @@ export interface DashboardAggregatesProp {
 
 export interface RenderProps {
     dashboard: { data: DashboardData; aggregates: DashboardAggregatesProp };
-    "request-detail": { request: RequestRecord };
+    "request-detail": { request: RequestRecord; csrfToken?: string };
     approvals: { items: ApprovalItem[] };
     settings: { config: SettingsView; data?: SettingsData };
-    costs: { series: CostSeries };
+    costs: {
+        series: CostSeries;
+        /** SPEC-036-2-03 — pre-computed by the route handler. */
+        projection?: import("../lib/costs-projection").ProjectionResult;
+    };
     logs: { lines: LogLine[] };
-    ops: { health: OpsHealth };
+    ops: {
+        health: OpsHealth;
+        /** SPEC-014-2-04 — per-request CSRF token threaded through to KillSwitch. */
+        csrfToken?: string;
+    };
     /** SPEC-015-4-02 — `rows` is the legacy stub shape, `page`/`filters`
      *  is the live HMAC-chained log; AuditView prefers `page` when set. */
     audit: {
