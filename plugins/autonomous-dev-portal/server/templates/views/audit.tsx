@@ -13,11 +13,20 @@ import type {
 } from "../../types/render";
 import { AuditRowFragment } from "../fragments/audit-row";
 
+/** Format an ISO-8601 timestamp as compact `YYYY-MM-DD HH:mm:ssZ` for
+ *  table cells (TDD-034 §5.6 — table timestamps use compact ISO form). */
+function formatTimestampCompact(iso: string): string {
+    const ts = Date.parse(iso);
+    if (Number.isNaN(ts)) return iso;
+    return new Date(ts).toISOString().replace("T", " ").slice(0, 19) + "Z";
+}
+
 const integrityLabel: Record<AuditPageResultProp["integrityStatus"], string> = {
     verified: "Chain verified",
     warning: "Chain has gaps",
     error: "Chain integrity FAILED",
     unknown: "Chain integrity unknown",
+    // Note: "FAILED" stays uppercase per design system status-badge rule.
 };
 
 interface IntegrityProps {
@@ -153,7 +162,7 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters }) => 
     if (page === undefined) {
         return (
             <section class="audit">
-                <h1>Audit Log</h1>
+                <h1>Audit log</h1>
                 <table class="audit-table">
                     <thead>
                         <tr>
@@ -183,7 +192,7 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters }) => 
     const liveFilters: AuditFiltersProp = filters ?? {};
     return (
         <section class="audit">
-            <h1>Audit Log</h1>
+            <h1>Audit log</h1>
             <FilterForm filters={liveFilters} />
             <div class="audit-status">
                 <IntegrityIndicator
@@ -208,13 +217,13 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters }) => 
                     <tbody>
                         {page.entries.map((entry) => (
                             <tr class="audit-row">
-                                <td>{String(entry.sequence)}</td>
+                                <td><code>{String(entry.sequence)}</code></td>
                                 <td>
-                                    <time datetime={entry.timestamp}>
-                                        {entry.timestamp}
+                                    <time datetime={entry.timestamp} class="mono">
+                                        {formatTimestampCompact(entry.timestamp)}
                                     </time>
                                 </td>
-                                <td>{entry.operatorId}</td>
+                                <td><code>{entry.operatorId}</code></td>
                                 <td>{entry.action}</td>
                                 <td>
                                     {String(

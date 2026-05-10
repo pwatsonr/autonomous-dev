@@ -10,7 +10,7 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
 }) => (
     <section class="request-detail">
         <h1>
-            {request.repo} / {request.id}
+            {request.repo} / <code>{request.id}</code>
         </h1>
         <p class="summary">{request.summary}</p>
         <RequestTimeline requestId={request.id} phases={request.phases} />

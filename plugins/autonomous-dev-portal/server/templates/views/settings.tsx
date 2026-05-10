@@ -135,8 +135,8 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
                 </ul>
             ) : null}
 
-            {/* Cost Management ----------------------------------------- */}
-            <SettingsSection id="cost" title="Cost Management">
+            {/* Cost management ----------------------------------------- */}
+            <SettingsSection id="cost" title="Cost management">
                 <div class="field">
                     <label for="cost-daily">Daily cap (USD)</label>
                     <input
@@ -171,8 +171,8 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
                 </div>
             </SettingsSection>
 
-            {/* Trust Levels -------------------------------------------- */}
-            <SettingsSection id="trust" title="Trust Levels">
+            {/* Trust levels -------------------------------------------- */}
+            <SettingsSection id="trust" title="Trust levels">
                 {repositories.length === 0 ? (
                     <p class="empty">No repositories registered.</p>
                 ) : (
@@ -210,7 +210,7 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
             </SettingsSection>
 
             {/* Allowlist ----------------------------------------------- */}
-            <SettingsSection id="allowlist" title="Repository Allowlist">
+            <SettingsSection id="allowlist" title="Repository allowlist">
                 <p class="settings-section__description">
                     One git repository path per line.
                 </p>

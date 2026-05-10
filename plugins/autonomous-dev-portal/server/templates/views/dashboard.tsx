@@ -1,4 +1,6 @@
 // SPEC-013-3-03 §Views — dashboard view component.
+// SPEC-034-2-05 — voice/copy sweep: "Repositories" is the canonical
+// dashboard heading (sentence case; single proper noun).
 
 import type { FC } from "hono/jsx";
 

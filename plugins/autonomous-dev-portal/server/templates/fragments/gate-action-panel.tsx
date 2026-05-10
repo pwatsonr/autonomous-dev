@@ -268,7 +268,7 @@ const ActivePanel: FC<GateActionPanelProps> = (props) => {
                         requestId={requestId}
                         repo={repo}
                         action="request-changes"
-                        label="Request Changes"
+                        label="Request changes"
                         cssClass="gate-request-changes"
                         requiresComment
                     />

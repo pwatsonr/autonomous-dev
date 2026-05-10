@@ -10,15 +10,15 @@ export const OpsView: FC<RenderProps["ops"]> = ({ health }) => (
         <h2>Daemon</h2>
         <dl>
             <dt>Status</dt>
-            <dd>{health.daemon.status}</dd>
+            <dd><code class={`status status-${health.daemon.status}`}>{health.daemon.status}</code></dd>
             <dt>PID</dt>
-            <dd>{health.daemon.pid !== null ? String(health.daemon.pid) : "—"}</dd>
+            <dd><code>{health.daemon.pid !== null ? String(health.daemon.pid) : "—"}</code></dd>
         </dl>
         <h2>Components</h2>
         <ul>
             {Object.entries(health.components).map(([name, status]) => (
                 <li class={`component status-${status}`}>
-                    <strong>{name}</strong>: {status}
+                    <strong>{name}</strong>: <code>{status}</code>
                 </li>
             ))}
         </ul>

@@ -21,11 +21,11 @@ export const ErrorDetails: FC<Props> = ({ details, requestPath }) => {
     if (details === undefined || details === "") return <></>;
     return (
         <details class="error-details">
-            <summary>Technical Details</summary>
+            <summary>Technical details</summary>
             <div class="error-details-content">
                 {requestPath !== undefined && requestPath !== "" ? (
                     <p>
-                        <strong>Request Path:</strong> <code>{requestPath}</code>
+                        <strong>Request path:</strong> <code>{requestPath}</code>
                     </p>
                 ) : null}
                 <pre>

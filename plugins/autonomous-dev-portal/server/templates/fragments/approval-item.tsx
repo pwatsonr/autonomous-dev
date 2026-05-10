@@ -20,7 +20,9 @@ export const ApprovalItemRow: FC<Item> = ({
     <article class={`approval-item risk-${riskLevel}`} data-approval-id={id}>
         <header>
             <span class="repo">{repo}</span>
-            <span class={`risk-badge risk-${riskLevel}`}>{riskLevel}</span>
+            <code class={`risk-badge risk-${riskLevel} mono`}>
+                {riskLevel.toUpperCase()}
+            </code>
         </header>
         <p class="summary">{summary}</p>
         {riskLevel === "high" ? (

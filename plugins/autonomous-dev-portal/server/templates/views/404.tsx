@@ -6,6 +6,9 @@
 // The legacy `RenderProps["404"]` shape (with `path`) is preserved so
 // existing handlers continue to call `renderPage(c, "404", { path })`.
 // We synthesize an ErrorContext from those props on the way through.
+//
+// SPEC-034-2-05 — voice/copy sweep: copy is owned by `<ErrorPage>`;
+// nothing template-specific to sweep here.
 
 import type { FC } from "hono/jsx";
 

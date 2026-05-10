@@ -20,19 +20,40 @@ function classFor(status: string): string {
     return `daemon-status-pill status-${status}`;
 }
 
+/**
+ * SPEC-034-2-05 §Voice/copy sweep — canonical daemon status copy.
+ *
+ * The "running" case uses the kit canonical "Daemon running" (not
+ * "Daemon is running"). Other states render as "Daemon: <STATUS>" with
+ * the status word UPPERCASE per the design system status-badge rule.
+ */
+function labelFor(state: string): string {
+    if (state === "running") return "Daemon running";
+    return `Daemon: ${state.toUpperCase()}`;
+}
+
 export const DaemonStatusPill: FC<Props> = ({ status }) => {
-    const label =
-        status === "unknown" ? "checking…" : `daemon: ${status.status}`;
-    const cssClass =
-        status === "unknown" ? classFor("unknown") : classFor(status.status);
+    if (status === "unknown") {
+        return (
+            <span
+                class={classFor("unknown")}
+                hx-get="/api/daemon-status"
+                hx-trigger="every 30s"
+                hx-swap="outerHTML"
+            >
+                <code class="mono">checking…</code>
+            </span>
+        );
+    }
+    const state = status.status;
     return (
         <span
-            class={cssClass}
+            class={classFor(state)}
             hx-get="/api/daemon-status"
             hx-trigger="every 30s"
             hx-swap="outerHTML"
         >
-            {label}
+            <code class="mono">{labelFor(state)}</code>
         </span>
     );
 };

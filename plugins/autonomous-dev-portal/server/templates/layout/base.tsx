@@ -8,6 +8,10 @@
 // The defer attribute on the HTMX <script> ensures it initialises after
 // DOM parse, which matches HTMX's documented requirements.
 //
+// SPEC-034-2-05 §Voice/copy sweep — visible chrome strings (page <title>
+// "autonomous-dev portal" and footer "autonomous-dev") are sentence case;
+// no exclamation marks; no emoji; no per-template copy lives here.
+//
 // SPEC-014-2-04 §Nonce Helper — every <script> tag carries the per-request
 // CSP nonce supplied by `cspMiddleware` and threaded through the renderer
 // via the `cspNonce` prop. The nonce is mandatory in production: an
