@@ -1,0 +1,98 @@
+# SPEC-035-4-04 — CI Docker-pinned visual regression runner.
+#
+# Runs the Playwright visual regression suite from SPEC-035-4-03 inside
+# the version-pinned Playwright Docker image
+# `mcr.microsoft.com/playwright:v1.40.0-jammy`. Pinning eliminates
+# cross-OS render diffs; the floating tags `:latest` / `:v1` / `:jammy`
+# are NOT used (AC-3).
+#
+# Failure modes:
+#   - Missing golden  -> `GOLDEN_MISSING:` from check-goldens-present.sh
+#                         (step runs BEFORE Playwright so no opaque stack).
+#   - Goldens > 500KB without LFS -> `GOLDEN_SIZE_EXCEEDED:` from
+#                         check-goldens-size.sh.
+#   - Pixel diff > 0.1% -> Playwright fails; diffs uploaded as artifact.
+#
+# Auto-generation in CI is forbidden: the job never passes
+# `--project=golden-gen` and never sets `UPDATE_GOLDEN=1` (AC-7).
+
+name: visual-regression
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: visual-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # AC-3: literally pinned image tag. Updates require a deliberate edit.
+    container:
+      image: mcr.microsoft.com/playwright:v1.40.0-jammy
+
+    defaults:
+      run:
+        working-directory: plugins/autonomous-dev-portal
+
+    env:
+      PORT: 19281
+      NODE_ENV: test
+      PORTAL_WORDMARK_BRACKETS: '1'
+      CI: 'true'
+
+    steps:
+      - name: Checkout (with LFS)
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # AC-5 step 4 / AC-6: pre-flight golden presence check runs BEFORE
+      # Playwright so a missing golden fails fast with the human-readable
+      # `GOLDEN_MISSING:` message.
+      - name: Check goldens present
+        run: bash scripts/ci/check-goldens-present.sh
+
+      # AC-5 step 5: 500 KB goldens-size guard. Without LFS tracking, an
+      # oversized goldens dir fails with `GOLDEN_SIZE_EXCEEDED:`.
+      - name: Check goldens size
+        run: bash scripts/ci/check-goldens-size.sh
+
+      # AC-5 step 6: start the portal in the background, then wait for the
+      # loopback port. The portal logs to stdout — Playwright's `--reporter
+      # list` will surface its own readiness messages on top.
+      - name: Start portal (background)
+        run: bun run server/index.ts &
+
+      - name: Wait for portal port
+        run: bash scripts/ci/wait-for-port.sh "${PORT}" 30
+
+      # AC-7: never pass `--project=golden-gen`; never set UPDATE_GOLDEN.
+      # The default `chromium` project has `updateSnapshots: 'none'`.
+      - name: Run Playwright visual regression suite
+        run: npx playwright test tests/visual-regression/design-system.spec.ts
+
+      # AC-5 step 8: on failure, upload the report + raw test results +
+      # any diff PNGs Playwright wrote so reviewers can inspect drift.
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diffs
+          path: |
+            plugins/autonomous-dev-portal/playwright-report/
+            plugins/autonomous-dev-portal/test-results/
+            plugins/autonomous-dev-portal/tests/visual-regression/goldens/**/*-diff.png
+          if-no-files-found: ignore

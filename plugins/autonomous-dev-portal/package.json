@@ -11,7 +11,9 @@
     "start": "bun run server/server.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint server/ tests/",
-    "test": "bun test"
+    "test": "bun test",
+    "test:visual": "npx playwright test tests/visual-regression/design-system.spec.ts",
+    "gen:visual-goldens": "UPDATE_GOLDEN=1 npx playwright test tests/visual-regression/design-system.spec.ts --project=golden-gen"
   },
   "dependencies": {
     "dompurify": "~3.0.5",

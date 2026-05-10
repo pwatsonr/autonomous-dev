@@ -1,0 +1,12 @@
+# SPEC-035-4-03 §Goldens directory.
+#
+# Pixel-perfect golden PNGs for the `/design-system` visual regression
+# suite live alongside this file. Bootstrap the directory by running
+# `npm run gen:visual-goldens` locally; commit the 21 generated PNGs
+# (`design-system-full.png` + `design-system-card-{01..20}.png`).
+#
+# If `du -sb tests/visual-regression/goldens/` exceeds 512000 bytes,
+# track the directory under git-lfs:
+#   git lfs track "tests/visual-regression/goldens/*.png"
+# and re-stage the goldens. SPEC-035-4-04's
+# `scripts/ci/check-goldens-size.sh` enforces the threshold in CI.
