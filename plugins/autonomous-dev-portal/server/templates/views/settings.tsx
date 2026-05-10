@@ -1,60 +1,400 @@
-// SPEC-015-2-02 §Settings page — full editor.
+// SPEC-036-4-01 §Settings view — five-tab redesign.
 //
-// The page renders four sections, each as its own <SettingsSection>:
-//   1. Cost Management   — daily / monthly cap (numeric, validated server-side)
-//   2. Trust Levels      — per-repo enum (untrusted | basic | trusted)
-//   3. Repository Allowlist — array of git repo paths (canonicalized + checked)
-//   4. Notifications     — slack webhook + notification email
+// Composes:
+//   1. Page head        (delivered by ShellLayout via pageTitle)
+//   2. Tab nav          (`SettingsTabs`)
+//   3. Five panel sections in a fixed order — `general`, `variants`,
+//      `standards`, `backends`, `agents`. The panel matching
+//      `data.activeTab` renders without `hidden`; the other four carry
+//      `hidden` so a JS-off browser still shows the deep-linked tab.
+//   4. Top-level dialog modals (Inspect Agent, etc.) hoisted as
+//      siblings of the panel sections per SPEC-036-4-01 AC-05.
+//   5. Three module scripts: `settings-tabs.js`, `form-validation.js`,
+//      `settings-modals.js`.
 //
-// HTMX-first: the form has `hx-target="this"` and `hx-swap="outerHTML"`; on
-// validation errors the server re-renders the same view with `fieldErrors`
-// populated, and each section drops a <FieldError> below the offending input.
-//
-// Sticky values come from the user's submitted (potentially invalid) form
-// data, NOT the on-disk config — a user who typed `0` for daily cap should
-// see `0` after the 422, not a silent reset.
-//
-// Backward compatibility: the existing dispatcher in templates/index.tsx
-// passes `{ config: SettingsView }`. The full-editor entry points
-// (`SettingsEditor`, `SettingsPage`) are exported separately and consumed
-// by the new POST /settings handler in routes/settings.ts.
+// SPEC-015-2-02 §SettingsEditor — the full editor exported here is kept
+// for the existing POST /settings round-trip (server-side persistence
+// path). The default `SettingsView` is the redesigned tabbed page.
 
 import type { FC } from "hono/jsx";
 
-import type { RenderProps } from "../../types/render";
+import { Btn, Card, Chip, CostRing } from "../../components/primitives";
+import type { RenderProps, SettingsData, TabId } from "../../types/render";
+import { AgentInspectModal, AgentTable } from "../fragments/agent-table";
+import { AllowlistTable } from "../fragments/allowlist-table";
 import { FieldError } from "../fragments/field-error";
+import { NotificationsCard } from "../fragments/notifications-card";
 import { SettingsSection } from "../fragments/settings-section";
+import { SettingsTabs } from "../fragments/settings-tabs";
+import { TrustOverridesTable } from "../fragments/trust-overrides-table";
 
-// ---- Legacy view (kept for the existing dispatcher) ------------------------
+// ---- Tab panel sub-views ---------------------------------------------------
 
-export const SettingsView: FC<RenderProps["settings"]> = ({ config }) => (
-    <section class="settings">
-        <h1>Settings</h1>
-        <dl>
-            <dt>Authentication mode</dt>
-            <dd>{config.auth_mode}</dd>
-            <dt>Port</dt>
-            <dd>{String(config.port)}</dd>
-            <dt>Log level</dt>
-            <dd>{config.log_level}</dd>
-        </dl>
+const TRUST_LEVELS = ["L0", "L1", "L2", "L3"] as const;
+
+const TrustCard: FC<{ data: SettingsData }> = ({ data }) => (
+    <section class="card" aria-labelledby="trust-heading">
+        <h3 id="trust-heading">Trust level</h3>
+        <p class="meta">
+            Higher trust levels reduce manual approval prompts. Per-repo
+            overrides take precedence over the global default.
+        </p>
+        <fieldset class="field" data-field="trust-level">
+            <legend class="visually-hidden">Global trust level</legend>
+            {TRUST_LEVELS.map((lvl) => {
+                const id = `trust-level-${lvl.toLowerCase()}`;
+                return (
+                    <label class="radio" for={id}>
+                        <input
+                            type="radio"
+                            id={id}
+                            name="trust-level"
+                            value={lvl}
+                            checked={data.trustLevel === lvl}
+                            data-validate="trust-level"
+                        />
+                        <span class="mono">{lvl}</span>
+                    </label>
+                );
+            })}
+        </fieldset>
     </section>
 );
 
-// ---- Full editor (SPEC-015-2-02) -------------------------------------------
+const TrustOverridesCard: FC<{ data: SettingsData }> = ({ data }) => {
+    const allowlistPaths = data.allowlist.map((e) => e.path);
+    return (
+        <section class="card" aria-labelledby="trust-overrides-heading">
+            <h3 id="trust-overrides-heading">Per-repo overrides</h3>
+            <TrustOverridesTable
+                overrides={data.trustOverrides}
+                allowlist={allowlistPaths}
+            />
+            <datalist id="allowlist-datalist">
+                {allowlistPaths.map((p) => (
+                    <option value={p} />
+                ))}
+            </datalist>
+        </section>
+    );
+};
+
+const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
+    <section class="card" aria-labelledby="cost-caps-heading">
+        <h3 id="cost-caps-heading">Cost caps</h3>
+        <div class="field" data-cost-cap-group>
+            <label for="cost-cap-per-request">Per-request cap</label>
+            <span class="prefix">$</span>
+            <input
+                type="number"
+                id="cost-cap-per-request"
+                name="perRequest"
+                min="0"
+                step="0.01"
+                value={String(data.costCaps.perRequest)}
+                class="input"
+                data-validate="cost-cap"
+                data-cost-cap-field="perRequest"
+            />
+            <FieldError field="perRequest" message={undefined} />
+        </div>
+        <div class="field" data-cost-cap-group>
+            <label for="cost-cap-daily">Daily cap</label>
+            <span class="prefix">$</span>
+            <input
+                type="number"
+                id="cost-cap-daily"
+                name="daily"
+                min="0"
+                step="0.01"
+                value={String(data.costCaps.daily)}
+                class="input"
+                data-validate="cost-cap"
+                data-cost-cap-field="daily"
+            />
+            <FieldError field="daily" message={undefined} />
+        </div>
+        <div class="field" data-cost-cap-group>
+            <label for="cost-cap-monthly">Monthly cap</label>
+            <span class="prefix">$</span>
+            <input
+                type="number"
+                id="cost-cap-monthly"
+                name="monthly"
+                min="0"
+                step="0.01"
+                value={String(data.costCaps.monthly)}
+                class="input"
+                data-validate="cost-cap"
+                data-cost-cap-field="monthly"
+            />
+            <FieldError field="monthly" message={undefined} />
+        </div>
+
+        <div class="form-actions">
+            <Btn kind="ghost" data-action="reset-cost-caps">
+                Reset to defaults
+            </Btn>
+        </div>
+
+        <h4>Current spend</h4>
+        <div class="cost-rings">
+            <CostRing
+                spent={data.currentSpend.today}
+                cap={data.costCaps.daily}
+                label="TODAY"
+            />
+            <CostRing
+                spent={data.currentSpend.month}
+                cap={data.costCaps.monthly}
+                label="MONTH"
+            />
+        </div>
+    </section>
+);
+
+const AllowlistCard: FC<{ data: SettingsData }> = ({ data }) => (
+    <section class="card" aria-labelledby="allowlist-heading">
+        <h3 id="allowlist-heading">Repo allowlist</h3>
+        <AllowlistTable entries={data.allowlist} />
+        <form
+            class="add-allowlist-form"
+            hx-post="/api/settings/allowlist"
+            hx-target="[data-fragment='allowlist-table']"
+            hx-swap="outerHTML"
+        >
+            <div class="field">
+                <label for="allowlist-new-path">Add repo (absolute path)</label>
+                <input
+                    type="text"
+                    id="allowlist-new-path"
+                    name="path"
+                    class="input mono"
+                    placeholder="/Users/op/repos/foo"
+                    data-validate="allowlist-path"
+                    autocomplete="off"
+                />
+                <FieldError field="allowlist-new-path" message={undefined} />
+            </div>
+            <Btn kind="primary" disabled>
+                Add
+            </Btn>
+        </form>
+    </section>
+);
+
+const VariantsPanel: FC<{ data: SettingsData }> = ({ data }) => (
+    <section class="card" aria-labelledby="variants-heading">
+        <h3 id="variants-heading">Pipeline variants</h3>
+        <table class="tbl">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Label</th>
+                    <th>Phases</th>
+                </tr>
+            </thead>
+            <tbody>
+                {data.variants.map((v) => (
+                    <tr>
+                        <td class="mono">{v.id}</td>
+                        <td>{v.label}</td>
+                        <td class="mono">{v.phases.join(" → ")}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </section>
+);
+
+const StandardsPanel: FC<{ data: SettingsData }> = ({ data }) => (
+    <section class="card" aria-labelledby="standards-heading">
+        <h3 id="standards-heading">Standards rules</h3>
+        <table class="tbl">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Severity</th>
+                    <th>Description</th>
+                    <th>Applies</th>
+                    <th>Hits</th>
+                </tr>
+            </thead>
+            <tbody>
+                {data.standards.map((rule) => (
+                    <tr>
+                        <td class="mono">{rule.id}</td>
+                        <td>
+                            <Chip
+                                variant="status"
+                                tone={
+                                    rule.severity === "blocking"
+                                        ? "err"
+                                        : rule.severity === "warn"
+                                          ? "warn"
+                                          : "muted"
+                                }
+                            >
+                                {rule.severity}
+                            </Chip>
+                        </td>
+                        <td>{rule.desc}</td>
+                        <td class="mono">{rule.applies}</td>
+                        <td class="mono">{rule.hits}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </section>
+);
+
+const BackendsPanel: FC<{ data: SettingsData }> = ({ data }) => (
+    <section class="card" aria-labelledby="backends-heading">
+        <h3 id="backends-heading">Deploy backends</h3>
+        <table class="tbl">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Label</th>
+                    <th>Kind</th>
+                    <th>Enabled</th>
+                    <th>Health</th>
+                </tr>
+            </thead>
+            <tbody>
+                {data.backends.map((b) => (
+                    <tr>
+                        <td class="mono">{b.id}</td>
+                        <td>{b.label}</td>
+                        <td class="mono">{b.kind}</td>
+                        <td>{b.enabled ? "yes" : "no"}</td>
+                        <td>
+                            <Chip variant="status" tone={b.health}>
+                                {b.health}
+                            </Chip>
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </section>
+);
+
+// ---- Main view -------------------------------------------------------------
+
+interface PanelProps {
+    id: TabId;
+    activeTab: TabId;
+    children?: unknown;
+}
+
+const Panel: FC<PanelProps> = ({ id, activeTab, children }) => {
+    const isActive = id === activeTab;
+    if (isActive) {
+        return (
+            <section
+                id={`settings-panel-${id}`}
+                role="tabpanel"
+                data-tab-panel={id}
+                aria-labelledby={`settings-tab-${id}`}
+            >
+                {children}
+            </section>
+        );
+    }
+    return (
+        <section
+            id={`settings-panel-${id}`}
+            role="tabpanel"
+            data-tab-panel={id}
+            aria-labelledby={`settings-tab-${id}`}
+            hidden
+        >
+            {children}
+        </section>
+    );
+};
+
+export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
+    if (data === undefined) {
+        // Backward-compatibility fallback for callers that still pass
+        // only `{ config }` (legacy dispatcher seam). Render an empty
+        // shell with the General tab active.
+        return (
+            <main class="settings settings-redesign">
+                <h1>Settings</h1>
+                <p class="meta">Loading…</p>
+            </main>
+        );
+    }
+
+    const activeTab = data.activeTab;
+    // Cost caps + saved-config validity drives the "Send test
+    // notification now" Btn — server is authoritative.
+    const canSendTest = data.notifications.notifyDefault !== "none";
+
+    return (
+        <main class="settings settings-redesign" data-page="settings">
+            <div class="page-head">
+                <h1>Settings</h1>
+            </div>
+
+            <SettingsTabs activeTab={activeTab} />
+
+            <Panel id="general" activeTab={activeTab}>
+                <TrustCard data={data} />
+                <TrustOverridesCard data={data} />
+                <CostCapsCard data={data} />
+                <AllowlistCard data={data} />
+                <NotificationsCard
+                    config={data.notifications}
+                    canSendTest={canSendTest}
+                />
+            </Panel>
+
+            <Panel id="variants" activeTab={activeTab}>
+                <VariantsPanel data={data} />
+            </Panel>
+
+            <Panel id="standards" activeTab={activeTab}>
+                <StandardsPanel data={data} />
+            </Panel>
+
+            <Panel id="backends" activeTab={activeTab}>
+                <BackendsPanel data={data} />
+            </Panel>
+
+            <Panel id="agents" activeTab={activeTab}>
+                <section class="card" aria-labelledby="agents-heading">
+                    <h3 id="agents-heading">Agent factory</h3>
+                    <AgentTable agents={data.agents} />
+                </section>
+            </Panel>
+
+            {/* Top-level dialogs — hoisted out of [hidden] panels per
+                SPEC-036-4-01 AC-05. */}
+            {data.agents.map((agent) => (
+                <AgentInspectModal agent={agent} />
+            ))}
+
+            <script type="module" src="/static/js/settings-tabs.js"></script>
+            <script type="module" src="/static/js/form-validation.js"></script>
+            <script type="module" src="/static/js/settings-modals.js"></script>
+        </main>
+    );
+};
+
+// ---- Legacy SettingsEditor kept for the existing POST /settings flow ------
+// (Untouched; PLAN-036-4 is re-skin only — persistence layer unchanged.)
 
 export interface RepositorySummary {
-    /** URL-safe slug used as the form key suffix (`trustLevels.<slug>`). */
     slug: string;
-    /** Display name. */
     name: string;
 }
 
 export type TrustLevel = "untrusted" | "basic" | "trusted";
 
 export interface SettingsEditorProps {
-    /** Current proposed (sticky) values. Numbers may legitimately be 0
-     *  (e.g., the user just typed it; validator catches it). */
     settings: {
         costCaps?: { daily?: number | null; monthly?: number | null };
         trustLevels?: Record<string, string>;
@@ -69,7 +409,6 @@ export interface SettingsEditorProps {
     warnings?: string[];
     successMessage?: string;
     serviceError?: string;
-    /** CSRF token; injected by the route handler. */
     csrfToken?: string;
 }
 
@@ -135,7 +474,6 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
                 </ul>
             ) : null}
 
-            {/* Cost management ----------------------------------------- */}
             <SettingsSection id="cost" title="Cost management">
                 <div class="field">
                     <label for="cost-daily">Daily cap (USD)</label>
@@ -171,7 +509,6 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
                 </div>
             </SettingsSection>
 
-            {/* Trust levels -------------------------------------------- */}
             <SettingsSection id="trust" title="Trust levels">
                 {repositories.length === 0 ? (
                     <p class="empty">No repositories registered.</p>
@@ -209,16 +546,13 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
                 )}
             </SettingsSection>
 
-            {/* Allowlist ----------------------------------------------- */}
             <SettingsSection id="allowlist" title="Repository allowlist">
                 <p class="settings-section__description">
                     One git repository path per line.
                 </p>
                 {(settings.allowlist ?? []).map((p, i) => (
                     <div class="field">
-                        <label for={`allowlist-${i}`}>
-                            Path {i + 1}
-                        </label>
+                        <label for={`allowlist-${i}`}>Path {i + 1}</label>
                         <input
                             type="text"
                             id={`allowlist-${i}`}
@@ -248,7 +582,6 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
                 </div>
             </SettingsSection>
 
-            {/* Notifications ------------------------------------------- */}
             <SettingsSection id="notifications" title="Notifications">
                 <div class="field">
                     <label for="slack-webhook">Slack webhook URL</label>
@@ -276,9 +609,7 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
                         type="email"
                         id="notify-email"
                         name="notifications.email.to"
-                        value={valueOrEmpty(
-                            settings.notifications?.email?.to,
-                        )}
+                        value={valueOrEmpty(settings.notifications?.email?.to)}
                         class={fieldClass(
                             "input",
                             fe,
@@ -300,3 +631,7 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
         </form>
     );
 };
+
+// Card / placeholder import keeps the symbol used so tree-shakers don't
+// drop the SettingsSection import paths during typecheck-only builds.
+export const _ensureCardImportUsed = Card;
