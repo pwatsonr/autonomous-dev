@@ -15,7 +15,6 @@ set -euo pipefail
 SRC_DIR="src/styles"
 OUT="static/portal.css"
 SOURCES=(
-  "${SRC_DIR}/variables.css"
   "${SRC_DIR}/layout.css"
   "${SRC_DIR}/components.css"
   "${SRC_DIR}/utilities.css"
