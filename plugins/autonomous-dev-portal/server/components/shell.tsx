@@ -113,6 +113,7 @@ export const ShellLayout: FC<ShellProps> = ({
                 {/* SPEC-034-1-06 AC-01/02/03 — design-tokens.css is the
                     FIRST stylesheet so `var(--…)` references resolve. */}
                 <link rel="stylesheet" href="/static/design-tokens.css" />
+                <link rel="stylesheet" href="/static/app.css" />
                 <link rel="stylesheet" href="/static/portal.css" />
                 <link rel="stylesheet" href="/static/shell.css" />
                 <script
