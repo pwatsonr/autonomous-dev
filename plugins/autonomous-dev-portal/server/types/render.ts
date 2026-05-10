@@ -143,6 +143,117 @@ export interface SettingsView {
     log_level: string;
 }
 
+// SPEC-036-4-01 — Settings tab IDs (single source of truth).
+// Server route handler, view, and tab-nav fragment all import this so a
+// typo cannot create drift (per PLAN-036-4 risk row 7).
+export const TAB_IDS = [
+    "general",
+    "variants",
+    "standards",
+    "backends",
+    "agents",
+] as const;
+
+export type TabId = (typeof TAB_IDS)[number];
+
+// SPEC-036-4-07 — Agent factory record + recent runs reference.
+export interface AgentRunRef {
+    id: string;
+    /** ISO-8601 timestamp. */
+    startedAt: string;
+    status: "success" | "failed" | "cancelled";
+    durationMs: number;
+    cost: number;
+}
+
+export interface AgentRecord {
+    name: string;
+    role: string;
+    state: "active" | "shadow" | "frozen";
+    /** Approval rate as a percentage 0..100. */
+    approvalPct: number;
+    /** Precision percentage 0..100. */
+    precisionPct: number;
+    /** Recall percentage 0..100. */
+    recallPct: number;
+    version: string;
+    /** ISO-8601 last-trained timestamp. */
+    lastTrainedAt: string;
+    /** Recent runs, capped to 5 by the loader (PLAN-036-4 risk row 6). */
+    recentRuns: AgentRunRef[];
+}
+
+// SPEC-036-4 — deploy backend record (Backends tab).
+export interface DeployBackend {
+    id: string;
+    label: string;
+    kind: string;
+    enabled: boolean;
+    health: "ok" | "warn" | "err" | "muted";
+}
+
+// SPEC-036-4-03 — per-repo trust override.
+export interface TrustOverride {
+    repo: string;
+    /** Trust level (`L0`/`L1`/`L2`/`L3`) or `inherit`. */
+    level: "L0" | "L1" | "L2" | "L3" | "inherit";
+    source: string;
+    immutable?: boolean;
+}
+
+// SPEC-036-4-04 — cost cap configuration.
+export interface CostCaps {
+    perRequest: number;
+    daily: number;
+    monthly: number;
+}
+
+// SPEC-036-4-05 — repo allowlist entry.
+export interface AllowlistEntry {
+    id: string;
+    path: string;
+    status: "ok" | "missing" | "not-a-repo";
+    /** ISO-8601 timestamp. */
+    addedAt: string;
+}
+
+// SPEC-036-4-06 — notifications config.
+export type NotifyDefault = "discord" | "slack" | "both" | "none";
+export type WebhookTestStatus = "ok" | "warn" | "err" | "muted";
+
+export interface NotificationsConfig {
+    discordWebhook: string;
+    slackWebhook: string;
+    discordStatus: WebhookTestStatus;
+    slackStatus: WebhookTestStatus;
+    notifyDefault: NotifyDefault;
+    dndEnabled: boolean;
+    /** `HH:MM` 24-hour format. */
+    dndStart: string;
+    dndEnd: string;
+}
+
+// SPEC-036-4-04 — current spend snapshot for informational display.
+export interface CurrentSpend {
+    today: number;
+    month: number;
+}
+
+// SPEC-036-4 — Settings page data model.
+export interface SettingsData {
+    activeTab: TabId;
+    trustLevel: "L0" | "L1" | "L2" | "L3";
+    trustOverrides: TrustOverride[];
+    allowlist: AllowlistEntry[];
+    costCaps: CostCaps;
+    currentSpend: CurrentSpend;
+    notifications: NotificationsConfig;
+    variants: PipelineVariant[];
+    standards: StandardRule[];
+    backends: DeployBackend[];
+    agents: AgentRecord[];
+}
+
 export interface CostPoint {
     label: string;
     value: number;
@@ -201,7 +312,7 @@ export interface RenderProps {
     dashboard: { data: DashboardData; aggregates: DashboardAggregatesProp };
     "request-detail": { request: RequestRecord };
     approvals: { items: ApprovalItem[] };
-    settings: { config: SettingsView };
+    settings: { config: SettingsView; data?: SettingsData };
     costs: { series: CostSeries };
     logs: { lines: LogLine[] };
     ops: { health: OpsHealth };
