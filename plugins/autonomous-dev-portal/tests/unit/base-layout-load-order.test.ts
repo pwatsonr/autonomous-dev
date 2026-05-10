@@ -14,13 +14,34 @@
 import { describe, expect, test } from "bun:test";
 
 import { renderFullPage } from "../../server/templates/index";
+import type { DashboardAggregatesProp } from "../../server/types/render";
+
+/**
+ * Empty aggregates baseline used by the load-order suite (the suite
+ * cares about <head> only, never the dashboard body). Kept here so
+ * SPEC-036-1-01's aggregate shape change doesn't ripple into every
+ * test that just needs *some* dashboard render.
+ */
+const EMPTY_AGGREGATES: DashboardAggregatesProp = {
+    totalActive: 0,
+    totalGates: 0,
+    totalMtd: 0,
+    gateBreakdownText: "0 reviewer / 0 standards / 0 cost",
+    totalBlockingHits: 0,
+    standardsCount: 0,
+    topGates: [],
+    standardsDrift: [],
+};
 
 /**
  * Helper: render the dashboard view via the same pipeline routes use.
  * Returns the full `<!doctype html>...</html>` string.
  */
 async function renderHomeHtml(): Promise<string> {
-    return renderFullPage("dashboard", { data: { repos: [] } });
+    return renderFullPage("dashboard", {
+        data: { repos: [] },
+        aggregates: EMPTY_AGGREGATES,
+    });
 }
 
 /** Returns the substring between `<head>` and `</head>` (inclusive of tags). */
@@ -94,7 +115,7 @@ describe("BaseLayout — SPEC-034-1-06 stylesheet & script load order", () => {
         const NONCE = "test-nonce-abc123";
         const html = await renderFullPage(
             "dashboard",
-            { data: { repos: [] } },
+            { data: { repos: [] }, aggregates: EMPTY_AGGREGATES },
             undefined,
             NONCE,
         );
