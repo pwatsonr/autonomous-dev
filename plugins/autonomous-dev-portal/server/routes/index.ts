@@ -20,6 +20,7 @@ import type { AuthRouteDeps } from "./auth";
 import { registerAuthRoutes } from "./auth";
 import { costsHandler } from "./costs";
 import { dashboardHandler } from "./dashboard";
+import { designSystemHandler } from "./design-system";
 import { healthHandler } from "./health";
 import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
@@ -66,5 +67,6 @@ export function registerRoutes(
     app.get("/logs", logsHandler);
     app.get("/ops", opsHandler);
     app.get("/audit", auditHandler);
+    app.get("/design-system", designSystemHandler);
     app.get("/health", healthHandler);
 }
