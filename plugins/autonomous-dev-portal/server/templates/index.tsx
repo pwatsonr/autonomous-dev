@@ -1,9 +1,12 @@
 // SPEC-013-3-02 §RenderPage — template dispatcher.
 // SPEC-034-2-05 — voice/copy sweep: dispatcher contains no user-facing
 // copy; included in the sweep for AC-01 file coverage.
+// SPEC-035-1-05 — wraps views in `<ShellLayout>` (replacing legacy
+// `<BaseLayout>`) and threads the `portal-theme` cookie value down so
+// the SSR `<html data-theme>` matches the client-side IIFE before paint.
 //
 // Maps a `ViewName` to its JSX view component and renders either the
-// full HTML document (wrapped in `<BaseLayout>`) or a fragment (the
+// full HTML document (wrapped in `<ShellLayout>`) or a fragment (the
 // view component's bare output). Page handlers in `server/routes/` call
 // `renderPage(c, view, props)` from `lib/response-utils`; this module
 // owns the `view -> component` mapping and `Promise<string>` resolution.
@@ -17,8 +20,10 @@
 
 import type { Context } from "hono";
 
+import type { Theme } from "../lib/theme";
+import { getThemeFromCookie } from "../lib/theme";
 import type { RenderProps, ViewName } from "../types/render";
-import { BaseLayout } from "./layout/base";
+import { ShellLayout } from "../components/shell";
 import { ApprovalsView } from "./views/approvals";
 import { AuditView } from "./views/audit";
 import { CostsView } from "./views/costs";
@@ -118,34 +123,44 @@ function activePathFor(view: ViewName): string {
 }
 
 /**
- * Full-page render: wraps the view in `<BaseLayout>` and returns the
+ * Full-page render: wraps the view in `<ShellLayout>` and returns the
  * complete `<!doctype html>...</html>` string suitable for `c.html(...)`.
+ *
+ * SPEC-035-1-05 — migrated from `BaseLayout` to `ShellLayout`. The
+ * server-rendered theme is supplied by the caller (route handler) via
+ * `getThemeFromCookie(c)` and threaded into the shell so the SSR HTML
+ * carries the same `data-theme` the client-side IIFE will apply,
+ * eliminating flash-of-unstyled-content on full-page reloads.
  *
  * @param view  the named view (matches a key in `RenderProps`)
  * @param props strictly-typed props for that view
- * @param activeOverride optional path override for `<Navigation>` (used
+ * @param activeOverride optional path override for the rail nav (used
  *   by `notFound` so the nav highlights the page the user attempted)
  * @param cspNonce SPEC-014-2-04 — per-request CSP nonce; threaded into
  *   every `<script>` tag in the layout. Defaults to empty string for
  *   callers without a request context (tests, error pre-render).
+ * @param theme  SPEC-035-1-05 — server-rendered theme cookie value.
+ *   Defaults to `"light"` when omitted (tests, error pre-render).
  */
 export async function renderFullPage<V extends ViewName>(
     view: V,
     props: RenderProps[V],
     activeOverride?: string,
     cspNonce: string = "",
+    theme: Theme = "light",
 ): Promise<string> {
     const body = renderViewBody(view, props);
     const layout = (
-        <BaseLayout
+        <ShellLayout
             activePath={activeOverride ?? activePathFor(view)}
             cspNonce={cspNonce}
+            theme={theme}
         >
             {body}
-        </BaseLayout>
+        </ShellLayout>
     );
     const inner = await resolveJsxToString(layout);
-    // BaseLayout's <html> root does not include a doctype on its own.
+    // ShellLayout's <html> root does not include a doctype on its own.
     return `<!doctype html>${inner}`;
 }
 
@@ -184,6 +199,7 @@ export async function renderViewToContext<V extends ViewName>(
               props,
               undefined,
               c.get("cspNonce") ?? "",
+              getThemeFromCookie(c),
           );
     // Cast to ContentfulStatusCode-compatible literal union.
     return c.html(

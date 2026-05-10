@@ -16,6 +16,7 @@
 import type { Context } from "hono";
 
 import { renderFragment, renderFullPage } from "../templates";
+import { getThemeFromCookie } from "./theme";
 import type { RenderProps, ViewName } from "../types/render";
 
 const HX_REQUEST = "HX-Request";
@@ -42,6 +43,11 @@ export function isHtmxRequest(c: Context): boolean {
  *
  * SPEC-014-2-04 — the per-request CSP nonce is read off the context and
  * threaded into the layout so every `<script>` tag carries it.
+ *
+ * SPEC-035-1-05 — the `portal-theme` cookie is read off the context via
+ * `getThemeFromCookie` and threaded into `ShellLayout` so the SSR
+ * `<html data-theme>` matches what the client-side IIFE would set,
+ * preventing flash-of-unstyled-content on full-page reloads.
  */
 export async function renderPage<V extends ViewName>(
     c: Context,
@@ -50,7 +56,13 @@ export async function renderPage<V extends ViewName>(
 ): Promise<Response> {
     const html = isHtmxRequest(c)
         ? await renderFragment(view, props)
-        : await renderFullPage(view, props, undefined, c.get("cspNonce") ?? "");
+        : await renderFullPage(
+              view,
+              props,
+              undefined,
+              c.get("cspNonce") ?? "",
+              getThemeFromCookie(c),
+          );
     return c.html(html, 200);
 }
 
@@ -59,11 +71,19 @@ export async function renderPage<V extends ViewName>(
  * handlers (e.g. request-detail when a stub is missing). Echoes the
  * requested path so users see what was missing without leaking any
  * server-side state.
+ *
+ * SPEC-035-1-05 — propagates the theme cookie like `renderPage`.
  */
 export async function notFound(c: Context): Promise<Response> {
     const props: RenderProps["404"] = { path: c.req.path };
     const html = isHtmxRequest(c)
         ? await renderFragment("404", props)
-        : await renderFullPage("404", props, undefined, c.get("cspNonce") ?? "");
+        : await renderFullPage(
+              "404",
+              props,
+              undefined,
+              c.get("cspNonce") ?? "",
+              getThemeFromCookie(c),
+          );
     return c.html(html, 404);
 }

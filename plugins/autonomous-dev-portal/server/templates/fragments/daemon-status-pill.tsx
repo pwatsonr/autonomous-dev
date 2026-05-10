@@ -32,6 +32,12 @@ function labelFor(state: string): string {
     return `Daemon: ${state.toUpperCase()}`;
 }
 
+/**
+ * @deprecated SPEC-035-1-05 — replaced by the daemon-status indicator in
+ *   `RailOpsBar` (`server/components/rail-ops-bar.tsx`). Removed in
+ *   TDD-018-C; replaced by ShellLayout / RailNav / RailOpsBar. Retained
+ *   transitionally as a fallback for the deprecated `Navigation`.
+ */
 export const DaemonStatusPill: FC<Props> = ({ status }) => {
     if (status === "unknown") {
         return (
