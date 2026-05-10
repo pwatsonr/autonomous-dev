@@ -7,7 +7,11 @@
 // HTMX-aware:
 //   - HX-Request: true → returns the standalone <ErrorDetails> fragment
 //     so an hx-target swap inserts a small piece in place of a full page.
-//   - non-HTMX → returns the full <BaseLayout> + <ErrorPage>.
+//   - non-HTMX → returns the full <ShellLayout> + <ErrorPage>.
+//
+// SPEC-035-1-05 — migrated from `BaseLayout` to `ShellLayout` and threads
+// the `portal-theme` cookie value via `getThemeFromCookie(c)` so error
+// pages render with the user's persisted theme.
 //
 // The 404 helper continues to live in `response-utils.ts` because it is
 // reused by individual route handlers (e.g. request-detail) before the
@@ -17,9 +21,10 @@ import type { Context } from "hono";
 
 import { ErrorDetails } from "../templates/fragments/error-details";
 import { ErrorPage } from "../templates/pages/error";
-import { BaseLayout } from "../templates/layout/base";
+import { ShellLayout } from "../components/shell";
 import { buildErrorContext } from "./error-context";
 import { isHtmxRequest } from "./response-utils";
+import { getThemeFromCookie } from "./theme";
 
 interface MaybeLogger {
     error: (obj: unknown, msg?: string) => void;
@@ -84,9 +89,13 @@ export async function serverError(err: Error, c: Context): Promise<Response> {
     }
 
     const page = await jsxToString(
-        <BaseLayout activePath="/" cspNonce={c.get("cspNonce") ?? ""}>
+        <ShellLayout
+            activePath="/"
+            cspNonce={c.get("cspNonce") ?? ""}
+            theme={getThemeFromCookie(c)}
+        >
             <ErrorPage {...ctx} />
-        </BaseLayout>,
+        </ShellLayout>,
     );
     return c.html(`<!doctype html>${page}`, ctx.statusCode);
 }

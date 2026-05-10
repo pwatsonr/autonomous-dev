@@ -29,6 +29,12 @@ const NAV_ITEMS: readonly NavItem[] = [
     { href: "/audit", label: "Audit" },
 ];
 
+/**
+ * @deprecated SPEC-035-1-05 — replaced by `RailNav`
+ *   (`server/components/rail-nav.tsx`). Removed in TDD-018-C; replaced
+ *   by ShellLayout / RailNav / RailOpsBar. Retained transitionally as a
+ *   fallback for the deprecated `BaseLayout`.
+ */
 export const Navigation: FC<{ activePath: string }> = ({ activePath }) => (
     <nav aria-label="Primary">
         <ul>

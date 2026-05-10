@@ -50,6 +50,12 @@ interface Props {
     children?: unknown;
 }
 
+/**
+ * @deprecated SPEC-035-1-05 — replaced by `ShellLayout`
+ *   (`server/components/shell.tsx`). Removed in TDD-018-C; replaced by
+ *   ShellLayout / RailNav / RailOpsBar. Retained transitionally as a
+ *   fallback so reverting the rollout is a one-line import swap.
+ */
 export const BaseLayout: FC<Props> = ({ activePath, cspNonce, children }) => (
     <html lang="en" data-theme="light">
         <head>
