@@ -126,6 +126,101 @@ export interface RequestRecord {
     repo: string;
     summary: string;
     phases: Phase[];
+    // SPEC-036-3-01..06 — Request Detail re-skin (PLAN-036-3). All optional
+    // for back-compat with the existing stub & 015-* consumers.
+    /** Active variant id (e.g. `"prd"`, `"code"`, `"deploy"`). */
+    variant?: string;
+    /** Pre-resolved variant label for display. */
+    variantLabel?: string;
+    /** Pipeline phase list in canonical order (variant-aware). */
+    pipelinePhases?: string[];
+    /** Currently-active phase name (must appear in `pipelinePhases`). */
+    currentPhase?: string;
+    /** Top-level lifecycle status — `"gate"` activates the gate-detail card. */
+    status?: "running" | "gate";
+    /** Active gate type when `status === "gate"`. */
+    gateType?: string;
+    /** Free-form gate description rendered in the gate detail card body. */
+    gateDetail?: string;
+    /** Minutes elapsed at the gate. */
+    waitedMin?: number;
+    /** Reviewer chain (review/code phases). */
+    reviewers?: RequestReviewer[];
+    /** Deploy stage when `currentPhase === "deploy"`. */
+    deployStage?: string;
+    /** Deploy target label (e.g. `"prod-cluster"`). */
+    deployTarget?: string;
+    /** SPEC-036-3-02 — persistent reading surface artifact. */
+    currentArtifact?: RequestArtifact;
+    /** SPEC-036-3-05 — past daemon iterations against this request. */
+    runs?: RequestRunRef[];
+}
+
+/**
+ * SPEC-036-3-04 §Reviewer chain detail — per-reviewer card content.
+ *
+ * `dimensions` are rubric scores rendered via the `Score` primitive; each
+ * dimension links to the reviewer agent run via the `runId` on the parent.
+ */
+export interface RequestReviewerDimension {
+    /** Rubric dimension label (e.g. `"correctness"`). */
+    name: string;
+    /** Score numerator. */
+    num: number;
+    /** Score denominator. */
+    den: number;
+    /** Pass threshold; tone-mapping is server-derived. */
+    threshold?: number;
+}
+
+export interface RequestReviewer {
+    /** Reviewer agent name (e.g. `"qa-edge-case-reviewer"`). */
+    name: string;
+    /** Agent semver (rendered `meta-mono`). */
+    version: string;
+    /** When `true` the reviewer is in a blocking state — finding lines
+     *  attached on this card will block the gate. */
+    blocking: boolean;
+    /** Free-form finding summary (one line). */
+    finding: string;
+    /** Reviewer agent run id; powers `/agents/{name}/runs/{runId}` links. */
+    runId: string;
+    /** Rubric dimensions — each rendered as a `Score` row. */
+    dimensions: RequestReviewerDimension[];
+}
+
+/**
+ * SPEC-036-3-02 §RequestArtifact — persistent inline reading surface.
+ *
+ * The artifact pane consumes this shape to render PRD/TDD prose (markdown),
+ * code diffs (per-line tinted `<pre>`), or plain text. Trust boundary: the
+ * daemon is authoritative for `content`; the renderer escapes diff/text
+ * branches and runs a minimal markdown subset for the prose branch.
+ */
+export interface RequestArtifact {
+    /** Phase name the artifact belongs to (uppercased in the section head). */
+    phase: string;
+    /** Render branch — drives format-aware rendering. */
+    format: "markdown" | "diff" | "text";
+    /** Daemon-authored artifact body. */
+    content: string;
+    /** Optional artifact identifier shown `meta-mono dim` next to the head. */
+    artifactId?: string;
+}
+
+/**
+ * SPEC-036-3-05 §RequestRunRef — past daemon iteration row in run-history.
+ */
+export interface RequestRunRef {
+    runId: string;
+    /** ISO-8601 UTC timestamp; rendered `meta-mono dim` verbatim. */
+    timestamp: string;
+    /** Phase the run executed (drives the phase chip). */
+    phase: string;
+    /** Run outcome → outcomeTone() picks the chip tone. */
+    outcome: "pass" | "fail" | "block";
+    /** Cost in USD. */
+    cost: number;
 }
 
 export interface ApprovalItem {
@@ -199,7 +294,7 @@ export interface DashboardAggregatesProp {
 
 export interface RenderProps {
     dashboard: { data: DashboardData; aggregates: DashboardAggregatesProp };
-    "request-detail": { request: RequestRecord };
+    "request-detail": { request: RequestRecord; csrfToken?: string };
     approvals: { items: ApprovalItem[] };
     settings: { config: SettingsView };
     costs: { series: CostSeries };
