@@ -148,9 +148,61 @@ export interface CostPoint {
     value: number;
 }
 
+// SPEC-036-2-01 §FR-9 — Costs surface extensions. All optional for back-compat.
+
+export interface PhaseSpend {
+    /** Lowercase phase name (matches `PhaseName`). */
+    phase: string;
+    /** Cost in USD. */
+    cost: number;
+    /** Percentage of total spend (0-100). */
+    pct: number;
+}
+
+export interface ReviewerSpend {
+    /** Reviewer agent name (e.g. "qa-edge-case"). */
+    name: string;
+    /** "generic" or "specialist" — drives chip tone. */
+    role: "generic" | "specialist";
+    /** Number of dispatches MTD. */
+    runs: number;
+    /** False-positive rate 0..1, or null when unknown. */
+    fpRate: number | null;
+    /** Cost in USD. */
+    cost: number;
+}
+
+export interface DeploySpend {
+    /** Environment label (prod, staging, dev, ...). */
+    env: string;
+    /** Backend tag (gcp, aws, k8s, github-pages, ...). */
+    backend: string;
+    /** Number of deploys MTD. */
+    deploys: number;
+    /** Last deploy time, free-form (e.g. "14:31", "2h ago"). */
+    lastDeploy: string;
+    /** Health tone: ok / warn / err / muted. */
+    health: "ok" | "warn" | "err";
+    /** Cost in USD. */
+    cost: number;
+}
+
 export interface CostSeries {
     points: CostPoint[];
     budgetUsd: number;
+    // SPEC-036-2-01 §FR-9 extensions.
+    /** Per-phase spend rows for the "Spend by phase" table. */
+    phaseSpend?: PhaseSpend[];
+    /** Per-reviewer spend rows. */
+    reviewerSpend?: ReviewerSpend[];
+    /** Per-(env,backend) deploy spend rows. */
+    deploySpend?: DeploySpend[];
+    /** MTD total cost in USD. */
+    totalMtd?: number;
+    /** Number of requests MTD (denominator for avg/request KPI). */
+    requestCount?: number;
+    /** Monthly cost cap in USD (denominator for ring + KPI sub-line). */
+    costCap?: number;
 }
 
 export interface LogLine {
@@ -159,9 +211,106 @@ export interface LogLine {
     message: string;
 }
 
+// SPEC-036-2-04 §FR-9 — Ops surface extensions. All optional for back-compat.
+
+export interface McpServer {
+    /** Server name (filesystem, github, prometheus, ...). */
+    name: string;
+    /** Health tone. */
+    status: "ok" | "warn" | "err";
+    /** Free-form latency / state detail (e.g. "12ms", "retry 1/3"). */
+    detail: string;
+}
+
+export interface PluginChainCategory {
+    /** Display label (CORE, REVIEWERS, VARIANTS, DEPLOY, ORG). */
+    name: string;
+    /** Optional accent — `core` or `org` get a tinted chrome on the chip. */
+    accent?: "core" | "org";
+    /** Package@version strings; may be empty (renders header only). */
+    packages: string[];
+}
+
+export interface LogEntry {
+    /** ISO8601 or short-format ts (e.g. "14:32:04Z"). Rendered as-is. */
+    ts: string;
+    /** INFO / WARN / ERROR / DEBUG / TRACE. DEBUG/TRACE are filtered out. */
+    level: string;
+    /** Message text. Phase/deploy/agent markers handled by the fragment. */
+    message: string;
+}
+
+export interface DeployEvent {
+    /** Time label ("14:31", "2d ago", ...). */
+    time: string;
+    /** Backend tag. */
+    backend: string;
+    /** Environment. */
+    env: string;
+    /** Status tone. */
+    status: "ok" | "warn" | "err";
+    /** Display text ("ok", "degraded", "rolled back"). */
+    statusLabel: string;
+}
+
+export interface StandardsChange {
+    /** Time label ("2h ago"). */
+    time: string;
+    /** Body text — fragment renders this verbatim with sentence case. */
+    text: string;
+}
+
+export interface HeartbeatSample {
+    /** ISO timestamp or 5-minute-bucket label. */
+    ts: string;
+    /** Bar height encoder. */
+    latencyMs: number;
+    /** Sample tone. */
+    status: "ok" | "slow" | "miss";
+}
+
+export interface CircuitBreakerState {
+    /** "closed" (healthy), "open" (tripped), "half-open" (probing). */
+    state: "closed" | "open" | "half-open";
+    /** Number of failures observed in the current window. */
+    failureCount: number;
+    /** ISO timestamp of the most recent state change. */
+    changedAt: string | null;
+}
+
+export interface KillSwitchState {
+    engaged: boolean;
+    armed: boolean;
+    /** Server-minted ISO arm timestamp. */
+    armedAt?: string;
+}
+
 export interface OpsHealth {
     daemon: { status: string; pid: number | null };
     components: Record<string, string>;
+    // SPEC-036-2-04 §FR-9 / SPEC-036-2-05 / SPEC-036-2-06 extensions.
+    /** MCP server health rows. */
+    mcpServers?: McpServer[];
+    /** Plugin chain visualization categories (5 columns). */
+    pluginChain?: PluginChainCategory[];
+    /** Recent log entries (last 50, server-trimmed; INFO/WARN/ERROR only). */
+    recentLog?: LogEntry[];
+    /** Deploy events for the right-hand column table. */
+    deployEvents?: DeployEvent[];
+    /** Recent standards changes feed. */
+    standardsChanges?: StandardsChange[];
+    /** Total standards rules in catalog (for KPI strip). */
+    standardsCount?: number;
+    /** Subset of `standardsCount` flagged as immutable. */
+    immutableCount?: number;
+    /** 24-hour heartbeat samples (5-minute buckets, max 288). */
+    heartbeat?: HeartbeatSample[];
+    /** Circuit breaker state for the daemon control plane. */
+    circuitBreaker?: CircuitBreakerState;
+    /** Kill switch idle/armed/engaged state. */
+    killSwitch?: KillSwitchState;
+    /** Daemon uptime label ("4d 12h"). */
+    uptime?: string;
 }
 
 export interface AuditRow {
@@ -202,9 +351,17 @@ export interface RenderProps {
     "request-detail": { request: RequestRecord };
     approvals: { items: ApprovalItem[] };
     settings: { config: SettingsView };
-    costs: { series: CostSeries };
+    costs: {
+        series: CostSeries;
+        /** SPEC-036-2-03 — pre-computed by the route handler. */
+        projection?: import("../lib/costs-projection").ProjectionResult;
+    };
     logs: { lines: LogLine[] };
-    ops: { health: OpsHealth };
+    ops: {
+        health: OpsHealth;
+        /** SPEC-014-2-04 — per-request CSRF token threaded through to KillSwitch. */
+        csrfToken?: string;
+    };
     /** SPEC-015-4-02 — `rows` is the legacy stub shape, `page`/`filters`
      *  is the live HMAC-chained log; AuditView prefers `page` when set. */
     audit: {

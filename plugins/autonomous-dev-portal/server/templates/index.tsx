@@ -60,8 +60,15 @@ function renderViewBody<V extends ViewName>(
             return (
                 <SettingsView {...(props as RenderProps["settings"])} />
             );
-        case "costs":
-            return <CostsView {...(props as RenderProps["costs"])} />;
+        case "costs": {
+            const cp = props as RenderProps["costs"];
+            return (
+                <CostsView
+                    series={cp.series}
+                    projection={cp.projection}
+                />
+            );
+        }
         case "logs":
             return <LogsView {...(props as RenderProps["logs"])} />;
         case "ops":
