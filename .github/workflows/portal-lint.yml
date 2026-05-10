@@ -1,0 +1,143 @@
+# ============================================================
+# Portal lint gate — SPEC-034-2-04 (CI integration / merge-blocking).
+# ============================================================
+# Runs the four portal lint checks on PRs that touch portal CSS,
+# styles, or templates. Each check is its own job so failures are
+# individually attributable in the GitHub UI (AC-03 of SPEC-034-2-04).
+#
+# Merge-blocking jobs:
+#   - lint-css-tokens          (SPEC-034-2-01, TDD-034 §5.8 / M-01)
+#   - lint-box-shadow          (SPEC-034-2-03, TDD-034 §5.5 / R-15a)
+#   - lint-no-emoji            (SPEC-034-2-02, TDD-034 §5.6 rule 2 / M-05)
+#   - phase-contrast-a-and-c   (PRD-018 M-02 part A + M-06 parity)
+#
+# Advisory (continue-on-error) jobs:
+#   - phase-contrast-peer-chip (PRD-018 M-02 part B / OI-3403)
+#       Currently fails 14/14 against the design palette. The orchestrator
+#       has deferred enforcement pending a design-system decision (see the
+#       open-issue note below). Suggest opening a tracking issue titled
+#       "OI-3403: Adjust peer-chip palette to satisfy >=3:1 adjacent pairs"
+#       and link it from this workflow when filed.
+#
+# Branch protection: an admin must mark the four merge-blocking jobs as
+# required status checks for `main` in repo settings (per SPEC-034-2-04
+# AC-04). The advisory job MUST NOT be added to required checks.
+# ============================================================
+
+name: portal-lint
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/autonomous-dev-portal/server/static/**/*.css'
+      - 'plugins/autonomous-dev-portal/src/styles/**'
+      - 'plugins/autonomous-dev-portal/server/templates/**'
+      - 'plugins/autonomous-dev-portal/scripts/lint-css-tokens.sh'
+      - 'plugins/autonomous-dev-portal/scripts/lint-no-emoji.sh'
+      - 'plugins/autonomous-dev-portal/scripts/lint-box-shadow.sh'
+      - 'plugins/autonomous-dev-portal/scripts/check-phase-contrast.ts'
+      - '.github/workflows/portal-lint.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-css-tokens:
+    name: Lint CSS tokens (no hex / font / px literals)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run lint-css-tokens.sh
+        run: bash plugins/autonomous-dev-portal/scripts/lint-css-tokens.sh
+
+  lint-box-shadow:
+    name: Lint box-shadow tokenization
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run lint-box-shadow.sh
+        run: bash plugins/autonomous-dev-portal/scripts/lint-box-shadow.sh
+
+  lint-no-emoji:
+    name: Lint templates (no Unicode emoji)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run lint-no-emoji.sh
+        run: bash plugins/autonomous-dev-portal/scripts/lint-no-emoji.sh
+
+  phase-contrast-a-and-c:
+    name: Phase contrast — Part A (WCAG) + Part C (parity)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Run check-phase-contrast.ts (skip Part B)
+        # Part B (peer-chip pair contrast) is advisory in CI today; see the
+        # phase-contrast-peer-chip job below and the open-issue note in this
+        # workflow's header. Parts A and C remain merge-blocking.
+        run: bun run plugins/autonomous-dev-portal/scripts/check-phase-contrast.ts --skip-peer-chip
+
+  phase-contrast-peer-chip:
+    name: Phase contrast — Part B (peer-chip, ADVISORY)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # ----------------------------------------------------------------
+    # ADVISORY ONLY — DO NOT mark as a required status check.
+    #
+    # Open issue: peer-chip adjacent-pair contrast (>=3:1) currently fails
+    # 14/14 against the design palette in design-tokens.css. The failure
+    # is a known design-system issue, not a code regression — fixing it
+    # requires updating the --phase-* color tokens, which is outside the
+    # scope of SPEC-034-2-04. The orchestrator has deferred enforcement
+    # pending that design decision.
+    #
+    # Suggested tracking issue (file separately, not from this PR):
+    #   Title:  "OI-3403: Adjust peer-chip palette to satisfy >=3:1 adjacent pairs"
+    #   Refs:   PRD-018 M-02 (part B), TDD-034 §5.10, SPEC-034-2-04
+    #   Action: when palette is fixed, remove `continue-on-error: true`
+    #           below and the `--skip-peer-chip` flag in the merge-blocking
+    #           job above, then add this job to required status checks.
+    # ----------------------------------------------------------------
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Run check-phase-contrast.ts (full — Part B will fail today)
+        run: bun run plugins/autonomous-dev-portal/scripts/check-phase-contrast.ts
