@@ -38,6 +38,8 @@
 import type { FC } from "hono/jsx";
 
 import type { Theme } from "../lib/theme";
+import { RailNav } from "./rail-nav";
+import { BrandWordmark } from "./brand-wordmark";
 
 /**
  * SPEC-034-1-06 — FOUC-prevention IIFE.
@@ -73,6 +75,14 @@ export interface ShellProps {
     pageTitle?: string;
     /** Optional `<div class="head-actions">` content (buttons, links, etc.). */
     headActions?: unknown;
+    /** Pending-approval count badge for the RailNav Approvals item. */
+    approvalsCount?: number;
+    /** Daemon status pill in the RailOpsBar. */
+    daemonStatus?: "running" | "stale" | "down" | "unknown";
+    /** Whether the kill-switch is currently engaged. */
+    killSwitchEngaged?: boolean;
+    /** MTD spend value rendered in the RailOpsBar (USD, 2 decimals). */
+    mtdSpend?: number;
 }
 
 /**
@@ -91,6 +101,10 @@ export const ShellLayout: FC<ShellProps> = ({
     pageTitle,
     headActions,
     children,
+    approvalsCount,
+    daemonStatus = "unknown",
+    killSwitchEngaged = false,
+    mtdSpend,
 }) => {
     const resolvedTheme: Theme = theme === "dark" ? "dark" : "light";
     const nonce = cspNonce ?? "";
@@ -130,10 +144,45 @@ export const ShellLayout: FC<ShellProps> = ({
             <body>
                 <div class="app">
                     <aside class="rail" data-active-path={activePath}>
-                        {/* SPEC-035-1-02/03/04 will mount RailNav,
-                            RailOpsBar, BrandWordmark here. The wrapper
-                            <aside> is rendered now so the grid column
-                            is reserved and the shell CSS is exercised. */}
+                        <div class="rail-brand">
+                            <BrandWordmark theme={resolvedTheme} />
+                        </div>
+                        <RailNav
+                            activePath={activePath}
+                            approvalsCount={approvalsCount}
+                        />
+                        <div class="rail-ops">
+                            <div class="rail-ops-row">
+                                <span
+                                    class={`dot ${daemonStatus === "running" ? "live" : daemonStatus === "stale" ? "warn" : daemonStatus === "down" ? "err" : "muted"}`}
+                                ></span>
+                                <span class="rail-ops-label">
+                                    {daemonStatus === "running"
+                                        ? "Daemon running"
+                                        : daemonStatus === "stale"
+                                          ? "Daemon stale"
+                                          : daemonStatus === "down"
+                                            ? "Daemon down"
+                                            : "Daemon unknown"}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                class={`kbtn ${killSwitchEngaged ? "engaged" : ""}`}
+                                hx-get="/ops/kill-switch-modal?step=arm"
+                                hx-target="#modal-slot"
+                                hx-swap="innerHTML"
+                            >
+                                {killSwitchEngaged
+                                    ? "Kill switch ENGAGED"
+                                    : "Kill switch"}
+                            </button>
+                            {mtdSpend !== undefined ? (
+                                <div class="rail-ops-mtd meta-mono">
+                                    ${mtdSpend.toFixed(2)} MTD
+                                </div>
+                            ) : null}
+                        </div>
                     </aside>
                     <main class="main">
                         {pageTitle !== undefined || headActions !== undefined ? (

@@ -22,6 +22,7 @@ import { costsHandler } from "./costs";
 import { dashboardHandler } from "./dashboard";
 import { designSystemHandler } from "./design-system";
 import { healthHandler } from "./health";
+import { buildKillSwitchRoutes } from "./kill-switch";
 import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
 import { requestDetailHandler } from "./request-detail";
@@ -69,4 +70,7 @@ export function registerRoutes(
     app.get("/audit", auditHandler);
     app.get("/design-system", designSystemHandler);
     app.get("/health", healthHandler);
+
+    // SPEC-035-3 — kill-switch sub-router (mounts /ops/kill-switch* paths).
+    app.route("/", buildKillSwitchRoutes());
 }

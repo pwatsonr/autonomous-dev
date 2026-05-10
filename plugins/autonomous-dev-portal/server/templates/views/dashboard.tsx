@@ -61,8 +61,17 @@ export interface DashboardAggregates {
  */
 export const DashboardHeadActions: FC = () => (
     <>
-        <Btn>Refresh</Btn>
-        <Btn kind="primary">+ New request</Btn>
+        <a href="/" class="btn">
+            Refresh
+        </a>
+        <a
+            href="https://github.com/pwatsonr/autonomous-dev#submitting-a-request"
+            class="btn primary"
+            target="_blank"
+            rel="noopener"
+        >
+            + New request
+        </a>
     </>
 );
 
