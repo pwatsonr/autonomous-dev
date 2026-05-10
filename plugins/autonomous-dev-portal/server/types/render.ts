@@ -32,10 +32,85 @@ export interface RepoSummary {
     lastActivity: string; // ISO8601
     monthlyCostUsd: number;
     attentionCount: number;
+    // SPEC-036-1-06 §RepoSummary extensions — all optional for back-compat.
+    /** Trust level (`L0`/`L1`/`L2`/`L3`); rendered in mono in the top row. */
+    trust?: string;
+    /** Active phase name; drives the 4px phase-colored left bar (R-12). */
+    phase?: string;
+    /** Variant id (raw); fragments use `variantLabel` for display. */
+    variant?: string;
+    /** Pre-resolved variant label for display; eliminates client lookup. */
+    variantLabel?: string;
+    /** Backend tag (e.g. `python`, `node`); rendered as info-tone chip. */
+    backend?: string;
+    /** Stack tag (e.g. `react`, `cli`); rendered as muted-tone chip. */
+    stack?: string;
+    /** Number of pending gates against this repo (drives footer warn chip). */
+    gateCount?: number;
+    /** When `true`, the repo card uses warn-line treatment instead of phase
+     *  left bar. SPEC-036-1-03 AC #2. */
+    attn?: boolean;
+}
+
+// SPEC-036-1-06 §New types ---------------------------------------------------
+
+export interface DashboardRequest {
+    id: string;
+    repo: string;
+    title: string;
+    phase: string;
+    status: "running" | "gate";
+    cost: number;
+    turns: number;
+    score: number;
+    variant: string;
+    gateType?: string;
+    stack?: string;
+    /** Pre-resolved variant label for display; eliminates client-side lookup. */
+    variantLabel?: string;
+    /** Minutes spent waiting at a gate (when status === 'gate'). */
+    waitedMin?: number;
+}
+
+export interface StandardsHit {
+    ruleId: string;
+    severity: "blocking" | "warn" | "advisory";
+    hits: number;
+}
+
+export interface StandardsDriftEntry {
+    repo: string;
+    hitCount: number;
+    severityMax: "blocking" | "warn" | "advisory";
+    hits: StandardsHit[];
+}
+
+export interface StandardRule {
+    id: string;
+    severity: "blocking" | "warn" | "advisory";
+    desc: string;
+    /** Repo-name predicate string (e.g. `"*"` or `"acme,beta"`). */
+    applies: string;
+    source: string;
+    immutable: boolean;
+    hits: number;
+}
+
+export interface PipelineVariant {
+    id: string;
+    label: string;
+    desc: string;
+    phases: string[];
+    reviewers?: Record<string, string[]>;
 }
 
 export interface DashboardData {
     repos: RepoSummary[];
+    // SPEC-036-1-06 §DashboardData extensions — all optional for back-compat.
+    requests?: DashboardRequest[];
+    standards?: StandardRule[];
+    variants?: PipelineVariant[];
+    standardsDrift?: StandardsDriftEntry[];
 }
 
 export interface Phase {
@@ -105,8 +180,25 @@ export type AuditFiltersProp = import("./audit-types").AuditFilters;
 
 // ---- RenderProps union -----------------------------------------------------
 
+/**
+ * SPEC-036-1-01 — server-side Dashboard aggregates passed to the view.
+ * Mirrors `DashboardAggregates` in `templates/views/dashboard.tsx`,
+ * declared here as well so route handlers can construct the props
+ * object without importing from `templates/`.
+ */
+export interface DashboardAggregatesProp {
+    totalActive: number;
+    totalGates: number;
+    totalMtd: number;
+    gateBreakdownText: string;
+    totalBlockingHits: number;
+    standardsCount: number;
+    topGates: DashboardRequest[];
+    standardsDrift: StandardsDriftEntry[];
+}
+
 export interface RenderProps {
-    dashboard: { data: DashboardData };
+    dashboard: { data: DashboardData; aggregates: DashboardAggregatesProp };
     "request-detail": { request: RequestRecord };
     approvals: { items: ApprovalItem[] };
     settings: { config: SettingsView };
