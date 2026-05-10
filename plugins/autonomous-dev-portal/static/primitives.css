@@ -1,0 +1,315 @@
+/* SPEC-035-2-07 — Primitive class styles (TDD §6.5 / §15 inventory).
+   ============================================================
+   Styles for Btn, Chip, Phase Chip, Dot (+ pulse), Score, Ring,
+   Card. Plus the `.tbl` table contract from SPEC-035-2-06.
+   Loaded after design-tokens.css and before any page CSS.
+
+   Invariants:
+     - All colors via tokens (no raw hex outside the documented
+       pulse-keyframe ripple, which uses spec rgba values per R-15).
+     - No `box-shadow:` outside the documented R-15a inset-bar
+       exemptions (table active-row, focus-visible) and the dot.live
+       ripple keyframe.
+     - All transitions use motion tokens (`--dur-fast`, `--ease-std`).
+     - Card has no shadow (R-15a) — chrome is the 1px border + 3px
+       radius only.
+   ============================================================ */
+
+/* === Buttons (R-09) ============================================= */
+/* Four-state matrix per primary/secondary/ghost/destructive:
+   default / hover / active / focus-visible. Disabled is global. */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    font: 500 13px/1 var(--font-sans);
+    background: var(--bg-1);
+    color: var(--fg-0);
+    border: 1px solid var(--line-2);
+    border-radius: 3px;
+    cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease-std),
+        border-color var(--dur-fast) var(--ease-std);
+}
+
+.btn.sm {
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+}
+
+.btn:hover {
+    background: var(--bg-2);
+}
+
+.btn:active {
+    background: var(--bg-3);
+}
+
+.btn.primary {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+}
+
+.btn.primary:hover {
+    background: var(--brand-hover);
+}
+
+.btn.primary:active {
+    background: var(--brand-press);
+}
+
+.btn.ghost {
+    background: transparent;
+    border-color: transparent;
+}
+
+.btn.ghost:hover {
+    background: var(--bg-2);
+}
+
+.btn.destructive {
+    background: var(--bg-1);
+    border-color: var(--err-line);
+    color: var(--err);
+}
+
+.btn.destructive:hover {
+    background: var(--err-tint);
+}
+
+.btn.destructive:active {
+    background: var(--err-tint);
+    border-color: var(--err);
+}
+
+.btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Focus-visible affordance (NG-07 / R-09): 2px brand outline with
+   2px gap. Applies to every interactive primitive. */
+.btn:focus-visible,
+.chip[tabindex]:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
+
+/* === Chips (R-10) =============================================== */
+/* Pill-shaped tone badges. Status variant = caller-supplied label;
+   tone-tinted background + matching foreground color. */
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 18px;
+    padding: 0 8px;
+    border-radius: 999px;
+    font: 700 11px/1 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--bg-2);
+    color: var(--fg-1);
+}
+
+.chip.ok    { background: var(--ok-tint);    color: var(--ok); }
+.chip.warn  { background: var(--warn-tint);  color: var(--warn); }
+.chip.err   { background: var(--err-tint);   color: var(--err); }
+.chip.info  { background: var(--info-tint);  color: var(--info); }
+.chip.muted { background: var(--muted-tint); color: var(--muted); }
+.chip.brand { background: var(--brand-tint); color: var(--brand); }
+
+/* === Phase Chips (R-10, R-11) =================================== */
+/* Same pill shape as `.chip`, plus 18px left padding to make room
+   for the 6px dot rendered via `::before`. The dot color is
+   currentColor — it inherits the chip's tone, so the eight phase
+   selectors below need only set `background` + `color`. */
+
+.chip-phase {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 18px;
+    padding: 0 8px 0 18px;
+    border-radius: 999px;
+    font: 700 11px/1 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--bg-2);
+    color: var(--fg-1);
+}
+
+.chip-phase::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.chip-phase.prd     { background: color-mix(in srgb, var(--phase-prd) 15%, var(--bg-1));     color: var(--phase-prd); }
+.chip-phase.tdd     { background: color-mix(in srgb, var(--phase-tdd) 15%, var(--bg-1));     color: var(--phase-tdd); }
+.chip-phase.plan    { background: color-mix(in srgb, var(--phase-plan) 15%, var(--bg-1));    color: var(--phase-plan); }
+.chip-phase.spec    { background: color-mix(in srgb, var(--phase-spec) 15%, var(--bg-1));    color: var(--phase-spec); }
+.chip-phase.code    { background: color-mix(in srgb, var(--phase-code) 15%, var(--bg-1));    color: var(--phase-code); }
+.chip-phase.review  { background: color-mix(in srgb, var(--phase-review) 15%, var(--bg-1));  color: var(--phase-review); }
+.chip-phase.deploy  { background: color-mix(in srgb, var(--phase-deploy) 15%, var(--bg-1));  color: var(--phase-deploy); }
+.chip-phase.observe { background: color-mix(in srgb, var(--phase-observe) 15%, var(--bg-1)); color: var(--phase-observe); }
+
+/* === Dots + pulse (R-15) ======================================== */
+/* `.dot` and `@keyframes pulse` are also defined in design-tokens.css
+   (vendored from the design system); these rules are redeclared here
+   so primitives.css is self-sufficient when consumed in isolation
+   (e.g. design-system showcase page). The two definitions are
+   intentionally identical. */
+
+.dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+}
+
+.dot.ok    { background: var(--ok); }
+.dot.warn  { background: var(--warn); }
+.dot.err   { background: var(--err); }
+.dot.info  { background: var(--info); }
+.dot.muted { background: var(--muted); }
+
+/* `.dot.live` — canonical pulsing state indicator (R-15). The
+   ripple uses spec rgba values from the design system; documented
+   exemption from the no-raw-hex rule. */
+.dot.live {
+    background: var(--ok);
+    animation: pulse 1.6s var(--ease-std) infinite;
+}
+
+@keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(47, 122, 62, 0.45); }
+    70%  { box-shadow: 0 0 0 6px rgba(47, 122, 62, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(47, 122, 62, 0); }
+}
+
+/* === Score ====================================================== */
+/* Inline 0..100 bar. Width + fill color are inline-styled by the
+   JSX (because both depend on the `value` prop); the rest of the
+   chrome lives here. */
+
+.score-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.score-track {
+    display: inline-block;
+    width: 80px;
+    height: 4px;
+    background: var(--bg-3);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.score-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.score-num {
+    font: 700 12px/1 var(--font-mono);
+    color: var(--fg-0);
+}
+
+.score-label {
+    font: 500 10px/1 var(--font-mono);
+    color: var(--fg-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* === Ring ======================================================= */
+/* `.ring` carries no special styling — sizing is on the SVG element
+   itself. Reserved selector for future hooks (e.g. tooltip, focus). */
+
+.ring {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* === Card (R-12, R-15a) ========================================= */
+/* 1px border, 3px radius, NO box-shadow (R-15a). The optional 4px
+   left bar is inline-styled by the JSX. */
+
+.card {
+    background: var(--bg-1);
+    border: 1px solid var(--line-1);
+    border-radius: 3px;
+}
+
+.card-h {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line-1);
+    font: 600 14px/1.2 var(--font-sans);
+    color: var(--fg-0);
+}
+
+.card-b {
+    padding: 16px;
+}
+
+/* === Tables (SPEC-035-2-06 / R-14) ============================== */
+/* Horizontal hairlines only. No zebra. No outer card frame. */
+
+.tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.tbl th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-1);
+    text-align: left;
+    padding: 10px 12px;
+    font: 700 10px/1 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+    border-bottom: 1px solid var(--line-2);
+}
+
+.tbl td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line-1);
+}
+
+.tbl tr:hover td {
+    background: var(--bg-2);
+}
+
+/* Active-row marker (R-14): 2px brand bar via inset box-shadow.
+   R-15a exemption: inset-bar pattern; CI lint whitelist. */
+.tbl tr.active td:first-child {
+    box-shadow: inset 2px 0 0 var(--brand);
+}
+
+/* Cell modifiers (TDD §15 inventory). */
+.tbl td.mono  { font-family: var(--font-mono); }
+.tbl td.num   { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl td.title { font-weight: 600; }
