@@ -72,3 +72,109 @@
     align-items: center;
     gap: var(--s-2);
 }
+
+/* ============================================================
+   SPEC-035-1-03 — RailOpsBar
+   ============================================================
+   Fixed-bottom block inside `.rail`. The parent rail is a flex
+   column; `margin-top: auto` here pushes this block to the
+   floor. A single hairline border-top separates it from the
+   nav above. Token-only colors (R-15a). */
+.rail-ops {
+    margin-top: auto;
+    border-top: 1px solid var(--line-1);
+    padding: var(--s-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+
+/* One row inside the ops bar: dot + label + right-aligned value.
+   `min-width: 0` allows the right-aligned value to truncate without
+   pushing the dot out of view if a label runs long. */
+.rail-ops .line {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font-size: var(--t-meta);
+    color: var(--fg-1);
+    min-width: 0;
+}
+
+.rail-ops .line .lbl {
+    flex: 1 1 auto;
+    color: var(--fg-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Right-aligned value cell. Uses the mono stack so digits line up
+   (tabular-nums) — important for the MTD spend column. */
+.rail-ops .line .v {
+    flex: 0 0 auto;
+    color: var(--fg-0);
+    font-family: var(--font-mono);
+    font-size: var(--t-mono-meta);
+    font-variant-numeric: tabular-nums;
+}
+
+/* `dot muted` uses the muted neutral; not present in portal.css's
+   default dot palette so we declare it here scoped to the rail-ops
+   context to avoid leaking into other regions. */
+.rail-ops .dot.muted { background: var(--muted); }
+.rail-ops .dot.ok    { background: var(--ok); }
+
+/* Kill-switch button. Distinct red-line treatment because this is a
+   destructive global action (R-13). The non-engaged state is a hollow
+   red-bordered button; engaging the switch fills it with `--err-tint`
+   so operators see immediately at a glance that the system is armed. */
+.kbtn {
+    margin-top: var(--s-1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid var(--err-line);
+    border-radius: var(--r-2);
+    background: transparent;
+    color: var(--err);
+    font-family: var(--font-mono);
+    font-size: var(--t-mono-meta);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-std),
+                color var(--dur-fast) var(--ease-std);
+}
+
+.kbtn:hover {
+    background: var(--err-tint);
+}
+
+.kbtn:focus-visible {
+    outline: 2px solid var(--err);
+    outline-offset: 1px;
+}
+
+/* Engaged state: the switch has been armed. Use the err-tint fill so
+   the button reads as "active / armed" rather than "available". */
+.kbtn.engaged,
+.kbtn[aria-disabled="true"] {
+    background: var(--err-tint);
+    color: var(--err);
+    cursor: default;
+}
+
+.kbtn-icon {
+    display: inline-flex;
+    align-items: center;
+    line-height: 0;
+}
+
+.kbtn-icon svg {
+    stroke: currentColor;
+}
+
