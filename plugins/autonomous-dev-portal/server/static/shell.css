@@ -72,3 +72,84 @@
     align-items: center;
     gap: var(--s-2);
 }
+
+/* === RailNav (SPEC-035-1-02 / TDD-035 SS 6.2) =========================
+   Section navigation rendered inside `<aside class="rail">`. Two groups
+   (Operate / System) separated by a small spacer; active item carries an
+   inset brand-bar accent on the leading edge. R-15a permits the inset
+   shadow as a brand accent only — no drop shadows here. */
+.rail-nav {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: var(--s-1);
+    padding: var(--s-2) 0;
+}
+
+.rail-nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+/* Visual gap between the Operate and System groups. */
+.rail-nav-group + .rail-nav-group {
+    margin-top: var(--s-3);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--line-1);
+}
+
+/* Each nav anchor: icon + label + optional count badge. The leading 2px
+   transparent box-shadow reserves the accent slot so the active state
+   does not reflow neighbours. */
+.rail-nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 7px 10px;
+    border-radius: 3px;
+    font-size: 13px;
+    color: var(--fg-1);
+    text-decoration: none;
+    box-shadow: inset 2px 0 0 transparent;
+}
+
+.rail-nav-item:hover {
+    background: var(--bg-2);
+    color: var(--fg-0);
+}
+
+.rail-nav-item.active {
+    background: var(--bg-2);
+    color: var(--fg-0);
+    box-shadow: inset 2px 0 0 var(--brand);
+}
+
+/* Icon slot — 14px square placeholder. SPEC-035-1-02 leaves icon assets
+   to a follow-up; the slot reserves space so labels align across rows. */
+.rail-nav-item .ic {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.rail-nav-item .label {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Pending-count badge, rendered only on the Approvals anchor when
+   `approvalsCount > 0`. */
+.rail-nav-item .count {
+    display: inline-block;
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: var(--brand);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+}
