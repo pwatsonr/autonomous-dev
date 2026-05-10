@@ -1,4 +1,6 @@
 // SPEC-013-3-03 §Fragment Components — RequestTimeline.
+// SPEC-034-2-05 §Voice/copy sweep — phase timestamps render compact ISO;
+// agent identifiers render in mono.
 //
 // Vertical phase timeline. Status icon is conveyed via CSS class only
 // (no inline SVG/glyphs — CSS owns the visual). Each entry includes a
@@ -15,6 +17,12 @@ interface Props {
     phases: Phase[];
 }
 
+function formatTimestampCompact(iso: string): string {
+    const ts = Date.parse(iso);
+    if (Number.isNaN(ts)) return iso;
+    return new Date(ts).toISOString().replace("T", " ").slice(0, 19) + "Z";
+}
+
 export const RequestTimeline: FC<Props> = ({ requestId, phases }) => (
     <ol class="request-timeline">
         {phases.map((phase) => (
@@ -25,10 +33,12 @@ export const RequestTimeline: FC<Props> = ({ requestId, phases }) => (
                 <div class="entry-body">
                     <h3>{phase.name}</h3>
                     {phase.timestamp !== null ? (
-                        <time datetime={phase.timestamp}>{phase.timestamp}</time>
+                        <time datetime={phase.timestamp} class="mono">
+                            {formatTimestampCompact(phase.timestamp)}
+                        </time>
                     ) : null}
                     {phase.agent !== null ? (
-                        <span class="agent">{phase.agent}</span>
+                        <code class="agent">{phase.agent}</code>
                     ) : null}
                     {phase.detail !== null ? (
                         <details>

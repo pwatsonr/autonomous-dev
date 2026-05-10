@@ -1,4 +1,6 @@
 // SPEC-013-3-02 §RenderPage — template dispatcher.
+// SPEC-034-2-05 — voice/copy sweep: dispatcher contains no user-facing
+// copy; included in the sweep for AC-01 file coverage.
 //
 // Maps a `ViewName` to its JSX view component and renders either the
 // full HTML document (wrapped in `<BaseLayout>`) or a fragment (the

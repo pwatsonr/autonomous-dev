@@ -6,12 +6,22 @@
 //
 // Callers that DO want a sanitized stack in development should call
 // `<ErrorPage>` directly with a `buildErrorContext`-derived prop set.
+//
+// SPEC-034-2-05 — voice/copy sweep: when the caller passes an empty
+// message, fall back to the canonical "Failed to load data" string
+// (TDD-034 §5.6) so the user-facing copy stays consistent.
 
 import type { FC } from "hono/jsx";
 
 import type { RenderProps } from "../../types/render";
 import { ErrorPage } from "../pages/error";
 
-export const ServerErrorView: FC<RenderProps["500"]> = ({ message }) => (
-    <ErrorPage statusCode={500} message={message} />
-);
+const DEFAULT_500_MESSAGE = "Failed to load data";
+
+export const ServerErrorView: FC<RenderProps["500"]> = ({ message }) => {
+    const safeMessage =
+        typeof message === "string" && message.trim().length > 0
+            ? message
+            : DEFAULT_500_MESSAGE;
+    return <ErrorPage statusCode={500} message={safeMessage} />;
+};

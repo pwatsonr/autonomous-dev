@@ -1,4 +1,6 @@
 // SPEC-013-3-03 §Navigation Component.
+// SPEC-034-2-05 — voice/copy sweep: nav labels are already sentence
+// case single-word entries; no canonical replacements apply here.
 //
 // Site navigation rendered inside the BaseLayout <header>. The item
 // whose href matches `activePath` is marked with both `aria-current`

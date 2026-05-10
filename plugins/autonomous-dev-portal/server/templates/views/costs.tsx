@@ -1,4 +1,6 @@
 // SPEC-013-3-03 §Views — costs view component.
+// SPEC-034-2-05 — voice/copy sweep: heading already sentence case;
+// cost values rendered by `formatUsd` which uses `.toFixed(2)`.
 
 import type { FC } from "hono/jsx";
 

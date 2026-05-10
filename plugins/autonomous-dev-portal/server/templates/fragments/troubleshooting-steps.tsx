@@ -19,18 +19,25 @@ export const TroubleshootingSteps: FC<Props> = ({ health }) => (
         role="region"
         aria-labelledby="ts-heading"
     >
-        <h2 id="ts-heading">Daemon Status: {health.status}</h2>
+        <h2 id="ts-heading">
+            Daemon status: <code class={`status status-${health.status}`}>{health.status}</code>
+        </h2>
         <p>{health.message}</p>
         {health.lastHeartbeat !== undefined ? (
             <p>
                 <strong>Last heartbeat:</strong>{" "}
-                <time>{health.lastHeartbeat.toISOString()}</time>{" "}
+                <time class="mono">
+                    {health.lastHeartbeat
+                        .toISOString()
+                        .replace("T", " ")
+                        .slice(0, 19) + "Z"}
+                </time>{" "}
                 <strong>Age:</strong>{" "}
-                {String(Math.floor(health.stalenessSeconds ?? 0))}s
+                <code>{String(Math.floor(health.stalenessSeconds ?? 0))}s</code>
             </p>
         ) : null}
         <div class="daemon-troubleshooting">
-            <h3>Troubleshooting Steps</h3>
+            <h3>Troubleshooting steps</h3>
             <ol>
                 <li>
                     Check daemon process:{" "}

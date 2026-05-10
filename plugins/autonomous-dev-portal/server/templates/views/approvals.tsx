@@ -7,9 +7,9 @@ import { ApprovalItemRow } from "../fragments/approval-item";
 
 export const ApprovalsView: FC<RenderProps["approvals"]> = ({ items }) => (
     <section class="approvals">
-        <h1>Approval Queue</h1>
+        <h1>Approval queue</h1>
         {items.length === 0 ? (
-            <p class="empty">No pending approvals.</p>
+            <p class="empty">No active requests.</p>
         ) : (
             <div class="approval-list">
                 {items.map((it) => (

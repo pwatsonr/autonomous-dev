@@ -10,7 +10,7 @@
 //   - <main role="main" aria-labelledby="error-heading">
 //   - <h1 id="error-heading"> with the status-specific title
 //   - <p class="error-message" role="alert"> for screen-reader announce
-//   - "Return to Dashboard" link carries `autofocus` for keyboard users
+//   - "Return to dashboard" link carries `autofocus` for keyboard users
 //
 // CSP-compatible: no inline <script>, no inline style="…", no on*
 // handlers. The "Go Back" button uses an inline event-only string for
@@ -48,7 +48,7 @@ interface NavSuggestion {
 }
 
 const NAV_SUGGESTIONS: readonly NavSuggestion[] = [
-    { href: "/", label: "Portfolio Dashboard" },
+    { href: "/", label: "Portfolio dashboard" },
     { href: "/approvals", label: "Approvals" },
     { href: "/settings", label: "Settings" },
     { href: "/ops", label: "Ops" },
@@ -126,10 +126,10 @@ export const ErrorPage: FC<ErrorContext> = ({
                     class="btn btn-secondary"
                     data-action="history-back"
                 >
-                    Go Back
+                    Go back
                 </button>
                 <a href="/" class="btn btn-primary" autofocus>
-                    Return to Dashboard
+                    Return to dashboard
                 </a>
             </div>
         </main>
