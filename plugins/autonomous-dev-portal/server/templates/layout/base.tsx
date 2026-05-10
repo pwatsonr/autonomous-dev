@@ -13,10 +13,31 @@
 // via the `cspNonce` prop. The nonce is mandatory in production: an
 // inline-or-external script without it is blocked by the policy and emits
 // a violation report. Ship the empty string when CSP is disabled (tests).
+//
+// SPEC-034-1-06 §Token & theme integration —
+//   1. /static/design-tokens.css MUST be the FIRST stylesheet so CSS
+//      variables are defined before any consumer references them.
+//   2. A FOUC-prevention IIFE runs synchronously at the top of <head>
+//      to set <html data-theme="..."> from localStorage BEFORE first
+//      paint, eliminating the light→dark flash on theme-flagged refresh.
+//   3. /static/theme-toggle.js (SPEC-034-1-05) is loaded `defer` after
+//      the IIFE when the asset is present.
 
 import type { FC } from "hono/jsx";
 
 import { Navigation } from "../fragments/navigation";
+
+/**
+ * SPEC-034-1-06 — FOUC-prevention IIFE.
+ *
+ * Runs synchronously in <head> to apply the persisted theme to
+ * `<html data-theme>` before first paint. Wrapped in try/catch because
+ * `localStorage` access throws in some sandboxed contexts (e.g. when
+ * cookies/storage are blocked); we silently fall back to "light".
+ */
+const FOUC_PREVENTION_IIFE =
+    "(function(){var t;try{t=localStorage.getItem('portal-theme')}catch(e){}" +
+    "document.documentElement.dataset.theme=t==='dark'?'dark':'light';})();";
 
 interface Props {
     activePath: string;
@@ -26,7 +47,7 @@ interface Props {
 }
 
 export const BaseLayout: FC<Props> = ({ activePath, cspNonce, children }) => (
-    <html lang="en">
+    <html lang="en" data-theme="light">
         <head>
             <meta charset="utf-8" />
             <meta
@@ -34,6 +55,16 @@ export const BaseLayout: FC<Props> = ({ activePath, cspNonce, children }) => (
                 content="width=device-width, initial-scale=1"
             />
             <title>autonomous-dev portal</title>
+            {/* SPEC-034-1-06 — synchronous FOUC-prevention IIFE.
+                Must run BEFORE any stylesheet so `data-theme` is set
+                before the browser paints. */}
+            <script
+                nonce={cspNonce ?? ""}
+                dangerouslySetInnerHTML={{ __html: FOUC_PREVENTION_IIFE }}
+            ></script>
+            {/* SPEC-034-1-06 AC-01/02/03 — design-tokens.css is the FIRST
+                stylesheet; portal.css consumes its CSS variables. */}
+            <link rel="stylesheet" href="/static/design-tokens.css" />
             <link rel="stylesheet" href="/static/portal.css" />
             <script
                 src="/static/htmx.min.js"
