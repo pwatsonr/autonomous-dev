@@ -38,7 +38,7 @@ This parent plan decomposes the parity work into 7 child plans, each with a smal
 ## Out-of-scope
 
 - New features beyond the kit (live config edit modals beyond what the kit shows, etc.)
-- Re-skinning Homelab (not currently a portal surface)
+- Homelab surface — will land later as a contribution from the `autonomous-dev-homelab` plugin (separate plan; portal contribution mechanism TBD)
 - Re-doing PRD-018 — this is a parity sweep, not a redesign
 
 ## Acceptance (rolled-up)
