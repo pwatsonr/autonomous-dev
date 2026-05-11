@@ -178,7 +178,17 @@ export function checkFileIntegrity(filePath: string): FileIntegrityResult {
 
   const diskHash = computeSha256(diskContent);
 
-  // Retrieve committed version from git
+  // Retrieve committed version from git. In headless / non-git contexts
+  // (plugin cache, portal spawn, CI without a checkout) there is no
+  // committed version to compare against; pass with diskHash only.
+  if (tryGetGitRoot(path.dirname(resolvedPath)) === null) {
+    return {
+      filePath: resolvedPath,
+      passed: true,
+      diskHash,
+    };
+  }
+
   let gitContent: string;
   try {
     gitContent = getGitFileContent(resolvedPath);
@@ -224,13 +234,21 @@ export function checkFileIntegrity(filePath: string): FileIntegrityResult {
 function batchGitStatus(agentsDir: string): Map<string, string> {
   const dirtyFiles = new Map<string, string>();
 
+  // Headless / non-git contexts (plugin cache, portal spawn, CI without a
+  // checkout) have no git history to diff against. Return empty so the
+  // caller falls back to path-traversal + SHA-256-of-disk-only checks.
+  const gitRoot = tryGetGitRoot(agentsDir);
+  if (gitRoot === null) {
+    return dirtyFiles;
+  }
+
   try {
     const output = execFileSync(
       'git',
       ['status', '--porcelain', agentsDir],
       {
         encoding: 'utf-8',
-        cwd: getGitRoot(agentsDir),
+        cwd: gitRoot,
         stdio: ['pipe', 'pipe', 'pipe'],
       },
     );
@@ -303,6 +321,19 @@ function getGitRoot(fromDir: string): string {
     throw new Error(
       `Not a git repository or git not available: ${err instanceof Error ? err.message : String(err)}`,
     );
+  }
+}
+
+/**
+ * Like getGitRoot but returns null instead of throwing when the directory
+ * is not in a git checkout or git isn't installed. Used by the headless
+ * integrity-check fallback path.
+ */
+function tryGetGitRoot(fromDir: string): string | null {
+  try {
+    return getGitRoot(fromDir);
+  } catch {
+    return null;
   }
 }
 
