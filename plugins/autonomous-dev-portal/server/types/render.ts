@@ -121,6 +121,31 @@ export interface Phase {
     detail: string | null;
 }
 
+/**
+ * SPEC-037-7-02 §Standards-applied — one row in the Standards-applied
+ * section. Severity values are constrained at the type level; renderers
+ * MUST coerce unknown values to `"advisory"` (defensive default).
+ */
+export interface StandardsRule {
+    id: string;
+    desc: string;
+    severity: "blocking" | "warn" | "advisory";
+    source: string;
+    immutable?: boolean;
+}
+
+/**
+ * SPEC-037-7-01/02 §Request feature flags. Optional bag used by the
+ * Request Detail view to decide whether to mount conditional sections.
+ * Kept as a discrete sub-object so future flag additions don't bloat the
+ * `RequestRecord` interface.
+ */
+export interface RequestFlags {
+    /** SPEC-037-7-02 — when true the Standards-applied section renders
+     *  iff `standardsApplied.length > 0`. */
+    hasStandards?: boolean;
+}
+
 export interface RequestRecord {
     id: string; // REQ-NNNNNN
     repo: string;
@@ -154,6 +179,25 @@ export interface RequestRecord {
     currentArtifact?: RequestArtifact;
     /** SPEC-036-3-05 — past daemon iterations against this request. */
     runs?: RequestRunRef[];
+
+    // SPEC-037-7-01 §`.rd-stat` block — three mono numeric cells in the
+    // request-header right column. All optional for back-compat; renderers
+    // default missing fields to `0`.
+    /** Total request cost in USD. Rendered `$X.XX`. */
+    cost?: number;
+    /** Total daemon turns (loop iterations). */
+    turns?: number;
+    /** Aggregate reviewer score (0-100 or 0-10 depending on rubric). */
+    score?: number;
+    /** ISO-8601 start timestamp. Rendered as the final `.rd-meta` segment. */
+    startedAt?: string;
+
+    // SPEC-037-7-02 §Standards-applied section.
+    /** Per-request feature flag bag; drives conditional sections. */
+    flags?: RequestFlags;
+    /** Standards rules applied to this request (rendered iff
+     *  `flags.hasStandards === true` AND list is non-empty). */
+    standardsApplied?: StandardsRule[];
 }
 
 /**
