@@ -22,10 +22,40 @@ import { Hono } from "hono";
 import type { AuditAppender, SSEBroadcaster } from "./_action-deps";
 import { noopActionLogger, noopBroadcaster, resolveActor } from "./_action-deps";
 import type { ActionLogger } from "./_action-deps";
+import { ApprovalsKpiStrip } from "../templates/fragments/approvals-kpi-strip";
+import { GateRow } from "../templates/fragments/gate-row";
+import type { ApprovalItem } from "../types/render";
 
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 const BULK_MIN = 1;
 const BULK_MAX = 50;
+
+/** SPEC-037-4-05 — filter shape sent by the Approvals page bulk button. */
+const FILTER_VALUES = new Set([
+    "all",
+    "reviewer-chain",
+    "standards-violation",
+    "cost-cap",
+]);
+
+/**
+ * SPEC-037-4-05 §Bulk-approve filter integration. Optional service
+ * surface — when provided, the bulk endpoint accepts an HTMX form POST
+ * (`filter=<value>`) and responds with the rebuilt `.gate-list` plus an
+ * `.kpi-strip` HTMX OOB swap. When omitted, the endpoint preserves the
+ * PLAN-037-2 JSON contract.
+ */
+export interface BulkApproveByFilterService {
+    /** Approve every open gate matching `filter` (`"all"` = every gate). */
+    approveByFilter(
+        filter: string,
+        actor: string,
+    ): Promise<{
+        approvedIds: string[];
+        remaining: ApprovalItem[];
+        costCapDailyUsd: number;
+    }>;
+}
 
 export type ApprovalState = "approved" | "rejected";
 
@@ -53,6 +83,11 @@ export interface ApprovalsActionDeps {
     audit: AuditAppender;
     bus?: SSEBroadcaster;
     logger?: ActionLogger;
+    /** SPEC-037-4-05 — when present, enables the form-shaped
+     *  `filter=<value>` bulk-approve path that returns an HTML fragment
+     *  + `.kpi-strip` OOB swap. The JSON `{ids: [...]}` contract is
+     *  preserved when this is omitted. */
+    bulkApproveByFilter?: BulkApproveByFilterService;
 }
 
 interface BulkBody {
@@ -119,6 +154,60 @@ export function buildApprovalsActionRoutes(
     router.post("/api/approvals/:id/reject", decideHandler("rejected"));
 
     router.post("/api/approvals/bulk-approve", async (c) => {
+        // SPEC-037-4-05 — when the Approvals page POSTs `filter=<value>`
+        // via HTMX (form encoding), respond with the rebuilt gate-list
+        // + .kpi-strip OOB swap. This branch is only active when the
+        // route deps provide `bulkApproveByFilter`; PLAN-037-2's
+        // JSON-shaped `{ids: [...]}` contract is otherwise preserved.
+        const contentType = c.req.header("Content-Type") ?? "";
+        const isForm =
+            contentType.includes("application/x-www-form-urlencoded") ||
+            contentType.includes("multipart/form-data");
+        if (isForm && deps.bulkApproveByFilter !== undefined) {
+            const form = await c.req.formData();
+            const rawFilter = String(form.get("filter") ?? "all");
+            const filter = FILTER_VALUES.has(rawFilter) ? rawFilter : "all";
+            const actor = resolveActor(c.get("auth"));
+            const { approvedIds, remaining, costCapDailyUsd } =
+                await deps.bulkApproveByFilter.approveByFilter(filter, actor);
+            // Audit + broadcast each successful approval so observers
+            // see incremental updates (parity with the JSON path).
+            for (const id of approvedIds) {
+                await deps.audit.append({
+                    event: "approval_approved",
+                    id,
+                    actor,
+                    bulk: true,
+                    filter,
+                });
+                bus.publish("approval", { id, state: "approved" });
+            }
+            // Empty result still returns 200 with an empty gate-list +
+            // an .empty sibling so HTMX swaps don't leave stale DOM.
+            const body = (
+                <>
+                    {remaining.length === 0 ? (
+                        <>
+                            <div class="gate-list"></div>
+                            <div class="empty">No open gates</div>
+                        </>
+                    ) : (
+                        <div class="gate-list">
+                            {remaining.map((it) => (
+                                <GateRow {...it} />
+                            ))}
+                        </div>
+                    )}
+                    <ApprovalsKpiStrip
+                        items={remaining}
+                        costCapDailyUsd={costCapDailyUsd}
+                        oob="outerHTML:.kpi-strip"
+                    />
+                </>
+            );
+            return c.html(body);
+        }
+
         let body: BulkBody = {};
         try {
             body = (await c.req.json()) as BulkBody;
