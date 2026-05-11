@@ -415,7 +415,21 @@ export function buildCommand(
   // Stash cwd here since the canonical CommandSource has no field for it.
   flags.__cwd = process.cwd();
 
+  // PLAN-038-follow-up — submit_handler reads
+  // `description = command.args.join(' ').trim()` so the description
+  // must land in `args`, not in `flags`. For `feedback`, the second
+  // positional is the message — same pattern. Promote the canonical
+  // positional out of payload into args[0] (or args[1] when a
+  // requestId is present).
   const args: string[] = requestId ? [requestId] : [];
+  if (commandName === 'submit' && typeof payload.description === 'string') {
+    args.push(payload.description);
+    delete flags.description;
+  }
+  if (commandName === 'feedback' && typeof payload.message === 'string') {
+    args.push(payload.message);
+    delete flags.message;
+  }
 
   return {
     commandName,

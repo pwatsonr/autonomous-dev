@@ -10,3 +10,4 @@ tests/standards/precision-report.json
 .autonomous-dev/logs/
 .autonomous-dev/baselines/
 .autonomous-dev/fingerprints/
+intake/adapters/cli_adapter.js
