@@ -38,6 +38,11 @@ import {
 } from "./wiring/adapters";
 import { buildAgentsDeps } from "./wiring/agents-deps";
 import { FileApprovalsStore } from "./wiring/approvals-store";
+import {
+    readApprovalsCount,
+    readKillSwitchEngaged,
+    readMtdSpend,
+} from "./wiring/daemon-readers";
 import { buildGateAndRequestDeps } from "./wiring/gate-store";
 import { buildFileWebhookDispatcher } from "./wiring/notification-dispatcher";
 import { FileSettingsStore } from "./wiring/settings-store";
@@ -124,11 +129,14 @@ export async function startServer(): Promise<Server<unknown>> {
     registerRoutes(app, {
         sseBus,
         confirmation,
-        // SPEC-037-2-02 — daemon-status handler.
+        // SPEC-037-2-02 — daemon-status handler. Real readers consume the
+        // daemon's on-disk state files (cost-ledger.json, approvals-queue.json,
+        // kill-switch.flag). Each reader falls back to its default on any
+        // I/O / parse error and caches the result for 5s.
         daemonStatus: {
-            readMtdSpend: async () => 0,
-            readApprovalsCount: async () => 0,
-            readKillSwitchEngaged: async () => false,
+            readMtdSpend,
+            readApprovalsCount,
+            readKillSwitchEngaged,
         },
         // SPEC-037-2-03 — approvals action routes (file-backed queue).
         approvalsActions: {
