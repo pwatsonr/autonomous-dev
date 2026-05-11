@@ -25,7 +25,7 @@
 //     </div>
 //     <div class="rail-nav-group" data-group="system">
 //       <div class="rail-nav-group-label">SYSTEM</div>
-//       <a href="/settings#agents" …>…</a>
+//       <a href="/agents" …>…</a>
 //       <a href="/settings"        …>…</a>
 //       <a href="/ops"             …>…</a>
 //     </div>
@@ -64,7 +64,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     { href: "/approvals", label: "Approvals", group: "operate", iconName: "shield-alert" },
     { href: "/requests", label: "Requests", group: "operate", iconName: "git-pull-request" },
     { href: "/costs", label: "Costs", group: "operate", iconName: "dollar-sign" },
-    { href: "/settings#agents", label: "Agents", group: "system", iconName: "bot" },
+    { href: "/agents", label: "Agents", group: "system", iconName: "bot" },
     { href: "/settings", label: "Settings", group: "system", iconName: "sliders" },
     { href: "/ops", label: "Ops", group: "system", iconName: "terminal" },
 ];
@@ -84,7 +84,7 @@ const GROUP_LABELS: Record<NavGroup, string> = {
 const BADGE_MAP: Record<string, keyof RailNavCounts> = {
     "/approvals": "approvalsCount",
     "/requests": "requestsCount",
-    "/settings#agents": "agentsAlertCount",
+    "/agents": "agentsAlertCount",
 };
 
 /**
@@ -96,7 +96,7 @@ const BADGE_MAP: Record<string, keyof RailNavCounts> = {
 const BADGE_NOUN: Record<string, string> = {
     "/approvals": "pending",
     "/requests": "active",
-    "/settings#agents": "",
+    "/agents": "",
 };
 
 /** Internal shape passed into `renderItem` so the 3 optional counts flow as one arg. */

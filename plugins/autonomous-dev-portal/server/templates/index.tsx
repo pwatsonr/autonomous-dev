@@ -28,6 +28,7 @@ import {
 } from "../lib/shell-rail-state";
 import type { RenderProps, ViewName } from "../types/render";
 import { ShellLayout } from "../components/shell";
+import { AgentsView } from "./views/agents";
 import { ApprovalsView } from "./views/approvals";
 import { AuditView } from "./views/audit";
 import { CostsView } from "./views/costs";
@@ -35,6 +36,7 @@ import { DashboardView } from "./views/dashboard";
 import { LogsView } from "./views/logs";
 import { NotFoundView } from "./views/404";
 import { OpsView } from "./views/ops";
+import { ReposView } from "./views/repos";
 import { RequestDetailView } from "./views/request-detail";
 import { RequestsView } from "./views/requests";
 import { ServerErrorView } from "./views/500";
@@ -84,6 +86,10 @@ function renderViewBody<V extends ViewName>(
             return <OpsView {...(props as RenderProps["ops"])} />;
         case "audit":
             return <AuditView {...(props as RenderProps["audit"])} />;
+        case "agents":
+            return <AgentsView {...(props as RenderProps["agents"])} />;
+        case "repos":
+            return <ReposView {...(props as RenderProps["repos"])} />;
         case "404":
             return <NotFoundView {...(props as RenderProps["404"])} />;
         case "500":
@@ -131,6 +137,10 @@ function activePathFor(view: ViewName): string {
             return "/ops";
         case "audit":
             return "/audit";
+        case "agents":
+            return "/agents";
+        case "repos":
+            return "/repos";
         case "dashboard":
         case "request-detail":
         case "404":

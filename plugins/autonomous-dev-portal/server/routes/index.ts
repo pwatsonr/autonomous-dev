@@ -37,6 +37,7 @@ import {
     buildAgentActionRoutes,
     type AgentActionDeps,
 } from "./agents-actions";
+import { agentsApiHandler, agentsHandler } from "./agents";
 import { approvalsHandler } from "./approvals";
 import {
     buildApprovalsActionRoutes,
@@ -66,6 +67,7 @@ import { buildKillSwitchRoutes } from "./kill-switch";
 import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
 import { requestDetailHandler } from "./request-detail";
+import { reposHandler } from "./repos";
 import { requestsHandler } from "./requests";
 import { settingsHandler } from "./settings";
 import {
@@ -290,6 +292,12 @@ export function registerRoutes(
     app.get("/audit", auditHandler);
     app.get("/design-system", designSystemHandler);
     app.get("/health", healthHandler);
+
+    // PLAN-038 TASK-005 — net-new surfaces. Initial empty-data scaffolding;
+    // TASK-015 wires the real composition readers.
+    app.get("/agents", agentsHandler);
+    app.get("/repos", reposHandler);
+    app.get("/api/agents", agentsApiHandler);
 
     // PLAN-038 TASK-001 — SVG favicon at the URL root (browsers default-request
     // /favicon.svg). Reads from the configured static root so it honors the
