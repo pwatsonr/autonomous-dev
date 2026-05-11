@@ -2,7 +2,7 @@
 governance:
   status: ready-for-review
   created_at: "2026-05-11T12:00:00Z"
-  updated_at: "2026-05-11T12:00:00Z"
+  updated_at: "2026-05-11T17:30:00Z"
   phase: prd
   jira_epic: ""
   slug: intake-to-deploy-e2e-pipeline
@@ -10,6 +10,10 @@ governance:
     - status: ready-for-review
       timestamp: "2026-05-11T12:00:00Z"
       actor: product-manager
+    - status: ready-for-review
+      timestamp: "2026-05-11T17:30:00Z"
+      actor: product-manager
+      note: "v1.1 revision addressing PRD reviewer findings"
 ---
 
 # PRD-019: Intake-to-Deploy End-to-End Pipeline
@@ -18,11 +22,26 @@ governance:
 |-------------|--------------------------------------------|
 | **Title**   | Intake-to-Deploy End-to-End Pipeline        |
 | **PRD ID**  | PRD-019                                    |
-| **Version** | 1.0                                        |
+| **Version** | 1.1                                        |
 | **Date**    | 2026-05-11                                 |
 | **Author**  | Patrick Watson                             |
 | **Status**  | Ready for Review                           |
 | **Plugin**  | autonomous-dev                             |
+
+---
+
+## Changelog
+
+### v1.1 (2026-05-11)
+
+Revision addressing PRD reviewer findings:
+
+- **MAJOR-1 (OQ-019-01)**: Locked agent dispatch mechanism. The `claude` CLI `--agent <name>` flag is verified. FR-019-11 updated to use `claude --agent <agent-name> --prompt <phase-prompt> --print --output-format json --max-turns <N>`. OQ-019-01 removed from Open Questions.
+- **MAJOR-2 (OQ-019-02)**: Locked review pass/fail detection. Phase agents write `phase-result.json` to `~/.autonomous-dev/portal/request-actions/<REQ-id>/phase-result-<phase>.json`. FR-019-14, FR-019-12, FR-019-10 updated. OQ-019-02 removed from Open Questions.
+- **MINOR-1**: FR-019-01/02/03 rewritten to scope changes to `initRouter()` only; `submit_handler.ts` already supports optional deps.
+- **MINOR-2**: New FR-019-06a added specifying `status` vs `current_phase` field mapping in SQLite and `state.json`.
+- **MINOR-3 (OQ-019-04)**: Locked `intake` as bookkeeping-only state. FR-019-09 updated. OQ-019-04 removed from Open Questions.
+- Open Questions reduced from 6 to 2 (OQ-019-05 and OQ-019-06 remain as TDD-level decisions).
 
 ---
 
@@ -87,27 +106,33 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 ### Error States
 
 - **US-019-12** (P0): As a System Operator, when the submit handler encounters a filesystem error writing `state.json` (permission denied, disk full), I want the SQLite transaction to be rolled back and a clear error message returned to the CLI so that no orphaned state exists.
-- **US-019-13** (P0): As a System Operator, when the daemon encounters a `state.json` with an unrecognized phase in its `status` field, I want it to log a warning and skip that request (not crash) so that one corrupt request does not block all other requests.
+- **US-019-13** (P0): As a System Operator, when the daemon encounters a `state.json` with an unrecognized phase in its `current_phase` field, I want it to log a warning and skip that request (not crash) so that one corrupt request does not block all other requests.
 
 ---
 
 ## 5. Functional Requirements
 
-### 5.1 Submit Handler Fix: Graceful Degradation for Optional Dependencies
+### 5.1 Submit Router Fix: Graceful Construction with Optional Dependencies
 
-- **FR-019-01** (P0): The submit handler SHALL treat `claudeClient`, `duplicateDetector`, and `injectionRules` as optional dependencies. When `claudeClient` is undefined, the handler SHALL skip the NLP parsing stage (Stage 2) and use the raw description truncated to 100 characters as the title, the full description as `parsedDescription`, and `null` for `targetRepo`, `deadline`, `relatedTickets`, `technicalConstraints`, and `acceptanceCriteria` (all of which can be overridden by flag values). -- **Acceptance criterion**: `autonomous-dev request submit "Add dark mode" --repo /path/to/repo` persists a row in SQLite with `title = "Add dark mode"` and `target_repo = "/path/to/repo"` when `claudeClient` is undefined.
+- **FR-019-01** (P0): The `initRouter()` function in `cli_adapter.ts` SHALL construct the submit handler with `claudeClient`, `duplicateDetector`, and `injectionRules` as optional (possibly undefined) dependencies. The router SHALL be constructable with only `authz`, `rateLimiter`, and `db` provided. Note: the `submit_handler.ts` already supports optional deps -- it guards each one with `if (this.deps.X)` checks at `submit_handler.ts:92-196`. No handler changes are required; this FR addresses only the `initRouter()` wiring at `cli_adapter.ts:843-880`. -- **Acceptance criterion**: `initRouter()` resolves without throwing when `claudeClient`, `duplicateDetector`, and `injectionRules` are all undefined; `router.route({ command: 'submit', ... })` reaches the handler's `execute()` method.
 
-- **FR-019-02** (P0): When `duplicateDetector` is undefined, the submit handler SHALL skip the duplicate detection stage (Stage 3) entirely and proceed to enqueue. -- **Acceptance criterion**: Submitting the same description twice succeeds both times when `duplicateDetector` is undefined.
+- **FR-019-02** (P0): When `claudeClient` is undefined, the existing submit handler gracefully skips the NLP parsing stage (Stage 2), using the raw description truncated to 100 characters as the title and `null` for NLP-derived fields. No handler changes are required; this FR confirms the existing behavior. The `initRouter()` fix in FR-019-01 is the only code change needed to enable this path. -- **Acceptance criterion**: `autonomous-dev request submit "Add dark mode" --repo /path/to/repo` persists a row in SQLite with `title = "Add dark mode"` and `target_repo = "/path/to/repo"` when `claudeClient` is undefined.
 
-- **FR-019-03** (P0): When `injectionRules` is undefined or an empty array, the submit handler SHALL skip the sanitization stage (Stage 1) and proceed to NLP parsing (or its fallback). -- **Acceptance criterion**: A description containing text that would trigger injection rules passes when `injectionRules` is empty.
+- **FR-019-03** (P0): When `duplicateDetector` is undefined, the existing submit handler gracefully skips the duplicate detection stage (Stage 3). When `injectionRules` is undefined or an empty array, the existing submit handler skips the sanitization stage (Stage 1). No handler changes are required; this FR confirms the existing behavior. The `initRouter()` fix in FR-019-01 is the only code change needed. -- **Acceptance criterion**: Submitting the same description twice succeeds both times when `duplicateDetector` is undefined. A description containing text that would trigger injection rules passes when `injectionRules` is empty.
 
-- **FR-019-04** (P0): The `initRouter()` function in `cli_adapter.ts` SHALL NOT crash when `claudeClient`, `duplicateDetector`, or `injectionRules` are undefined. The router SHALL be constructable with only `authz`, `rateLimiter`, and `db` provided. -- **Acceptance criterion**: `initRouter()` resolves without throwing; `router.route({ command: 'submit', ... })` reaches the handler's `execute()` method.
+- **FR-019-04** (P0): The `initRouter()` function SHALL resolve the `TODO(PLAN-011-1)` at `cli_adapter.ts:843-880` by wiring the three optional deps from config when available, and passing `undefined` when not. No new config schema is required -- the deps are simply omitted from the handler constructor arguments. -- **Acceptance criterion**: `initRouter()` resolves without throwing; `router.route({ command: 'submit', ... })` reaches the handler's `execute()` method.
 
 ### 5.2 State.json Handoff on Submit
 
 - **FR-019-05** (P0): On successful SQLite insertion of a new request, the submit handler SHALL write a `state.json` file to `<target_repo>/.autonomous-dev/requests/<request_id>/state.json` using the FR-824a two-phase commit pattern: (1) write a temporary file `state.json.tmp.<pid>`, (2) commit the SQLite transaction, (3) atomically `rename()` the temp file to `state.json`. If the rename fails, the SQLite transaction SHALL be rolled back. -- **Acceptance criterion**: After a successful `submit`, both `SELECT * FROM requests WHERE request_id = ?` returns a row AND `<repo>/.autonomous-dev/requests/<id>/state.json` exists with matching `id`, `status`, `priority`, `target_repo`, `title`, `created_at`.
 
-- **FR-019-06** (P0): The `state.json` written by the submit handler SHALL contain all fields required by the daemon's `select_request()` and `spawn_session()` functions: `id`, `status` (set to `intake`), `priority` (integer: high=0, normal=1, low=2), `created_at`, `updated_at`, `title`, `description`, `target_repo`, `source`, `type` (from `--type` flag, default `feature`), `blocked_by` (empty array), `phase_history` (empty array), `current_phase_metadata` (empty object), `cost_accrued_usd` (0), `turn_count` (0), `escalation_count` (0), `schema_version` (1), `error` (null). -- **Acceptance criterion**: The daemon's `validate_state_file()` and `select_request()` accept the written file without errors.
+- **FR-019-06** (P0): The `state.json` written by the submit handler SHALL contain all fields required by the daemon's `select_request()` and `spawn_session()` functions: `id`, `status` (set to `queued`), `current_phase` (set to `intake`), `priority` (integer: high=0, normal=1, low=2), `created_at`, `updated_at`, `title`, `description`, `target_repo`, `source`, `type` (from `--type` flag, default `feature`), `blocked_by` (empty array), `phase_history` (empty array), `current_phase_metadata` (empty object), `cost_accrued_usd` (0), `turn_count` (0), `escalation_count` (0), `schema_version` (1), `error` (null). -- **Acceptance criterion**: The daemon's `validate_state_file()` and `select_request()` accept the written file without errors.
+
+- **FR-019-06a** (P0): The system SHALL use two separate fields to track request lifecycle and pipeline position, with the following canonical mapping:
+  - **SQLite `requests` table**: `status` column = `'queued' | 'running' | 'gate' | 'done' | 'cancelled'` (top-level lifecycle state); `current_phase` column = `'intake' | 'prd' | 'prd_review' | 'tdd' | 'tdd_review' | 'plan' | 'plan_review' | 'spec' | 'spec_review' | 'code' | 'code_review' | 'integration' | 'deploy'` (pipeline position).
+  - **`state.json`**: SHALL include BOTH `status` and `current_phase` as separate top-level fields with the same value domains as SQLite.
+  - **Daemon behavior**: The supervisor reads `status` to filter actionable rows (`queued` -> pick up; `done` -> skip), then reads `current_phase` to decide which agent to dispatch.
+  -- **Acceptance criterion**: `state.json` written by the submit handler contains `"status": "queued"` and `"current_phase": "intake"` as separate fields. The daemon's `select_request()` filters on `status` and reads `current_phase` for dispatch.
 
 - **FR-019-07** (P0): The submit handler SHALL validate the generated request ID against `^REQ-\d{6}$` and validate that the resolved `state.json` path is within `<target_repo>/.autonomous-dev/requests/`. Any path traversal attempt SHALL cause submission to fail before any filesystem write. -- **Acceptance criterion**: Submitting with a `--repo` value containing `..` or symlinks pointing outside the repo fails with `VALIDATION_ERROR`.
 
@@ -115,40 +140,47 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 
 - **FR-019-08** (P0): The daemon's `select_request()` function SHALL continue to scan `<repo>/.autonomous-dev/requests/*/state.json` files as it does today. No change to the daemon's work-discovery mechanism is required because FR-019-05 now produces these files on submit. -- **Acceptance criterion**: After FR-019-05 is implemented, running the daemon with `--once` finds the newly-submitted request and selects it.
 
-- **FR-019-09** (P1): The daemon SHALL set the request's `status` field to the first pipeline phase (`prd` for `feature` type, or the type-appropriate first phase per PRD-011 variants) when it begins processing a request whose `status` is `intake`. This transition SHALL be written atomically to `state.json` and appended to `events.jsonl`. -- **Acceptance criterion**: After daemon processes an `intake`-status request, `state.json` shows `status: "prd"` (for feature type) and `events.jsonl` contains a `state_transition` event from `intake` to `prd`.
+- **FR-019-09** (P1): The `intake` value for `current_phase` is a bookkeeping state only -- it indicates the submit handler completed validation synchronously and the request is ready for processing. There is no separate agent session for `intake`. When the daemon picks up a request with `status: "queued"` and `current_phase: "intake"`, it SHALL immediately set `status` to `"running"` and `current_phase` to the first pipeline phase (`prd` for `feature` type, or the type-appropriate first phase per PRD-011 variants). This transition SHALL be written atomically to `state.json` and appended to `events.jsonl`. -- **Acceptance criterion**: After daemon picks up an `intake`-phase request, `state.json` shows `status: "running"`, `current_phase: "prd"` (for feature type), and `events.jsonl` contains a `state_transition` event from `intake` to `prd`.
 
 ### 5.4 Per-Phase Agent Dispatch
 
-- **FR-019-10** (P0): The daemon SHALL maintain a phase-to-agent mapping that associates each pipeline phase with the correct agent definition from `plugins/autonomous-dev/agents/*.md`. The mapping SHALL be:
+- **FR-019-10** (P0): The daemon SHALL maintain a phase-to-agent mapping that associates each pipeline phase with the correct agent name from `plugins/autonomous-dev/agents/*.md`. Every dispatched agent is responsible for writing a `phase-result.json` file (see FR-019-14) at the end of its session. If agents do not natively produce this file, a thin shell wrapper in `spawn-session.sh` SHALL synthesize the result file from the agent's output JSON. Note: changing agent spec files is out of scope for this PRD. The mapping SHALL be:
 
-  | Phase | Agent File | Agent Role |
+  | Phase | Agent Name | Agent Role |
   |-------|-----------|------------|
-  | `prd` | `prd-author.md` | PRD generation |
-  | `prd_review` | `doc-reviewer.md` | Document quality review |
-  | `tdd` | `tdd-author.md` | TDD generation |
-  | `tdd_review` | `doc-reviewer.md` | Document quality review |
-  | `plan` | `plan-author.md` | Implementation plan generation |
-  | `plan_review` | `doc-reviewer.md` | Document quality review |
-  | `spec` | `spec-author.md` | Implementation spec generation |
-  | `spec_review` | `doc-reviewer.md` | Document quality review |
-  | `code` | `code-executor.md` | Code generation and testing |
-  | `code_review` | `quality-reviewer.md` | Code quality review |
-  | `integration` | `test-executor.md` | Integration testing |
-  | `deploy` | `deploy-executor.md` | Deployment execution |
+  | `prd` | `prd-author` | PRD generation |
+  | `prd_review` | `doc-reviewer` | Document quality review |
+  | `tdd` | `tdd-author` | TDD generation |
+  | `tdd_review` | `doc-reviewer` | Document quality review |
+  | `plan` | `plan-author` | Implementation plan generation |
+  | `plan_review` | `doc-reviewer` | Document quality review |
+  | `spec` | `spec-author` | Implementation spec generation |
+  | `spec_review` | `doc-reviewer` | Document quality review |
+  | `code` | `code-executor` | Code generation and testing |
+  | `code_review` | `quality-reviewer` | Code quality review |
+  | `integration` | `test-executor` | Integration testing |
+  | `deploy` | `deploy-executor` | Deployment execution |
 
-  -- **Acceptance criterion**: For each phase in the table, `resolve_agent(phase)` returns the correct agent file path. Unit test covers all 12 mappings.
+  -- **Acceptance criterion**: For each phase in the table, `resolve_agent(phase)` returns the correct agent name. Unit test covers all 12 mappings.
 
-- **FR-019-11** (P0): The daemon's `spawn_session()` function SHALL pass the `--agent-prompt` flag (or the equivalent agent selection mechanism) to the `claude` CLI invocation, referencing the agent definition file resolved by FR-019-10 for the request's current phase. The existing `--prompt` flag SHALL continue to carry the phase-specific context (request description, prior artifacts, review feedback). -- **Acceptance criterion**: The `claude` command invoked by `spawn_session()` includes the agent file path in its arguments. Log entry at `spawn_session` shows `agent=prd-author.md` when processing a request in `prd` phase.
+- **FR-019-11** (P0): The daemon's `spawn_session()` function SHALL invoke the `claude` CLI with the `--agent <agent-name>` flag, where `<agent-name>` is the agent name resolved by FR-019-10 for the request's current phase. The `claude` CLI resolves the agent name to the corresponding file in `plugins/autonomous-dev/agents/<name>.md`. The full invocation SHALL be: `claude --agent <agent-name> --prompt <phase-prompt> --print --output-format json --max-turns <N>`. The existing `--prompt` flag SHALL carry the phase-specific context (request description, prior artifacts, review feedback). -- **Acceptance criterion**: The `claude` command invoked by `spawn_session()` includes `--agent prd-author` when processing a request in `prd` phase. Log entry at `spawn_session` shows `agent=prd-author` when processing a request in `prd` phase.
 
-- **FR-019-12** (P0): The phase prompt resolved by `resolve_phase_prompt()` SHALL include: (a) the request's title and description, (b) the target repository path, (c) any artifacts produced by prior phases (e.g., the PRD document path when entering `tdd` phase), (d) any review feedback from a failed `_review` phase that caused a retry, and (e) the output path where the agent should write its artifact. -- **Acceptance criterion**: The prompt string for a `tdd` phase includes the path to the PRD file generated in the `prd` phase. The prompt string for a `prd` retry after `prd_review` failure includes the review feedback.
+- **FR-019-12** (P0): The phase prompt resolved by `resolve_phase_prompt()` SHALL include: (a) the request's title and description, (b) the target repository path, (c) any artifacts produced by prior phases (e.g., the PRD document path when entering `tdd` phase), (d) any review feedback from a failed `_review` phase that caused a retry -- sourced from the `feedback` field of the corresponding `phase-result-<phase>.json` file and inlined into the retry prompt, and (e) the output path where the agent should write its artifact. -- **Acceptance criterion**: The prompt string for a `tdd` phase includes the path to the PRD file generated in the `prd` phase. The prompt string for a `prd` retry after `prd_review` failure includes the review feedback from `phase-result-prd_review.json`.
 
 ### 5.5 Phase Advancement State Machine
 
-- **FR-019-13** (P0): After a successful session (exit code 0), the daemon SHALL advance the request's `status` to the next phase in the pipeline sequence. The advancement SHALL: (a) read the next phase from `next_phase_for_state()`, (b) update `state.json` atomically (write `.tmp`, then `mv`), (c) append a `state_transition` event to `events.jsonl` with the session ID, cost, and turns used, (d) update `phase_history` with the completed phase entry. -- **Acceptance criterion**: After the `prd` agent exits 0, `state.json` shows `status: "prd_review"` and `events.jsonl` has a `state_transition` from `prd` to `prd_review`.
+- **FR-019-13** (P0): After a successful session (exit code 0), the daemon SHALL advance the request to the next phase in the pipeline sequence. The advancement SHALL: (a) read the next phase from `next_phase_for_state()`, (b) update `state.json` atomically (write `.tmp`, then `mv`) setting `current_phase` to the next phase and `status` to `"running"` (or `"gate"` if the next phase is a `_review` phase), (c) append a `state_transition` event to `events.jsonl` with the session ID, cost, and turns used, (d) update `phase_history` with the completed phase entry. -- **Acceptance criterion**: After the `prd` agent exits 0, `state.json` shows `current_phase: "prd_review"` and `status: "gate"`, and `events.jsonl` has a `state_transition` from `prd` to `prd_review`.
 
-- **FR-019-14** (P0): After a `_review` phase session exits 0, the daemon SHALL check the review result (pass/fail) from the session output or the updated `state.json` metadata. On pass, advance to the next phase. On fail, transition back to the preceding generation phase and include the review feedback in the `current_phase_metadata.review_feedback` field. -- **Acceptance criterion**: When `prd_review` fails, `state.json` shows `status: "prd"` and `current_phase_metadata.review_feedback` is non-empty.
+- **FR-019-14** (P0): Each phase agent (or its `spawn-session.sh` wrapper) SHALL write a result file to `~/.autonomous-dev/portal/request-actions/<REQ-id>/phase-result-<phase>.json` at the end of its session. The file SHALL contain:
+  - `status`: `"pass"` | `"fail"` | `"error"`
+  - `feedback`: optional string (review failures feed this back into the retry prompt for the preceding generation phase)
+  - `artifacts`: optional list of file paths produced by the phase
+  - `next_phase`: optional override (defaults to the natural next phase from the state machine)
 
-- **FR-019-15** (P0): When the pipeline reaches the terminal phase (`deploy` completion or the last phase in a type-specific variant), the daemon SHALL set `status` to `done` (or `monitor` per PRD-001 state definitions), record the completion timestamp, and write a final `state_transition` event. -- **Acceptance criterion**: A fully-completed request has `status: "monitor"` or `status: "done"` and a non-null `completed_at` timestamp.
+  After a `_review` phase session exits 0, the daemon SHALL read the corresponding `phase-result-<phase>.json` file to determine the review outcome. On `status: "pass"`, advance to the next phase. On `status: "fail"`, transition back to the preceding generation phase, set `current_phase_metadata.review_feedback` to the `feedback` field value, and set `status` to `"running"`. If the result file is missing after a session exits 0, treat as a pass with a warning logged.
+  -- **Acceptance criterion**: When `prd_review` writes `phase-result-prd_review.json` with `status: "fail"` and `feedback: "Missing success metrics"`, `state.json` shows `current_phase: "prd"`, `status: "running"`, and `current_phase_metadata.review_feedback` contains `"Missing success metrics"`.
+
+- **FR-019-15** (P0): When the pipeline reaches the terminal phase (`deploy` completion or the last phase in a type-specific variant), the daemon SHALL set `status` to `done` (or `monitor` per PRD-001 state definitions), record the completion timestamp, and write a final `state_transition` event. -- **Acceptance criterion**: A fully-completed request has `status: "done"` and a non-null `completed_at` timestamp.
 
 ### 5.6 Portal State Synchronization
 
@@ -160,7 +192,7 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 
 ### 5.7 End-to-End Smoke Test
 
-- **FR-019-19** (P0): The project SHALL include a smoke test script at `plugins/autonomous-dev/test/e2e/smoke-e2e.sh` (or `.ts`) that: (a) creates a temporary git repository with a minimal codebase, (b) adds the temp repo to the daemon's allowlist, (c) runs `autonomous-dev request submit "Add a hello-world function" --repo <tmp-repo> --type feature`, (d) verifies the `state.json` file exists with `status: "intake"`, (e) runs the daemon in `--once` mode, (f) verifies the request advanced to at least the `prd` phase, (g) verifies a PRD artifact file exists in the repo, (h) verifies the portal request-action file was written, (i) cleans up. -- **Acceptance criterion**: The smoke test exits 0 on a correctly-configured system. It exits non-zero with a diagnostic message on failure.
+- **FR-019-19** (P0): The project SHALL include a smoke test script at `plugins/autonomous-dev/test/e2e/smoke-e2e.sh` (or `.ts`) that: (a) creates a temporary git repository with a minimal codebase, (b) adds the temp repo to the daemon's allowlist, (c) runs `autonomous-dev request submit "Add a hello-world function" --repo <tmp-repo> --type feature`, (d) verifies the `state.json` file exists with `status: "queued"` and `current_phase: "intake"`, (e) runs the daemon in `--once` mode, (f) verifies the request advanced to at least the `prd` phase, (g) verifies a PRD artifact file exists in the repo, (h) verifies the portal request-action file was written, (i) verifies a `phase-result-prd.json` file was written, (j) cleans up. -- **Acceptance criterion**: The smoke test exits 0 on a correctly-configured system. It exits non-zero with a diagnostic message on failure.
 
 - **FR-019-20** (P1): The smoke test SHALL be runnable in CI (no interactive prompts, no long-lived daemon). It SHALL complete in under 10 minutes. It SHALL not require a real Claude API key if the system supports a mock/stub mode; otherwise it SHALL document the API key requirement clearly. -- **Acceptance criterion**: Smoke test runs successfully in a GitHub Actions workflow (or documents why it cannot).
 
@@ -178,7 +210,7 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 ### Security
 
 - The submit handler's path validation (FR-019-07) SHALL prevent path traversal attacks. The `state.json` path SHALL be computed via `path.resolve()` and validated to begin with the target repo's absolute path.
-- Agent files referenced by the phase-to-agent mapping (FR-019-10) SHALL be validated to exist within `plugins/autonomous-dev/agents/`. The daemon SHALL not accept arbitrary file paths as agent definitions.
+- Agent names referenced by the phase-to-agent mapping (FR-019-10) SHALL be validated against the known set of agent names. The daemon SHALL not accept arbitrary strings as agent names. The `claude` CLI resolves agent names from the installed plugin's agents directory.
 - The `--prompt` passed to `claude` SHALL not include raw user input without the existing sanitization from `intake/core/sanitizer.ts` (when `injectionRules` are provided). When `injectionRules` are absent, the system operates at trust level L1+ where the operator is the submitter and injection risk is accepted.
 
 ### Scalability
@@ -192,10 +224,11 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 
 ### In Scope
 
-- Wiring the three missing dependencies in `initRouter()` as optional (graceful degradation when absent) so that `submit` persists to SQLite without crashing
+- Fixing `initRouter()` in `cli_adapter.ts` to wire the three optional dependencies without crashing (the submit handler already supports optional deps; no handler changes required)
 - Implementing the FR-824a two-phase commit handoff to write `state.json` alongside SQLite on submit
-- Implementing per-phase agent dispatch in the daemon's `spawn_session()` using the phase-to-agent mapping table
+- Implementing per-phase agent dispatch in the daemon's `spawn_session()` using `claude --agent <agent-name>` and the phase-to-agent mapping table
 - Implementing phase advancement logic in the daemon's post-session state update flow
+- Implementing `phase-result.json` output contract: agents (or a thin `spawn-session.sh` wrapper) write `phase-result-<phase>.json` to `~/.autonomous-dev/portal/request-actions/<REQ-id>/`
 - Writing request-action files to the portal's `~/.autonomous-dev/portal/request-actions/` directory on every state transition
 - Building an end-to-end smoke test that validates submit through at least one completed phase
 - Updating the phase prompt resolver to include prior-phase artifacts and review feedback
@@ -217,12 +250,12 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 
 ### Services
 
-- **Claude Code CLI** (`claude`): The daemon spawns `claude` processes for each phase. Must be installed and authenticated. Version pinning per PRD-001 R-1 mitigation.
+- **Claude Code CLI** (`claude`): The daemon spawns `claude` processes for each phase using `--agent <name>`. Must be installed and authenticated. Version pinning per PRD-001 R-1 mitigation. The `--agent` flag resolves the agent name to `plugins/autonomous-dev/agents/<name>.md`.
 - **SQLite** (`better-sqlite3`): The intake layer's canonical request index. Schema at v3, migrations managed by `intake/db/migrator.ts`.
 
 ### Database Migrations
 
-- No new SQLite schema migrations required. The existing schema supports all fields needed for FR-019-05/06. The `source` and `adapter_metadata` columns were added per PRD-008 specification.
+- No new SQLite schema migrations required. The existing schema supports all fields needed for FR-019-05/06. The `source` and `adapter_metadata` columns were added per PRD-008 specification. Note: the `current_phase` column already exists; FR-019-06a formalizes the `status` vs `current_phase` separation that is already present in the schema.
 
 ### Filesystem Paths (read/write)
 
@@ -230,12 +263,13 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 - `<repo>/.autonomous-dev/requests/<id>/events.jsonl` -- appended by daemon on state transitions (new write in this PRD's scope)
 - `<repo>/.autonomous-dev/requests/<id>/checkpoint.json` -- written by daemon (existing)
 - `~/.autonomous-dev/portal/request-actions/<id>.json` -- written by daemon on state transitions (new)
+- `~/.autonomous-dev/portal/request-actions/<id>/phase-result-<phase>.json` -- written by phase agents or spawn-session wrapper (new)
 - `~/.autonomous-dev/cost-ledger.json` -- updated by daemon (existing)
 - `~/.autonomous-dev/heartbeat.json` -- updated by daemon (existing)
 - `~/.autonomous-dev/intake.db` -- written by submit handler (existing)
 - `~/.claude/autonomous-dev.json` -- read by daemon for config (existing)
 
-### Agent Definitions (read-only)
+### Agent Definitions (read-only, resolved by `claude --agent <name>`)
 
 - `plugins/autonomous-dev/agents/prd-author.md`
 - `plugins/autonomous-dev/agents/tdd-author.md`
@@ -271,7 +305,7 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| Agent sessions produce malformed output that the daemon cannot parse to determine pass/fail, causing the pipeline to stall | High | High | Define a structured output contract: agents write a `phase-result.json` to the request directory with `{ result: "pass" \| "fail", artifacts: [...], feedback: "..." }`. The daemon reads this file rather than parsing free-form session output. If the file is missing after a session exits 0, treat as a pass with a warning logged. |
+| Agent sessions produce malformed output that the daemon cannot parse to determine pass/fail, causing the pipeline to stall | High | High | Phase agents (or the `spawn-session.sh` wrapper) write a structured `phase-result-<phase>.json` to `~/.autonomous-dev/portal/request-actions/<REQ-id>/`. The daemon reads this file rather than parsing free-form session output. If the file is missing after a session exits 0, treat as a pass with a warning logged. |
 | Phase prompts are insufficient for agents to produce quality artifacts, leading to repeated review failures and escalations | Medium | High | The prompts are iteratable. Start with minimal prompts that include request description + prior artifacts. Measure review pass rate in the smoke test. If < 50% of PRD generations pass review on first attempt, iterate on the prd-author prompt in a follow-up. |
 | The daemon's single-threaded `select_request()` -> `spawn_session()` loop means only one request is processed per iteration, leading to queue starvation for multi-request workloads | Medium | Medium | Acceptable for v1 (single-operator, 1-3 requests). The existing parallel agent spawner (`src/parallel/agent-spawner.ts`) can be wired in a future PRD to process multiple requests concurrently. |
 | `state.json` format differences between what the submit handler writes and what `validate_state_file()` / `select_request()` expect, causing the daemon to skip newly-submitted requests | Medium | High | Include a compatibility test that writes a `state.json` using the submit handler and runs it through `validate_state_file()` and the `jq` parsing in `select_request()`. This is part of the smoke test (FR-019-19). |
@@ -280,7 +314,7 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 
 ### Assumptions
 
-- The `claude` CLI supports an `--agent-prompt` flag or equivalent mechanism to load agent definitions from `.md` files. If the CLI does not support this, the agent prompt must be inlined into the `--prompt` flag, which changes the prompt construction logic but not the overall architecture. This is flagged as Open Question OQ-019-01.
+- The `claude` CLI's `--agent <name>` flag resolves the agent name from the installed plugin's agents directory (`plugins/autonomous-dev/agents/<name>.md`). Verified via `claude --help` output.
 - The existing `validate_state_file()` function in `supervisor-loop.sh` validates the JSON structure but does not reject files missing the `type` or `source` fields (since legacy state files from PRD-001 predate these fields). New state files will include these fields, but the daemon must tolerate their absence in older files.
 - The 18 agent definitions in `agents/*.md` are complete and functional -- they contain the correct system prompts, model selections, and tool configurations for their respective phases. This PRD does not validate agent content.
 - The operator has `claude` CLI installed, authenticated, and within API usage limits. The daemon's existing cost cap and rate limit checks (FR-500 through FR-508 from PRD-001) protect against runaway spending.
@@ -295,24 +329,24 @@ The autonomous-dev system has accumulated 18 prior PRDs, a working CLI intake la
 **Goal**: `autonomous-dev request submit` persists to both SQLite and `state.json` without crashing.
 
 Deliverables:
-- Patch `submit_handler.ts` to treat `claudeClient`, `duplicateDetector`, and `injectionRules` as optional (FR-019-01 through FR-019-03)
-- Verify `initRouter()` constructs without errors when the three deps are undefined (FR-019-04)
-- Implement `state.json` two-phase write in the submit handler (FR-019-05, FR-019-06, FR-019-07)
+- Fix `initRouter()` in `cli_adapter.ts` to wire `claudeClient`, `duplicateDetector`, and `injectionRules` as optional deps (FR-019-01 through FR-019-04). Note: submit_handler.ts already supports optional deps; no handler changes required.
+- Implement `state.json` two-phase write in the submit handler with dual `status`/`current_phase` fields (FR-019-05, FR-019-06, FR-019-06a, FR-019-07)
 - Rebuild CLI bundle (`bun run build:cli`)
-- Unit tests: submit handler with no optional deps, state.json schema validation against `validate_state_file()`
-- Manual validation: `autonomous-dev request submit "test" --repo /path --type feature` produces both SQLite row and `state.json`
+- Unit tests: initRouter() with no optional deps, state.json schema validation against `validate_state_file()`
+- Manual validation: `autonomous-dev request submit "test" --repo /path --type feature` produces both SQLite row and `state.json` with `status: "queued"` and `current_phase: "intake"`
 
 ### Phase 2 -- Agent Dispatch and Phase Advancement (Target: Sprint 1-2, days 3-7)
 
-**Goal**: The daemon picks up requests, dispatches the correct agent per phase, and advances through the state machine.
+**Goal**: The daemon picks up requests, dispatches the correct agent per phase via `claude --agent <name>`, and advances through the state machine.
 
 Deliverables:
-- Implement `resolve_agent()` function with the phase-to-agent mapping table (FR-019-10)
-- Update `spawn_session()` to include agent selection in the `claude` CLI invocation (FR-019-11)
-- Update `resolve_phase_prompt()` to include prior-phase artifacts and review feedback (FR-019-12)
-- Implement phase advancement in the daemon's post-session handler: `update_request_state()` writes next-phase status, appends `events.jsonl`, updates `phase_history` (FR-019-13, FR-019-14, FR-019-15)
-- Implement intake-to-first-phase transition (FR-019-09)
-- Unit tests: `resolve_agent()` for all 12 phases, `next_phase_for_state()` integration
+- Implement `resolve_agent()` function with the phase-to-agent name mapping table (FR-019-10)
+- Update `spawn_session()` to invoke `claude --agent <agent-name> --prompt <phase-prompt> --print --output-format json --max-turns <N>` (FR-019-11)
+- Implement `phase-result.json` output contract: thin wrapper in `spawn-session.sh` synthesizes result file from agent output JSON if the agent does not produce it natively (FR-019-14)
+- Update `resolve_phase_prompt()` to include prior-phase artifacts and review feedback from `phase-result-<phase>.json` (FR-019-12)
+- Implement phase advancement in the daemon's post-session handler: reads `phase-result.json`, updates `state.json` with next `current_phase` and appropriate `status`, appends `events.jsonl`, updates `phase_history` (FR-019-13, FR-019-14, FR-019-15)
+- Implement intake-to-first-phase bookkeeping transition: `current_phase: "intake"` -> `current_phase: "prd"`, `status: "queued"` -> `status: "running"` (FR-019-09)
+- Unit tests: `resolve_agent()` for all 12 phases, `next_phase_for_state()` integration, `phase-result.json` parsing
 - Manual validation: daemon with `--once` processes one request from `intake` through `prd`
 
 ### Phase 3 -- Portal Sync and Smoke Test (Target: Sprint 2, days 7-10)
@@ -339,12 +373,8 @@ Deliverables:
 
 | ID | Question | Owner | Status |
 |----|----------|-------|--------|
-| OQ-019-01 | How does the `claude` CLI accept agent definitions from `.md` files? Is `--agent-prompt` the correct flag, or must the agent prompt content be inlined into `--prompt`? If inlined, the daemon needs to read the `.md` file and prepend its content to the phase prompt. | System Operator | Open |
-| OQ-019-02 | How should the daemon determine review pass/fail from a `_review` phase session? Options: (a) the review agent writes a structured `phase-result.json` file, (b) the daemon parses the session output JSON for a verdict field, (c) the daemon checks whether the agent updated `state.json` status directly. Option (a) is cleanest but requires adding output-contract documentation to each review agent. | System Operator | Open |
-| OQ-019-03 | Should the smoke test require a real Claude API key, or should it support a mock mode? If mock mode, what mechanism stubs the `claude` CLI invocation? Options: (a) `CAPTURE_SPAWN_TO` env var (already exists in `spawn-session.sh`), (b) a `--dry-run` flag on the daemon that logs what it would spawn without invoking `claude`, (c) a fake `claude` binary on PATH that returns canned output. | System Operator | Open |
-| OQ-019-04 | Should the daemon advance the request from `intake` to `prd` immediately upon pickup, or should the intake phase itself be a real agent session that performs request enrichment (NLP parsing, disambiguation)? PRD-001 defines `intake` as a phase with a 5-minute timeout and 1 retry, suggesting it is a real phase. But the submit handler already performs validation. If `intake` is just a bookkeeping state, the daemon should skip it and go directly to `prd`. | System Operator | Open |
-| OQ-019-05 | The `code` phase agent (`code-executor.md`) is expected to create a branch and commit code. Should it also create a PR, or should that happen in the `integration` phase? PRD-001 defines `integration` as "Integration tests pass, PR created". Clarifying the boundary between `code` and `integration` affects the phase prompt content. | System Operator | Open |
-| OQ-019-06 | The portal's `request-ledger-reader.ts` expects a `waitedMin` field in request-action files. How should the daemon compute this? It would need to track when a request enters a `_review` (gate) phase and calculate elapsed minutes. This requires either a timer in the daemon or a timestamp field in `state.json`'s `phase_history`. | System Operator | Open |
+| OQ-019-05 | The `code` phase agent (`code-executor.md`) is expected to create a branch and commit code. Should it also create a PR, or should that happen in the `integration` phase? PRD-001 defines `integration` as "Integration tests pass, PR created". Clarifying the boundary between `code` and `integration` affects the phase prompt content. | System Operator | Open -- deferred to TDD |
+| OQ-019-06 | The portal's `request-ledger-reader.ts` expects a `waitedMin` field in request-action files. How should the daemon compute this? It would need to track when a request enters a `_review` (gate) phase and calculate elapsed minutes. This requires either a timer in the daemon or a timestamp field in `state.json`'s `phase_history`. | System Operator | Open -- deferred to TDD |
 
 ---
 
@@ -358,4 +388,4 @@ Deliverables:
 
 ---
 
-*End of PRD-019: Intake-to-Deploy End-to-End Pipeline*
+*End of PRD-019: Intake-to-Deploy End-to-End Pipeline (v1.1)*
