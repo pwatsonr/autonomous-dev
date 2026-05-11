@@ -118,13 +118,12 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
                 <tbody>
                     {agents.map((a) => (
                         // PLAN-038 polish — row click loads the inspect
-                        // modal via HTMX. The handler returns an HTML
-                        // fragment that mounts inside #modal-slot.
+                        // modal. The delegated click handler lives in
+                        // static/js/agents-row-click.js (CSP disallows
+                        // inline `onclick` attributes). The script reads
+                        // `data-agent` to fetch the right modal fragment.
                         <tr
                             data-agent={a.name}
-                            hx-get={`/agents/${a.name}/inspect-modal`}
-                            hx-target="#modal-slot"
-                            hx-swap="innerHTML"
                             role="button"
                             tabindex={0}
                         >
@@ -147,7 +146,8 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
             </table>
         )}
 
-        {/* HTMX swap target for the inspect modal. */}
-        <div id="modal-slot"></div>
+        {/* Modal-slot lives in ShellLayout (shell.tsx) so it's available
+            on every surface — do not duplicate the id here. */}
+        <script src="/static/js/agents-row-click.js" defer></script>
     </section>
 );

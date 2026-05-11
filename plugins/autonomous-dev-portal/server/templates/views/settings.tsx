@@ -30,42 +30,51 @@ import { TrustOverridesTable } from "../fragments/trust-overrides-table";
 
 // ---- Tab panel sub-views ---------------------------------------------------
 
-const TRUST_LEVELS = ["L0", "L1", "L2", "L3"] as const;
+// PLAN-038 polish — rewritten to match the kit's `<section class="sec">`
+// pattern (Settings.jsx). Each section uses `.sec` for vertical spacing,
+// `.sec-head` for the h2, and `.dim` for the description paragraph.
+
+const TRUST_LEVEL_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+    { value: "L0", label: "L0 — paranoid (every gate human)" },
+    { value: "L1", label: "L1 — automated tests" },
+    { value: "L2", label: "L2 — automated PRD + cost" },
+    { value: "L3", label: "L3 — only security gate human" },
+];
 
 const TrustCard: FC<{ data: SettingsData }> = ({ data }) => (
-    <section class="card" aria-labelledby="trust-heading">
-        <h3 id="trust-heading">Trust level</h3>
-        <p class="meta">
-            Higher trust levels reduce manual approval prompts. Per-repo
-            overrides take precedence over the global default.
+    <section class="sec" aria-labelledby="trust-heading">
+        <div class="sec-head">
+            <h2 id="trust-heading">Trust level</h2>
+        </div>
+        <p class="dim">
+            Determines which gates require human approval. Per-repo overrides
+            take precedence over the global default.
         </p>
-        <fieldset class="field" data-field="trust-level">
-            <legend class="visually-hidden">Global trust level</legend>
-            {TRUST_LEVELS.map((lvl) => {
-                const id = `trust-level-${lvl.toLowerCase()}`;
-                return (
-                    <label class="radio" for={id}>
-                        <input
-                            type="radio"
-                            id={id}
-                            name="trust-level"
-                            value={lvl}
-                            checked={data.trustLevel === lvl}
-                            data-validate="trust-level"
-                        />
-                        <span class="mono">{lvl}</span>
-                    </label>
-                );
-            })}
-        </fieldset>
+        <select
+            class="input"
+            name="trust-level"
+            data-validate="trust-level"
+        >
+            {TRUST_LEVEL_OPTIONS.map((opt) => (
+                <option value={opt.value} selected={data.trustLevel === opt.value}>
+                    {opt.label}
+                </option>
+            ))}
+        </select>
     </section>
 );
 
 const TrustOverridesCard: FC<{ data: SettingsData }> = ({ data }) => {
     const allowlistPaths = data.allowlist.map((e) => e.path);
     return (
-        <section class="card" aria-labelledby="trust-overrides-heading">
-            <h3 id="trust-overrides-heading">Per-repo overrides</h3>
+        <section class="sec" aria-labelledby="trust-overrides-heading">
+            <div class="sec-head">
+                <h2 id="trust-overrides-heading">Per-repo overrides</h2>
+            </div>
+            <p class="dim">
+                Pin a different trust level for specific repos. Useful for
+                experimental or low-stakes repositories.
+            </p>
             <TrustOverridesTable
                 overrides={data.trustOverrides}
                 allowlist={allowlistPaths}
@@ -80,8 +89,13 @@ const TrustOverridesCard: FC<{ data: SettingsData }> = ({ data }) => {
 };
 
 const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
-    <section class="card" aria-labelledby="cost-caps-heading">
-        <h3 id="cost-caps-heading">Cost caps</h3>
+    <section class="sec" id="cost-caps" aria-labelledby="cost-caps-heading">
+        <div class="sec-head">
+            <h2 id="cost-caps-heading">Cost caps</h2>
+        </div>
+        <p class="dim">
+            Hard caps. Pipelines pause when reached until reset or override.
+        </p>
         <div class="field" data-cost-cap-group>
             <label for="cost-cap-per-request">Per-request cap</label>
             <span class="prefix">$</span>
@@ -154,8 +168,13 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
 );
 
 const AllowlistCard: FC<{ data: SettingsData }> = ({ data }) => (
-    <section class="card" aria-labelledby="allowlist-heading">
-        <h3 id="allowlist-heading">Repo allowlist</h3>
+    <section class="sec" aria-labelledby="allowlist-heading">
+        <div class="sec-head">
+            <h2 id="allowlist-heading">Repo allowlist</h2>
+        </div>
+        <p class="dim">
+            Only repositories on this list can be the target of a request.
+        </p>
         <AllowlistTable entries={data.allowlist} />
         <form
             class="add-allowlist-form"
