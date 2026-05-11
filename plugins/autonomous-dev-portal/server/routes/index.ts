@@ -37,7 +37,11 @@ import {
     buildAgentActionRoutes,
     type AgentActionDeps,
 } from "./agents-actions";
-import { agentsApiHandler, agentsHandler } from "./agents";
+import {
+    agentsApiHandler,
+    agentsHandler,
+    agentsInspectModalHandler,
+} from "./agents";
 import { approvalsHandler } from "./approvals";
 import {
     buildApprovalsActionRoutes,
@@ -298,6 +302,8 @@ export function registerRoutes(
     app.get("/agents", agentsHandler);
     app.get("/repos", reposHandler);
     app.get("/api/agents", agentsApiHandler);
+    // PLAN-038 polish — row click loads the inspect modal HTML fragment.
+    app.get("/agents/:name/inspect-modal", agentsInspectModalHandler);
 
     // PLAN-038 TASK-001 — SVG favicon at the URL root (browsers default-request
     // /favicon.svg). Reads from the configured static root so it honors the

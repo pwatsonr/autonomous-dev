@@ -23,7 +23,15 @@ import { noopActionLogger, resolveActor } from "./_action-deps";
 const NAME_RE = /^[a-z][a-z0-9-]{0,63}$/;
 const CLI_TIMEOUT_MS = 10_000;
 
-export type AgentVerb = "promote" | "shadow" | "freeze";
+// PLAN-038 polish — added "unshadow" + "unfreeze" so the operator can
+// reverse a state change from the UI (matches the CLI bridge in
+// plugins/autonomous-dev/bin/agent-cli.ts which already supports both).
+export type AgentVerb =
+    | "promote"
+    | "shadow"
+    | "freeze"
+    | "unshadow"
+    | "unfreeze";
 
 export interface AgentCliResult {
     ok: boolean;
@@ -67,9 +75,18 @@ export interface AgentActionDeps {
 }
 
 function pastTenseEvent(verb: AgentVerb): string {
-    if (verb === "promote") return "agent_promoted";
-    if (verb === "shadow") return "agent_shadowed";
-    return "agent_frozen";
+    switch (verb) {
+        case "promote":
+            return "agent_promoted";
+        case "shadow":
+            return "agent_shadowed";
+        case "freeze":
+            return "agent_frozen";
+        case "unshadow":
+            return "agent_unshadowed";
+        case "unfreeze":
+            return "agent_unfrozen";
+    }
 }
 
 function genericErrorFragment(): JSX.Element {
@@ -203,6 +220,8 @@ export function buildAgentActionRoutes(
     router.post("/api/agents/:name/promote", handle("promote"));
     router.post("/api/agents/:name/shadow", handle("shadow"));
     router.post("/api/agents/:name/freeze", handle("freeze"));
+    router.post("/api/agents/:name/unshadow", handle("unshadow"));
+    router.post("/api/agents/:name/unfreeze", handle("unfreeze"));
 
     router.get("/api/agents/:name/inspect", async (c) => {
         const name = c.req.param("name");

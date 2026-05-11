@@ -48,6 +48,40 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
             <h1>Agents</h1>
         </div>
 
+        {/* PLAN-038 polish — intro + lifecycle explanation. Operators
+            new to the system need to know what BASELINE / SHADOW / FROZEN
+            / PROMOTED mean before they decide what to do with a row. */}
+        <div class="agents-intro">
+            <p>
+                Plugin agents run reviewers, executors, and analysts during
+                request processing. Each agent has a lifecycle state:
+            </p>
+            <dl>
+                <dt>baseline</dt>
+                <dd>
+                    The default. The agent runs at its declared version on
+                    every matching request.
+                </dd>
+                <dt>shadow</dt>
+                <dd>
+                    Runs in parallel for evaluation but its output does not
+                    affect gates or scoring. Use to evaluate a new agent or
+                    a version bump without risk.
+                </dd>
+                <dt>frozen</dt>
+                <dd>
+                    Pinned at the current version — the daemon will not
+                    auto-upgrade it. Use when a newer version regressed
+                    behavior.
+                </dd>
+                <dt>promoted</dt>
+                <dd>
+                    A previously-shadow agent that has been promoted to
+                    serve traffic. Reverts to baseline if rolled back.
+                </dd>
+            </dl>
+        </div>
+
         <div class="kpi-strip">
             <div class="kpi">
                 <div class="kpi-label">Total agents</div>
@@ -83,7 +117,17 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
                 </thead>
                 <tbody>
                     {agents.map((a) => (
-                        <tr>
+                        // PLAN-038 polish — row click loads the inspect
+                        // modal via HTMX. The handler returns an HTML
+                        // fragment that mounts inside #modal-slot.
+                        <tr
+                            data-agent={a.name}
+                            hx-get={`/agents/${a.name}/inspect-modal`}
+                            hx-target="#modal-slot"
+                            hx-swap="innerHTML"
+                            role="button"
+                            tabindex={0}
+                        >
                             <td class="agent-name">{a.name}</td>
                             <td class="mono">{a.version}</td>
                             <td>
@@ -102,5 +146,8 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
                 </tbody>
             </table>
         )}
+
+        {/* HTMX swap target for the inspect modal. */}
+        <div id="modal-slot"></div>
     </section>
 );

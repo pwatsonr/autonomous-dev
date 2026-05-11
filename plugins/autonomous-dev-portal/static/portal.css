@@ -1,3 +1,91 @@
 /*! autonomous-dev portal.css | portal-only overrides: kill-switch (PLAN-035-3) + error page (PLAN-036-1). Kit base rules live in app.css; do not duplicate them here. */
 /*! daemon status banner + error page — PLAN-036-1 */.daemon-status-banner{padding:var(--s-4);border-left:4px solid;border-radius:var(--r-1);margin-bottom:var(--s-4)}.daemon-status-banner.warning{background:var(--warn-tint);border-color:var(--warn)}.daemon-status-banner.error{background:var(--err-tint);border-color:var(--err)}.error-page{max-width:600px;margin:var(--s-12) auto;text-align:center;padding:var(--s-6)}.error-page h1{font-size:var(--t-display);margin:var(--s-4) 0}.error-message{font-size:var(--t-h1);color:var(--fg-1)}.error-help{color:var(--fg-2)}.error-actions{display:flex;gap:var(--s-4);justify-content:center;margin-top:var(--s-6)}.error-details{margin-top:var(--s-6);text-align:left;background:var(--bg-2);padding:var(--s-4);border-radius:var(--r-2)}.error-details summary{cursor:pointer;font-weight:600}.error-details pre{overflow-x:auto;font-size:var(--t-meta)}.daemon-status-info{margin-top:var(--s-6);text-align:left}.daemon-troubleshooting code{background:var(--bg-2);padding:0 var(--s-1);border-radius:var(--r-1);font-size:var(--t-meta)}
 /*! kill-switch — SPEC-035-3-01 */.ks-panel{border:1px solid var(--line-1);border-radius:3px;padding:12px 14px}.ks-panel.armed{border-color:var(--err-line,var(--err));background:var(--err-tint)}.ks-panel.ks-error{border-color:var(--err-line,var(--err));background:var(--err-tint)}.ks-status{display:flex;align-items:center;gap:12px}.ks-action{margin-top:8px}.ks-confirm-label{font:11px/1.4 var(--mono,monospace);color:var(--err);display:block;margin-bottom:4px}
+
+/*! portal polish pass — overrides for vendored app.css. app.css is vendored verbatim per PRD-018 R-01; these overrides land in portal.css at the same specificity. */
+
+/* Brand wordmark — keep `[ autonomous-dev ]` on one line. Without nowrap, the
+   bracket spans flow onto a second line when the rail's content padding
+   compresses (visible regression after the SPEC-037-3-03 caption was added). */
+.rail-brand .wm { white-space: nowrap; }
+
+/* Buttons (incl. anchors styled as buttons) must not show the default <a>
+   underline. The vendored .btn rule omits text-decoration; anchors using
+   class="btn" therefore inherit underline from user-agent. */
+.btn, a.btn, .head-actions a, .head-actions button { text-decoration: none; }
+.btn:hover, a.btn:hover { text-decoration: none; }
+
+/* Agents surface — clickable rows. Cursor + hover hint so operators know
+   each row opens an inspect modal. */
+.agents-surface .tbl tbody tr { cursor: pointer; }
+.agents-surface .tbl tbody tr:hover { background: var(--bg-2); }
+
+/* Agents intro — small explanatory paragraph below H1. */
+.agents-intro { color: var(--fg-1); font-size: 13px; line-height: 1.55; margin: 0 0 18px; max-width: 720px; }
+.agents-intro dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 10px 0 0; }
+.agents-intro dt { font-family: var(--font-mono); font-size: 11px; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.05em; }
+.agents-intro dd { margin: 0; font-size: 13px; color: var(--fg-1); }
+
+/* Repos surface — give the table the same clickable cue once row links land. */
+.repos-surface .tbl tbody tr { cursor: default; }
+
+/* Costs / Approvals — disabled head-action button styling so "Bulk approve"
+   visibly grays out when there's nothing to approve. */
+.btn:disabled, .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+/* Approvals — bulk approve button width: keep the full label visible. */
+.head-actions .btn.bulk-approve { white-space: nowrap; }
+
+/* Agent inspect modal — stats grid layout (label / value pairs). */
+.modal .stats-grid { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 12px 0; font-size: 13px; }
+.modal .stats-grid dt { font-family: var(--font-mono); font-size: 11px; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.05em; }
+.modal .stats-grid dd { margin: 0; color: var(--fg-0); }
+
+/* PLAN-038 polish — Settings page layout fixes.
+   The vendored .field rule (app.css:267) stacks everything vertically;
+   that's wrong for radio groups and `$ + input` cost-cap pairs. */
+
+/* Trust level radio group — horizontal layout. */
+.field[data-field="trust-level"] {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+}
+.field[data-field="trust-level"] .radio {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+
+/* Cost cap inputs — label on top, then `$ + input` on one row. */
+.field[data-cost-cap-group] { gap: 6px; }
+.field[data-cost-cap-group] label { font-size: 12px; font-weight: 500; color: var(--fg-1); }
+.field[data-cost-cap-group] .prefix {
+    display: inline-block;
+    width: 18px;
+    text-align: right;
+    color: var(--fg-2);
+    font-family: var(--font-mono);
+}
+/* Wrap prefix + input on a single row using a grid-like flex setup.
+   Two children (.prefix + .input) inside a vertical flex container —
+   target them with a positional selector to make them inline. */
+.field[data-cost-cap-group] .prefix + .input {
+    display: inline-block;
+    width: calc(100% - 28px);
+}
+/* Re-flow: make the cost-cap field a 2-row grid so prefix + input share the second row. */
+.field[data-cost-cap-group] {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 4px;
+    align-items: center;
+}
+.field[data-cost-cap-group] > label { grid-column: 1 / -1; grid-row: 1; }
+.field[data-cost-cap-group] > .prefix { grid-column: 1; grid-row: 2; }
+.field[data-cost-cap-group] > .input { grid-column: 2; grid-row: 2; width: 100%; }
+.field[data-cost-cap-group] > [data-field-error] { grid-column: 1 / -1; grid-row: 3; }

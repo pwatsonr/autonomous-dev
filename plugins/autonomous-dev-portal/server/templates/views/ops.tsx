@@ -12,7 +12,9 @@
 import type { FC } from "hono/jsx";
 
 import { Btn, Card, Chip, Dot } from "../../components/primitives";
-import { KillSwitch } from "../../components/kill-switch";
+// PLAN-038 polish — KillSwitch removed from Ops head-actions (already in
+// rail-ops bar). Import retained-as-comment for git-blame discoverability.
+// import { KillSwitch } from "../../components/kill-switch";
 import type { OpsHealth, RenderProps } from "../../types/render";
 import { EmptyState } from "../fragments/empty-state";
 import { HeartbeatSparkline } from "../fragments/heartbeat-sparkline";
@@ -124,17 +126,14 @@ const OpsHeadActions: FC<{ health: OpsHealth; csrfToken?: string }> = ({
     health,
     csrfToken,
 }) => {
-    const ks = health.killSwitch ?? { engaged: false, armed: false };
+    // PLAN-038 polish — the rail-ops bar (bottom of left rail) already
+    // carries the Kill switch button (see ShellLayout). Duplicating it
+    // on the Ops surface adds visual noise without adding capability.
+    void health;
+    void csrfToken;
     return (
         <>
             <Btn>Refresh</Btn>
-            <KillSwitch
-                engaged={ks.engaged}
-                armed={ks.armed}
-                armedAt={ks.armedAt}
-                onConfirm="/ops/kill-switch"
-                csrfToken={csrfToken ?? ""}
-            />
         </>
     );
 };

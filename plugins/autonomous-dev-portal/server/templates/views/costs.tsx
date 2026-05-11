@@ -13,7 +13,7 @@
 
 import type { FC } from "hono/jsx";
 
-import { Btn, Chip } from "../../components/primitives";
+import { Chip } from "../../components/primitives";
 import type { ProjectionResult } from "../../lib/costs-projection";
 import type { CostSeries, RenderProps } from "../../types/render";
 import { CostChart } from "../fragments/cost-chart";
@@ -76,9 +76,13 @@ export function buildCostsKpis(s: CostSeries): KpiItem[] {
 }
 
 const CostsHeadActions: FC = () => (
+    // PLAN-038 polish — "Export CSV" was a dead button (no handler, no
+    // requirement). Dropped. "Set caps" now deeplinks to the cost-caps
+    // section on the Settings General tab.
     <>
-        <Btn>Export CSV</Btn>
-        <Btn>Set caps</Btn>
+        <a class="btn" href="/settings#cost-caps">
+            Set caps
+        </a>
     </>
 );
 
