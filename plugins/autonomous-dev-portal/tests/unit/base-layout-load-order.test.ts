@@ -97,7 +97,19 @@ describe("BaseLayout — SPEC-034-1-06 stylesheet & script load order", () => {
 
     test("<html> carries a default data-theme attribute the IIFE can override", async () => {
         const html = await renderHomeHtml();
-        // Match either `data-theme="light"` or `data-theme='light'`.
+        // SPEC-037-1-01 — default flipped from "light" to "dark" so cold
+        // loads paint against the kit's dark palette.
+        expect(html).toMatch(/<html[^>]*\sdata-theme=["']dark["']/);
+    });
+
+    test("SPEC-037-1-01: an explicit theme='light' override still renders 'light'", async () => {
+        const html = await renderFullPage(
+            "dashboard",
+            { data: { repos: [] }, aggregates: EMPTY_AGGREGATES },
+            undefined,
+            "",
+            "light",
+        );
         expect(html).toMatch(/<html[^>]*\sdata-theme=["']light["']/);
     });
 

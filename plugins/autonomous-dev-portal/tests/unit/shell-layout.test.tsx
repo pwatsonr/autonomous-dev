@@ -1,8 +1,10 @@
 // SPEC-035-1-01 §ShellLayout — unit tests.
+// SPEC-037-1-01 — default theme flipped from "light" to "dark"; SPEC-037-1-02
+// adds the theme-toggle pill rendered as the final child of `.rail-ops`.
 //
 // Renders <ShellLayout> via Hono's JSX runtime and asserts the structural
 // invariants from the spec acceptance criteria:
-//   - <html data-theme=…> reflects the prop (defaults to "light")
+//   - <html data-theme=…> reflects the prop (defaults to "dark")
 //   - design-tokens.css is the FIRST stylesheet
 //   - FOUC-prevention IIFE is present in <head>, nonce-protected
 //   - body contains <div class="app"> with <aside class="rail"> + <main class="main">
@@ -21,9 +23,9 @@ async function render(node: unknown): Promise<string> {
 }
 
 describe("ShellLayout — SPEC-035-1-01", () => {
-    test("AC: <html data-theme='light'> when theme prop is omitted", async () => {
+    test("AC (SPEC-037-1-01): <html data-theme='dark'> when theme prop is omitted", async () => {
         const html = await render(<ShellLayout activePath="/" />);
-        expect(html).toMatch(/<html[^>]*\sdata-theme=["']light["']/);
+        expect(html).toMatch(/<html[^>]*\sdata-theme=["']dark["']/);
     });
 
     test("AC: <html data-theme='dark'> when theme='dark'", async () => {
@@ -31,6 +33,29 @@ describe("ShellLayout — SPEC-035-1-01", () => {
             <ShellLayout activePath="/" theme="dark" />,
         );
         expect(html).toMatch(/<html[^>]*\sdata-theme=["']dark["']/);
+    });
+
+    test("AC (SPEC-037-1-01): <html data-theme='light'> when theme='light'", async () => {
+        const html = await render(
+            <ShellLayout activePath="/" theme="light" />,
+        );
+        expect(html).toMatch(/<html[^>]*\sdata-theme=["']light["']/);
+    });
+
+    test("AC (SPEC-037-1-01): theme=undefined resolves to 'dark' (defensive)", async () => {
+        const html = await render(
+            <ShellLayout
+                activePath="/"
+                theme={undefined as unknown as "dark"}
+            />,
+        );
+        expect(html).toMatch(/<html[^>]*\sdata-theme=["']dark["']/);
+    });
+
+    test("AC (SPEC-037-1-01): FOUC IIFE fallback branch is 'dark'", async () => {
+        const html = await render(<ShellLayout activePath="/" />);
+        // The inverted ternary form: t === 'light' ? 'light' : 'dark'.
+        expect(html).toContain("'light'?'light':'dark'");
     });
 
     test("AC: design-tokens.css is the FIRST stylesheet in <head>", async () => {
