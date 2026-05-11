@@ -92,12 +92,22 @@ const VARIANTS: PipelineVariant[] = [
             "deploy",
             "observe",
         ],
+        // SPEC-037-5-03 — reviewer chain per phase (`.rev-line` rendering).
+        reviewers: {
+            review: ["qa-edge-case", "security-reviewer"],
+            code: ["code-reviewer"],
+            deploy: ["release-manager"],
+        },
     },
     {
         id: "fast",
         label: "Fast-track (4-phase)",
         desc: "PLAN → CODE → REVIEW → OBSERVE for tiny changes.",
         phases: ["plan", "code", "review", "observe"],
+        reviewers: {
+            review: ["qa-edge-case"],
+            code: ["code-reviewer"],
+        },
     },
 ];
 
@@ -131,27 +141,43 @@ const STANDARDS: StandardRule[] = [
     },
 ];
 
+// SPEC-037-5-04 — backend cards consume `name`, `kind` ("bundled"/"plugin"),
+// `cost`, `caps`, and `status` ("available"/"not-installed") in addition to
+// the legacy fields. The stub fans out across both kinds so the snapshot
+// asserts the chip-class flip and the `not-installed` action footer.
 const BACKENDS: DeployBackend[] = [
     {
         id: "fly-prod",
         label: "Fly.io (prod)",
-        kind: "fly",
+        name: "Fly.io (prod)",
+        kind: "bundled",
         enabled: true,
         health: "ok",
+        cost: "$0.012 / run",
+        caps: ["regions:auto", "blue/green", "rollback"],
+        status: "available",
     },
     {
         id: "k8s-stage",
         label: "Kubernetes (staging)",
-        kind: "k8s",
+        name: "Kubernetes (staging)",
+        kind: "bundled",
         enabled: true,
         health: "warn",
+        cost: "$0.008 / run",
+        caps: ["multi-region", "rollback"],
+        status: "available",
     },
     {
         id: "render-canary",
         label: "Render (canary)",
-        kind: "render",
+        name: "Render (canary)",
+        kind: "plugin",
         enabled: false,
         health: "muted",
+        cost: "$0.020 / run",
+        caps: ["preview-urls"],
+        status: "not-installed",
     },
 ];
 
@@ -226,6 +252,10 @@ const SETTINGS_DATA: SettingsData = {
     standards: STANDARDS,
     backends: BACKENDS,
     agents: AGENTS,
+    // SPEC-037-5-02 — flat defaults consumed by the rebuilt General tab.
+    dailyCap: 25,
+    defaultVariant: "p8",
+    defaultBackend: "fly-prod",
 };
 
 /**

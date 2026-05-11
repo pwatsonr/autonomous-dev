@@ -144,6 +144,14 @@ export const ShellLayout: FC<ShellProps> = ({
                     type="module"
                     nonce={nonce}
                 ></script>
+                {/* SPEC-037-5-06 — shared overlay-modal dismissal helper.
+                    Document-level delegated listeners; safe to load on
+                    every page (no-op when no `.modal-bg` is present). */}
+                <script
+                    src="/static/js/modal-overlay.js"
+                    defer
+                    nonce={nonce}
+                ></script>
             </head>
             <body>
                 <div class="app">
