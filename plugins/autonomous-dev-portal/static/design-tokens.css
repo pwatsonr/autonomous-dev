@@ -113,15 +113,19 @@
   --muted-tint: #ebe9df;
 
   /* ----- Phase colors (PRD → TDD → Plan → Spec → Code → Review → Deploy → Observe) ----- */
-  /* Subtle, distinct. Used as left bar / chip background only. */
-  --phase-prd:    #6b4ea8;
-  --phase-tdd:    #2f6f8f;
-  --phase-plan:   #1d7a5f;
-  --phase-spec:   #6b6a1a;
-  --phase-code:   #c8631a;
-  --phase-review: #8a4d1b;
-  --phase-deploy: #2f7a3e;
-  --phase-observe:#5a5a5a;
+  /* Subtle, distinct. Used as left bar / chip background only.
+     Palette alternates dark/medium luminance along the pipeline so adjacent
+     phase chips reach >=3:1 peer-chip contrast (PRD-018 M-02 part B / OI-3403).
+     Same hue families as before: purple / blue / green / olive / orange /
+     brown / green-dark / gray. */
+  --phase-prd:    #3d2470;
+  --phase-tdd:    #4f93b0;
+  --phase-plan:   #0d3a2a;
+  --phase-spec:   #948a22;
+  --phase-code:   #5a2d08;
+  --phase-review: #b8814f;
+  --phase-deploy: #0d3a18;
+  --phase-observe:#878573;
 
   /* ----- Type: Families ----- */
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -226,15 +230,18 @@
   --muted: #95917f;
   --muted-tint: #2a281f;
 
-  /* Phase colors — lighter so they read against bg-1 */
-  --phase-prd:    #a48bd9;
-  --phase-tdd:    #6fa8c7;
-  --phase-plan:   #66b896;
-  --phase-spec:   #b5b250;
-  --phase-code:   #e89255;
-  --phase-review: #c98a55;
-  --phase-deploy: #98c39a;
-  --phase-observe:#9a978a;
+  /* Phase colors — alternate light/dark along the pipeline so adjacent chips
+     reach >=3:1 peer-chip contrast (PRD-018 M-02 part B / OI-3403). Same hue
+     families as the light theme; "high" lanes are lifted, "low" lanes pulled
+     down to widen the luminance gap. All still >=3:1 vs --bg-0. */
+  --phase-prd:    #d6c4ee;
+  --phase-tdd:    #3d6f94;
+  --phase-plan:   #a8e0c4;
+  --phase-spec:   #6f6c20;
+  --phase-code:   #f5b888;
+  --phase-review: #955d35;
+  --phase-deploy: #c4e8c6;
+  --phase-observe:#706e5c;
 
   /* Shadows — barely-there, more about depth than light */
   --shadow-1: 0 1px 0 rgba(0,0,0,0.4), 0 0 0 1px var(--line-1);
