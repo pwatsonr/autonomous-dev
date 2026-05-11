@@ -22,3 +22,4 @@ daemon.lock
 heartbeat.json
 crash-state.json
 kill-switch.flag
+.claude/
