@@ -1,0 +1,6 @@
+{
+  "v": 1,
+  "frozen": ["security-reviewer", "deploy-executor"],
+  "shadowed": ["code-executor", "test-executor"],
+  "updatedAt": "2026-05-09T14:21:00Z"
+}

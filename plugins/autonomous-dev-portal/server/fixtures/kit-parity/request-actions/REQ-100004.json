@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100004",
+  "repo": "profile-svc",
+  "title": "Avatar upload pipeline",
+  "phase": "PLAN",
+  "status": "running",
+  "cost": 1.18,
+  "variant": "feature-default",
+  "createdAt": "2026-05-10T08:15:00Z"
+}
