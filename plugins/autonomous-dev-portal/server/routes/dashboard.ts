@@ -16,7 +16,7 @@ import {
     computeStandardsDrift,
     totalBlockingHits as sumBlockingHits,
 } from "../lib/standards-drift";
-import { loadDashboardStub } from "../stubs/repos";
+import { readDashboardData } from "../wiring/dashboard-readers";
 import type {
     DashboardAggregatesProp,
     DashboardData,
@@ -71,7 +71,10 @@ export function computeDashboardAggregates(
 }
 
 export const dashboardHandler = async (c: Context): Promise<Response> => {
-    const data = await loadDashboardStub();
+    // PLAN-038 TASK-012 — swapped from loadDashboardStub() to the real
+    // composition reader. Empty state-dir → honest zero KPIs (per the
+    // tenet "Honesty over fidelity").
+    const data = await readDashboardData();
     const aggregates = computeDashboardAggregates(data);
     return renderPage(c, "dashboard", { data, aggregates });
 };

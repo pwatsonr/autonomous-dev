@@ -42,16 +42,19 @@ describe("PLAN-038 new routes — /agents, /repos, /api/agents", () => {
         expect(Array.isArray(body)).toBe(true);
     });
 
-    test("/agents empty-state copy is honest (no kit fixtures leak)", async () => {
+    test("/agents lists real manifest agents (not kit fixtures)", async () => {
         const app = freshApp();
         const res = await app.request("/agents");
         const html = await res.text();
-        // Honest empty-state copy from agents.tsx view.
-        expect(html).toContain("No agents have been frozen or shadowed");
-        // Kit-screenshot fixtures must NOT appear in the live empty-state.
-        expect(html).not.toContain("qa-edge-case");
-        expect(html).not.toContain("ux-ui");
-        expect(html).not.toContain("rule-set");
+        // After TASK-015, /agents reads from plugins/autonomous-dev/agents/*.md
+        // — the real manifest. It should list real agents like code-executor
+        // (and qa-edge-case-reviewer, which is a real agent name — distinct
+        // from the kit's "qa-edge-case" fixture-only name without the suffix).
+        expect(html).toContain("code-executor");
+        // The kit's fake bare names (no `-reviewer` suffix) from stubs/costs.ts
+        // should not leak: the rendered table only has full manifest names.
+        const fakeBarePattern = /\bqa-edge-case\b(?!-)/; // not followed by a `-`
+        expect(html).not.toMatch(fakeBarePattern);
     });
 
     test("/repos empty-state copy is honest (no kit fixtures leak)", async () => {

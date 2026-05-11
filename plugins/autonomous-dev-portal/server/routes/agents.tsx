@@ -12,25 +12,18 @@
 import type { Context } from "hono";
 
 import { renderPage } from "../lib/response-utils";
-import type { AgentsPageData } from "../types/render";
+import { readAgentsData } from "../wiring/agents-readers";
 
-/** PLAN-038 §empty-state honesty — readers return safe zeros until the
- *  composition layer is wired. The view renders honest empty-state copy. */
-function emptyAgentsPageData(): AgentsPageData {
-    return {
-        kpis: { totalAgents: 0, frozenCount: 0, shadowCount: 0 },
-        agents: [],
-    };
-}
-
-/** `GET /agents` — Agents surface (HTML). */
+/** `GET /agents` — Agents surface (HTML). PLAN-038 TASK-015 wires the
+ *  real composition reader (was emptyAgentsPageData scaffolding in
+ *  TASK-005). */
 export const agentsHandler = async (c: Context): Promise<Response> => {
-    const data = emptyAgentsPageData();
+    const data = await readAgentsData();
     return renderPage(c, "agents", data);
 };
 
 /** `GET /api/agents` — same data as JSON. */
 export const agentsApiHandler = async (c: Context): Promise<Response> => {
-    const data = emptyAgentsPageData();
+    const data = await readAgentsData();
     return c.json(data.agents);
 };

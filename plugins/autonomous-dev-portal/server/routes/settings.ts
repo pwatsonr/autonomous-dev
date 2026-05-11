@@ -9,6 +9,7 @@ import type { Context } from "hono";
 import { renderPage } from "../lib/response-utils";
 import { loadSettingsData, loadSettingsStub } from "../stubs/settings";
 import { TAB_IDS, type TabId } from "../types/render";
+import { readPortalSettings } from "../wiring/settings-reader";
 
 /**
  * SPEC-036-4-01 AC-01 / AC-06 — pure function so it can be unit-tested
@@ -28,5 +29,25 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
     const config = await loadSettingsStub();
     const data = await loadSettingsData();
     data.activeTab = resolveActiveTab(c.req.query("tab"));
+
+    // PLAN-038 TASK-020 — swap the fake `/Users/op/repos/*` allowlist for
+    // the real portal-settings allowlist. Other settings tabs (general /
+    // variants / standards / backends / agents) remain on the stub for
+    // now; their wiring is tracked as follow-up under PRD-018 NG-3702.
+    const realSettings = await readPortalSettings();
+    if (realSettings.allowlist.length > 0) {
+        config.allowlist = realSettings.allowlist.map((entry, i) => ({
+            id: entry.id,
+            path: entry.path,
+            // Real-source allowlist entries don't carry the legacy
+            // `status` / `addedAt` fields. Defaults preserve the view
+            // contract without lying about state.
+            status: "ok" as const,
+            addedAt: new Date().toISOString(),
+        }));
+    } else {
+        config.allowlist = [];
+    }
+
     return renderPage(c, "settings", { config, data });
 };
