@@ -2,7 +2,7 @@
 governance:
   status: ready-for-review
   created_at: "2026-05-11T22:00:00Z"
-  updated_at: "2026-05-11T22:00:00Z"
+  updated_at: "2026-05-12T01:30:00Z"
   phase: tdd
   jira_epic: ""
   slug: intake-to-deploy-e2e-pipeline
@@ -11,6 +11,10 @@ governance:
     - status: ready-for-review
       timestamp: "2026-05-11T22:00:00Z"
       actor: tdd-author
+    - status: ready-for-review
+      timestamp: "2026-05-12T01:30:00Z"
+      actor: tdd-author
+      note: "v1.1 -- address reviewer findings (3 MAJOR, 3 MINOR, 2 SUGGESTION)"
 ---
 
 # TDD-038: Intake-to-Deploy End-to-End Pipeline
@@ -18,11 +22,37 @@ governance:
 | Field       | Value                                      |
 |-------------|--------------------------------------------|
 | **TDD ID**  | TDD-038                                    |
-| **Version** | 1.0                                        |
-| **Date**    | 2026-05-11                                 |
+| **Version** | 1.1                                        |
+| **Date**    | 2026-05-12                                 |
 | **Author**  | Patrick Watson                             |
 | **Plugin**  | autonomous-dev                             |
 | **PRD**     | PRD-019 v1.1                               |
+
+---
+
+## Changelog
+
+### v1.1 (2026-05-12)
+
+Addresses the TDD reviewer's 3 MAJOR, 3 MINOR, and 2 SUGGESTION findings.
+
+**MAJOR-1 (Competing agent-dispatch paths)**: Rewrote Section 6.2 agent dispatch design. The canonical dispatch point is now `spawn_session_typed()` in `spawn-session.sh` (existing, line 110). The daemon's `spawn_session()` delegates to it via a new `dispatch_phase_session()` wrapper that resolves phase to agent name and calls `spawn_session_typed`. All references to directly invoking `claude --print --output-format json --max-turns N --prompt ...` in `supervisor-loop.sh` have been removed.
+
+**MAJOR-2 (Dead `jq -n` block)**: Deleted the dead `jq -n` block from `write_portal_request_action()`. The first `jq -n` invocation used `input` on `/dev/null` stdin, always producing null, suppressed by `|| true`. The second `jq` block (which reads from `state.json`) is self-contained and is the sole implementation.
+
+**MAJOR-3 (OQ-019-05 resolution incomplete)**: Adopted Option A. The `resolve_phase_prompt()` code-phase prompt template now includes explicit instructions for branch creation (`autonomous/<request-id>`), conventional-commit messages, `gh pr create`, and writing the PR URL to `phase-result.json.artifacts[]`. This puts PR-creation knowledge in the phase prompt (data), not the agent spec (code), preserving the Non-Goal of "no agent spec changes."
+
+**MINOR-1 (FR-019-05 atomicity ordering)**: Added explanation in Section 6.2 `writeStateJson()` that the SQLite-first ordering is intentional because it prevents phantom request dispatch if rename succeeds but SQLite fails.
+
+**MINOR-2 (Temp-file naming inconsistency)**: Standardized all temp-file references to `${file}.tmp.$$` (PID-suffixed) throughout all shell code blocks.
+
+**MINOR-3 (Smoke test artifact check)**: Added step 8a to the smoke test that hard-fails (exit 1) if no `docs/prd/*.md` artifact exists in `TMP_REPO` after daemon run, satisfying FR-019-19 AC (g).
+
+**SUGGESTION-1 (`phase_overrides` field)**: Added `phase_overrides: []` to the initial `state.json` schema in Section 6.1, with a note that future PRD-011 type-aware sequences will populate it.
+
+**SUGGESTION-2 (`turn_limit` precedence)**: Added a precedence note in Section 6.2 dispatch design: CLI `--max-turns` always overrides agent frontmatter `turn_limit`; the agent value is informational only.
+
+**Line-range sync**: Canonical `initRouter()` line range is 848-882 throughout.
 
 ---
 
@@ -32,7 +62,7 @@ This TDD specifies the technical changes required to wire the autonomous-dev pip
 
 1. **Submit-to-filesystem handoff**: The `initRouter()` function in `cli_adapter.ts` leaves three dependencies undefined, causing submit to crash. After fixing the wiring, the submit handler must write a `state.json` file using the FR-824a two-phase commit pattern so the daemon can discover work.
 
-2. **Daemon-to-agent dispatch**: The daemon's `spawn_session()` currently invokes `claude --print` with no agent mapping. It must resolve the correct agent per phase (using `claude --agent <name>`) and construct phase-appropriate prompts containing prior artifacts and review feedback.
+2. **Daemon-to-agent dispatch**: The daemon's `spawn_session()` currently invokes `claude --print` with no agent mapping. It must delegate to the existing `spawn_session_typed()` in `spawn-session.sh`, which already builds `claude --agent <name> --state <state-file>` with per-type flag injection. A new `dispatch_phase_session()` wrapper resolves phase to agent name and calls `spawn_session_typed`.
 
 3. **Phase advancement and portal sync**: After each agent session, the daemon must read the `phase-result.json` output, advance the state machine, and write request-action files to the portal's backing store.
 
@@ -46,7 +76,7 @@ This TDD specifies the technical changes required to wire the autonomous-dev pip
 
 - Fix `initRouter()` so `autonomous-dev request submit` succeeds without `claudeClient`, `duplicateDetector`, or `injectionRules` configured
 - Implement the FR-824a two-phase `state.json` write on submit so the daemon discovers new requests via its existing filesystem scan
-- Implement per-phase agent dispatch in the daemon using `claude --agent <name>` with the locked phase-to-agent mapping table
+- Implement per-phase agent dispatch in the daemon by delegating to `spawn_session_typed()` in `spawn-session.sh` with the locked phase-to-agent mapping table
 - Implement post-session phase advancement logic reading `phase-result.json` files, including review-failure retry loops
 - Synchronize pipeline state to portal request-action files on every transition so the portal shows real-time progress
 - Deliver an end-to-end smoke test that validates submit through at least one completed phase
@@ -70,7 +100,7 @@ This TDD specifies the technical changes required to wire the autonomous-dev pip
 
 - **Technical debt**: This design resolves three long-standing TODO items: the `TODO(PLAN-011-1)` at `cli_adapter.ts:843`, the unimplemented FR-824a handoff from PRD-008, and the missing agent dispatch in `spawn_session()`. It introduces no new debt; all code paths are tested by the smoke test.
 
-- **Long-term trajectory**: The phase-to-agent mapping is a simple lookup table that can be extended for new request types or pipeline variants (PRD-011) without structural changes. The `phase-result.json` contract establishes a clean agent-daemon boundary that supports future agent evolution (output format changes) without daemon modifications. The design keeps the daemon single-threaded for v1 but documents the exact point (`select_request` -> `spawn_session` loop in `main_loop()`) where parallel dispatch can be wired later.
+- **Long-term trajectory**: The phase-to-agent mapping is a simple lookup table that can be extended for new request types or pipeline variants (PRD-011) without structural changes. The `phase-result.json` contract establishes a clean agent-daemon boundary that supports future agent evolution (output format changes) without daemon modifications. The design keeps the daemon single-threaded for v1 but documents the exact point (`select_request` -> `dispatch_phase_session` loop in `main_loop()`) where parallel dispatch can be wired later.
 
 ---
 
@@ -91,31 +121,44 @@ This TDD specifies the technical changes required to wire the autonomous-dev pip
 |              |            |       |    +-> resolve_agent()  NEW |
 |              +-> SQLite   |       |    |   phase -> agent name  |
 |              |            |       |    |                        |
-|              +-> state.json NEW   |    +-> spawn_session()      |
-|                           |       |    |   claude --agent <name>|
-+---------------------------+       |    |                        |
-                                    |    +-> read phase-result    |
-+---------------------------+       |    |   .json            NEW |
+|              +-> state.json NEW   |    +-> dispatch_phase_   NEW|
+|                           |       |    |   session()            |
++---------------------------+       |    |   delegates to         |
+                                    |    |   spawn_session_typed()|
++---------------------------+       |    |   in spawn-session.sh  |
 |  Portal (autonomous-dev-  |       |    |                        |
-|  portal)                  |       |    +-> advance_phase()  NEW |
-|                           |       |    |   update state.json    |
+|  portal)                  |       |    +-> read phase-result    |
+|                           |       |    |   .json            NEW |
 |  request-ledger-reader.ts |       |    |                        |
-|    reads:                 |       |    +-> write_portal_    NEW |
-|    request-actions/*.json |       |    |   request_action()     |
+|    reads:                 |       |    +-> advance_phase()  NEW |
+|    request-actions/*.json |       |    |   update state.json    |
 |    gate-decisions/*.json  |       |    |                        |
-+---------------------------+       +----+------------------------+
++---------------------------+       |    +-> write_portal_    NEW |
+                                    |    |   request_action()     |
+                                    |    |                        |
+                                    +----+------------------------+
                                          |
-                                    +----v------------------------+
-                                    |  Agent Session               |
-                                    |  claude --agent prd-author   |
-                                    |    --prompt <context>        |
-                                    |    --print --output-format   |
-                                    |    json --max-turns <N>      |
-                                    |                              |
-                                    |  Writes:                     |
-                                    |    docs/prd/<slug>.md  (art) |
-                                    |    phase-result-prd.json     |
-                                    +------------------------------+
+                              +----------v-----------------------+
+                              |  spawn-session.sh (existing)     |
+                              |  spawn_session_typed()           |
+                              |    assemble_spawn_command()      |
+                              |    injects per-type flags        |
+                              |    execs:                        |
+                              |      claude --agent <name>       |
+                              |        --state <state-file>      |
+                              |        [--bug-context-path ...]  |
+                              |        [--expedited]             |
+                              +----------------------------------+
+                                         |
+                              +----------v-----------------------+
+                              |  Agent Session                   |
+                              |  claude --agent prd-author       |
+                              |    --state <state-file>          |
+                              |                                  |
+                              |  Writes:                         |
+                              |    docs/prd/<slug>.md  (artifact)|
+                              |    phase-result-prd.json         |
+                              +----------------------------------+
 ```
 
 ### Canonical Filesystem Layout
@@ -157,7 +200,8 @@ The following ASCII tree resolves the directory layout disambiguation deferred f
 ### Service Boundaries
 
 - **CLI Adapter** (`cli_adapter.ts`): Constructs the `IntakeRouter` with optional deps, dispatches submit commands, and writes `state.json` after SQLite insertion
-- **Daemon Supervisor** (`supervisor-loop.sh`): Discovers work via filesystem scan, resolves agent names per phase, spawns Claude sessions, reads phase results, advances the state machine, and syncs to portal
+- **Daemon Supervisor** (`supervisor-loop.sh`): Discovers work via filesystem scan, resolves agent names per phase, delegates to `spawn_session_typed()` for agent dispatch, reads phase results, advances the state machine, and syncs to portal
+- **Spawn Helper** (`spawn-session.sh`): Assembles the `claude --agent <name> --state <file>` invocation with per-type flag injection (bug, infra, expedited). Existing code, no modifications required.
 - **Agent Sessions** (`claude --agent <name>`): Stateless per-phase execution units that produce artifacts and write `phase-result.json` files
 - **Portal Reader** (`request-ledger-reader.ts`): Read-only consumer of `request-actions/*.json` files; no changes required in this TDD
 
@@ -168,11 +212,12 @@ The following ASCII tree resolves the directory layout disambiguation deferred f
 3. `SubmitHandler` persists to SQLite, then writes `state.json` atomically to `<repo>/.autonomous-dev/requests/<id>/state.json` with `status: "queued"`, `current_phase: "intake"`
 4. Daemon's `select_request()` scans allowlisted repos, finds the new `state.json`
 5. Daemon transitions `intake` -> `prd`: sets `status: "running"`, `current_phase: "prd"`
-6. Daemon resolves `prd` -> `prd-author` agent, builds phase prompt, spawns `claude --agent prd-author --prompt <prompt> --print --output-format json --max-turns 50`
-7. Agent writes PRD artifact to repo and `phase-result-prd.json` to `~/.autonomous-dev/portal/request-actions/<REQ-id>/`
-8. Daemon reads `phase-result-prd.json`, sees `status: "pass"`, advances to `prd_review`
-9. Cycle repeats through `tdd`, `plan`, `spec`, `code`, `code_review`, `integration`, `deploy`
-10. On terminal completion, daemon sets `status: "done"`, writes final portal action file
+6. Daemon calls `dispatch_phase_session()`, which resolves `prd` -> `prd-author` agent, then calls `spawn_session_typed(state_file, "prd", "prd-author")` in `spawn-session.sh`
+7. `spawn_session_typed()` assembles and execs `claude --agent prd-author --state <state-file>` (with any per-type flags injected)
+8. Agent writes PRD artifact to repo and `phase-result-prd.json` to `~/.autonomous-dev/portal/request-actions/<REQ-id>/`
+9. Daemon reads `phase-result-prd.json`, sees `status: "pass"`, advances to `prd_review`
+10. Cycle repeats through `tdd`, `plan`, `spec`, `code`, `code_review`, `integration`, `deploy`
+11. On terminal completion, daemon sets `status: "done"`, writes final portal action file
 
 ### Request Lifecycle State Machine
 
@@ -223,7 +268,8 @@ The following ASCII tree resolves the directory layout disambiguation deferred f
 | **state.json write location**: Where does the submit handler write state.json? | `~/.autonomous-dev/requests/<id>/state.json` (centralized, daemon-specific) | `<target_repo>/.autonomous-dev/requests/<id>/state.json` (per-repo, as PRD-001 defined) | **Option B** | The daemon's `select_request()` already scans `<repo>/.autonomous-dev/requests/*/state.json` across allowlisted repos. Writing to a centralized location would require a new scan path. Option B is backward-compatible with zero daemon changes to work discovery. |
 | **Review feedback delivery**: How does retry feedback reach the generation agent? | Store feedback in `state.json` under `current_phase_metadata.review_feedback` and read from there in the phase prompt | Store feedback only in `phase-result-<review>.json` and inject from there | **Both** | `phase-result.json` is the primary source (written by reviewer agent). The daemon copies feedback into `state.json` so that `resolve_phase_prompt()` has a single place to read context. This dual-write is intentional: `phase-result.json` is the audit record; `state.json` is the runtime view. |
 | **waitedMin computation** (OQ-019-06) | Track gate entry/exit timestamps in the daemon and compute elapsed minutes on each portal write | Record `gate_entered_at` in `state.json.phase_history` entries and compute delta at portal write time | **Option B** | Daemon-side timers are lost on restart. Recording the timestamp in `phase_history` persists through crashes and daemon restarts. The computation `(now - gate_entered_at) / 60000` is trivial at write time. |
-| **code vs. integration boundary** (OQ-019-05) | `code-executor` creates branch, commits, AND creates PR; `integration` (test-executor) runs tests only | `code-executor` creates branch and commits code only; `integration` (test-executor) runs tests AND creates PR | **Option A** | PRD-001 defines integration as "Integration tests pass, PR created" but the PR is a natural output of a test-passing commit. The `code-executor` agent already has `Bash` tool access and can run `git checkout -b`, `git commit`, and `gh pr create`. Having the code agent own the full branch lifecycle (branch + commit + PR) keeps the code-to-review feedback loop tight -- if `code_review` fails, the code agent can amend the same branch. The `integration` phase (`test-executor`) then runs the integration test suite against the PR branch and reports pass/fail. The `deploy-executor` handles merge-to-main. |
+| **code vs. integration boundary** (OQ-019-05) | `code-executor` creates branch, commits, AND creates PR; `integration` (test-executor) runs tests only | `code-executor` creates branch and commits code only; `integration` (test-executor) runs tests AND creates PR | **Option A** | PRD-001 defines integration as "Integration tests pass, PR created" but the PR is a natural output of a test-passing commit. The `code-executor` agent already has `Bash` tool access and can run `git checkout -b`, `git commit`, and `gh pr create`. Having the code agent own the full branch lifecycle (branch + commit + PR) keeps the code-to-review feedback loop tight -- if `code_review` fails, the code agent can amend the same branch. The `integration` phase (`test-executor`) then runs the integration test suite against the PR branch and reports pass/fail. The `deploy-executor` handles merge-to-main. **Note**: The code-executor agent spec (`agents/code-executor.md`) is NOT modified; instead, the code-phase prompt template (data, not code) carries the branch/PR instructions. See Section 6.2 `resolve_phase_prompt()` for the code-phase prompt content. |
+| **Agent dispatch path**: Where does the daemon build the `claude` CLI invocation? | Modify `spawn_session()` in `supervisor-loop.sh` to directly build `claude --agent <name> --prompt ... --print --output-format json --max-turns N` | Delegate to `spawn_session_typed()` in `spawn-session.sh`, which already builds `claude --agent <name> --state <file>` with per-type flag injection | **Option B** | `spawn_session_typed()` (line 110 of `spawn-session.sh`) already handles agent dispatch with `--agent` and `--state`, and adds per-type flags (bug context, infra gates, expedited reviews). Building a second dispatch path in `supervisor-loop.sh` creates competing code paths and duplicates the flag injection logic. The daemon should resolve phase to agent name, then delegate the actual CLI assembly to `spawn_session_typed()`. |
 
 ---
 
@@ -256,6 +302,7 @@ The `state.json` file is the canonical runtime state for a request. Written by t
   "type": "feature",
   "blocked_by": [],
   "phase_history": [],
+  "phase_overrides": [],
   "current_phase_metadata": {},
   "cost_accrued_usd": 0,
   "turn_count": 0,
@@ -264,6 +311,8 @@ The `state.json` file is the canonical runtime state for a request. Written by t
   "error": null
 }
 ```
+
+**`phase_overrides` field**: An empty array on creation. Future PRD-011 (type-aware pipeline sequences) will populate this with a custom phase ordering (e.g., `["prd", "prd_review", "code", "code_review", "deploy"]` for bug-fix requests that skip TDD/plan/spec). The daemon's `next_phase_for_state()` already reads `phase_overrides[]` when present (supervisor-loop.sh lines 798-804) and falls back to the legacy hardcoded sequence when the array is empty or absent.
 
 **Field mapping from SQLite `RequestEntity` to `state.json`**:
 
@@ -280,6 +329,7 @@ The `state.json` file is the canonical runtime state for a request. Written by t
 | `target_repo` | `target_repo` | Direct |
 | `source_channel` | `source` | Direct |
 | (from `--type` flag) | `type` | Default `feature` |
+| (not in SQLite) | `phase_overrides` | Default `[]` |
 
 #### `phase-result-<phase>.json` Schema (FR-019-14)
 
@@ -364,7 +414,7 @@ Current state: The function has a `TODO(PLAN-011-1)` comment at line 843. The `I
 Change: Remove the TODO comment. The existing code already passes `undefined` for the three optional deps because they are not included in the constructor arg. The fix is confirming the existing behavior works and removing the misleading TODO.
 
 ```typescript
-// BEFORE (line 843-881):
+// BEFORE (lines 843-882):
 // TODO(PLAN-011-1): wire claudeClient + duplicateDetector + injectionRules
 export async function initRouter(): Promise<IntakeRouterLike> {
   // ... existing code ...
@@ -396,11 +446,13 @@ export async function initRouter(): Promise<IntakeRouterLike> {
 
 File: `plugins/autonomous-dev/intake/handlers/submit_handler.ts`, after line 227 (after `this.db.insertRequest(request)`).
 
+**Atomicity ordering note (FR-019-05)**: The PRD states the sequence as: write temp file, commit SQLite, atomic rename. This TDD inverts the order to: SQLite insert, write temp, rename. We invert the PRD's stated order because SQLite-first ensures durability of the canonical record before the `state.json` (which the daemon polls) becomes visible. If the rename succeeds but SQLite fails, the daemon would dispatch a phantom request -- one with a `state.json` but no corresponding row in `intake.db`. SQLite-first is therefore safer: the worst failure mode is a SQLite row with no `state.json`, which is harmless (the daemon never discovers it) and can be retried by the operator.
+
 ```typescript
 /**
  * Write state.json using the FR-824a two-phase commit pattern.
- * 1. Write to state.json.tmp.<pid>
- * 2. (SQLite already committed above)
+ * 1. SQLite row already committed above (canonical record first)
+ * 2. Write to state.json.tmp.<pid>
  * 3. Atomically rename tmp -> state.json
  *
  * On rename failure, the SQLite row persists but state.json is absent.
@@ -435,6 +487,7 @@ function writeStateJson(request: RequestEntity, targetRepo: string): void {
     type: /* from flags */ 'feature',
     blocked_by: [],
     phase_history: [],
+    phase_overrides: [],
     current_phase_metadata: {},
     cost_accrued_usd: 0,
     turn_count: 0,
@@ -481,6 +534,169 @@ resolve_agent() {
         *)              echo "" ;;
     esac
 }
+```
+
+#### `dispatch_phase_session()` -- New Wrapper in Daemon
+
+File: `plugins/autonomous-dev/bin/supervisor-loop.sh`, replacing the current `spawn_session()` body (lines 1002-1087).
+
+This function is the daemon's single entry point for running a phase session. It resolves the agent name from the current phase, prepares the state file, and delegates CLI assembly and execution to `spawn_session_typed()` in `spawn-session.sh`.
+
+**`--state` vs `--prompt` note**: `spawn_session_typed()` passes `--state <state-file>` to `claude`. The `--state` flag causes Claude to resume from a prior conversation state file. For initial phase dispatch (no prior state), the state file is the request's `state.json`, which Claude reads as context. The daemon does NOT pass `--prompt` separately; instead, the phase-specific context (prior artifacts, review feedback, output path expectations) is written into `state.json.current_phase_metadata` before dispatch, where the agent can read it. This avoids the need to construct and shell-escape large prompt strings in bash.
+
+**`turn_limit` precedence**: The daemon passes `--max-turns <N>` on the CLI invocation (via the `resolve_max_turns()` function). The `code-executor.md` agent spec declares `turn_limit: 50` in its frontmatter. CLI `--max-turns` always overrides agent frontmatter `turn_limit` -- the CLI flag is the authoritative budget; agent frontmatter is informational only. For the `code` phase, the daemon budgets 200 turns via `resolve_max_turns("code")`, which overrides the agent's `turn_limit: 50`.
+
+```bash
+# dispatch_phase_session(request_id, project) -> string
+#   Resolves the agent for the current phase, writes phase context into
+#   state.json metadata, and delegates to spawn_session_typed() in
+#   spawn-session.sh for CLI assembly and execution.
+#
+# Arguments:
+#   $1 -- request_id: The request ID to process.
+#   $2 -- project:    Absolute path to the project/repository root.
+#
+# Stdout:
+#   "{exit_code}|{session_cost}|{output_file}"
+dispatch_phase_session() {
+    local request_id="${1:-}"
+    local project="${2:-}"
+
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+    local req_dir="${project}/.autonomous-dev/requests/${request_id}"
+
+    # Guard: state file must exist and be valid
+    if ! validate_state_file "${state_file}"; then
+        log_error "State file invalid or missing: ${state_file}"
+        echo "1|0|"
+        return
+    fi
+
+    # Read current phase (not status -- phase drives agent selection)
+    local current_phase
+    current_phase=$(jq -r '.current_phase' "${state_file}")
+
+    # Resolve agent
+    local agent_name
+    agent_name=$(resolve_agent "${current_phase}")
+    if [[ -z "${agent_name}" ]]; then
+        log_error "No agent mapped for phase '${current_phase}', skipping ${request_id}"
+        echo "1|0|"
+        return
+    fi
+
+    # Resolve max turns (daemon budget overrides agent frontmatter turn_limit)
+    local max_turns
+    max_turns=$(resolve_max_turns "${current_phase}")
+
+    # Write phase context into state.json metadata so the agent can read it
+    local phase_prompt
+    phase_prompt=$(resolve_phase_prompt "${current_phase}" "${request_id}" "${project}")
+
+    local tmp="${state_file}.tmp.$$"
+    jq --arg prompt "${phase_prompt}" \
+        --arg max_turns "${max_turns}" \
+        '
+        .current_phase_metadata.phase_prompt = $prompt |
+        .current_phase_metadata.max_turns = ($max_turns | tonumber) |
+        .current_phase_metadata.session_active = true
+        ' "${state_file}" > "${tmp}"
+    mv "${tmp}" "${state_file}"
+
+    # Checkpoint -- copy current state as recovery point
+    cp "${state_file}" "${req_dir}/checkpoint.json"
+    log_info "Checkpoint created for ${request_id}"
+
+    # Update heartbeat with active request
+    write_heartbeat "${request_id}"
+
+    # Log the spawn
+    log_info "Spawning session: request=${request_id} phase=${current_phase} agent=${agent_name} max_turns=${max_turns}"
+
+    # Build output file path
+    local timestamp
+    timestamp=$(date +%s)
+    local output_file="${LOG_DIR}/session-${request_id}-${timestamp}.json"
+
+    # Delegate to spawn_session_typed() in spawn-session.sh
+    # spawn_session_typed(state_file, target_phase, agent) handles:
+    #   - per-type flag injection (bug context, infra gates, expedited)
+    #   - assembling the claude CLI invocation
+    #   - executing claude --agent <name> --state <state-file>
+    local spawn_script="${PLUGIN_DIR}/bin/spawn-session.sh"
+
+    local exit_code=0
+    bash "${spawn_script}" "${state_file}" "${current_phase}" "${agent_name}" \
+        > "${output_file}" 2>&1 &
+    CURRENT_CHILD_PID=$!
+
+    # Wait for the child process
+    wait "${CURRENT_CHILD_PID}" || exit_code=$?
+
+    # Handle signal interruption during wait
+    if [[ "${SHUTDOWN_REQUESTED}" == "true" && -n "${CURRENT_CHILD_PID}" ]]; then
+        log_info "Session wait interrupted by shutdown signal"
+        graceful_shutdown_child
+    fi
+    CURRENT_CHILD_PID=""
+
+    # Clear session active flag
+    if [[ -f "${state_file}" ]]; then
+        local tmp="${state_file}.tmp.$$"
+        jq '.current_phase_metadata.session_active = false' "${state_file}" > "${tmp}"
+        mv "${tmp}" "${state_file}"
+    fi
+
+    # Log exit
+    log_info "Session exited: request=${request_id} phase=${current_phase} agent=${agent_name} exit_code=${exit_code}"
+
+    # Parse session cost from output
+    local session_cost="0"
+    if [[ -f "${output_file}" ]]; then
+        session_cost=$(jq -r '.cost_usd // .result.cost_usd // 0' "${output_file}" 2>/dev/null || echo "0")
+    fi
+
+    # Clear heartbeat active request
+    write_heartbeat
+
+    # Return result
+    echo "${exit_code}|${session_cost}|${output_file}"
+}
+```
+
+The existing `spawn_session()` function (lines 1002-1087) is renamed to `spawn_session_legacy()` and retained as a dead-code fallback during the rollout period. `main_loop()` line 1928 changes from `spawn_session` to `dispatch_phase_session`.
+
+#### `resolve_phase_prompt()` -- Updated for Code-Phase PR Instructions
+
+File: `plugins/autonomous-dev/bin/supervisor-loop.sh`, lines 951-986.
+
+The existing `resolve_phase_prompt()` function is updated to include code-phase-specific prompt content. When `phase == "code"`, the prompt template includes explicit instructions for branch creation, conventional commits, and PR creation. This puts PR-creation knowledge in the phase prompt (data), not the agent spec (code), preserving the Non-Goal of "no agent spec changes."
+
+The code-phase prompt addition (appended to the existing fallback or template-based prompt):
+
+```bash
+# Inside resolve_phase_prompt(), after the existing prompt resolution:
+if [[ "${status}" == "code" ]]; then
+    local code_instructions
+    code_instructions="
+## Branch and PR Instructions
+
+1. Create a branch named \`autonomous/${request_id}\` if you are not already on one:
+   \`git checkout -b autonomous/${request_id}\`
+
+2. Commit your changes incrementally with conventional-commit messages
+   (e.g., \`feat(module): add X\`, \`fix(module): correct Y\`).
+
+3. When the implementation passes lint and tests, push the branch and create a PR:
+   \`git push -u origin autonomous/${request_id}\`
+   \`gh pr create --base main --head autonomous/${request_id} --title \"<conventional title>\" --body \"<summary referencing request ${request_id}>\"\`
+
+4. Write the PR URL to your phase-result output file under \`artifacts[]\` so the
+   daemon can track it. Example:
+   {\"status\": \"pass\", \"artifacts\": [\"https://github.com/.../pull/N\", \"src/new-file.ts\"]}
+"
+    prompt="${prompt}${code_instructions}"
+fi
 ```
 
 #### `advance_phase()` -- New Function in Daemon
@@ -534,7 +750,7 @@ advance_phase() {
         next_status="running"
 
         # Copy feedback into state
-        local tmp="${state_file}.tmp"
+        local tmp="${state_file}.tmp.$$"
         jq --arg fb "${result_feedback}" \
             '.current_phase_metadata.review_feedback = $fb' \
             "${state_file}" > "${tmp}"
@@ -577,7 +793,7 @@ advance_phase() {
         }')
 
     # Update state.json atomically
-    local tmp="${state_file}.tmp"
+    local tmp="${state_file}.tmp.$$"
     if [[ -n "${next_phase}" ]]; then
         jq --arg phase "${next_phase}" \
             --arg status "${next_status}" \
@@ -647,7 +863,7 @@ File: `plugins/autonomous-dev/bin/supervisor-loop.sh`, new function.
 ```bash
 # write_portal_request_action(request_id, project) -> void
 #   Writes/updates the portal request-action file for the given request.
-#   Uses atomic tmp+mv pattern.
+#   Uses atomic tmp+mv pattern with PID-suffixed temp file.
 write_portal_request_action() {
     local request_id="$1"
     local project="$2"
@@ -673,15 +889,6 @@ write_portal_request_action() {
             waited_min=$(( (now_epoch - gate_epoch) / 60 ))
         fi
     fi
-
-    jq -n \
-        --arg id "${request_id}" \
-        --arg state_file "${state_file}" \
-        --argjson waited "${waited_min}" \
-        '
-        ($state_file | ltrimstr("") | . as $sf |
-          (input | .) ) // {}
-        ' < /dev/null 2>/dev/null || true
 
     # Read fields from state.json and build the action file
     jq --arg waited "${waited_min}" \
@@ -765,10 +972,17 @@ Operator           CLI Adapter         SubmitHandler       SQLite      Filesyste
   |                    |                    |                |              | resolve_agent|
   |                    |                    |                |              | -> prd-author|
   |                    |                    |                |              |              |
-  |                    |                    |                |              | spawn_session|
+  |                    |                    |                |              | dispatch_    |
+  |                    |                    |                |              | phase_session|
+  |                    |                    |                |              |  -> spawn_   |
+  |                    |                    |                |              |  session_    |
+  |                    |                    |                |              |  typed()     |
+  |                    |                    |                |              |              |
   |                    |                    |                |              | claude       |
   |                    |                    |                |              | --agent      |
   |                    |                    |                |              | prd-author   |
+  |                    |                    |                |              | --state      |
+  |                    |                    |                |              | <state-file> |
   |                    |                    |                |              |              |
   |                    |                    |                |              | <session runs|
   |                    |                    |                |              |  writes PRD  |
@@ -787,9 +1001,11 @@ Operator           CLI Adapter         SubmitHandler       SQLite      Filesyste
 ```
 Daemon                  Agent (doc-reviewer)      Filesystem
   |                           |                       |
-  | spawn_session             |                       |
-  | claude --agent            |                       |
-  | doc-reviewer              |                       |
+  | dispatch_phase_session    |                       |
+  |  -> spawn_session_typed   |                       |
+  |   claude --agent          |                       |
+  |   doc-reviewer            |                       |
+  |   --state <state-file>    |                       |
   |-------------------------->|                       |
   |                           |                       |
   |                           |-- phase-result ------>|
@@ -807,8 +1023,9 @@ Daemon                  Agent (doc-reviewer)      Filesystem
   |   status = "running"                              |
   |   review_feedback = feedback                      |
   |                                                   |
-  | Next iteration: spawn prd-author                  |
-  | with feedback in prompt                           |
+  | Next iteration: dispatch_phase_session            |
+  | -> spawn_session_typed(state, "prd", "prd-author")|
+  | with feedback in state metadata                   |
 ```
 
 ---
@@ -816,7 +1033,7 @@ Daemon                  Agent (doc-reviewer)      Filesystem
 ## 7. Scalability Analysis
 
 - **Expected load**: 1-3 concurrent requests across 1-5 repositories. Single operator. < 1 request per hour sustained.
-- **Bottlenecks**: The daemon's single-threaded `select_request()` -> `spawn_session()` loop means only one request is processed per iteration. At 1-3 concurrent requests, this is acceptable -- each poll iteration processes one request, and the poll interval (30s default) ensures all requests are eventually serviced.
+- **Bottlenecks**: The daemon's single-threaded `select_request()` -> `dispatch_phase_session()` loop means only one request is processed per iteration. At 1-3 concurrent requests, this is acceptable -- each poll iteration processes one request, and the poll interval (30s default) ensures all requests are eventually serviced.
 - **Horizontal scaling**: Not applicable. Single-operator, single-machine architecture. If parallel dispatch is needed, the existing `src/parallel/agent-spawner.ts` module can be wired into the main loop in a future PRD.
 - **Data volume growth**: Each request produces ~10-20 files (state.json, events.jsonl, phase-result files, artifacts). At 10 requests/day * 20 files = 200 files/day. Filesystem scan in `select_request()` remains fast (< 1s) up to ~10,000 state files across all repos.
 - **Cost ceiling**: Per-session cost is bounded by `--max-turns <N>`. The daemon's existing `check_cost_caps()` enforces daily (`$50` default) and monthly (`$500` default) cost caps. The per-phase turn budgets (defined in `resolve_max_turns()`) are: intake=10, prd/tdd/plan/spec=50, reviews=30, code=200, integration=100, deploy=30. At worst-case Sonnet 4 pricing (~$0.10/turn), the maximum single-session cost is: code phase = 200 turns * $0.10 = **$20**. The daily cap of $50 provides a hard ceiling of 2-3 code-phase sessions per day.
@@ -846,6 +1063,7 @@ The daemon writes structured JSONL to `~/.autonomous-dev/logs/daemon.log`. New l
 | `Portal request-action updated: <path>` | INFO | After writing portal file |
 | `phase-result file missing or corrupt for REQ-*/*. Treating as pass.` | WARN | When phase-result.json is absent |
 | `Intake->prd transition: REQ-* (type=feature)` | INFO | First daemon pickup of new request |
+| `No agent mapped for phase '<phase>', skipping REQ-*` | ERROR | Unknown phase encountered |
 
 ### Daemon Log Queries
 
@@ -890,6 +1108,7 @@ Existing daemon alerting is sufficient:
 **File: `plugins/autonomous-dev/intake/__tests__/unit/state_json_writer.test.ts`** (new)
 
 - `writeStateJson()` creates `state.json` with correct schema version and all required fields
+- `writeStateJson()` output includes `phase_overrides: []`
 - `writeStateJson()` rejects request IDs not matching `^REQ-\d{6}$`
 - `writeStateJson()` rejects `--repo` values containing `..` path traversal
 - `writeStateJson()` performs atomic tmp+rename (verify no partial writes)
@@ -919,6 +1138,7 @@ Existing daemon alerting is sufficient:
 
 - Full submit flow: CLI args -> `initRouter()` -> `SubmitHandler` -> SQLite row + `state.json` file
 - Validates that the `state.json` file is parseable by `jq` and matches the schema
+- Validates that `state.json` contains `phase_overrides: []`
 - Validates that `select_request()` in the daemon would find and select the written state file
 
 ### End-to-End Smoke Test (FR-019-19, FR-019-20)
@@ -990,6 +1210,14 @@ if [[ "${STATUS}" != "queued" || "${PHASE}" != "intake" ]]; then
 fi
 echo "PASS: state.json written with status=queued, current_phase=intake"
 
+# 4a. Verify phase_overrides field exists
+OVERRIDES=$(jq -r '.phase_overrides | length' "${STATE_FILE}" 2>/dev/null || echo "missing")
+if [[ "${OVERRIDES}" == "missing" ]]; then
+  echo "FAIL: state.json missing phase_overrides field"
+  exit 1
+fi
+echo "PASS: state.json contains phase_overrides (length=${OVERRIDES})"
+
 # 5. Run daemon in --once mode
 echo "--- Running daemon --once ---"
 "${HOME}/.claude/plugins/autonomous-dev/bin/supervisor-loop.sh" --once 2>&1 || {
@@ -1021,6 +1249,15 @@ else
   echo "WARN: phase-result-prd.json not written (agent may not produce it natively)"
 fi
 
+# 8a. Verify PRD artifact exists in repo (FR-019-19 AC (g))
+PRD_ARTIFACT=$(find "${TMP_REPO}/docs/prd" -name '*.md' -type f 2>/dev/null | head -1)
+if [[ -n "${PRD_ARTIFACT}" ]]; then
+  echo "PASS: PRD artifact found at ${PRD_ARTIFACT}"
+else
+  echo "FAIL: no docs/prd/*.md artifact found in ${TMP_REPO} after prd phase"
+  exit 1
+fi
+
 echo "--- Smoke test complete ---"
 exit 0
 ```
@@ -1033,9 +1270,9 @@ Coverage target: 100% of new functions (unit); smoke test validates the full int
 
 ### Phase 1: Submit Fix and State Handoff (Days 1-3)
 
-1. **Remove TODO comment** in `cli_adapter.ts:843-844`. Verify the existing `IntakeRouter` constructor call at line 875-881 already passes `undefined` for optional deps. No functional code change needed -- just confirm and document the behavior.
+1. **Remove TODO comment** in `cli_adapter.ts:843-844`. Verify the existing `IntakeRouter` constructor call at lines 875-882 already passes `undefined` for optional deps. No functional code change needed -- just confirm and document the behavior.
 
-2. **Implement `writeStateJson()`** in `submit_handler.ts` (after `this.db.insertRequest()` at line 227). Add the path traversal guard, request ID validation, atomic tmp+rename write, and `state.json` schema construction.
+2. **Implement `writeStateJson()`** in `submit_handler.ts` (after `this.db.insertRequest()` at line 227). Add the path traversal guard, request ID validation, atomic tmp+rename write, and `state.json` schema construction. Include `phase_overrides: []` in the initial state.
 
 3. **Wire `writeStateJson()` into `SubmitHandler.execute()`** between the `insertRequest()` call (line 227) and the queue position query (line 229). Extract `targetRepo` from flags and pass it with the `RequestEntity`.
 
@@ -1051,29 +1288,32 @@ Coverage target: 100% of new functions (unit); smoke test validates the full int
 
 1. **Add `resolve_agent()` function** to `supervisor-loop.sh` after line 934. Hardcoded case statement with 12 mappings.
 
-2. **Modify `spawn_session()`** (lines 1002-1087) to:
-   - Read `current_phase` from `state.json` (currently reads `.status` at line 1018 -- change to `.current_phase`)
-   - Call `resolve_agent(current_phase)` to get the agent name
-   - If agent name is empty (unknown phase), log warning and skip
-   - Replace the bare `claude --print` invocation (lines 1046-1052) with `claude --agent <agent-name> --prompt <prompt> --print --output-format json --max-turns <N>`
-   - Call `spawn_session_typed()` from `spawn-session.sh` if the request has type-specific flags
+2. **Add `dispatch_phase_session()` function** to `supervisor-loop.sh`, replacing the current `spawn_session()` invocation in `main_loop()`. The new function:
+   - Reads `current_phase` from `state.json` (not `.status` as the old code did at line 1018)
+   - Calls `resolve_agent(current_phase)` to get the agent name
+   - If agent name is empty (unknown phase), logs error and skips
+   - Writes phase context into `state.json.current_phase_metadata`
+   - Delegates CLI assembly and execution to `spawn_session_typed()` in `spawn-session.sh` by invoking `bash "${PLUGIN_DIR}/bin/spawn-session.sh" "${state_file}" "${current_phase}" "${agent_name}"`
 
-3. **Update `resolve_phase_prompt()`** (lines 951-986) to include:
+3. **Rename `spawn_session()` to `spawn_session_legacy()`** and update `main_loop()` line 1928 to call `dispatch_phase_session()` instead.
+
+4. **Update `resolve_phase_prompt()`** (lines 951-986) to include:
    - Prior-phase artifact paths (read from `phase_history` in `state.json`)
    - Review feedback (read from `current_phase_metadata.review_feedback`)
    - Output path expectation (where the agent should write its artifact)
+   - Code-phase-specific instructions for branch creation (`autonomous/<request-id>`), conventional commits, and `gh pr create` (see Section 6.2)
 
-4. **Add intake-to-prd transition** in `main_loop()` (after line 1924): When `current_phase == "intake"`, immediately transition to `prd` (or type-appropriate first phase) without spawning a session.
+5. **Add intake-to-prd transition** in `main_loop()` (after line 1924): When `current_phase == "intake"`, immediately transition to `prd` (or type-appropriate first phase) without spawning a session.
 
-5. **Add `advance_phase()` function** after `update_request_state()`. Reads `phase-result.json`, determines next phase, updates state atomically.
+6. **Add `advance_phase()` function** after `update_request_state()`. Reads `phase-result.json`, determines next phase, updates state atomically.
 
-6. **Wire `advance_phase()` into `main_loop()`** success path (line 1949): After `update_request_state()` with `outcome=success`, call `advance_phase()`.
+7. **Wire `advance_phase()` into `main_loop()`** success path (line 1949): After `update_request_state()` with `outcome=success`, call `advance_phase()`.
 
-7. **Add `write_portal_request_action()` function** and call it from `advance_phase()` and from the intake-to-prd transition.
+8. **Add `write_portal_request_action()` function** and call it from `advance_phase()` and from the intake-to-prd transition.
 
-8. **Add phase-result synthesis to `spawn-session.sh`**: After the `claude` invocation, if `phase-result-<phase>.json` does not exist, synthesize it from the session output JSON.
+9. **Add phase-result synthesis to `spawn-session.sh`**: After the `claude` invocation, if `phase-result-<phase>.json` does not exist, synthesize it from the session output JSON.
 
-9. **Bats tests**: `resolve_agent.bats`, `advance_phase.bats`
+10. **Bats tests**: `resolve_agent.bats`, `advance_phase.bats`
 
 ### Phase 3: Portal Sync and Smoke Test (Days 7-10)
 
@@ -1090,7 +1330,7 @@ Coverage target: 100% of new functions (unit); smoke test validates the full int
 ### Rollback Plan
 
 - **Phase 1 rollback**: Revert the `writeStateJson()` addition in `submit_handler.ts`. SQLite persistence continues to work. The daemon will not discover new requests (returns to pre-PR state).
-- **Phase 2 rollback**: Revert `spawn_session()` and `main_loop()` changes. The daemon returns to its current behavior (spawning sessions without agent mapping, no phase advancement).
+- **Phase 2 rollback**: Restore `spawn_session_legacy()` as `spawn_session()` and revert `main_loop()` changes. The daemon returns to its current behavior (spawning sessions without agent mapping, no phase advancement).
 - **Phase 3 rollback**: Remove `write_portal_request_action()` calls. The portal returns to showing empty request tables.
 
 All phases are independently revertible. No database migrations are involved. All filesystem writes are additive (new files/directories).
@@ -1112,11 +1352,13 @@ All phases are independently revertible. No database migrations are involved. Al
 
 ### Open Questions
 
-All questions resolved. The two PRD-deferred questions are addressed in this TDD:
+All questions resolved. The PRD-deferred questions and reviewer MAJOR findings are addressed in this TDD:
 
-- **OQ-019-05 (code vs. integration boundary)**: Resolved in Section 5 (Trade-offs). The `code-executor` agent creates the branch, commits code, and creates the PR. The `test-executor` (integration phase) runs the integration test suite against the PR branch. The `deploy-executor` handles merge-to-main.
+- **OQ-019-05 (code vs. integration boundary)**: Resolved in Section 5 (Trade-offs). The `code-executor` agent creates the branch, commits code, and creates the PR. The PR-creation instructions are delivered via the code-phase prompt template in `resolve_phase_prompt()` (Section 6.2), not via agent spec changes. The `test-executor` (integration phase) runs the integration test suite against the PR branch. The `deploy-executor` handles merge-to-main.
 
 - **OQ-019-06 (waitedMin computation)**: Resolved in Section 5 (Trade-offs) and Section 6.2 (`write_portal_request_action()`). The daemon records `gate_entered_at` in `state.json.current_phase_metadata` when a request enters a `_review` phase. On each portal write, `waitedMin` is computed as `(now - gate_entered_at) / 60`.
+
+- **Competing dispatch paths (MAJOR-1)**: Resolved in Section 5 (Trade-offs, row 6) and Section 6.2 (`dispatch_phase_session()`). The canonical dispatch point is `spawn_session_typed()` in `spawn-session.sh`. The daemon resolves phase to agent and delegates.
 
 ---
 
@@ -1125,18 +1367,18 @@ All questions resolved. The two PRD-deferred questions are addressed in this TDD
 | Task | Estimate | Dependencies | Phase |
 |------|----------|--------------|-------|
 | Remove TODO in `initRouter()`, confirm optional deps behavior | 0.5 day | None | Phase 1 |
-| Implement `writeStateJson()` in submit_handler.ts | 1 day | None | Phase 1 |
+| Implement `writeStateJson()` in submit_handler.ts (with `phase_overrides: []`) | 1 day | None | Phase 1 |
 | Wire `writeStateJson()` into SubmitHandler.execute() with type propagation | 0.5 day | writeStateJson | Phase 1 |
 | Unit tests for initRouter + state.json writer | 1 day | writeStateJson | Phase 1 |
 | Add `resolve_agent()` to supervisor-loop.sh | 0.5 day | None | Phase 2 |
-| Modify `spawn_session()` for agent dispatch | 1 day | resolve_agent | Phase 2 |
-| Update `resolve_phase_prompt()` for prior artifacts + feedback | 1 day | spawn_session | Phase 2 |
+| Implement `dispatch_phase_session()` delegating to `spawn_session_typed()` | 1 day | resolve_agent | Phase 2 |
+| Update `resolve_phase_prompt()` for prior artifacts + feedback + code-phase PR instructions | 1 day | dispatch_phase_session | Phase 2 |
 | Add intake-to-prd transition in main_loop | 0.5 day | None | Phase 2 |
-| Implement `advance_phase()` | 1.5 days | spawn_session, resolve_agent | Phase 2 |
+| Implement `advance_phase()` | 1.5 days | dispatch_phase_session, resolve_agent | Phase 2 |
 | Add phase-result synthesis to spawn-session.sh | 0.5 day | advance_phase | Phase 2 |
 | Bats tests for resolve_agent + advance_phase | 1 day | resolve_agent, advance_phase | Phase 2 |
 | Implement `write_portal_request_action()` with waitedMin | 0.5 day | advance_phase | Phase 3 |
-| Build smoke test script | 1 day | All Phase 1 + 2 | Phase 3 |
+| Build smoke test script (with PRD artifact check) | 1 day | All Phase 1 + 2 | Phase 3 |
 | Integration test for submit-to-state flow | 0.5 day | Phase 1 | Phase 3 |
 | Manual validation + documentation | 0.5 day | All | Phase 3 |
 | **Total** | **~10 days** | | |
@@ -1151,20 +1393,20 @@ All questions resolved. The two PRD-deferred questions are addressed in this TDD
 | FR-019-02: When `claudeClient` undefined, NLP parsing skipped | Section 6.2 (API Design: initRouter), Section 10 (Unit Tests) | Submit with `claudeClient=undefined` persists row with `title = raw description truncated to 100 chars` | Full |
 | FR-019-03: When `duplicateDetector` undefined, dedup skipped; when `injectionRules` undefined/empty, sanitization skipped | Section 6.2 (API Design: initRouter), Section 10 (Unit Tests) | Submitting same description twice succeeds both times; injection-triggering text passes through | Full |
 | FR-019-04: `initRouter()` resolves TODO(PLAN-011-1) by wiring optional deps | Section 6.2 (API Design: initRouter), Section 11 Phase 1 step 1 | TODO comment removed; `initRouter()` returns functional router | Full |
-| FR-019-05: Submit handler writes `state.json` using FR-824a two-phase commit | Section 6.2 (API Design: writeStateJson), Section 11 Phase 1 steps 2-3 | After submit, both SQLite row and `<repo>/.autonomous-dev/requests/<id>/state.json` exist with matching fields | Full |
-| FR-019-06: `state.json` contains all fields required by daemon | Section 6.1 (state.json schema), Section 6.2 (writeStateJson) | `state.json` contains all 18 fields listed in FR-019-06; daemon's `validate_state_file()` accepts it | Full |
+| FR-019-05: Submit handler writes `state.json` using FR-824a two-phase commit | Section 6.2 (API Design: writeStateJson), Section 11 Phase 1 steps 2-3 | After submit, both SQLite row and `<repo>/.autonomous-dev/requests/<id>/state.json` exist with matching fields. Note: SQLite-first ordering (see atomicity ordering note in Section 6.2) | Full |
+| FR-019-06: `state.json` contains all fields required by daemon | Section 6.1 (state.json schema), Section 6.2 (writeStateJson) | `state.json` contains all 19 fields listed in FR-019-06 (including `phase_overrides`); daemon's `validate_state_file()` accepts it | Full |
 | FR-019-06a: Dual `status`/`current_phase` fields with canonical domain mapping | Section 4 (State Machine), Section 6.1 (state.json schema), Section 6.2 (writeStateJson) | `state.json` has separate `status: "queued"` and `current_phase: "intake"` fields; daemon filters on `status` and dispatches on `current_phase` | Full |
 | FR-019-07: Request ID validation + path traversal prevention | Section 6.2 (writeStateJson path traversal guard), Section 8 (Security) | Submit with `--repo` containing `..` fails with `VALIDATION_ERROR`; request ID matches `^REQ-\d{6}$` | Full |
 | FR-019-08: Daemon `select_request()` continues to scan filesystem | Section 4 (Data Flow step 4), Section 6.2 (no changes to select_request) | After FR-019-05, daemon's `--once` finds the newly-submitted request | Full |
-| FR-019-09: `intake` is bookkeeping only; daemon transitions queued/intake -> running/prd | Section 4 (State Machine), Section 6.2 (advance_phase), Section 11 Phase 2 step 4 | After daemon pickup, `state.json` shows `status: "running"`, `current_phase: "prd"`; `events.jsonl` has transition event | Full |
+| FR-019-09: `intake` is bookkeeping only; daemon transitions queued/intake -> running/prd | Section 4 (State Machine), Section 6.2 (advance_phase), Section 11 Phase 2 step 5 | After daemon pickup, `state.json` shows `status: "running"`, `current_phase: "prd"`; `events.jsonl` has transition event | Full |
 | FR-019-10: Phase-to-agent mapping table (12 entries) | Section 6.2 (resolve_agent), Section 10 (Bats tests) | `resolve_agent(phase)` returns correct agent name for all 12 phases; unit test covers all mappings | Full |
-| FR-019-11: `spawn_session()` uses `claude --agent <name>` | Section 6.2 (spawn_session modification), Section 11 Phase 2 step 2 | `claude` invocation includes `--agent prd-author` for prd phase; log shows `agent=prd-author` | Full |
-| FR-019-12: Phase prompt includes prior artifacts and review feedback | Section 6.2 (resolve_phase_prompt update), Section 11 Phase 2 step 3 | Prompt for `tdd` phase includes PRD path; prompt for `prd` retry includes review feedback | Full |
+| FR-019-11: `spawn_session()` uses `claude --agent <name>` via `spawn_session_typed()` | Section 6.2 (dispatch_phase_session), Section 5 (Trade-offs row 6) | `dispatch_phase_session()` delegates to `spawn_session_typed()` which invokes `claude --agent prd-author --state <file>` for prd phase; log shows `agent=prd-author` | Full |
+| FR-019-12: Phase prompt includes prior artifacts, review feedback, and code-phase PR instructions | Section 6.2 (resolve_phase_prompt update, code-phase prompt), Section 11 Phase 2 step 4 | Prompt for `tdd` phase includes PRD path; prompt for `prd` retry includes review feedback; prompt for `code` phase includes branch creation (`autonomous/<request-id>`) and `gh pr create` instructions; PR URL written to `phase-result.json.artifacts[]` | Full |
 | FR-019-13: Phase advancement after successful session | Section 6.2 (advance_phase), Section 6.5 (Sequence Diagrams) | After `prd` exit 0, state shows `current_phase: "prd_review"`, `status: "gate"`; events.jsonl has transition | Full |
 | FR-019-14: Phase agents write `phase-result-<phase>.json`; daemon reads it for review outcome | Section 4 (Filesystem Layout), Section 6.1 (phase-result schema), Section 6.2 (advance_phase) | `phase-result-prd_review.json` with `status: "fail"` and `feedback` causes state to revert to `prd` with feedback set | Full |
 | FR-019-15: Terminal phase sets `status: "done"` with `completed_at` | Section 6.2 (advance_phase terminal handling) | Completed request has `status: "done"` and non-null `completed_at` | Full |
 | FR-019-16: Portal request-action file written on every state transition | Section 6.1 (Portal action schema), Section 6.2 (write_portal_request_action) | `readRequestLedger()` returns non-empty array after intake->prd transition; entry has `phase: "prd"`, `status: "running"` | Full |
 | FR-019-17: Portal status reflects gate state during reviews | Section 6.2 (advance_phase sets gate status), Section 6.2 (write_portal_request_action) | Portal shows `status: "gate"` during `prd_review`; `status: "running"` after transition to `tdd` | Full |
 | FR-019-18: Daemon creates `request-actions/` dir if absent; atomic writes | Section 6.2 (write_portal_request_action: mkdir -p), Section 12 (Risks) | `mkdir -p` runs before first write; no `ENOENT` in logs | Full |
-| FR-019-19: End-to-end smoke test | Section 10 (Smoke Test), Section 11 Phase 3 step 3 | Smoke test exits 0 on correctly-configured system; exits non-zero with diagnostic on failure | Full |
+| FR-019-19: End-to-end smoke test | Section 10 (Smoke Test), Section 11 Phase 3 step 3 | Smoke test exits 0 on correctly-configured system; exits non-zero with diagnostic on failure; verifies `docs/prd/*.md` artifact exists (step 8a) | Full |
 | FR-019-20: Smoke test runnable in CI | Section 10 (Smoke Test notes) | Smoke test completes < 10 minutes; documents API key requirement if needed | Full |
