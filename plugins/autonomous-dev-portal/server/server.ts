@@ -109,6 +109,16 @@ export async function startServer(): Promise<Server<unknown>> {
     registerRoutes(app, {
         sseBus,
         confirmation,
+        // SPEC-037-2-02 — daemon-status handler. Readers default to safe
+        // values (0 spend, 0 approvals, false kill-switch) until real
+        // backing stores are wired. heartbeatPath defaults to
+        // ~/.autonomous-dev/heartbeat.json which exists for the running
+        // daemon; status is classified from its mtime.
+        daemonStatus: {
+            readMtdSpend: async () => 0,
+            readApprovalsCount: async () => 0,
+            readKillSwitchEngaged: async () => false,
+        },
     });
 
     // SPEC-037-2-01 FR-7 — close SSE connections gracefully on signal so
