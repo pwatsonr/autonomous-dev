@@ -146,7 +146,7 @@ export async function startServer(): Promise<Server<unknown>> {
         // SPEC-037-2-05 — agent action routes. promote/shadow/freeze
         // intentionally DEFERRED (501) per agents-deps.tsx header note;
         // inspect (GET) works.
-        agentActions: { ...buildAgentsDeps(), audit, logger: log },
+        agentsActions: { ...buildAgentsDeps(), audit, logger: log },
         // SPEC-037-2-06 — gate + request actions (marker-file pattern;
         // daemon picks decisions up on next iteration).
         gateAndRequestActions: {
