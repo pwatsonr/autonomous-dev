@@ -1,18 +1,26 @@
-// SPEC-036-3-06 §Gate actions — typed-CONFIRM modal interception.
+// SPEC-036-3-06 / SPEC-037-7-04 §Gate actions confirm-modal flow.
 //
 // Wires the three gate action buttons (Approve / Request Changes / Reject)
-// to the shared ConfirmModal helper. Each click intercepts the HTMX
-// request, opens the modal with action-specific copy, and only fires the
-// HTMX request once the operator confirms. Escape + backdrop dismiss
+// to a shared confirm-modal interstitial built on the `.modal-bg` overlay
+// pattern (SPEC-037-7-03; `static/modal.js`). Each click intercepts the
+// HTMX request, opens the modal with action-specific copy, and only fires
+// the HTMX request once the operator confirms. Escape + backdrop dismiss
 // cancel the action without firing the request.
 //
-// CSRF: read once on DOMContentLoaded from `<meta name="csrf-token">` and
-// attached to every HTMX request via `htmx:configRequest`. The button's
-// `hx-headers` carries the token statically as well so requests fired
-// before the listener attaches still authenticate.
+// On confirm:
+//   - If the modal carries a reason textarea, the value is attached as a
+//     `X-Gate-Note` header via the originating button's `hx-headers`.
+//   - The originating button is dispatched a `confirmed` event so its
+//     `hx-trigger="confirmed"` listener fires the HTMX POST.
+//
+// CSRF: read once from `<meta name="csrf-token">` and attached to every
+// HTMX request via `htmx:configRequest`. The button's `hx-headers` also
+// carries the token statically as a belt-and-braces fallback.
 
 (function () {
     "use strict";
+
+    var MODAL_ID = "confirm-gate";
 
     var COPY = {
         approve: {
@@ -26,7 +34,7 @@
         "request-changes": {
             title: "Request changes?",
             body:
-                "Send a short reason; the author will retry with this " +
+                "Send a short note; the author will retry with this " +
                 "feedback included in context.",
             confirmLabel: "Send",
             confirmKind: "secondary",
@@ -48,27 +56,37 @@
     }
 
     function ensureModal() {
-        var existing = document.getElementById("gate-action-modal");
+        var existing = document.querySelector(
+            '.modal-bg[data-modal="' + MODAL_ID + '"]',
+        );
         if (existing) return existing;
-        var dialog = document.createElement("dialog");
-        dialog.id = "gate-action-modal";
-        dialog.className = "modal gate-action-modal";
-        dialog.setAttribute("aria-labelledby", "gate-action-modal-title");
-        dialog.innerHTML =
-            '<div class="modal-content">' +
+        var wrap = document.createElement("div");
+        wrap.className = "modal-bg gate-action-modal";
+        wrap.setAttribute("data-modal", MODAL_ID);
+        wrap.setAttribute("hidden", "");
+        wrap.hidden = true;
+        wrap.innerHTML =
+            '<div class="modal modal-wide" role="dialog" aria-modal="true" ' +
+            'aria-labelledby="gate-action-modal-title">' +
+            '<div class="modal-head">' +
             '<h3 id="gate-action-modal-title"></h3>' +
-            '<p id="gate-action-modal-body" class="modal-body"></p>' +
+            '<button type="button" class="modal-close" data-modal-close ' +
+            'aria-label="Close">✕</button>' +
+            "</div>" +
+            '<div class="modal-body">' +
+            '<p id="gate-action-modal-body"></p>' +
             '<textarea id="gate-action-modal-reason" class="modal-input" ' +
             'placeholder="Reason..." hidden></textarea>' +
+            "</div>" +
             '<div class="modal-actions">' +
             '<button type="button" id="gate-action-modal-cancel" ' +
-            'data-dismiss="true">Cancel</button>' +
+            'class="btn" data-modal-close>Cancel</button>' +
             '<button type="button" id="gate-action-modal-confirm" ' +
             'class="btn primary"></button>' +
             "</div>" +
             "</div>";
-        document.body.appendChild(dialog);
-        return dialog;
+        document.body.appendChild(wrap);
+        return wrap;
     }
 
     function findButton(target) {
@@ -83,6 +101,9 @@
         }
         return null;
     }
+
+    /** Pending state for the current open confirm modal. */
+    var pending = null;
 
     function onClick(event) {
         var button = findButton(event.target);
@@ -108,22 +129,26 @@
         confirmBtn.textContent = copy.confirmLabel;
         confirmBtn.className = "btn " + copy.confirmKind;
 
-        function cleanup() {
-            confirmBtn.removeEventListener("click", onConfirm);
-            modal.removeEventListener("close", onClose);
-            modal.removeEventListener("click", onBackdrop);
+        // Tear down any prior pending confirm.
+        if (pending) {
+            pending.confirmBtn.removeEventListener("click", pending.onConfirm);
         }
+
         function onConfirm() {
-            cleanup();
+            confirmBtn.removeEventListener("click", onConfirm);
+            pending = null;
             // Attach the optional reason as a header so the existing HTMX
             // request can pick it up without a second form roundtrip.
             if (copy.withTextarea && reasonEl.value) {
-                button.setAttribute(
-                    "hx-vals",
-                    JSON.stringify({ reason: reasonEl.value }),
-                );
+                var headers = { "X-Gate-Note": reasonEl.value };
+                button.setAttribute("hx-headers", JSON.stringify(headers));
             }
-            modal.close();
+            if (window.portalModal && typeof window.portalModal.closeModal === "function") {
+                window.portalModal.closeModal(MODAL_ID);
+            } else {
+                modal.hidden = true;
+                modal.setAttribute("hidden", "");
+            }
             // Trigger the deferred HTMX request via the custom event the
             // button listens for (`hx-trigger="confirmed"`).
             if (typeof window.htmx !== "undefined") {
@@ -136,25 +161,19 @@
                 );
             }
         }
-        function onClose() {
-            cleanup();
-        }
-        function onBackdrop(ev) {
-            if (
-                ev.target === modal ||
-                (ev.target.getAttribute &&
-                    ev.target.getAttribute("data-dismiss") === "true")
-            ) {
-                modal.close();
-            }
-        }
 
+        pending = {
+            confirmBtn: confirmBtn,
+            onConfirm: onConfirm,
+        };
         confirmBtn.addEventListener("click", onConfirm);
-        modal.addEventListener("close", onClose);
-        modal.addEventListener("click", onBackdrop);
 
-        if (typeof modal.showModal === "function") {
-            modal.showModal();
+        if (window.portalModal && typeof window.portalModal.openModal === "function") {
+            window.portalModal.openModal(MODAL_ID);
+        } else {
+            // Fallback: toggle hidden directly.
+            modal.hidden = false;
+            modal.removeAttribute("hidden");
         }
     }
 

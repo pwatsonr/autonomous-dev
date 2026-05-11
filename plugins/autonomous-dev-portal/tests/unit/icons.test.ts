@@ -9,7 +9,9 @@ import { join } from "node:path";
 
 import { __resetIconCacheForTests, icon } from "../../server/lib/icons";
 
-const ICON_DIR = join(__dirname, "../../server/static/icons");
+// PLAN-038 TASK-002 — canonical icon root is `<package>/static/icons`
+// since the legacy `server/static/` tree was deleted.
+const ICON_DIR = join(__dirname, "../../static/icons");
 
 afterEach(() => {
     __resetIconCacheForTests();
