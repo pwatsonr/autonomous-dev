@@ -147,6 +147,124 @@ describe("ShellLayout — SPEC-035-1-01", () => {
         );
     });
 
+    test("SH-10 (SPEC-037-3-04): .rail-ops contains exactly 3 .line children when mtdSpend is defined", async () => {
+        const html = await render(
+            <ShellLayout
+                activePath="/"
+                daemonStatus="running"
+                daemonAgeSeconds={2}
+                breakerState="OK"
+                breakerCount={0}
+                breakerThreshold={3}
+                mtdSpend={16.84}
+                mtdPctOfCap={4}
+            />,
+        );
+        const opsStart = html.indexOf('<div class="rail-ops">');
+        const opsEnd = html.indexOf("</div>", html.indexOf("kbtn"));
+        const ops = html.slice(opsStart, opsEnd);
+        const lineMatches = ops.match(/<div class="line">/g) ?? [];
+        expect(lineMatches.length).toBe(3);
+    });
+
+    test("SH-11: .rail-ops contains 2 .line children when mtdSpend is undefined", async () => {
+        const html = await render(
+            <ShellLayout
+                activePath="/"
+                daemonStatus="running"
+                breakerState="OK"
+            />,
+        );
+        const opsStart = html.indexOf('<div class="rail-ops">');
+        const opsEnd = html.indexOf("</div>", html.indexOf("kbtn"));
+        const ops = html.slice(opsStart, opsEnd);
+        const lineMatches = ops.match(/<div class="line">/g) ?? [];
+        expect(lineMatches.length).toBe(2);
+    });
+
+    test("SH-12: daemonStatus='stale' → first dot is .warn; label includes 'stale'", async () => {
+        const html = await render(
+            <ShellLayout activePath="/" daemonStatus="stale" daemonAgeSeconds={120} />,
+        );
+        const opsStart = html.indexOf('<div class="rail-ops">');
+        const ops = html.slice(opsStart, opsStart + 600);
+        // First .line in rail-ops is the Daemon row.
+        const firstLine = ops.match(/<div class="line">[\s\S]*?<\/div>/);
+        expect(firstLine).not.toBeNull();
+        expect(firstLine![0]).toContain('class="dot warn"');
+        expect(firstLine![0]).toContain("stale");
+    });
+
+    test("SH-13: breakerState='TRIPPED' + 3/3 → value '3/3', dot .err", async () => {
+        const html = await render(
+            <ShellLayout
+                activePath="/"
+                breakerState="TRIPPED"
+                breakerCount={3}
+                breakerThreshold={3}
+            />,
+        );
+        // Second line in rail-ops is the Breaker row.
+        const opsStart = html.indexOf('<div class="rail-ops">');
+        const ops = html.slice(opsStart, opsStart + 1200);
+        const lines = [...ops.matchAll(/<div class="line">[\s\S]*?<\/div>/g)].map(
+            (m) => m[0],
+        );
+        expect(lines.length).toBeGreaterThanOrEqual(2);
+        const breaker = lines[1];
+        expect(breaker).toContain('class="dot err"');
+        expect(breaker).toContain('<span class="v">3/3</span>');
+        expect(breaker).toContain("Breaker TRIPPED");
+    });
+
+    test("SH-13b: breakerCount + threshold undefined → '--/--'", async () => {
+        const html = await render(
+            <ShellLayout activePath="/" breakerState="unknown" />,
+        );
+        expect(html).toContain('<span class="v">--/--</span>');
+    });
+
+    test("SH-14: mtdPctOfCap=85 → MTD dot .warn; value contains '(85%)'", async () => {
+        const html = await render(
+            <ShellLayout
+                activePath="/"
+                mtdSpend={42.5}
+                mtdPctOfCap={85}
+            />,
+        );
+        const opsStart = html.indexOf('<div class="rail-ops">');
+        const ops = html.slice(opsStart, opsStart + 1500);
+        const lines = [...ops.matchAll(/<div class="line">[\s\S]*?<\/div>/g)].map(
+            (m) => m[0],
+        );
+        // MTD row is the 3rd line when present.
+        const mtdLine = lines[2];
+        expect(mtdLine).toBeDefined();
+        expect(mtdLine).toContain('class="dot warn"');
+        expect(mtdLine).toContain("(85%)");
+        expect(mtdLine).toContain("$42.50");
+    });
+
+    test("SH-14b: mtdPctOfCap >= 100 → MTD dot .err", async () => {
+        const html = await render(
+            <ShellLayout activePath="/" mtdSpend={200} mtdPctOfCap={110} />,
+        );
+        const opsStart = html.indexOf('<div class="rail-ops">');
+        const ops = html.slice(opsStart);
+        const lines = [...ops.matchAll(/<div class="line">[\s\S]*?<\/div>/g)].map(
+            (m) => m[0],
+        );
+        expect(lines[2]).toContain('class="dot err"');
+    });
+
+    test("SH-15: .theme-toggle button is present after .kbtn", async () => {
+        const html = await render(<ShellLayout activePath="/" />);
+        const kbtnIdx = html.indexOf('class="kbtn');
+        const toggleIdx = html.indexOf('class="theme-toggle"');
+        expect(kbtnIdx).toBeGreaterThan(-1);
+        expect(toggleIdx).toBeGreaterThan(kbtnIdx);
+    });
+
     test("AC: htmx + theme-toggle scripts carry the cspNonce", async () => {
         const NONCE = "nonce-shell-002";
         const html = await render(
