@@ -153,3 +153,239 @@
     line-height: 18px;
     text-align: center;
 }
+
+/* SPEC-037-7-01 — Request Detail page-head + .rd-stat block.
+   ============================================================
+   Page-head adopts a two-row layout on the request-detail page:
+   the existing back-row (← Back, request id) + the Pause/Kill
+   action cluster on the right. */
+.request-detail .page-head .back-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.request-detail .page-head .back {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--line-1);
+    background: var(--bg-1);
+    color: var(--fg-1);
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.request-detail .page-head .back:hover {
+    background: var(--bg-2);
+    color: var(--fg-0);
+}
+
+.request-detail .page-head .r-id {
+    color: var(--fg-2);
+}
+
+/* `.rd-head` becomes a 2-column flex with `.rd-stat` on the right. */
+.request-header .rd-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-6);
+}
+
+.rd-stat {
+    display: flex;
+    align-items: stretch;
+    gap: var(--s-4);
+    flex-shrink: 0;
+}
+
+.rd-stat > div {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 60px;
+}
+
+.rd-stat-num {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg-0);
+    line-height: 1.2;
+}
+
+.rd-stat-lbl {
+    font-size: 11px;
+    color: var(--fg-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* SPEC-037-7-02 — Standards-applied section.
+   ============================================================
+   `.std-list` is a vertical stack of `.std-row` cards. Each row is
+   a 4-column grid (id · desc · severity · source). Severity tints
+   come from the design-tokens layer (`--warn-*`, `--err-*`,
+   `--info-*`) so the section participates in theme switching. */
+.standards-applied .std-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+
+.std-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 100px 160px;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    border-radius: 4px;
+    border: 1px solid var(--line-1);
+    background: var(--bg-1);
+}
+
+.std-row.sev-blocking {
+    border-left: 3px solid var(--err-line, var(--err, #c33));
+}
+
+.std-row.sev-warn {
+    border-left: 3px solid var(--warn-line, var(--warn, #b80));
+}
+
+.std-row.sev-advisory {
+    border-left: 3px solid var(--line-2, var(--line-1));
+}
+
+.std-id {
+    color: var(--fg-2);
+}
+
+.std-desc {
+    color: var(--fg-0);
+    font-size: 13px;
+}
+
+.std-sev {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.std-sev.blocking {
+    color: var(--err, #c33);
+}
+
+.std-sev.warn {
+    color: var(--warn, #b80);
+}
+
+.std-sev.advisory {
+    color: var(--fg-2);
+}
+
+.std-source {
+    font-size: 12px;
+    color: var(--fg-2);
+    text-align: right;
+}
+
+/* SPEC-037-7-03 — `.modal-bg` overlay primitives.
+   ============================================================
+   Replaces the native `<dialog>` we used pre-037-7. The shared
+   helper (`static/modal.js`) toggles `hidden` on the wrapper.
+   We use a fixed-position backdrop + centered content; clicks
+   on the backdrop close, clicks inside `.modal` do not. */
+.modal-bg {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--s-4);
+}
+
+.modal-bg[hidden] {
+    display: none;
+}
+
+.modal-bg > .modal {
+    background: var(--bg-0);
+    color: var(--fg-0);
+    border: 1px solid var(--line-1);
+    border-radius: 6px;
+    max-width: 720px;
+    width: 100%;
+    max-height: calc(100vh - var(--s-8));
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-bg > .modal.modal-wide {
+    max-width: 960px;
+}
+
+.modal-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    border-bottom: 1px solid var(--line-1);
+}
+
+.modal-head h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.modal-eyebrow {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+    margin-bottom: 2px;
+}
+
+.modal-close {
+    background: transparent;
+    border: 0;
+    color: var(--fg-2);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.modal-close:hover {
+    color: var(--fg-0);
+}
+
+.modal-body {
+    padding: var(--s-4);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s-2);
+    padding: var(--s-3) var(--s-4);
+    border-top: 1px solid var(--line-1);
+}
+
+.modal-input {
+    width: 100%;
+    min-height: 80px;
+    padding: var(--s-2);
+    border: 1px solid var(--line-1);
+    background: var(--bg-1);
+    color: var(--fg-0);
+    border-radius: 3px;
+    font: inherit;
+    box-sizing: border-box;
+}

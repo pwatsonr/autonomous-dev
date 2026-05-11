@@ -1,8 +1,9 @@
 // SPEC-034-1-03 §Inline-SVG icon helper.
 //
 // Server-side helper that loads vendored Lucide SVGs from
-// `server/static/icons/*.svg`, caches their raw markup in-process, and
-// emits inline SVG strings with a configurable size override.
+// `static/icons/*.svg` (the canonical served root since PLAN-038 TASK-002),
+// caches their raw markup in-process, and emits inline SVG strings with a
+// configurable size override.
 //
 // Why inline (not <img> / sprite):
 //   - Templates can apply `currentColor` for stroke, so icons inherit
@@ -29,9 +30,11 @@ import { join } from "node:path";
 
 // `import.meta.dir` is provided by Bun (the portal's runtime, see
 // package.json `engines.bun`). It resolves to the directory of this
-// source file, which keeps icon resolution stable regardless of the
-// process's cwd.
-const ICON_DIR = join(import.meta.dir, "../static/icons");
+// source file (`server/lib/`), which keeps icon resolution stable
+// regardless of the process's cwd. The canonical icon root is
+// `<package>/static/icons` (PLAN-038 TASK-002 deleted the legacy
+// `server/static/` tree).
+const ICON_DIR = join(import.meta.dir, "../../static/icons");
 
 const cache = new Map<string, string>();
 
