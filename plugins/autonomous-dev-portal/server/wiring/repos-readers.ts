@@ -31,14 +31,14 @@ export async function readReposData(
 
     // Project to the row shape, preserving allowlist order. Apply trust
     // override if present.
-    const repos: RepoSummary[] = allowlistRepos
-        .map((id) => {
-            const summary = byRepo.get(id);
-            if (summary === undefined) return undefined;
-            const trust = settings.trustOverrides[id] ?? settings.globalTrust;
-            return { ...summary, trust };
-        })
-        .filter((r): r is RepoSummary => r !== undefined);
+    const repos: RepoSummary[] = [];
+    for (const id of allowlistRepos) {
+        const summary = byRepo.get(id);
+        if (summary === undefined) continue;
+        const trust = settings.trustOverrides[id] ?? settings.globalTrust;
+        const withTrust: RepoSummary = { ...summary, trust };
+        repos.push(withTrust);
+    }
 
     // Append any repos with activity that aren't in the allowlist
     // (defensive — honesty contract).
