@@ -50,6 +50,11 @@ export interface AgentActionDeps {
     runAgentCli: (
         verb: AgentVerb,
         name: string,
+        /**
+         * Optional verb-specific argument. Used by `promote` to pass the
+         * target version. Other verbs ignore it.
+         */
+        arg?: string,
     ) => Promise<AgentCliResult>;
     /** Read an agent's current factory record. Returns null when unknown. */
     readAgentRecord: (name: string) => Promise<AgentInspectRecord | null>;
@@ -126,10 +131,31 @@ export function buildAgentActionRoutes(
             if (typeof name !== "string" || !NAME_RE.test(name)) {
                 return c.json({ error: "invalid-name" }, 400);
             }
+            // Extract optional version for `promote`; HTMX posts can
+            // submit form-encoded or query-string `?version=X` — accept
+            // both.
+            let arg: string | undefined;
+            if (verb === "promote") {
+                const fromQuery = c.req.query("version");
+                if (typeof fromQuery === "string" && fromQuery.length > 0) {
+                    arg = fromQuery;
+                } else {
+                    try {
+                        const body = await c.req.parseBody();
+                        const v = body["version"];
+                        if (typeof v === "string" && v.length > 0) arg = v;
+                    } catch {
+                        // body may be empty / non-form — leave arg undefined
+                    }
+                }
+                if (arg === undefined) {
+                    return c.json({ error: "version-required" }, 400);
+                }
+            }
             return await withLock(name, async () => {
                 let res: AgentCliResult;
                 try {
-                    res = await deps.runAgentCli(verb, name);
+                    res = await deps.runAgentCli(verb, name, arg);
                 } catch (err) {
                     logger.error("agent_action_failed", {
                         verb,
