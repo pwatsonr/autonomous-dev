@@ -381,6 +381,7 @@ Four tracks run in parallel for the first 3 days; Track D depends on Tracks A–
 - **Test**: `npm run test:visual` extended to cover all surfaces
 - **Acceptance Criteria**:
   - [ ] AC-3713 — every named surface has before/after pair in PR
+  - [ ] AC-3714 — `git grep PORTAL_DEMO_MODE` returns no matches; no `if (DEMO_MODE)` branches in any route handler (self-review confirmed missing from earlier task ACs)
   - [ ] CI screenshot diff job runs
 - **Estimate**: 2 hr
 
