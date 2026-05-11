@@ -52,8 +52,9 @@ function logRegistryEvent(eventType: string, details: Record<string, unknown>): 
  * State machine defining valid agent lifecycle transitions.
  *
  * - REGISTERED -> ACTIVE, FROZEN
- * - ACTIVE -> FROZEN, UNDER_REVIEW
+ * - ACTIVE -> FROZEN, SHADOWED, UNDER_REVIEW
  * - FROZEN -> ACTIVE
+ * - SHADOWED -> ACTIVE (unshadow returns to live traffic)
  * - UNDER_REVIEW -> VALIDATING, ACTIVE (rejected/cancelled)
  * - VALIDATING -> PROMOTED, REJECTED, CANARY (CANARY from PLAN-005-5)
  * - CANARY -> PROMOTED, REJECTED (from PLAN-005-5)
@@ -62,8 +63,9 @@ function logRegistryEvent(eventType: string, details: Record<string, unknown>): 
  */
 const VALID_TRANSITIONS: Record<AgentState, AgentState[]> = {
   'REGISTERED':   ['ACTIVE', 'FROZEN'],
-  'ACTIVE':       ['FROZEN', 'UNDER_REVIEW'],
+  'ACTIVE':       ['FROZEN', 'SHADOWED', 'UNDER_REVIEW'],
   'FROZEN':       ['ACTIVE'],
+  'SHADOWED':     ['ACTIVE'],
   'UNDER_REVIEW': ['VALIDATING', 'ACTIVE'],
   'VALIDATING':   ['PROMOTED', 'REJECTED', 'CANARY'],
   'CANARY':       ['PROMOTED', 'REJECTED'],
@@ -367,6 +369,62 @@ export class AgentRegistry implements IAgentRegistry {
 
     record.state = 'ACTIVE';
     logRegistryEvent('agent_unfrozen', { name });
+  }
+
+  /**
+   * Shadow an agent, setting its state to SHADOWED.
+   *
+   * SHADOWED is a safety mode: the daemon dispatcher may run the agent in
+   * parallel with the production version on real traffic, log both
+   * outputs, but only act on the production one. This lets operators
+   * evaluate a new agent version before promotion without affecting
+   * production behaviour.
+   *
+   * Guards:
+   *   - Agent must exist.
+   *   - Agent must be in ACTIVE state (mirrors freeze's "must not already
+   *     be FROZEN" check; we require ACTIVE explicitly so callers cannot
+   *     stack SHADOWED on top of FROZEN or UNDER_REVIEW).
+   *
+   * @throws Error if the agent does not exist or is not ACTIVE.
+   */
+  shadow(name: string): void {
+    const record = this.agents.get(name);
+    if (!record) {
+      throw new Error(`Cannot shadow: agent '${name}' not found in registry`);
+    }
+    if (record.state === 'SHADOWED') {
+      throw new Error(`Cannot shadow: agent '${name}' is already SHADOWED`);
+    }
+    if (record.state !== 'ACTIVE') {
+      throw new Error(`Cannot shadow: agent '${name}' is not ACTIVE (current state: ${record.state})`);
+    }
+
+    const previousState = record.state;
+    record.state = 'SHADOWED';
+    logRegistryEvent('agent_shadowed', { name, previousState });
+  }
+
+  /**
+   * Unshadow an agent, returning its state to ACTIVE.
+   *
+   * Guards:
+   *   - Agent must exist.
+   *   - Agent must be in SHADOWED state.
+   *
+   * @throws Error if the agent does not exist or is not SHADOWED.
+   */
+  unshadow(name: string): void {
+    const record = this.agents.get(name);
+    if (!record) {
+      throw new Error(`Cannot unshadow: agent '${name}' not found in registry`);
+    }
+    if (record.state !== 'SHADOWED') {
+      throw new Error(`Cannot unshadow: agent '${name}' is not SHADOWED (current state: ${record.state})`);
+    }
+
+    record.state = 'ACTIVE';
+    logRegistryEvent('agent_unshadowed', { name });
   }
 
   /**

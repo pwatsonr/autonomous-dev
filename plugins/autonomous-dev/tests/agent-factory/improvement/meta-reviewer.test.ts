@@ -239,6 +239,14 @@ class MockRegistry implements IAgentRegistry {
     const r = this.agents.get(name);
     if (r) r.state = 'ACTIVE';
   }
+  shadow(name: string): void {
+    const r = this.agents.get(name);
+    if (r) r.state = 'SHADOWED';
+  }
+  unshadow(name: string): void {
+    const r = this.agents.get(name);
+    if (r) r.state = 'ACTIVE';
+  }
   getState(name: string): AgentState | undefined {
     return this.agents.get(name)?.state;
   }

@@ -10,11 +10,14 @@
 //   - inspect            → commandInspect (human text) or JSON with --json
 //   - freeze   <name>    → commandFreeze + persist state
 //   - unfreeze <name>    → commandUnfreeze + persist state
+//   - shadow   <name>    → commandShadow + persist state
+//   - unshadow <name>    → commandUnshadow + persist state
 //   - promote  <name> <version>  → commandPromote (async)
 //   - list               → JSON list of {name, state} when --json, else text
 //
 // Persistence:
-//   freeze/unfreeze persist the FROZEN-name set to
+//   freeze/unfreeze and shadow/unshadow persist the FROZEN-name set and
+//   the SHADOWED-name set to
 //   `${AUTONOMOUS_DEV_STATE_DIR ?? ~/.autonomous-dev}/agent-states.json`.
 //   Subsequent invocations apply that overlay after registry.load() so the
 //   user-visible state survives process exits.
@@ -29,7 +32,9 @@ import {
     commandFreeze,
     commandInspect,
     commandPromote,
+    commandShadow,
     commandUnfreeze,
+    commandUnshadow,
 } from "../src/agent-factory/cli";
 import { AgentRegistry } from "../src/agent-factory/registry";
 
@@ -42,6 +47,8 @@ interface PersistedState {
     v: 1;
     /** Set of agent names currently FROZEN. */
     frozen: string[];
+    /** Set of agent names currently SHADOWED. */
+    shadowed: string[];
     /** ISO timestamp of the last mutation. */
     updatedAt: string;
 }
@@ -57,7 +64,12 @@ function stateFilePath(): string {
 async function readPersistedState(): Promise<PersistedState> {
     const path = stateFilePath();
     if (!existsSync(path)) {
-        return { v: 1, frozen: [], updatedAt: new Date(0).toISOString() };
+        return {
+            v: 1,
+            frozen: [],
+            shadowed: [],
+            updatedAt: new Date(0).toISOString(),
+        };
     }
     try {
         const raw = await fs.readFile(path, "utf-8");
@@ -67,13 +79,21 @@ async function readPersistedState(): Promise<PersistedState> {
             frozen: Array.isArray(parsed.frozen) ? parsed.frozen.filter(
                 (n): n is string => typeof n === "string",
             ) : [],
+            shadowed: Array.isArray(parsed.shadowed) ? parsed.shadowed.filter(
+                (n): n is string => typeof n === "string",
+            ) : [],
             updatedAt:
                 typeof parsed.updatedAt === "string"
                     ? parsed.updatedAt
                     : new Date(0).toISOString(),
         };
     } catch {
-        return { v: 1, frozen: [], updatedAt: new Date(0).toISOString() };
+        return {
+            v: 1,
+            frozen: [],
+            shadowed: [],
+            updatedAt: new Date(0).toISOString(),
+        };
     }
 }
 
@@ -88,14 +108,36 @@ async function writePersistedState(state: PersistedState): Promise<void> {
     await fs.rename(tmp, path);
 }
 
-/** Apply persisted FROZEN overlay onto a freshly-loaded registry. */
-function applyOverlay(registry: AgentRegistry, frozen: string[]): void {
+/**
+ * Apply persisted overlays (FROZEN, SHADOWED) onto a freshly-loaded
+ * registry. Agents are loaded as ACTIVE by default; the overlay
+ * re-asserts the user-visible state captured by previous CLI mutations.
+ *
+ * FROZEN takes precedence over SHADOWED: if a name appears in both
+ * sets (shouldn't happen in normal flow, but defensible), the freeze
+ * wins and the shadow entry becomes a no-op for this load.
+ */
+function applyOverlay(
+    registry: AgentRegistry,
+    frozen: string[],
+    shadowed: string[],
+): void {
+    const frozenSet = new Set(frozen);
     for (const name of frozen) {
         try {
             registry.freeze(name);
         } catch {
             // Agent may have been removed from disk while frozen. Silently
             // skip — the persisted entry becomes a no-op on the next write.
+        }
+    }
+    for (const name of shadowed) {
+        if (frozenSet.has(name)) continue;
+        try {
+            registry.shadow(name);
+        } catch {
+            // Same defensiveness as freeze: agent removed from disk or no
+            // longer ACTIVE, skip silently.
         }
     }
 }
@@ -112,6 +154,7 @@ interface InspectJson {
     state: string;
     description: string;
     frozen: boolean;
+    shadowed: boolean;
     riskTier?: string;
 }
 
@@ -127,6 +170,7 @@ function recordToJson(record: ReturnType<AgentRegistry["get"]>): InspectJson | n
         state: record.state,
         description: a.description ?? "",
         frozen: record.state === "FROZEN",
+        shadowed: record.state === "SHADOWED",
         riskTier: (a as Record<string, unknown>)["risk_tier"] as string | undefined,
     };
 }
@@ -143,7 +187,7 @@ async function main(): Promise<number> {
 
     if (!verb || verb === "--help" || verb === "-h") {
         console.error(
-            "Usage: autonomous-dev agent <inspect|freeze|unfreeze|promote|list> <name> [version] [--json]",
+            "Usage: autonomous-dev agent <inspect|freeze|unfreeze|shadow|unshadow|promote|list> <name> [version] [--json]",
         );
         return verb && verb !== "--help" && verb !== "-h" ? 1 : 0;
     }
@@ -164,9 +208,10 @@ async function main(): Promise<number> {
         return 1;
     }
 
-    // Apply persisted FROZEN overlay before any verb-specific logic runs.
+    // Apply persisted FROZEN + SHADOWED overlay before any verb-specific
+    // logic runs.
     const persisted = await readPersistedState();
-    applyOverlay(registry, persisted.frozen);
+    applyOverlay(registry, persisted.frozen, persisted.shadowed);
 
     if (verb === "list") {
         const records = registry.list();
@@ -233,6 +278,24 @@ async function main(): Promise<number> {
                     );
                 }
                 break;
+            case "shadow":
+                output = commandShadow(registry, name);
+                if (!output.startsWith("Error:")) {
+                    mutated = true;
+                    if (!persisted.shadowed.includes(name)) {
+                        persisted.shadowed.push(name);
+                    }
+                }
+                break;
+            case "unshadow":
+                output = commandUnshadow(registry, name);
+                if (!output.startsWith("Error:")) {
+                    mutated = true;
+                    persisted.shadowed = persisted.shadowed.filter(
+                        (n) => n !== name,
+                    );
+                }
+                break;
             case "promote": {
                 const version = rest[0];
                 if (!version) {
@@ -248,7 +311,7 @@ async function main(): Promise<number> {
                 break;
             }
             default: {
-                const msg = `unknown verb '${verb}'. Use inspect|freeze|unfreeze|promote|list.`;
+                const msg = `unknown verb '${verb}'. Use inspect|freeze|unfreeze|shadow|unshadow|promote|list.`;
                 if (jsonMode) {
                     console.log(JSON.stringify({ error: msg }));
                 } else {
