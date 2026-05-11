@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100002",
+  "repo": "critical-service",
+  "title": "Rate limiter for auth API",
+  "phase": "REVIEW",
+  "status": "gate",
+  "cost": 6.12,
+  "variant": "security-hardening",
+  "createdAt": "2026-05-10T11:00:00Z"
+}

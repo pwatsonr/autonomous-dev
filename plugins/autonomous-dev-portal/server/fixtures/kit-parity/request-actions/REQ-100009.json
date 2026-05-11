@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100009",
+  "repo": "profile-svc",
+  "title": "Migrate to async I/O",
+  "phase": "SPEC",
+  "status": "running",
+  "cost": 10.49,
+  "variant": "feature-default",
+  "createdAt": "2026-05-10T03:30:00Z"
+}

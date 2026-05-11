@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100001",
+  "repo": "my-app",
+  "title": "/health endpoint with uptime",
+  "phase": "CODE",
+  "status": "running",
+  "cost": 8.45,
+  "variant": "feature-default",
+  "createdAt": "2026-05-10T12:00:00Z"
+}

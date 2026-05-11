@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100007",
+  "repo": "docs-site",
+  "title": "Rebuild navigation IA",
+  "phase": "DEPLOY",
+  "status": "running",
+  "cost": 14.07,
+  "variant": "docs-only",
+  "createdAt": "2026-05-10T05:00:00Z"
+}

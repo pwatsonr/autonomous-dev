@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100008",
+  "repo": "my-app",
+  "title": "Drop Node 16 support",
+  "phase": "CODE",
+  "status": "running",
+  "cost": 5.42,
+  "variant": "feature-default",
+  "createdAt": "2026-05-10T04:15:00Z"
+}

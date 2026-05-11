@@ -69,3 +69,37 @@ export function userConfigPath(): string {
     if (override !== undefined && override.length > 0) return override;
     return join(homedir(), ".claude", "autonomous-dev.json");
 }
+
+// PLAN-038 TASK-008 — new paths for the Track-C readers.
+//
+// O.Q. #2 resolution: there is NO daemon-written `requests-ledger.json`
+// (v1.0/v1.1 of TDD-037 assumed there was; it does not exist). The
+// request-ledger reader aggregates from `requestActionsDir()` and
+// `gateDecisionsDir()` above. No new function needed for that.
+//
+// O.Q. #3 resolution: the daemon's CLI bridge writes `agent-states.json`
+// at the state-dir root (plugins/autonomous-dev/bin/agent-cli.ts:61).
+// Its real shape is thin — `{v, frozen[], shadowed[], updatedAt}`.
+
+/**
+ * Lifecycle state for plugin agents. Written by the `autonomous-dev agent`
+ * CLI bridge; read by the portal's Agents surface (TASK-010).
+ */
+export function agentStatesPath(): string {
+    return join(stateDirRoot(), "agent-states.json");
+}
+
+/**
+ * Canonical kit-parity fixture root. CI screenshot regression points
+ * `AUTONOMOUS_DEV_STATE_DIR` here to reproduce the kit-screenshot KPIs
+ * from real reader code paths (no demo-mode flag, no stub bypass).
+ *
+ * Resolved relative to the package root (`plugins/autonomous-dev-portal/`)
+ * via `import.meta.dir` so the path is stable regardless of `process.cwd()`.
+ */
+export function kitParityFixtureRoot(): string {
+    // `import.meta.dir` resolves to `server/wiring/`; `../../server/fixtures`
+    // walks back to `server/fixtures/`. The `kit-parity` subdir is committed
+    // to source.
+    return join(import.meta.dir, "..", "fixtures", "kit-parity");
+}

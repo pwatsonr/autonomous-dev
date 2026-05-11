@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100003",
+  "repo": "critical-service",
+  "title": "Database connection pool tuning",
+  "phase": "SPEC",
+  "status": "gate",
+  "cost": 4.20,
+  "variant": "security-hardening",
+  "createdAt": "2026-05-10T09:30:00Z"
+}

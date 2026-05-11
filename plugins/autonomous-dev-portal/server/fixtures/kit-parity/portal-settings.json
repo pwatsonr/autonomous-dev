@@ -1,0 +1,23 @@
+{
+  "repositories": {
+    "allowlist": [
+      { "id": "my-app", "path": "~/projects/my-app" },
+      { "id": "critical-service", "path": "~/projects/critical-service" },
+      { "id": "docs-site", "path": "~/projects/docs-site" },
+      { "id": "homelab-api", "path": "~/projects/homelab-api" },
+      { "id": "sentry-watch", "path": "~/projects/sentry-watch" },
+      { "id": "profile-svc", "path": "~/projects/profile-svc" }
+    ]
+  },
+  "trustLevels": {
+    "global": "L1",
+    "perRepo": {
+      "my-app": "L2",
+      "critical-service": "L0",
+      "docs-site": "L3",
+      "homelab-api": "L1",
+      "sentry-watch": "L2",
+      "profile-svc": "L1"
+    }
+  }
+}

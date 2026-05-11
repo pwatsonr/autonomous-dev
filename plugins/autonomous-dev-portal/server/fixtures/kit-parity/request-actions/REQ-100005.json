@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100005",
+  "repo": "homelab-api",
+  "title": "Add Prometheus metrics endpoint",
+  "phase": "PLAN",
+  "status": "running",
+  "cost": 0.74,
+  "variant": "feature-default",
+  "createdAt": "2026-05-10T07:30:00Z"
+}

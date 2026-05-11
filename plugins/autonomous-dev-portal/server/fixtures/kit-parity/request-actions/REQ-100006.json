@@ -1,0 +1,10 @@
+{
+  "id": "REQ-100006",
+  "repo": "sentry-watch",
+  "title": "Alert routing for L1 incidents",
+  "phase": "OBSERVE",
+  "status": "running",
+  "cost": 2.81,
+  "variant": "feature-default",
+  "createdAt": "2026-05-10T06:00:00Z"
+}
