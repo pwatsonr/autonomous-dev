@@ -6,15 +6,19 @@
 // PLAN-036-1 ships once, here. The fragment imports no primitives;
 // cost-ring / score visualizations belong on the Costs/Ops surfaces.
 //
-// Rendered HTML (SPEC-036-1-02 AC #2):
+// Rendered HTML (SPEC-036-1-02 AC #2, updated by SPEC-037-6-01):
 //   <div id="kpi-strip" class="kpi-strip">
 //     <div class="kpi">
 //       <div class="kpi-label">{label}</div>
-//       <div class="kpi-value">{value}</div>
+//       <div class="kpi-num">{value}</div>
 //       <div class="kpi-sub">{sub}</div>   <!-- omitted when sub is undefined -->
 //     </div>
 //     ...
 //   </div>
+//
+// SPEC-037-6-01: class `.kpi-value` was renamed to `.kpi-num` to match the
+// kit's canonical name (`app.css:354`). No layout change; the rename makes
+// the existing kit rule (mono, 26px) actually hit.
 
 import type { FC } from "hono/jsx";
 
@@ -36,7 +40,7 @@ export const KpiStrip: FC<KpiStripProps> = ({ items, id = "kpi-strip" }) => (
         {items.map((it) => (
             <div class="kpi">
                 <div class="kpi-label">{it.label}</div>
-                <div class="kpi-value">{it.value}</div>
+                <div class="kpi-num">{it.value}</div>
                 {it.sub != null && <div class="kpi-sub">{it.sub}</div>}
             </div>
         ))}

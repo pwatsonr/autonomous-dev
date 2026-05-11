@@ -18,18 +18,25 @@
 // Layout (FR-9): each line is a CSS grid 11ch / 6ch / 1fr (timestamp,
 // level, message) — the .log-line class in portal.css supplies the
 // grid template; the fragment only emits the spans.
+//
+// Per-line markup (SPEC-037-6-02): the kit defines color tiers only
+// on `.l-time / .l-info / .l-warn / .l-err / .l-mark` (app.css:331-336
+// + 669). The legacy `.ts / .lvl / .lvl-* / .msg` names rendered
+// uncolored. This fragment now emits the kit's flat-span shape and
+// places the marker treatment INSIDE the line as a `<span class="l-mark">`
+// instead of the row-level `marker` modifier the kit no longer styles.
 
 import type { FC } from "hono/jsx";
 
 import type { LogEntry } from "../../types/render";
 
-/** Per-level CSS class name. INFO/WARN/ERROR map to colored level spans. */
+/** Per-level CSS class name. INFO/WARN/ERROR map to colored level spans.
+ *  Per SPEC-037-6-02, emits the kit's flat span classes (no `.lvl` prefix). */
 function levelClass(level: string): string {
     const u = level.toUpperCase();
-    if (u === "ERROR" || u === "ERR") return "lvl lvl-err";
-    if (u === "WARN") return "lvl lvl-warn";
-    if (u === "INFO") return "lvl lvl-info";
-    return "lvl";
+    if (u === "ERROR" || u === "ERR") return "l-err";
+    if (u === "WARN") return "l-warn";
+    return "l-info";
 }
 
 /** Match agent dispatch lines for the bold/brand "marker" treatment. */
@@ -60,9 +67,9 @@ export const LiveLog: FC<LiveLogProps> = ({ entries, offline = false }) => {
         return (
             <div class="log" id="log-tail" style={CONTAINER_STYLE}>
                 <div class="log-line muted meta-mono">
-                    <span class="ts" />
-                    <span class="lvl" />
-                    <span class="msg">Daemon offline</span>
+                    <span class="l-time" />
+                    <span class="l-info" />
+                    <span>Daemon offline</span>
                 </div>
             </div>
         );
@@ -74,9 +81,9 @@ export const LiveLog: FC<LiveLogProps> = ({ entries, offline = false }) => {
         return (
             <div class="log" id="log-tail" style={CONTAINER_STYLE}>
                 <div class="log-line muted meta-mono">
-                    <span class="ts" />
-                    <span class="lvl" />
-                    <span class="msg">No log entries yet</span>
+                    <span class="l-time" />
+                    <span class="l-info" />
+                    <span>No log entries yet</span>
                 </div>
             </div>
         );
@@ -86,14 +93,17 @@ export const LiveLog: FC<LiveLogProps> = ({ entries, offline = false }) => {
         <div class="log" id="log-tail" style={CONTAINER_STYLE}>
             {visible.map((e) => {
                 const marker = isMarker(e.message);
-                const cls = marker ? "log-line marker" : "log-line";
                 return (
-                    <div class={cls}>
-                        <span class="ts">{e.ts}</span>
+                    <div class="log-line">
+                        <span class="l-time">{e.ts}</span>
                         <span class={levelClass(e.level)}>
                             {e.level.toUpperCase()}
                         </span>
-                        <span class="msg">{e.message}</span>
+                        {marker ? (
+                            <span class="l-mark">{e.message}</span>
+                        ) : (
+                            <span>{e.message}</span>
+                        )}
                     </div>
                 );
             })}

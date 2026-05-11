@@ -36,6 +36,19 @@ export type StatusTone =
     | "muted"
     | "brand";
 
+/**
+ * Role-tone palette (SPEC-037-6-03). Maps to kit rules
+ * `.chip.role-author / .role-reviewer / .role-specialist / .role-generic`
+ * at `app.css:409-412`. Used by the Costs reviewer-spend chip and any
+ * other reviewer-role contexts. Kept separate from {@link StatusTone}
+ * so the status palette stays semantically narrow.
+ */
+export type RoleTone =
+    | "role-author"
+    | "role-reviewer"
+    | "role-specialist"
+    | "role-generic";
+
 /** Eight portal phases — used by Chip (phase variant) and Card.leftBar. */
 export type PhaseName =
     | "prd"
@@ -102,33 +115,49 @@ export const Btn: FC<BtnProps> = ({
 // Chip + Dot — SPEC-035-2-03 (TDD §6.5.2 / §6.5.3)
 // ---------------------------------------------------------------------------
 
-type ChipVariant = "status" | "phase";
+type ChipVariant = "status" | "phase" | "backend";
+
+/** Optional size variant. Maps to kit `.chip.sm` (`app.css:408`). */
+type ChipSize = "sm";
 
 export interface ChipProps {
-    /** `"status"` for tone-driven status chips, `"phase"` for phase chips. */
+    /** `"status"` for tone-driven status chips, `"phase"` for phase chips,
+     *  `"backend"` for deploy-backend markers (SPEC-037-6-03). */
     variant: ChipVariant;
-    /** Tone token. For `"status"` accepts `StatusTone`; for `"phase"`
-     *  accepts `PhaseName`. */
-    tone?: StatusTone | PhaseName;
-    /** Inner text for status chips. Ignored for phase chips (R-11: phase
-     *  chips always render the uppercase phase name). */
+    /** Tone token. For `"status"` accepts `StatusTone` or `RoleTone`
+     *  (SPEC-037-6-03); for `"phase"` accepts `PhaseName`. Ignored for
+     *  `"backend"`. */
+    tone?: StatusTone | RoleTone | PhaseName;
+    /** Compact sizing (`.chip.sm`). Optional; default unset. */
+    size?: ChipSize;
+    /** Inner text for status / backend chips. Ignored for phase chips
+     *  (R-11: phase chips always render the uppercase phase name). */
     children?: unknown;
 }
 
 /**
  * SPEC-035-2-03 §Chip — status / phase classification badge.
+ * Extended by SPEC-037-6-03 with the `"backend"` variant + optional
+ * `size="sm"` and the `RoleTone` palette.
  *
  * Phase variant (R-11): renders `<span class="chip-phase {tone}">` with
  * the phase name uppercased as the text content. Any `children` are
  * intentionally ignored to keep phase labels canonical.
  *
- * Status variant: renders `<span class="chip {tone?}">` with `children`
- * verbatim. Consumers are responsible for uppercase per R-10.
+ * Status variant: renders `<span class="chip {tone?}{ sm?}">` with
+ * `children` verbatim. Accepts both {@link StatusTone} and
+ * {@link RoleTone} tokens. Consumers are responsible for uppercase
+ * (R-10) on tone='ok|warn|err|info'; role-* and backend variants render
+ * sentence case per the kit rules.
+ *
+ * Backend variant: renders `<span class="chip backend{ sm?}">{children}</span>`
+ * — kit `app.css:396` covers the backend palette; SPEC-037-6-03 expects
+ * `size="sm"` for the Costs deploy-backend column.
  *
  * The 6px colored dot rendered before phase-chip text is delivered by the
  * CSS `::before` pseudo-element in primitives.css — never injected here.
  */
-export const Chip: FC<ChipProps> = ({ variant, tone, children }) => {
+export const Chip: FC<ChipProps> = ({ variant, tone, size, children }) => {
     if (variant === "phase" && tone) {
         return (
             <span class={`chip-phase ${tone}`}>
@@ -136,11 +165,15 @@ export const Chip: FC<ChipProps> = ({ variant, tone, children }) => {
             </span>
         );
     }
-    return (
-        <span class={`chip ${tone ?? ""}`.trimEnd()}>
-            {children}
-        </span>
-    );
+    if (variant === "backend") {
+        const cls = ["chip", "backend"];
+        if (size === "sm") cls.push("sm");
+        return <span class={cls.join(" ")}>{children}</span>;
+    }
+    const cls = ["chip"];
+    if (tone) cls.push(tone);
+    if (size === "sm") cls.push("sm");
+    return <span class={cls.join(" ")}>{children}</span>;
 };
 
 /** Dot's tone palette is intentionally narrower than Chip's (no "brand"). */
