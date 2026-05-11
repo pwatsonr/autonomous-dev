@@ -163,12 +163,14 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                                     <tr>
                                         <td>{r.name}</td>
                                         <td>
+                                            {/* SPEC-037-6-03: reviewer-role chips use the kit's purpose-built
+                                             *  role-* palette instead of the generic info / muted tones. */}
                                             <Chip
                                                 variant="status"
                                                 tone={
                                                     r.role === "specialist"
-                                                        ? "info"
-                                                        : "muted"
+                                                        ? "role-specialist"
+                                                        : "role-generic"
                                                 }
                                             >
                                                 {r.role}
@@ -220,10 +222,9 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                                         <strong>{d.env}</strong>
                                     </td>
                                     <td>
-                                        <Chip
-                                            variant="status"
-                                            tone="info"
-                                        >
+                                        {/* SPEC-037-6-03: deploy-backend column uses the kit's
+                                         *  `.chip.backend.sm` marker (compact). */}
+                                        <Chip variant="backend" size="sm">
                                             {d.backend}
                                         </Chip>
                                     </td>

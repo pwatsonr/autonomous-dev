@@ -39,11 +39,11 @@ describe("KpiStrip — SPEC-036-1-02", () => {
         ]);
     });
 
-    test("AC #2: each tile carries kpi-label, kpi-value, kpi-sub", async () => {
+    test("AC #2: each tile carries kpi-label, kpi-num, kpi-sub (SPEC-037-6-01)", async () => {
         const html = await render(<KpiStrip items={items} />);
         // 4 tiles -> 4 labels, 4 values, 4 subs
         const labelCount = (html.match(/class="kpi-label"/g) ?? []).length;
-        const valueCount = (html.match(/class="kpi-value"/g) ?? []).length;
+        const valueCount = (html.match(/class="kpi-num"/g) ?? []).length;
         const subCount = (html.match(/class="kpi-sub"/g) ?? []).length;
         expect(labelCount).toBe(4);
         expect(valueCount).toBe(4);
@@ -61,7 +61,7 @@ describe("KpiStrip — SPEC-036-1-02", () => {
         const html = await render(
             <KpiStrip items={[{ label: "Active", value: 0 }]} />,
         );
-        expect(html).toContain('<div class="kpi-value">0</div>');
+        expect(html).toContain('<div class="kpi-num">0</div>');
     });
 
     test("AC #4: '$0.00' renders verbatim (PRD-018 R-22)", async () => {
@@ -82,7 +82,7 @@ describe("KpiStrip — SPEC-036-1-02", () => {
     test("AC #6: MTD value matches /^\\$\\d+\\.\\d{2}$/", async () => {
         const html = await render(<KpiStrip items={items} />);
         const match = html.match(
-            /<div class="kpi-value">(\$\d+\.\d{2})<\/div>/,
+            /<div class="kpi-num">(\$\d+\.\d{2})<\/div>/,
         );
         expect(match).not.toBeNull();
         expect(match![1]).toMatch(/^\$\d+\.\d{2}$/);

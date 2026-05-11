@@ -163,6 +163,52 @@ describe("Chip — SPEC-035-2-03", () => {
         // No tone -> rendered as plain `<span class="chip">` (defensive).
         expect(html).toContain('class="chip"');
     });
+
+    // SPEC-037-6-03: extended tone palette + size=sm + backend variant.
+    test("status variant with tone=\"role-specialist\" renders class=\"chip role-specialist\"", async () => {
+        const html = await render(
+            <Chip variant="status" tone="role-specialist">
+                specialist
+            </Chip>,
+        );
+        expect(html).toContain('class="chip role-specialist"');
+        expect(html).toContain("specialist");
+    });
+
+    test("status variant with tone=\"role-generic\" renders class=\"chip role-generic\"", async () => {
+        const html = await render(
+            <Chip variant="status" tone="role-generic">
+                generic
+            </Chip>,
+        );
+        expect(html).toContain('class="chip role-generic"');
+    });
+
+    test("size=\"sm\" appends sm to the class on a status chip", async () => {
+        const html = await render(
+            <Chip variant="status" tone="info" size="sm">
+                X
+            </Chip>,
+        );
+        expect(html).toContain('class="chip info sm"');
+    });
+
+    test("backend variant renders class=\"chip backend\" with children", async () => {
+        const html = await render(
+            <Chip variant="backend">fly</Chip>,
+        );
+        expect(html).toContain('class="chip backend"');
+        expect(html).toContain("fly");
+    });
+
+    test("backend variant + size=\"sm\" renders class=\"chip backend sm\"", async () => {
+        const html = await render(
+            <Chip variant="backend" size="sm">
+                fly
+            </Chip>,
+        );
+        expect(html).toContain('class="chip backend sm"');
+    });
 });
 
 // ---------------------------------------------------------------------------

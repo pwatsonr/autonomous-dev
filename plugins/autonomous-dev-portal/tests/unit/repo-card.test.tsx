@@ -33,15 +33,23 @@ const baseRepo: RepoSummary = {
     attn: false,
 };
 
-describe("RepoCard — SPEC-036-1-03", () => {
-    test("AC #1: renders the 6 regions in DOM order", async () => {
+describe("RepoCard — SPEC-036-1-03 (updated by SPEC-037-6-01)", () => {
+    test("SPEC-037-6-01 AC: outer element is <button class=\"repo-card\"> (no <Card> wrapper)", async () => {
         const html = await render(<RepoCard {...baseRepo} />);
-        // rc-top first, then rc-path, then two rc-meta, then rc-footer
-        const idxTop = html.indexOf("rc-top");
-        const idxPath = html.indexOf("rc-path");
-        const idxMeta1 = html.indexOf("rc-meta");
-        const idxMeta2 = html.indexOf("rc-meta", idxMeta1 + 1);
-        const idxFoot = html.indexOf("rc-footer");
+        // Single-element outer wrapper: <button> carries the class.
+        expect(html).toMatch(/^<button [^>]*class="repo-card/);
+        // No double-wrapper: the legacy <div class="card"> ... <div class="repo-card"> shape is gone.
+        expect(html).not.toContain('class="card"');
+    });
+
+    test("AC #1: renders the 6 regions in kit class names in DOM order", async () => {
+        const html = await render(<RepoCard {...baseRepo} />);
+        // repo-top first, then repo-path, then two repo-meta-row, then repo-foot
+        const idxTop = html.indexOf("repo-top");
+        const idxPath = html.indexOf("repo-path");
+        const idxMeta1 = html.indexOf("repo-meta-row");
+        const idxMeta2 = html.indexOf("repo-meta-row", idxMeta1 + 1);
+        const idxFoot = html.indexOf("repo-foot");
         expect(idxTop).toBeGreaterThan(-1);
         expect(idxTop).toBeLessThan(idxPath);
         expect(idxPath).toBeLessThan(idxMeta1);
@@ -49,17 +57,17 @@ describe("RepoCard — SPEC-036-1-03", () => {
         expect(idxMeta2).toBeLessThan(idxFoot);
     });
 
-    test("AC #1.1: top row carries repo name and trust", async () => {
+    test("AC #1.1: top row carries repo name and trust under kit class names", async () => {
         const html = await render(<RepoCard {...baseRepo} />);
-        expect(html).toContain('<span class="rc-name">acme</span>');
-        expect(html).toContain('<span class="rc-trust meta-mono">L1</span>');
+        expect(html).toContain('<span class="repo-id">acme</span>');
+        expect(html).toContain('<span class="repo-trust meta-mono">L1</span>');
     });
 
     test("AC #6: trust badge omitted when undefined", async () => {
         const html = await render(
             <RepoCard {...baseRepo} trust={undefined} />,
         );
-        expect(html).not.toContain("rc-trust");
+        expect(html).not.toContain("repo-trust");
     });
 
     test("AC #1.2: path row uses ~/projects/{repo}", async () => {
@@ -72,7 +80,7 @@ describe("RepoCard — SPEC-036-1-03", () => {
         expect(html).toContain('<span class="chip-phase code">CODE</span>');
     });
 
-    test("AC #1.6: phase left bar delegated to Card primitive", async () => {
+    test("AC #1.6: phase left bar emitted inline on the <button class=\"repo-card\">", async () => {
         const html = await render(<RepoCard {...baseRepo} phase="code" />);
         expect(html).toContain("border-left: 4px solid var(--phase-code)");
     });

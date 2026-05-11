@@ -1,17 +1,26 @@
 // SPEC-036-1-03 §RepoCard — kit-faithful 6-region repo card.
 //
 // Rewritten from the v1.0 `<dl>`-based card to the TDD-036 §6.1
-// 6-region layout consuming the `Card` primitive (with `leftBar` set
-// to the active phase, or warn-line treatment when `attn === true`)
-// and `Chip` primitives for phase / variant / backend / stack tags.
+// 6-region layout. Updated by SPEC-037-6-01 to:
+//   - Emit kit-canonical class names (`.repo-top`, `.repo-id`,
+//     `.repo-trust`, `.repo-path`, `.repo-meta-row`, `.repo-foot`)
+//     so the kit's `app.css:370-386` rules actually hit.
+//   - Collapse the `<Card><div class="repo-card">` double wrapper to
+//     a single `<button class="repo-card">` element, matching the
+//     kit's `Dashboard.jsx` shape and the hoverable interaction the
+//     `.repo-card:hover` rule (`app.css:377`) expects.
 //
 // 6 regions in DOM order (SPEC-036-1-03 AC #1):
-//   1. Top row    : repo name + trust-level badge
-//   2. Path row   : ~/projects/{repo} in mono dim
-//   3. Meta row 1 : phase chip (uppercase) + variant chip (label, sentence case)
-//   4. Meta row 2 : backend chip (info tint) + stack chip (muted)
-//   5. Footer     : N active + $X.XX MTD + (need-approval chip OR last-activity)
-//   6. Left bar   : 4px solid var(--phase-{phase}) (Card primitive responsibility)
+//   1. Top row    : repo name + trust-level badge   (.repo-top)
+//   2. Path row   : ~/projects/{repo} in mono dim   (.repo-path)
+//   3. Meta row 1 : phase chip + variant chip       (.repo-meta-row)
+//   4. Meta row 2 : backend chip + stack chip       (.repo-meta-row)
+//   5. Footer     : N active + $X.XX MTD + (need-approval chip OR
+//                   last-activity)                   (.repo-foot)
+//   6. Left bar   : 4px solid var(--phase-{phase}) emitted inline on
+//                   the `<button class="repo-card">` element; suppressed
+//                   when `attn===true` (`.attn` rule supplies the warn
+//                   treatment via kit `app.css:378`).
 //
 // The grid container `<div id="repo-grid" class="repo-grid">` is
 // rendered by `RepoCardGrid` so the parent view can substitute
@@ -20,7 +29,7 @@
 
 import type { FC } from "hono/jsx";
 
-import { Card, Chip } from "../../components/primitives";
+import { Chip } from "../../components/primitives";
 import type { PhaseName } from "../../components/primitives";
 import type { RepoSummary } from "../../types/render";
 
@@ -38,65 +47,77 @@ function formatLastActivity(value: string): string {
 }
 
 export const RepoCard: FC<RepoSummary> = (r) => {
-    // SPEC-036-1-03 AC #1.6 + #2: phase-tokened left bar is replaced by
-    // warn-line treatment when `attn === true`. We do NOT pass leftBar
-    // in the warn case; the `.attn` class supplies the warn border via
-    // tokenized CSS.
-    const phaseForBar = r.attn ? undefined : (r.phase as PhaseName | undefined);
+    // SPEC-036-1-03 AC #1.6 + #2 (per SPEC-037-6-01): phase-tokened left
+    // bar is emitted inline on the single `<button class="repo-card">`
+    // element. When `attn===true`, the inline `border-left` is suppressed
+    // and the `.attn` class supplies the warn-line treatment via the kit
+    // rule on `app.css:378`. The kit's static `.repo-card` rule provides
+    // a default `var(--phase-code)` bar; the inline style overrides it
+    // with the active phase token when present.
+    const phase = r.phase as PhaseName | undefined;
+    const className = `repo-card${r.attn ? " attn" : ""}`;
+    const style =
+        !r.attn && phase
+            ? `border-left: 4px solid var(--phase-${phase})`
+            : undefined;
     return (
-        <Card leftBar={phaseForBar} padding="md">
-            <div class={`repo-card${r.attn ? " attn" : ""}`}>
-                {/* 1. Top row */}
-                <div class="rc-top">
-                    <span class="rc-name">{r.repo}</span>
-                    {r.trust && (
-                        <span class="rc-trust meta-mono">{r.trust}</span>
-                    )}
-                </div>
-                {/* 2. Path row */}
-                <div class="rc-path meta-mono dim">~/projects/{r.repo}</div>
-                {/* 3. Meta row 1 — phase + variant label */}
-                <div class="rc-meta">
-                    {r.phase && (
-                        <Chip variant="phase" tone={r.phase as PhaseName} />
-                    )}
-                    {r.variantLabel && (
-                        <Chip variant="status" tone="muted">
-                            {r.variantLabel}
-                        </Chip>
-                    )}
-                </div>
-                {/* 4. Meta row 2 — backend + stack */}
-                <div class="rc-meta">
-                    {r.backend && (
-                        <Chip variant="status" tone="info">
-                            {r.backend}
-                        </Chip>
-                    )}
-                    {r.stack && (
-                        <Chip variant="status" tone="muted">
-                            {r.stack}
-                        </Chip>
-                    )}
-                </div>
-                {/* 5. Footer */}
-                <div class="rc-footer">
-                    <span>{r.activeRequests} active</span>
-                    <span class="meta-mono">
-                        ${r.monthlyCostUsd.toFixed(2)} MTD
-                    </span>
-                    {(r.gateCount ?? 0) > 0 ? (
-                        <Chip variant="status" tone="warn">
-                            {r.gateCount ?? 0} need approval
-                        </Chip>
-                    ) : (
-                        <span class="meta-mono dim">
-                            {formatLastActivity(r.lastActivity)}
-                        </span>
-                    )}
-                </div>
+        <button
+            type="button"
+            class={className}
+            data-phase={r.phase ?? ""}
+            style={style}
+        >
+            {/* 1. Top row */}
+            <div class="repo-top">
+                <span class="repo-id">{r.repo}</span>
+                {r.trust && (
+                    <span class="repo-trust meta-mono">{r.trust}</span>
+                )}
             </div>
-        </Card>
+            {/* 2. Path row */}
+            <div class="repo-path meta-mono dim">~/projects/{r.repo}</div>
+            {/* 3. Meta row 1 — phase + variant label */}
+            <div class="repo-meta-row">
+                {r.phase && (
+                    <Chip variant="phase" tone={r.phase as PhaseName} />
+                )}
+                {r.variantLabel && (
+                    <Chip variant="status" tone="muted">
+                        {r.variantLabel}
+                    </Chip>
+                )}
+            </div>
+            {/* 4. Meta row 2 — backend + stack */}
+            <div class="repo-meta-row">
+                {r.backend && (
+                    <Chip variant="status" tone="info">
+                        {r.backend}
+                    </Chip>
+                )}
+                {r.stack && (
+                    <Chip variant="status" tone="muted">
+                        {r.stack}
+                    </Chip>
+                )}
+            </div>
+            {/* 5. Footer — active + MTD counts receive .num so the kit
+                rule on `app.css:385` brightens them (color + weight). */}
+            <div class="repo-foot">
+                <span class="num">{r.activeRequests} active</span>
+                <span class="meta-mono num">
+                    ${r.monthlyCostUsd.toFixed(2)} MTD
+                </span>
+                {(r.gateCount ?? 0) > 0 ? (
+                    <Chip variant="status" tone="warn">
+                        {r.gateCount ?? 0} need approval
+                    </Chip>
+                ) : (
+                    <span class="meta-mono dim">
+                        {formatLastActivity(r.lastActivity)}
+                    </span>
+                )}
+            </div>
+        </button>
     );
 };
 
