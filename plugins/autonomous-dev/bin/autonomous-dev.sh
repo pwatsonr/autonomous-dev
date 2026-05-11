@@ -54,6 +54,7 @@ Commands:
   config validate      Validate configuration
   request <subcmd>     Manage request lifecycle (run 'request --help' for list)
   reconcile            Detect/repair drift (run 'reconcile --help' for options)
+  agent <verb> <name>  Agent-factory action: inspect | freeze | unfreeze | promote
 
 Options:
   --help, -h           Show this help message
@@ -746,6 +747,14 @@ case "${COMMAND}" in
         ;;
     reconcile)
         cmd_reconcile_delegate "$@"
+        ;;
+    agent)
+        # Bun-executable wrapper for the in-process agent-factory CLI.
+        if ! command -v bun >/dev/null 2>&1; then
+            echo "ERROR: 'agent' subcommand requires bun on PATH" >&2
+            exit 127
+        fi
+        exec bun run "${PLUGIN_BIN_DIR}/agent-cli.ts" "$@"
         ;;
     --help|-h)
         usage

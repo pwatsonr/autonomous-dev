@@ -59,15 +59,39 @@ async function readAgentRecord(
  * emits the documented `agent_action_not_implemented` structured-WARN log
  * + `{error: "not-implemented", verb}` envelope.
  */
-async function deferredRunAgentCli(): Promise<AgentCliResult> {
-    return {
-        ok: false,
-        code: 127,
-        stdout: "",
-        stderr:
-            "unknown command: agent factory CLI not reachable from portal " +
-            "(PLAN-037-2 DEFERRED — TODO: wire via daemon RPC)",
-    };
+/**
+ * Spawn `autonomous-dev agent <verb> <name>` via the CLI dispatcher,
+ * which execs into the bun-runnable `bin/agent-cli.ts` wrapper.
+ *
+ * Timeouts at 30s — `commandPromote` may write to disk; `commandInspect`
+ * is instant.
+ */
+async function spawnAgentCli(
+    verb: string,
+    name: string,
+): Promise<AgentCliResult> {
+    try {
+        const proc = Bun.spawn(["autonomous-dev", "agent", verb, name], {
+            stdout: "pipe",
+            stderr: "pipe",
+        });
+        const [stdout, stderr] = await Promise.all([
+            new Response(proc.stdout).text(),
+            new Response(proc.stderr).text(),
+        ]);
+        const code = await proc.exited;
+        return { ok: code === 0, code, stdout, stderr };
+    } catch (err) {
+        return {
+            ok: false,
+            code: 127,
+            stdout: "",
+            stderr:
+                err instanceof Error
+                    ? `spawn failed: ${err.message}`
+                    : `spawn failed: ${String(err)}`,
+        };
+    }
 }
 
 function renderInspectRow(record: AgentInspectRecord): JSX.Element {
@@ -85,7 +109,7 @@ function renderInspectRow(record: AgentInspectRecord): JSX.Element {
 
 export function buildAgentsDeps(): AgentActionDeps {
     return {
-        runAgentCli: deferredRunAgentCli,
+        runAgentCli: spawnAgentCli,
         readAgentRecord,
         renderRow: renderInspectRow,
         // The audit appender is injected by the central wiring module so
