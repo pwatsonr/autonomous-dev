@@ -36,8 +36,14 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                 <a class="btn" href="/settings#approvals">
                     Settings
                 </a>
+                {/* PLAN-038 polish — disable Bulk approve when there's
+                    nothing to approve; tightened label so the full text
+                    fits the button (was "Bulk approve…" with ellipsis,
+                    truncating in the head-actions container). */}
                 <Btn
                     kind="primary"
+                    class="bulk-approve"
+                    disabled={items.length === 0}
                     hx-post="/api/approvals/bulk-approve"
                     hx-include="[data-segmented-filter='approvals'] .seg-btn.on"
                     hx-vals={
@@ -46,8 +52,13 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                     hx-confirm="Approve every gate matching the current filter?"
                     hx-target=".gate-list"
                     hx-swap="outerHTML"
+                    title={
+                        items.length === 0
+                            ? "No gates to approve"
+                            : `Approve all ${items.length} pending gates matching the current filter`
+                    }
                 >
-                    Bulk approve…
+                    Bulk approve
                 </Btn>
             </div>
         </div>
