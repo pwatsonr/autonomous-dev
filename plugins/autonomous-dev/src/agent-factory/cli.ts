@@ -8,6 +8,8 @@
  *   - agent reload     -- Trigger full registry reload
  *   - agent freeze     -- Freeze an agent (set state to FROZEN)
  *   - agent unfreeze   -- Unfreeze an agent (set state to ACTIVE)
+ *   - agent shadow     -- Shadow an agent (set state to SHADOWED)
+ *   - agent unshadow   -- Unshadow an agent (set state to ACTIVE)
  *   - agent metrics    -- Aggregate metrics, trend, domain breakdown, alerts
  *   - agent dashboard  -- Summary table sorted by approval rate with trends
  *   - agent rollback   -- Rollback an agent to a previous version
@@ -269,6 +271,53 @@ export function commandUnfreeze(registry: IAgentRegistry, name: string): string 
   try {
     registry.unfreeze(name);
     return `Agent '${name}' has been unfrozen (state: ACTIVE).`;
+  } catch (err) {
+    return `Error: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Command: agent shadow <name>
+// ---------------------------------------------------------------------------
+
+/**
+ * Shadow an agent and return a confirmation message.
+ *
+ * SHADOWED is a safety mode for evaluating a new agent version on real
+ * traffic without affecting production: the daemon dispatcher may run
+ * the shadowed agent side-by-side with the production version and log
+ * both outputs, but only act on the production one. The state is now
+ * legible; the daemon's read+act wiring is intentionally out of scope
+ * for this verb.
+ *
+ * @param registry  The agent registry.
+ * @param name      The agent name to shadow.
+ * @returns         Confirmation or error message.
+ */
+export function commandShadow(registry: IAgentRegistry, name: string): string {
+  try {
+    registry.shadow(name);
+    return `Agent '${name}' has been shadowed (state: SHADOWED).`;
+  } catch (err) {
+    return `Error: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Command: agent unshadow <name>
+// ---------------------------------------------------------------------------
+
+/**
+ * Unshadow an agent and return a confirmation message.
+ *
+ * @param registry  The agent registry.
+ * @param name      The agent name to unshadow.
+ * @returns         Confirmation or error message.
+ */
+export function commandUnshadow(registry: IAgentRegistry, name: string): string {
+  try {
+    registry.unshadow(name);
+    return `Agent '${name}' has been unshadowed (state: ACTIVE).`;
   } catch (err) {
     return `Error: ${err instanceof Error ? err.message : String(err)}`;
   }
@@ -639,6 +688,8 @@ export interface CliContext {
  *   agent reload
  *   agent freeze <name>
  *   agent unfreeze <name>
+ *   agent shadow <name>
+ *   agent unshadow <name>
  *   agent metrics <name>
  *   agent dashboard
  *   agent rollback <name> [--force]
@@ -696,6 +747,22 @@ export async function dispatchCommand(
         return 'Error: agent unfreeze requires a name argument.\nUsage: agent unfreeze <name>';
       }
       return commandUnfreeze(registry, name);
+    }
+
+    case 'shadow': {
+      const name = args[1];
+      if (!name) {
+        return 'Error: agent shadow requires a name argument.\nUsage: agent shadow <name>';
+      }
+      return commandShadow(registry, name);
+    }
+
+    case 'unshadow': {
+      const name = args[1];
+      if (!name) {
+        return 'Error: agent unshadow requires a name argument.\nUsage: agent unshadow <name>';
+      }
+      return commandUnshadow(registry, name);
     }
 
     case 'metrics': {
@@ -1150,6 +1217,8 @@ function usageMessage(): string {
     '  agent reload             Reload all agents from disk',
     '  agent freeze <name>      Freeze an agent (set state to FROZEN)',
     '  agent unfreeze <name>    Unfreeze an agent (set state to ACTIVE)',
+    '  agent shadow <name>      Shadow an agent (set state to SHADOWED)',
+    '  agent unshadow <name>    Unshadow an agent (set state to ACTIVE)',
     '  agent metrics <name>     Show aggregate metrics for an agent',
     '  agent dashboard          Show summary dashboard for all agents',
     '  agent rollback <name>    Rollback an agent to a previous version',

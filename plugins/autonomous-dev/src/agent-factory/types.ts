@@ -160,6 +160,7 @@ export type AgentState =
   | 'REGISTERED'
   | 'ACTIVE'
   | 'FROZEN'
+  | 'SHADOWED'
   | 'UNDER_REVIEW'
   | 'VALIDATING'
   | 'CANARY'
@@ -208,6 +209,8 @@ export type AuditEventType =
   | 'integrity_check_failed'
   | 'agent_frozen'
   | 'agent_unfrozen'
+  | 'agent_shadowed'
+  | 'agent_unshadowed'
   | 'agent_loaded'
   | 'agent_rejected'
   | 'registry_reloaded'
@@ -298,6 +301,8 @@ export interface IAgentRegistry {
   getForTask(taskDescription: string, taskDomain?: string): RankedAgent[];
   freeze(name: string): void;
   unfreeze(name: string): void;
+  shadow(name: string): void;
+  unshadow(name: string): void;
   getState(name: string): AgentState | undefined;
   setState(name: string, state: AgentState): void;
   /** Transition agent state following the VALID_TRANSITIONS state machine (SPEC-005-4-5). */

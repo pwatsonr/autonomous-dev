@@ -54,7 +54,8 @@ Commands:
   config validate      Validate configuration
   request <subcmd>     Manage request lifecycle (run 'request --help' for list)
   reconcile            Detect/repair drift (run 'reconcile --help' for options)
-  agent <verb> <name>  Agent-factory action: inspect | freeze | unfreeze | promote
+  agent <verb> <name>  Agent-factory action: inspect | freeze | unfreeze |
+                       shadow | unshadow | promote
 
 Options:
   --help, -h           Show this help message
