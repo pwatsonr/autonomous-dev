@@ -11,9 +11,9 @@
 // all but the last carry `border-right: 0`. These are emitted as extra
 // CSS classes (`first`, `last`, `no-right`) consumed by primitives.css.
 //
-// Click handler — vanilla JS module `static/js/phase-artifact-modal.js`
-// reads `data-phase` and calls `dialog.showModal()` on the matching
-// `<dialog id="artifact-modal-${phase}">` element.
+// Click handler — `static/modal.js` (SPEC-037-7-03) reads
+// `data-modal-open="artifact-{phase}"` and opens the matching
+// `.modal-bg[data-modal="artifact-{phase}"]` overlay.
 
 import type { FC } from "hono/jsx";
 
@@ -57,6 +57,7 @@ export const PipelineVis: FC<Props> = ({ phases, currentPhase }) => {
                             class={cls}
                             data-phase={p}
                             data-state={state}
+                            data-modal-open={`artifact-${p}`}
                         >
                             <span class="pipe-dot" aria-hidden="true"></span>
                             <span class="pipe-name">{p.toUpperCase()}</span>

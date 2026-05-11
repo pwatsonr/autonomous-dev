@@ -1,13 +1,24 @@
-// SPEC-036-3-03 §Phase artifact modal — server-rendered hidden <dialog>
+// SPEC-036-3-03 / SPEC-037-7-03 — Phase artifact modal.
 //
-// One <dialog id="artifact-modal-${phase}"> is emitted per phase that
-// carries an artifact. Rendered hidden by default; static/js/phase-artifact-
-// modal.js opens the matching dialog via `dialog.showModal()` when the
-// operator clicks the corresponding `pipe-step` in pipeline-vis.
+// Pre-SPEC-037-7-03 this fragment emitted a native `<dialog>` element
+// opened via `dialog.showModal()`. The new contract uses the shared
+// `.modal-bg` + `.modal` overlay pattern (see `static/modal.js`):
 //
-// Backdrop click + Escape dismiss are native <dialog> behavior; we attach
-// `data-dismiss="true"` to the close button for parity with the other
-// portal modals.
+//   <div class="modal-bg" data-modal="artifact-{phase}" hidden>
+//     <div class="modal modal-wide" role="dialog" aria-modal="true"
+//          aria-labelledby="artifact-modal-{phase}-title">
+//       <div class="modal-head">…</div>
+//       <div class="artifact-body">…</div>
+//     </div>
+//   </div>
+//
+// Triggers are wired by `static/modal.js`:
+//   - `[data-modal-open="artifact-{phase}"]` opens the modal
+//   - `[data-modal-close]` closes it
+//   - Escape / backdrop click also close
+//
+// The pipeline-vis pipe-step buttons carry the corresponding
+// `data-modal-open` attribute so a click opens the matching modal.
 
 import type { FC } from "hono/jsx";
 
@@ -22,12 +33,17 @@ interface Props {
 export const PhaseArtifactModal: FC<Props> = ({ artifacts, requestId }) => (
     <>
         {artifacts.map((artifact) => (
-            <dialog
-                id={`artifact-modal-${artifact.phase}`}
-                class="modal modal-wide phase-artifact-modal"
-                aria-labelledby={`artifact-modal-${artifact.phase}-title`}
+            <div
+                class="modal-bg phase-artifact-modal"
+                data-modal={`artifact-${artifact.phase}`}
+                hidden
             >
-                <div class="modal-content">
+                <div
+                    class="modal modal-wide"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby={`artifact-modal-${artifact.phase}-title`}
+                >
                     <div class="modal-head">
                         <div>
                             <div class="modal-eyebrow">Phase artifact</div>
@@ -40,7 +56,7 @@ export const PhaseArtifactModal: FC<Props> = ({ artifacts, requestId }) => (
                         <button
                             type="button"
                             class="modal-close"
-                            data-dismiss="true"
+                            data-modal-close
                             aria-label="Close"
                         >
                             ✕
@@ -54,7 +70,7 @@ export const PhaseArtifactModal: FC<Props> = ({ artifacts, requestId }) => (
                         />
                     </div>
                 </div>
-            </dialog>
+            </div>
         ))}
     </>
 );

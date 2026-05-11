@@ -121,6 +121,31 @@ export interface Phase {
     detail: string | null;
 }
 
+/**
+ * SPEC-037-7-02 §Standards-applied — one row in the Standards-applied
+ * section. Severity values are constrained at the type level; renderers
+ * MUST coerce unknown values to `"advisory"` (defensive default).
+ */
+export interface StandardsRule {
+    id: string;
+    desc: string;
+    severity: "blocking" | "warn" | "advisory";
+    source: string;
+    immutable?: boolean;
+}
+
+/**
+ * SPEC-037-7-01/02 §Request feature flags. Optional bag used by the
+ * Request Detail view to decide whether to mount conditional sections.
+ * Kept as a discrete sub-object so future flag additions don't bloat the
+ * `RequestRecord` interface.
+ */
+export interface RequestFlags {
+    /** SPEC-037-7-02 — when true the Standards-applied section renders
+     *  iff `standardsApplied.length > 0`. */
+    hasStandards?: boolean;
+}
+
 export interface RequestRecord {
     id: string; // REQ-NNNNNN
     repo: string;
@@ -154,6 +179,25 @@ export interface RequestRecord {
     currentArtifact?: RequestArtifact;
     /** SPEC-036-3-05 — past daemon iterations against this request. */
     runs?: RequestRunRef[];
+
+    // SPEC-037-7-01 §`.rd-stat` block — three mono numeric cells in the
+    // request-header right column. All optional for back-compat; renderers
+    // default missing fields to `0`.
+    /** Total request cost in USD. Rendered `$X.XX`. */
+    cost?: number;
+    /** Total daemon turns (loop iterations). */
+    turns?: number;
+    /** Aggregate reviewer score (0-100 or 0-10 depending on rubric). */
+    score?: number;
+    /** ISO-8601 start timestamp. Rendered as the final `.rd-meta` segment. */
+    startedAt?: string;
+
+    // SPEC-037-7-02 §Standards-applied section.
+    /** Per-request feature flag bag; drives conditional sections. */
+    flags?: RequestFlags;
+    /** Standards rules applied to this request (rendered iff
+     *  `flags.hasStandards === true` AND list is non-empty). */
+    standardsApplied?: StandardsRule[];
 }
 
 /**
@@ -223,12 +267,47 @@ export interface RequestRunRef {
     cost: number;
 }
 
+// SPEC-037-4-04 §ApprovalItem — rebuilt for the kit's gate-row shape.
+//
+// Replaces the legacy `riskLevel` / `costImpactUsd` schema. Each item is a
+// single open gate the operator can approve or reject from the Approvals
+// surface. The fields map to the kit's three-column gate-row layout:
+//   - `gateType` drives the row's left-border color + segmented-filter target
+//   - `phase` / `variant` / `repo` populate the gate-meta middle column
+//   - `waitedMin` / `cost` render in the left/right info columns
+//   - `detail` is the human-readable second line under the summary
+export type ApprovalGateType =
+    | "reviewer-chain"
+    | "standards-violation"
+    | "cost-cap";
+
+export type ApprovalPhase =
+    | "prd"
+    | "tdd"
+    | "plan"
+    | "spec"
+    | "build"
+    | "review"
+    | "deploy";
+
 export interface ApprovalItem {
     id: string;
     summary: string;
-    riskLevel: "low" | "med" | "high";
     repo: string;
-    costImpactUsd: number;
+    /** Gate type drives the segmented filter and the row's `gate-{type}` class. */
+    gateType: ApprovalGateType;
+    /** Phase the gate is blocking; powers the phase chip in gate-meta. */
+    phase: ApprovalPhase;
+    /** Variant id (e.g. `"deep-research"`); rendered via `variantLabel`. */
+    variant: string;
+    /** Integer minutes the gate has been waiting. */
+    waitedMin: number;
+    /** Cost-to-date in USD (may be 0). */
+    cost: number;
+    /** Human-readable gate-detail line beneath the row summary. */
+    detail: string;
+    /** Optional metadata for KPI sub-line aggregation (e.g. blocking-hit count). */
+    blocking?: boolean;
     actions: { id: string; label: string; confirm: string | null }[];
 }
 
@@ -576,7 +655,7 @@ export interface DashboardAggregatesProp {
 export interface RenderProps {
     dashboard: { data: DashboardData; aggregates: DashboardAggregatesProp };
     "request-detail": { request: RequestRecord; csrfToken?: string };
-    approvals: { items: ApprovalItem[] };
+    approvals: { items: ApprovalItem[]; costCapDailyUsd: number };
     settings: { config: SettingsView; data?: SettingsData };
     costs: {
         series: CostSeries;
