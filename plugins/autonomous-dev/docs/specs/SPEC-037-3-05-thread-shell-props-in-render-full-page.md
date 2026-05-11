@@ -12,12 +12,14 @@
 
 ## Objective
 
-Thread the new rail-ops + rail-nav props through `renderFullPage` in `server/templates/index.tsx`. Derive `daemonStatus`, `daemonAgeSeconds`, `breakerState`/`breakerCount`/`breakerThreshold`, `mtdSpend`/`mtdPctOfCap`, `killSwitchEngaged`, `approvalsCount`, `requestsCount`, `homelabFailingCount`, `agentsAlertCount` server-side once per render and pass them to `<ShellLayout>`. Uses a 5-second in-memory cache on heartbeat reads to avoid per-render disk hits.
+Thread the new rail-ops + rail-nav props through `renderFullPage` in `server/templates/index.tsx`. Derive `daemonStatus`, `daemonAgeSeconds`, `breakerState`/`breakerCount`/`breakerThreshold`, `mtdSpend`/`mtdPctOfCap`, `killSwitchEngaged`, `approvalsCount`, `requestsCount`, `agentsAlertCount` server-side once per render and pass them to `<ShellLayout>`. Uses a 5-second in-memory cache on heartbeat reads to avoid per-render disk hits.
+
+**Homelab field intentionally omitted.** `homelabFailingCount` is not derived here; the Homelab nav entry will be contributed by the `autonomous-dev-homelab` plugin via a future portal-plugin-contribution mechanism, so its data source belongs to that plugin, not portal core.
 
 ## Acceptance Criteria
 
 - **AC-01**: `renderFullPage` gains a new optional `shellState?: ShellRailState` parameter. When omitted, the function derives state via a new `deriveShellRailState()` helper that reads heartbeat.json + cost tracker + approvals queue + platforms state.
-- **AC-02**: `deriveShellRailState()` returns `{ daemonStatus, daemonAgeSeconds, breakerState, breakerCount, breakerThreshold, mtdSpend, mtdPctOfCap, killSwitchEngaged, approvalsCount, requestsCount, homelabFailingCount, agentsAlertCount }`. Each field is independent — a failure in one source yields `undefined`/`"unknown"` for that field only, never throwing.
+- **AC-02**: `deriveShellRailState()` returns `{ daemonStatus, daemonAgeSeconds, breakerState, breakerCount, breakerThreshold, mtdSpend, mtdPctOfCap, killSwitchEngaged, approvalsCount, requestsCount, agentsAlertCount }`. Each field is independent — a failure in one source yields `undefined`/`"unknown"` for that field only, never throwing.
 - **AC-03**: Heartbeat read is cached in a module-level Map keyed by `state-dir`, TTL 5_000 ms. Subsequent calls within the TTL reuse the cached value (verified via spy in tests).
 - **AC-04**: Daemon mapping — `daemon-status.ts` `"fresh"` → `daemonStatus="running"`; `"stale"` → `"stale"`; `"dead"` → `"down"`. `daemonAgeSeconds` = `Math.floor((now - last_seen)/1000)` when `last_seen` is present, else `undefined`.
 - **AC-05**: `<ShellLayout>` invocation inside `renderFullPage` spreads the resolved `shellState` plus `activePath`, `cspNonce`, `theme`. Existing callers of `renderFullPage` are unchanged (no signature break — new param is optional and trailing).
@@ -32,7 +34,7 @@ Files modified/created:
 
 Steps:
 1. Define a `ShellRailState` interface with all 12 fields (all optional).
-2. Implement `deriveShellRailState()` as the union of independent try/catch blocks — one per source. Sources: `daemon-status.ts` (daemon + kill-switch), cost-tracker JSON (mtd), approvals queue file (approvals/requests counts), platforms registry (homelab failing). Where a source is absent, omit the field.
+2. Implement `deriveShellRailState()` as the union of independent try/catch blocks — one per source. Sources: `daemon-status.ts` (daemon + kill-switch), cost-tracker JSON (mtd), approvals queue file (approvals/requests counts). Where a source is absent, omit the field. (Homelab platforms registry intentionally not consulted — Homelab data wiring belongs to the autonomous-dev-homelab plugin, not portal core.)
 3. Implement a `getCachedHeartbeat()` wrapper around `readDaemonStatus()` with 5_000 ms TTL.
 4. Thread `shellState` through `renderFullPage` and the optional `renderViewToContext` overload.
 5. Update `templates/index.test.tsx` to assert that calling `renderFullPage` with a mocked state surfaces the right props on `<ShellLayout>` (via render snapshot inspection).
