@@ -75,6 +75,14 @@ const REPOS_BASE = [
     },
 ] as const;
 
+// PLAN-Requests-Surface — `completedAt` / `createdAt` are recent-relative
+// constants resolved at stub-load time so the "Completed today" KPI and
+// the table's "Age" column always have plausible values without baking
+// in calendar dates that drift past the 24-hour window.
+const NOW_MS = Date.now();
+const ISO = (msAgo: number): string =>
+    new Date(NOW_MS - msAgo).toISOString();
+
 const REQUESTS_BASE: Omit<DashboardRequest, "variantLabel">[] = [
     {
         id: "REQ-000001",
@@ -89,6 +97,7 @@ const REQUESTS_BASE: Omit<DashboardRequest, "variantLabel">[] = [
         gateType: "reviewer-chain",
         stack: "hono",
         waitedMin: 14,
+        createdAt: ISO(3 * 60 * 60 * 1000), // 3h ago
     },
     {
         id: "REQ-000002",
@@ -101,6 +110,23 @@ const REQUESTS_BASE: Omit<DashboardRequest, "variantLabel">[] = [
         score: 92,
         variant: "fast-track",
         stack: "hono",
+        createdAt: ISO(45 * 60 * 1000), // 45m ago
+    },
+    // PLAN-Requests-Surface — completed-today fixture row so the
+    // Requests surface KPI strip isn't all zeros on a fresh install.
+    {
+        id: "REQ-000003",
+        repo: "beta",
+        title: "Document API token rotation policy",
+        phase: "review",
+        status: "done",
+        cost: 0.18,
+        turns: 1,
+        score: 95,
+        variant: "full",
+        stack: "fastapi",
+        createdAt: ISO(8 * 60 * 60 * 1000), // 8h ago
+        completedAt: ISO(2 * 60 * 60 * 1000), // 2h ago
     },
 ];
 

@@ -157,7 +157,13 @@ export const DashboardView: FC<DashboardViewProps> = ({
     aggregates,
 }) => {
     const repos = data.repos ?? [];
-    const requests = data.requests ?? [];
+    // PLAN-Requests-Surface — Dashboard table shows only non-terminal
+    // (active or gated) requests. `"done"` rows are surfaced on the new
+    // `/requests` surface and excluded here so the "Active requests"
+    // table stays semantically pure.
+    const requests = (data.requests ?? []).filter(
+        (r) => r.status !== "done",
+    );
     const kpiItems = buildKpiItems(repos.length, aggregates);
 
     return (

@@ -36,6 +36,7 @@ import { LogsView } from "./views/logs";
 import { NotFoundView } from "./views/404";
 import { OpsView } from "./views/ops";
 import { RequestDetailView } from "./views/request-detail";
+import { RequestsView } from "./views/requests";
 import { ServerErrorView } from "./views/500";
 import { SettingsView } from "./views/settings";
 
@@ -55,6 +56,10 @@ function renderViewBody<V extends ViewName>(
                 <RequestDetailView
                     {...(props as RenderProps["request-detail"])}
                 />
+            );
+        case "requests":
+            return (
+                <RequestsView {...(props as RenderProps["requests"])} />
             );
         case "approvals":
             return (
@@ -114,6 +119,8 @@ function activePathFor(view: ViewName): string {
     switch (view) {
         case "approvals":
             return "/approvals";
+        case "requests":
+            return "/requests";
         case "settings":
             return "/settings";
         case "costs":

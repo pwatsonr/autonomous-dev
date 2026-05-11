@@ -66,6 +66,7 @@ import { buildKillSwitchRoutes } from "./kill-switch";
 import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
 import { requestDetailHandler } from "./request-detail";
+import { requestsHandler } from "./requests";
 import { settingsHandler } from "./settings";
 import {
     buildSettingsActionRoutes,
@@ -281,6 +282,7 @@ export function registerRoutes(
     app.get("/", dashboardHandler);
     app.get("/repo/:repo/request/:id", requestDetailHandler);
     app.get("/approvals", approvalsHandler);
+    app.get("/requests", requestsHandler);
     app.get("/settings", settingsHandler);
     app.get("/costs", costsHandler);
     app.get("/logs", logsHandler);
