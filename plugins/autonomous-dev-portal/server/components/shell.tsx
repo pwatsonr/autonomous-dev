@@ -258,6 +258,13 @@ export const ShellLayout: FC<ShellProps> = ({
                     content="width=device-width, initial-scale=1"
                 />
                 <title>autonomous-dev portal</title>
+                {/* PLAN-038 TASK-001 — SVG favicon points at the kit's mark.
+                    Served from /static/favicon.svg (copy of mark.svg). */}
+                <link
+                    rel="icon"
+                    type="image/svg+xml"
+                    href="/static/favicon.svg"
+                />
                 {/* SPEC-034-1-06 — synchronous FOUC-prevention IIFE.
                     Must run BEFORE any stylesheet so `data-theme` is set
                     before the browser paints. */}

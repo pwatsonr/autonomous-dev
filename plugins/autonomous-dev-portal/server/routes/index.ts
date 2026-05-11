@@ -291,6 +291,22 @@ export function registerRoutes(
     app.get("/design-system", designSystemHandler);
     app.get("/health", healthHandler);
 
+    // PLAN-038 TASK-001 — SVG favicon at the URL root (browsers default-request
+    // /favicon.svg). Reads from the configured static root so it honors the
+    // same `staticRootDir` option as the /static/* mount above.
+    app.get("/favicon.svg", async (c) => {
+        const file = Bun.file(`${staticRootDir}/favicon.svg`);
+        if (!(await file.exists())) {
+            return c.notFound();
+        }
+        return new Response(file, {
+            headers: {
+                "Content-Type": "image/svg+xml",
+                "Cache-Control": "public, max-age=3600",
+            },
+        });
+    });
+
     // SPEC-035-3 — kill-switch sub-router (mounts /ops/kill-switch* paths).
     app.route("/", buildKillSwitchRoutes());
 }
