@@ -223,12 +223,47 @@ export interface RequestRunRef {
     cost: number;
 }
 
+// SPEC-037-4-04 §ApprovalItem — rebuilt for the kit's gate-row shape.
+//
+// Replaces the legacy `riskLevel` / `costImpactUsd` schema. Each item is a
+// single open gate the operator can approve or reject from the Approvals
+// surface. The fields map to the kit's three-column gate-row layout:
+//   - `gateType` drives the row's left-border color + segmented-filter target
+//   - `phase` / `variant` / `repo` populate the gate-meta middle column
+//   - `waitedMin` / `cost` render in the left/right info columns
+//   - `detail` is the human-readable second line under the summary
+export type ApprovalGateType =
+    | "reviewer-chain"
+    | "standards-violation"
+    | "cost-cap";
+
+export type ApprovalPhase =
+    | "prd"
+    | "tdd"
+    | "plan"
+    | "spec"
+    | "build"
+    | "review"
+    | "deploy";
+
 export interface ApprovalItem {
     id: string;
     summary: string;
-    riskLevel: "low" | "med" | "high";
     repo: string;
-    costImpactUsd: number;
+    /** Gate type drives the segmented filter and the row's `gate-{type}` class. */
+    gateType: ApprovalGateType;
+    /** Phase the gate is blocking; powers the phase chip in gate-meta. */
+    phase: ApprovalPhase;
+    /** Variant id (e.g. `"deep-research"`); rendered via `variantLabel`. */
+    variant: string;
+    /** Integer minutes the gate has been waiting. */
+    waitedMin: number;
+    /** Cost-to-date in USD (may be 0). */
+    cost: number;
+    /** Human-readable gate-detail line beneath the row summary. */
+    detail: string;
+    /** Optional metadata for KPI sub-line aggregation (e.g. blocking-hit count). */
+    blocking?: boolean;
     actions: { id: string; label: string; confirm: string | null }[];
 }
 
@@ -555,7 +590,7 @@ export interface DashboardAggregatesProp {
 export interface RenderProps {
     dashboard: { data: DashboardData; aggregates: DashboardAggregatesProp };
     "request-detail": { request: RequestRecord; csrfToken?: string };
-    approvals: { items: ApprovalItem[] };
+    approvals: { items: ApprovalItem[]; costCapDailyUsd: number };
     settings: { config: SettingsView; data?: SettingsData };
     costs: {
         series: CostSeries;

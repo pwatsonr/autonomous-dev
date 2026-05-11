@@ -144,6 +144,14 @@ export const ShellLayout: FC<ShellProps> = ({
                     type="module"
                     nonce={nonce}
                 ></script>
+                {/* SPEC-037-4-02 — Approvals segmented filter; pure DOM
+                    module that self-attaches on DOMContentLoaded and
+                    on htmx:afterSwap so OOB swaps re-bind cleanly. */}
+                <script
+                    src="/static/segmented-filter.js"
+                    defer
+                    nonce={nonce}
+                ></script>
             </head>
             <body>
                 <div class="app">
