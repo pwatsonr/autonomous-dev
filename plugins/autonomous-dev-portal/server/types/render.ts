@@ -358,12 +358,23 @@ export interface AgentRecord {
 }
 
 // SPEC-036-4 — deploy backend record (Backends tab).
+// SPEC-037-5-04 — extends with `name`, `cost`, `caps`, `status` for the
+// `.backend-card` grid layout. All new fields are optional for
+// back-compat with the existing five-column table renderer.
 export interface DeployBackend {
     id: string;
     label: string;
     kind: string;
     enabled: boolean;
     health: "ok" | "warn" | "err" | "muted";
+    /** SPEC-037-5-04 — display name for the card top row. Falls back to `label`. */
+    name?: string;
+    /** SPEC-037-5-04 — free-form cost line (e.g. `"$0.012 / run"`). */
+    cost?: string;
+    /** SPEC-037-5-04 — capability tags rendered as `.cap-chip`. */
+    caps?: string[];
+    /** SPEC-037-5-04 — install/availability state driving the action footer. */
+    status?: "available" | "not-installed" | string;
 }
 
 // SPEC-036-4-03 — per-repo trust override.
@@ -414,6 +425,10 @@ export interface CurrentSpend {
 }
 
 // SPEC-036-4 — Settings page data model.
+// SPEC-037-5 — extends with `dailyCap`, `defaultVariant`, `defaultBackend`
+// for the rebuilt General tab + Variants/Backends "Set default" actions.
+// All new fields are optional; the General panel falls back to
+// `costCaps.daily` / the first variant / the first available backend.
 export interface SettingsData {
     activeTab: TabId;
     trustLevel: "L0" | "L1" | "L2" | "L3";
@@ -426,6 +441,12 @@ export interface SettingsData {
     standards: StandardRule[];
     backends: DeployBackend[];
     agents: AgentRecord[];
+    /** SPEC-037-5-02 — flat numeric cap rendered in `.input-row`. */
+    dailyCap?: number;
+    /** SPEC-037-5-02 / 037-5-03 — currently-default variant id. */
+    defaultVariant?: string;
+    /** SPEC-037-5-02 / 037-5-04 — currently-default backend id. */
+    defaultBackend?: string;
 }
 
 export interface CostPoint {
