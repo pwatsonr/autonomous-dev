@@ -1,13 +1,14 @@
 // SPEC-036-2-04..06 §Route — Ops (`GET /ops`).
-//
-// Loads the ops stub, trims the recent log to last 200 server-side
-// (SPEC-036-2-04 FR-7 — DOM-growth mitigation), and renders the v1.1
-// Ops surface via the template dispatcher.
+// PLAN-038 TASK-017 — swapped from loadOpsStub() to the real
+// readOpsHealth() composition reader. MCP probe, deploy events, and
+// standards changes feed are empty by default (daemon does not track
+// these); plugin chain is read live from `plugins/<name>/.claude-plugin/
+// plugin.json`; recent log tails `~/.autonomous-dev/portal/portal.log`.
 
 import type { Context } from "hono";
 
 import { renderPage } from "../lib/response-utils";
-import { loadOpsStub } from "../stubs/ops";
+import { readOpsHealth } from "../wiring/ops-readers";
 import type { OpsHealth } from "../types/render";
 
 const MAX_LOG_RENDER = 200;
@@ -22,7 +23,7 @@ function trimRecentLog(h: OpsHealth): OpsHealth {
 }
 
 export const opsHandler = async (c: Context): Promise<Response> => {
-    const raw = await loadOpsStub();
+    const raw = await readOpsHealth();
     const health = trimRecentLog(raw);
     const csrfToken = (c.get("csrfToken") as string | undefined) ?? "";
     return renderPage(c, "ops", { health, csrfToken });
