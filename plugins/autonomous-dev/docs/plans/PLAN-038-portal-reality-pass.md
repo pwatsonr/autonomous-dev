@@ -10,6 +10,7 @@
 | **Parent PRD** | PRD-018-portal-visual-redesign                                |
 | **Plugin**     | autonomous-dev-portal                                         |
 | **Authoring**  | Synthesized from 3 parallel planning agents via `/universal-dev:taskPlan` |
+| **Version**    | 1.1 (open-questions resolved 2026-05-11; see `PLAN-038-open-questions-resolutions.md`) |
 
 ---
 
@@ -81,7 +82,7 @@ Four tracks run in parallel for the first 3 days; Track D depends on Tracks A–
 - **Estimate**: 1 hr
 
 #### TASK-002 — Static-root sweep + delete `server/static/`
-- **Description**: Execute the §5.7 sweep script. Inspect each of the three differing files (`gate-actions.js`, `shell.css`, `theme-toggle.js`) and decide authority per file (Agent 2 flagged this as needing explicit precedence — record decision in PR description). Run `rsync -av server/static/ static/`, verify with `diff -rq`, then `git rm -r server/static/`. Run `git grep -l 'server/static' -- server/ docs/ specs/` and rewrite remaining references. Smoke-test all critical assets after.
+- **Description**: Per-file authority is now known (O.Q. #4 resolved). Procedure: (1) `cp server/static/gate-actions.js static/gate-actions.js`, (2) `cp server/static/shell.css static/shell.css`, (3) `cp server/static/modal.js static/modal.js`, (4) `cp server/static/icons/sliders.svg static/icons/sliders.svg`, (5) **leave `static/theme-toggle.js` untouched** (already newer than server/static/), (6) `git rm -r server/static/`, (7) rewrite refs with `git grep -l 'server/static' | xargs sed -i ''`. Smoke-test all critical assets after.
 - **Owner Agent**: `code-executor` (consult `system-architect` for cascade/authority decisions)
 - **Files**:
   - `plugins/autonomous-dev-portal/server/static/` (delete entire tree)
@@ -158,7 +159,7 @@ Four tracks run in parallel for the first 3 days; Track D depends on Tracks A–
 ### Track C — Data layer (atomic + composition readers)
 
 #### TASK-007 — Add `AgentsPageData`, `ReposPageData`, `RepoSummary` extensions to `render.ts`
-- **Description**: Per TDD §5.1.1a, add the typed sketches. Agent 2's recommendation: **extend** the existing `RepoSummary` (if present) with optional new fields rather than introducing a parallel type; introduce new `AgentsPageData` and `ReposPageData` only for the net-new surfaces. Pin all field types.
+- **Description**: Per TDD §5.1.1a + O.Q. #3 resolution, add the typed sketches. Agent 2's recommendation: **extend** the existing `RepoSummary` (if present) with optional new fields rather than introducing a parallel type; introduce new `AgentsPageData` and `ReposPageData` only for the net-new surfaces. **AgentsPageData fields `runs30d`, `fpRate`, `lastDispatchAt` MUST be optional** (`?: number | null`) — the daemon does not track these. View renders `—` when absent. Pin all field types.
 - **Owner Agent**: `code-executor`
 - **Files**:
   - `plugins/autonomous-dev-portal/server/types/render.ts`
@@ -171,16 +172,16 @@ Four tracks run in parallel for the first 3 days; Track D depends on Tracks A–
 - **Estimate**: 1 hr
 
 #### TASK-008 — Extend `state-paths.ts` with new paths
-- **Description**: Per TDD §5.1.4, add `requestLedgerPath()`, `agentStatesPath()`, `kitParityFixtureRoot()`. **Open Question O.Q. #2/#3** must be resolved first — confirm the actual paths the daemon writes to before pinning defaults.
+- **Description**: Per O.Q. #2/#3 resolution: add `agentStatesPath()` returning `~/.autonomous-dev/agent-states.json` and `kitParityFixtureRoot()` returning `server/fixtures/kit-parity/` (resolved relative to the package). `requestActionsDir()` and `gateDecisionsDir()` already exist — no new exports needed for the request-ledger reader. **Do not** add a `requestLedgerPath()` (the daemon does not write that file; v1.1 of the TDD was wrong).
 - **Owner Agent**: `code-executor`
 - **Files**:
   - `plugins/autonomous-dev-portal/server/wiring/state-paths.ts`
-- **Dependencies**: O.Q. #2 + O.Q. #3 answered
+- **Dependencies**: O.Q. #2 + O.Q. #3 resolved (✓ — see resolutions doc)
 - **Lint**: `bun run typecheck`
 - **Test**: `bun test server/wiring/__tests__/state-paths.test.ts` (new). Pin default paths; pin `AUTONOMOUS_DEV_STATE_DIR` override behavior (already verified to work).
 - **Acceptance Criteria**:
-  - [ ] Three new path functions exported
-  - [ ] Default paths match daemon-written paths (per O.Q. resolution)
+  - [ ] Two new path functions exported (`agentStatesPath`, `kitParityFixtureRoot`)
+  - [ ] Default paths match daemon-written paths
 - **Estimate**: 30 min
 
 #### TASK-009 — Commit `server/fixtures/kit-parity/` directory
@@ -202,10 +203,10 @@ Four tracks run in parallel for the first 3 days; Track D depends on Tracks A–
 - **Estimate**: 2 hr
 
 #### TASK-010 — Implement atomic readers
-- **Description**: Write the three atomic readers per TDD §5.1.1:
-  - `wiring/request-ledger-reader.ts` — reads `requestLedgerPath()`, returns `RequestRow[]`
-  - `wiring/repo-aggregation-reader.ts` — reduces request ledger + cost ledger, returns `Map<RepoId, RepoSummary>`
-  - `wiring/agent-states-reader.ts` — reads `agentStatesPath()` merged with `.claude/agents/*.md` manifest scan, returns `AgentState[]`
+- **Description**: Write the three atomic readers per TDD §5.1.1 (v1.2 amendments applied):
+  - `wiring/request-ledger-reader.ts` — **aggregates** from `requestActionsDir()/*.json` + `gateDecisionsDir()/<repo>/<id>.json`. For each request id, the latest action wins; gate-decision joins in the in-gate/decided state. Returns deduped `RequestRow[]`.
+  - `wiring/repo-aggregation-reader.ts` — reduces request ledger + cost ledger by repo. Returns `Map<RepoId, RepoSummary>`.
+  - `wiring/agent-states-reader.ts` — scans `plugins/autonomous-dev/agents/*.md` for the canonical agent list (read filename as name; frontmatter for `description`), overlays `frozen[]` and `shadowed[]` from `agent-states.json`. Returns `AgentState[]` with `runs30d`, `fpRate`, `lastDispatchAt` as `null` (daemon does not track these).
   All readers must default to safe empty state on ENOENT / parse error (Agent 3's resilience requirement).
 - **Owner Agent**: `code-executor`
 - **Files**:
@@ -291,7 +292,7 @@ Four tracks run in parallel for the first 3 days; Track D depends on Tracks A–
 - **Estimate**: 1.5 hr
 
 #### TASK-016 — Wire Costs route (multi-reader composition)
-- **Description**: Swap `server/routes/costs.tsx` to use the cost-ledger reader for KPIs and daily-spend chart, plus an agent-manifest scan for the reviewer table (NOT the kit's `qa-edge-case` etc.). The reviewer table column mapping needs O.Q. #6 resolved — how to map cost-ledger entries to `.claude/agents/*.md` files. Daily-spend chart data shape conversion from ledger entries to chart series.
+- **Description**: Swap `server/routes/costs.tsx` to use the cost-ledger reader for KPIs and daily-spend chart (data-driven from the real `daily: {date: {total_usd}}` shape). Reviewer table is **empty-state by default** on a normal install (O.Q. #6 resolved: cost-ledger does not track per-reviewer data). Render the table headers with an empty body and a "Reviewer-level cost tracking not enabled" message that links to Settings. With `kit-parity` fixtures, the table populates from the fixture's richer reviewer schema so the kit screenshot regression still works. Daily-spend chart data shape: `[{date, total_usd}, ...]` mapped from `Object.entries(cost-ledger.daily)`.
 - **Owner Agent**: `code-executor`
 - **Files**: `plugins/autonomous-dev-portal/server/routes/costs.tsx`, possibly new `server/wiring/costs-readers.ts`
 - **Dependencies**: TASK-011, O.Q. #6 answered

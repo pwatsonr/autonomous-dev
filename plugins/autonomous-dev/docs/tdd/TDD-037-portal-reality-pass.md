@@ -4,7 +4,7 @@
 |----------------|-----------------------------------------------------------------------------|
 | **Title**      | Portal Reality Pass — Logo, Routes, Live Data                               |
 | **TDD ID**     | TDD-037                                                                     |
-| **Version**    | 1.1                                                                         |
+| **Version**    | 1.2                                                                         |
 | **Date**       | 2026-05-11                                                                  |
 | **Author**     | Patrick Watson                                                              |
 | **Phase**      | tdd                                                                        |
@@ -16,6 +16,7 @@
 
 ### Changelog
 
+- **v1.2 (2026-05-11)** — Addresses PLAN-038 open-question resolutions discovered during on-machine investigation. (1) NG-3707 amended: v1.1 wrongly claimed the daemon writes `requests-ledger.json`; it does not. The request-ledger reader now aggregates from `request-actions/*.json` + `gate-decisions/<repo>/<id>.json`. (2) `AgentsPageData.runs30d / fpRate / lastDispatchAt` are now **optional** — the daemon's `agent-states.json` is much thinner (`{frozen[], shadowed[]}`) and those fields cannot be data-driven. The view renders `—` when absent. (3) Costs reviewer table is empty-state by default on a normal install (cost-ledger only tracks daily totals; no per-reviewer data). (4) Static-root sweep is per-file, not blanket — `theme-toggle.js` in `static/` is newer and must be preserved. Full investigation in `plugins/autonomous-dev/docs/plans/PLAN-038-open-questions-resolutions.md`.
 - **v1.1 (2026-05-11)** — Addresses TDD review feedback. §5.1 rewritten to specify the composition-module contract (the "one-file swap" claim in v1.0 was wrong; new `wiring/dashboard-readers.ts` etc. are net-new work, not pure imports). Dropped the made-up `--accent` token; the CTA consumes the existing `--brand` token from `design-tokens.css` (kit alignment: `#c8631a` light / `#e89255` dark) per PRD-018 R-09. Replaced the `PORTAL_DEMO_MODE` code-branch design with a `AUTONOMOUS_DEV_STATE_DIR`-pointed fixture directory at `server/fixtures/kit-parity/`. Added Section 14 PRD traceability matrix. Revised effort estimate from 6–7 days to 9–11 days (Costs and Ops are multi-reader compositions). Fixed AC-3705 to use a route-regex-valid slug pair. Dropped `rsync --ignore-existing` from the static-root sweep (would have left three differing files in drift).
 
 ---
@@ -70,7 +71,7 @@ This is also the implementation home for the **canonical-static-root sweep** tha
 | NG-3704 | Moving the portal out of `plugins/autonomous-dev-portal/` — host-plugin question deferred.          |
 | NG-3705 | Mobile/responsive overhaul — desktop + laptop viewports only, per PRD-018 NG-06.                    |
 | NG-3706 | Re-doing the voice/copy sweep — that's done (TDD-034, PR #228).                                     |
-| NG-3707 | New daemon-state writers or new state file formats — the daemon's writes are out of scope. This TDD only adds **readers** that compose existing state files. (v1.0 said "every reader needed already exists" — wrong; see G-3717 for the inventory of new readers.) |
+| NG-3707 | New daemon-state writers or new state file formats — the daemon's writes are out of scope. This TDD only adds **readers** that compose existing state files. (v1.0 said "every reader needed already exists" — wrong; see G-3717 for the inventory of new readers. **v1.2 amendment**: v1.1 referenced `~/.autonomous-dev/portal/requests-ledger.json` as if the daemon writes it. It does not. Per the operator decision on 2026-05-11, the request-ledger reader aggregates from `~/.autonomous-dev/portal/request-actions/*.json` + `~/.autonomous-dev/portal/gate-decisions/<repo>/<id>.json`, both of which the daemon already writes. See `plugins/autonomous-dev/docs/plans/PLAN-038-open-questions-resolutions.md` §O.Q. #2.) |
 | NG-3708 | Browser cache-busting via `?v=hash` on stylesheet hrefs — already validated in handoff Step 2; if it resurfaces, separate ticket. |
 | NG-3709 | Introducing an `--accent` token parallel to `--brand` — explicitly rejected; the kit's CTA color **is** `--brand` per PRD-018 R-09. |
 
@@ -223,7 +224,7 @@ Each module sits at `plugins/autonomous-dev-portal/server/wiring/<name>.ts`, tak
 | `dashboard-readers.ts`  | `daemon-readers` + `approvals-store` + new `request-ledger-reader` + new `repo-aggregation-reader`                  | `DashboardData`        |
 | `agents-readers.ts`     | new `agent-states-reader` + agent manifest scan (`.claude/agents/*.md` frontmatter)                                  | `AgentsPageData` (new) |
 | `repos-readers.ts`      | new `repo-aggregation-reader` (per-repo MTD, active count, last-activity) + portal settings allowlist                | `ReposPageData` (new)  |
-| `request-ledger-reader` | reads `~/.autonomous-dev/portal/requests-ledger.json` (new path on `state-paths.ts`)                                | `RequestRow[]`         |
+| `request-ledger-reader` | **(v1.2)** aggregates from `~/.autonomous-dev/portal/request-actions/*.json` + `~/.autonomous-dev/portal/gate-decisions/<repo>/<id>.json` — both are existing daemon-written dirs. v1.1 wrongly assumed a single `requests-ledger.json` file existed. | `RequestRow[]`         |
 | `repo-aggregation-reader` | reduces the request ledger and cost ledger by repo                                                                | `Map<RepoId, RepoSummary>` |
 | `agent-states-reader`   | reads `~/.autonomous-dev/agent-states.json` (path **not** yet exported from `state-paths.ts`; this TDD adds it)      | `AgentState[]`         |
 
@@ -328,7 +329,7 @@ Today's `state-paths.ts` exports `approvalsQueuePath`, `gateDecisionsDir`, `gate
 
 | Function                | Default path                                          | Reader                  |
 |-------------------------|-------------------------------------------------------|-------------------------|
-| `requestLedgerPath()`   | `~/.autonomous-dev/portal/requests-ledger.json`       | `request-ledger-reader` |
+| **(v1.2)** `requestActionsDir()` and `gateDecisionsDir()` already exist in `state-paths.ts` — no new export needed. The request-ledger-reader composes from those two dirs. | already exported | `request-ledger-reader` |
 | `agentStatesPath()`     | `~/.autonomous-dev/agent-states.json`                 | `agent-states-reader`   |
 | `costLedgerPath()`      | `~/.autonomous-dev/cost-ledger.json`                  | existing in `daemon-readers` — not re-declared |
 | `kitParityFixtureRoot()`| `server/fixtures/kit-parity/` (resolved relative to package) | screenshot regression  |
