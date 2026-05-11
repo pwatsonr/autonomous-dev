@@ -172,6 +172,35 @@ button.btn:disabled, button.btn[disabled] {
 /* `.dim.small` — used by Notifications DND helper text. */
 .dim.small { font-size: 11px; margin-top: 4px; }
 
+/* Rail-nav count badge — readable in every state.
+   Vendored app.css ships `.rail-nav a .count { color: var(--fg-2) }` and
+   `.rail-nav a.active .count { color: var(--brand) }`. Combined with the
+   badge's `var(--brand)` background that we apply below, the inactive
+   state produces low-contrast gray-on-orange and the active state is
+   invisible (orange-on-orange). Override with explicit
+   high-contrast text on the brand fill, regardless of active state. */
+.rail-nav a .count,
+.rail-nav a.active .count,
+.rail-nav-item .count,
+.rail-nav-item.active .count {
+    background: var(--brand);
+    color: var(--bg-0);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 22px;
+    text-align: center;
+    line-height: 1.4;
+}
+[data-theme="light"] .rail-nav a .count,
+[data-theme="light"] .rail-nav a.active .count,
+[data-theme="light"] .rail-nav-item .count,
+[data-theme="light"] .rail-nav-item.active .count {
+    color: #fff;
+}
+
 /* Settings tab strip — make the tabs look like a flush row matching the
    kit's `seg seg-tabs` pattern, not a compact pill. */
 .seg.seg-tabs {
