@@ -201,31 +201,8 @@ button.btn:disabled, button.btn[disabled] {
     color: #fff;
 }
 
-/* Settings tab strip — make the tabs look like a flush row matching the
-   kit's `seg seg-tabs` pattern, not a compact pill. */
-.seg.seg-tabs {
-    display: inline-flex;
-    border-bottom: 1px solid var(--line-1);
-    background: transparent;
-    border-radius: 0;
-    padding: 0;
-    margin-bottom: 20px;
-    gap: 0;
-}
-.seg.seg-tabs .seg-btn,
-.seg.seg-tabs a.seg-btn {
-    border: 0;
-    background: transparent;
-    border-radius: 0;
-    padding: 10px 16px;
-    color: var(--fg-2);
-    font-weight: 500;
-    border-bottom: 2px solid transparent;
-}
-.seg.seg-tabs .seg-btn:hover { color: var(--fg-0); }
-.seg.seg-tabs .seg-btn.on,
-.seg.seg-tabs a.seg-btn[aria-current="page"] {
-    color: var(--fg-0);
-    border-bottom-color: var(--brand);
-    background: transparent;
-}
+/* Settings tab strip — REVERTED in PR after round 3.
+ * The vendored `.seg.seg-tabs` styling in app.css renders the tabs as
+ * a compact-pill container which the operator confirmed was correct.
+ * The flush-bottom-border override I added in round 3 was a regression
+ * and is removed. Keep this comment as a guard against re-adding it. */
