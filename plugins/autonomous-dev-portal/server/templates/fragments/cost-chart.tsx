@@ -1,5 +1,7 @@
 // SPEC-036-2-02 §CostChart — server-rendered SVG line chart for the
 // 30-day cost time series.
+// SPEC-034-2-05 §Voice/copy sweep — empty-state copy uses the kit
+// canonical short form ("No cost data") rather than "No cost data yet".
 //
 // Server-authored SVG, no user data, no script content; XSS surface =
 // empty per TDD-036 OI-002 resolution. The `d` attribute on every path
@@ -87,7 +89,7 @@ export const CostChart: FC<CostChartProps | CostSeries> = (props) => {
                     text-anchor="middle"
                     fill="var(--fg-2)"
                 >
-                    No cost data yet
+                    No cost data
                 </text>
             </svg>
         );

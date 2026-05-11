@@ -1,4 +1,9 @@
 // SPEC-015-2-01 §Panel Structure
+// SPEC-034-2-05 §Voice/copy sweep — operator id (`resolvedBy`) renders
+// in `<code>` mono; resolved-at timestamp uses `class="mono"`; the
+// live char-counter shares the same mono rhythm. Heading copy
+// ("Comment", "Approve", "Request changes", "Reject") was already
+// sentence case.
 //
 // The single source of truth for the approval gate UI. The panel renders one
 // of two modes:
@@ -150,14 +155,16 @@ const ResolvedPanel: FC<GateActionPanelProps> = ({
             {resolvedBy ? (
                 <>
                     {" "}
-                    by <strong>{resolvedBy}</strong>
+                    by <code class="mono">{resolvedBy}</code>
                 </>
             ) : null}
             {resolvedAt ? (
                 <>
                     {" "}
                     at{" "}
-                    <time datetime={resolvedAt}>{formatTime(resolvedAt)}</time>
+                    <time datetime={resolvedAt} class="mono">
+                        {formatTime(resolvedAt)}
+                    </time>
                 </>
             ) : null}
         </p>
@@ -249,7 +256,7 @@ const ActivePanel: FC<GateActionPanelProps> = (props) => {
                     aria-describedby={charCountId}
                     rows={3}
                 />
-                <span id={charCountId} class="char-count">
+                <span id={charCountId} class="char-count mono">
                     0/1000
                 </span>
                 <div

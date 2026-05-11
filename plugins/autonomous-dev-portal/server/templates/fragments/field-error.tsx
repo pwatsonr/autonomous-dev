@@ -1,4 +1,6 @@
 // SPEC-015-2-02 §Field Error Fragment
+// SPEC-034-2-05 §Voice/copy sweep — `data-field` dotted-path id renders
+// in mono so the offending field reads like other portal IDs.
 //
 // Inline alert rendered immediately below an offending input. The render
 // short-circuits to nothing when `message` is empty/undefined, so call

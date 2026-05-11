@@ -1,4 +1,7 @@
 // SPEC-015-2-01 §Escalation Badge
+// SPEC-034-2-05 §Voice/copy sweep — label "Escalated" is sentence case;
+// the relative timestamp gets `mono` so it reads in the same monospace
+// rhythm as other timestamps in TDD-034 §5.6.
 //
 // Render a small status badge whenever a pending-approval request has been
 // escalated. Two sources can set escalation:
@@ -50,7 +53,7 @@ export const EscalationBadge: FC<Props> = ({ escalatedAt }) => (
         <time
             datetime={escalatedAt}
             data-relative="true"
-            class="escalation-badge__time"
+            class="escalation-badge__time mono"
         >
             {formatRelative(escalatedAt)}
         </time>

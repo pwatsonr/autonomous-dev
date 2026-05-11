@@ -1,5 +1,8 @@
 // SPEC-015-4-01 §typed-confirm-modal — Hono JSX fragment for the
 // destructive-action confirmation modal used by the /ops dashboard.
+// SPEC-034-2-05 §Voice/copy sweep — heading "Confirm destructive
+// action" is sentence case; the required typed phrase renders in mono
+// (`<code>`) per TDD-034 §5.6 IDs/keywords-in-mono rule.
 //
 // Markup contract (consumed by static/js/ops-confirm.js):
 //   - Root id `ops-confirm-modal` with role="dialog", aria-modal="true",
