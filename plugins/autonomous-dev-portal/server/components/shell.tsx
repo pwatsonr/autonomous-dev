@@ -43,22 +43,24 @@ import { BrandWordmark } from "./brand-wordmark";
 
 /**
  * SPEC-034-1-06 — FOUC-prevention IIFE.
+ * SPEC-037-1-01 — Default flipped to "dark" so cold loads paint against the
+ * kit's dark palette. Only the literal `"light"` resolves to light; missing
+ * or unexpected values resolve to "dark".
  *
  * Runs synchronously in <head> to apply the persisted theme to
  * `<html data-theme>` before first paint. `localStorage` access is
  * wrapped in try/catch because some sandboxed contexts throw on read;
- * we silently fall back to "light" in that case. Identical to the
- * BaseLayout IIFE so behaviour is consistent across both layouts during
- * the transition.
+ * we silently fall back to "dark" in that case.
  */
 const FOUC_PREVENTION_IIFE =
     "(function(){var t;try{t=localStorage.getItem('portal-theme')}catch(e){}" +
-    "document.documentElement.dataset.theme=t==='dark'?'dark':'light';})();";
+    "document.documentElement.dataset.theme=t==='light'?'light':'dark';})();";
 
 export interface ShellProps {
     /** Current request path; passed to nav children for active highlighting. */
     activePath: string;
-    /** Server-rendered theme (from `getThemeFromCookie`). Default `"light"`. */
+    /** Server-rendered theme (from `getThemeFromCookie`). Default `"dark"`
+     *  (SPEC-037-1-01 — dark-default kit baseline). */
     theme?: Theme;
     /** SPEC-014-2-04 — per-request CSP nonce. Empty string disables (tests). */
     cspNonce?: string;
@@ -95,7 +97,7 @@ export interface ShellProps {
  */
 export const ShellLayout: FC<ShellProps> = ({
     activePath,
-    theme = "light",
+    theme = "dark",
     cspNonce,
     modalSlotContent,
     pageTitle,
@@ -106,7 +108,9 @@ export const ShellLayout: FC<ShellProps> = ({
     killSwitchEngaged = false,
     mtdSpend,
 }) => {
-    const resolvedTheme: Theme = theme === "dark" ? "dark" : "light";
+    // SPEC-037-1-01 — Defensive resolve: only the literal "light" returns
+    // "light"; any other value (including undefined) resolves to "dark".
+    const resolvedTheme: Theme = theme === "light" ? "light" : "dark";
     const nonce = cspNonce ?? "";
     return (
         <html lang="en" data-theme={resolvedTheme}>
@@ -182,6 +186,22 @@ export const ShellLayout: FC<ShellProps> = ({
                                     ${mtdSpend.toFixed(2)} MTD
                                 </div>
                             ) : null}
+                            {/* SPEC-037-1-02 — theme-toggle pill. The click
+                                handler is wired by static/theme-toggle.js
+                                via a delegated `[data-action="toggle-theme"]`
+                                listener (SPEC-037-1-03); no inline onclick. */}
+                            <button
+                                type="button"
+                                class="theme-toggle"
+                                aria-label="Toggle theme"
+                                data-action="toggle-theme"
+                            >
+                                <span class={`tt-track ${resolvedTheme}`}>
+                                    <span class="tt-knob"></span>
+                                    <span class="tt-l tt-light">LIGHT</span>
+                                    <span class="tt-l tt-dark">DARK</span>
+                                </span>
+                            </button>
                         </div>
                     </aside>
                     <main class="main">

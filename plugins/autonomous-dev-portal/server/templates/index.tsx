@@ -147,14 +147,15 @@ function activePathFor(view: ViewName): string {
  *   every `<script>` tag in the layout. Defaults to empty string for
  *   callers without a request context (tests, error pre-render).
  * @param theme  SPEC-035-1-05 — server-rendered theme cookie value.
- *   Defaults to `"light"` when omitted (tests, error pre-render).
+ *   Defaults to `"dark"` when omitted (SPEC-037-1-01 — dark-default kit
+ *   baseline; tests and error pre-render get the new default for free).
  */
 export async function renderFullPage<V extends ViewName>(
     view: V,
     props: RenderProps[V],
     activeOverride?: string,
     cspNonce: string = "",
-    theme: Theme = "light",
+    theme: Theme = "dark",
 ): Promise<string> {
     const body = renderViewBody(view, props);
     const layout = (
