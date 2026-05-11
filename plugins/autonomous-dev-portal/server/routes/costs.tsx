@@ -1,18 +1,19 @@
 // SPEC-036-2-01..03 §Route — Costs (`GET /costs`).
-//
-// Loads the costs stub, computes the month-end projection server-side,
-// and renders the v1.1 Costs surface via the template dispatcher. The
-// view stays purely presentational; aggregates land in props.
+// PLAN-038 TASK-016 — swapped from loadCostsStub() to the real
+// readCostsData() composition reader. Per O.Q. #6, the reviewer / phase
+// / deploy breakdown tables are empty by default on a real install
+// (cost-ledger only tracks daily totals); kit-parity fixtures populate
+// the daily chart for screenshot regression.
 
 import type { Context } from "hono";
 
 import { renderPage } from "../lib/response-utils";
 import { projectMonthEnd } from "../lib/costs-projection";
-import { loadCostsStub } from "../stubs/costs";
+import { readCostsData } from "../wiring/costs-readers";
 import type { CostSeries } from "../types/render";
 
 export const costsHandler = async (c: Context): Promise<Response> => {
-    const series: CostSeries = await loadCostsStub();
+    const series: CostSeries = await readCostsData();
     const projection = projectMonthEnd({
         series: series.points,
         mtd: series.totalMtd ?? 0,
