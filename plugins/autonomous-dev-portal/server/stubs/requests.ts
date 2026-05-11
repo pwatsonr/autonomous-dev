@@ -10,6 +10,7 @@ import type {
     RequestRecord,
     RequestReviewer,
     RequestRunRef,
+    StandardsRule,
 } from "../types/render";
 
 const PRD_MARKDOWN = `# Login retry policy
@@ -155,6 +156,31 @@ const CODE_ARTIFACT: RequestArtifact = {
     artifactId: "PR-1418",
 };
 
+// SPEC-037-7-02 — Standards-applied fixture for the gate-bearing
+// request (REQ-000001). Severities span the full palette so the
+// section snapshot covers all three tints.
+const STANDARDS_RULES: StandardsRule[] = [
+    {
+        id: "STD-AUTH-001",
+        desc: "Refresh tokens must be single-use",
+        severity: "blocking",
+        source: "core/auth",
+        immutable: true,
+    },
+    {
+        id: "STD-RETRY-014",
+        desc: "Exponential backoff with full jitter on 5xx",
+        severity: "warn",
+        source: "core/http",
+    },
+    {
+        id: "STD-OBS-022",
+        desc: "Emit retry-attempt counter for SLO dashboards",
+        severity: "advisory",
+        source: "org/observability",
+    },
+];
+
 const STUB: Record<string, RequestRecord> = {
     "acme/REQ-000001": {
         id: "REQ-000001",
@@ -204,6 +230,14 @@ const STUB: Record<string, RequestRecord> = {
         reviewers: REVIEWERS,
         currentArtifact: CODE_ARTIFACT,
         runs: RUNS,
+        // SPEC-037-7-01 — `.rd-stat` block + `started` segment.
+        cost: 3.42,
+        turns: 18,
+        score: 87,
+        startedAt: "2026-05-09T16:31:00Z",
+        // SPEC-037-7-02 — Standards-applied section.
+        flags: { hasStandards: true },
+        standardsApplied: STANDARDS_RULES,
     },
     "acme/REQ-000002": {
         id: "REQ-000002",

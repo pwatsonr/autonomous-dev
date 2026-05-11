@@ -1,19 +1,23 @@
 // SPEC-036-3-01..06 — Request Detail composition root.
+// SPEC-037-7-01..04 — Adds page-head, .rd-stat block, standards-applied
+// section, replaces <dialog> with .modal-bg overlay (consumes the shared
+// `static/modal.js` helper), and verifies gate/timeline action wiring.
 //
 // Pure composition: imports each fragment from `fragments/*` and emits the
 // 11-region order specified in TDD-036 §6.2 verbatim:
 //
-//   1. Page head (h1 + status / variant chips)         — RequestHeader
-//   2. Request header / SSE meta region                — RequestHeader (id)
-//   3. Pipeline visualization                          — PipelineVis
-//   4. Artifact pane (v1.1, persistent reading)        — ArtifactPane
-//   5. Reviewer chain (review/code phases)             — ReviewerChain
-//   6. Deploy pipeline (deploy phase)                  — DeployPipeline
-//   7. Gate detail card (status === gate)              — GateDetail
-//   8. Standards applied (TODO — out of scope here)
+//   0. Page head (← Back · REQ id · Pause/Kill)       — RequestPageHead (037-7-01)
+//   1. Request header / SSE meta region (.rd-head)     — RequestHeader (037-7-01)
+//   2. Pipeline visualization                          — PipelineVis
+//   3. Artifact pane (v1.1, persistent reading)        — ArtifactPane
+//   4. Reviewer chain (review/code phases)             — ReviewerChain
+//   5. Deploy pipeline (deploy phase)                  — DeployPipeline
+//   6. Gate detail card (status === gate)              — GateDetail
+//   7. Standards applied (flags.hasStandards)          — StandardsApplied (037-7-02)
+//   8. Request timeline (always rendered)              — RequestTimeline
 //   9. Run history (v1.1, always rendered)             — RunHistory
 //  10. Confirm modal (mounted by gate-actions.js)       — modal-slot
-//  11. Phase artifact modal (one per phase artifact)    — PhaseArtifactModal
+//  11. Phase artifact modal (one per phase artifact)    — PhaseArtifactModal (037-7-03)
 //
 // Conditional rendering uses straight ternaries on the request shape — no
 // fragment-level logic is duplicated here. All fragments self-handle their
@@ -28,9 +32,11 @@ import { GateDetail } from "../fragments/gate-detail";
 import { PhaseArtifactModal } from "../fragments/phase-artifact-modal";
 import { PipelineVis } from "../fragments/pipeline-vis";
 import { RequestHeader } from "../fragments/request-header";
+import { RequestPageHead } from "../fragments/request-page-head";
 import { RequestTimeline } from "../fragments/request-timeline";
 import { ReviewerChain } from "../fragments/reviewer-chain";
 import { RunHistory } from "../fragments/run-history";
+import { StandardsApplied } from "../fragments/standards-applied";
 
 const DEFAULT_PIPELINE: string[] = [
     "prd",
@@ -61,9 +67,18 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
     const phaseArtifacts =
         request.currentArtifact !== undefined ? [request.currentArtifact] : [];
 
+    // SPEC-037-7-02 — Standards-applied section gates on the explicit
+    // `flags.hasStandards` AND a non-empty rule list.
+    const standardsRules = request.standardsApplied ?? [];
+    const showStandards =
+        request.flags?.hasStandards === true && standardsRules.length > 0;
+
     return (
         <main class="request-detail">
-            {/* Region 1+2: page head + meta region */}
+            {/* Region 0: page-head — ← Back, request id, Pause/Kill. */}
+            <RequestPageHead requestId={request.id} />
+
+            {/* Region 1+2: request header + meta region. */}
             <RequestHeader request={request} />
 
             {/* Region 3: pipeline visualization (always rendered) */}
@@ -107,6 +122,11 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
                 />
             ) : null}
 
+            {/* Region 8: standards applied (flags.hasStandards). */}
+            {showStandards ? (
+                <StandardsApplied rules={standardsRules} />
+            ) : null}
+
             {/* Phase timeline (legacy region preserved for OOB swaps). */}
             <RequestTimeline
                 requestId={request.id}
@@ -121,6 +141,13 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
                 artifacts={phaseArtifacts}
                 requestId={request.id}
             />
+
+            {/* Page-level scripts — SPEC-037-7-03 shared modal helper +
+                SPEC-036-3-06 gate-actions confirm-modal interceptor. The
+                shell template loads /static/htmx.min.js + theme-toggle.js;
+                this view adds the surface-specific scripts. */}
+            <script src="/static/modal.js" defer></script>
+            <script src="/static/gate-actions.js" defer></script>
         </main>
     );
 };
