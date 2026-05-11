@@ -13,6 +13,7 @@
 export type ViewName =
     | "dashboard"
     | "request-detail"
+    | "requests"
     | "approvals"
     | "settings"
     | "costs"
@@ -59,7 +60,10 @@ export interface DashboardRequest {
     repo: string;
     title: string;
     phase: string;
-    status: "running" | "gate";
+    /** Lifecycle status. `"done"` (PLAN-Requests-Surface) marks a completed
+     *  request; the legacy Dashboard table filters those out, the new
+     *  `/requests` surface aggregates them for "Completed today" KPIs. */
+    status: "running" | "gate" | "done";
     cost: number;
     turns: number;
     score: number;
@@ -70,6 +74,11 @@ export interface DashboardRequest {
     variantLabel?: string;
     /** Minutes spent waiting at a gate (when status === 'gate'). */
     waitedMin?: number;
+    /** ISO-8601 completion timestamp. Set when `status === "done"`; drives
+     *  the `/requests` surface "Completed today" KPI rollup. */
+    completedAt?: string;
+    /** ISO-8601 creation timestamp. Powers the "Age" column on /requests. */
+    createdAt?: string;
 }
 
 export interface StandardsHit {
@@ -652,9 +661,26 @@ export interface DashboardAggregatesProp {
     standardsDrift: StandardsDriftEntry[];
 }
 
+/**
+ * PLAN-Requests-Surface §RequestsAggregates — pre-computed counts &
+ * totals threaded into the `/requests` view so the KPI strip never has
+ * to recompute from `items`. Mirrors the pattern used by
+ * `DashboardAggregatesProp`.
+ */
+export interface RequestsAggregatesProp {
+    activeCount: number;
+    inGateCount: number;
+    completedTodayCount: number;
+    totalCostMtdUsd: number;
+}
+
 export interface RenderProps {
     dashboard: { data: DashboardData; aggregates: DashboardAggregatesProp };
     "request-detail": { request: RequestRecord; csrfToken?: string };
+    requests: {
+        items: DashboardRequest[];
+        aggregates: RequestsAggregatesProp;
+    };
     approvals: { items: ApprovalItem[]; costCapDailyUsd: number };
     settings: { config: SettingsView; data?: SettingsData };
     costs: {

@@ -1,0 +1,92 @@
+// PLAN-Requests-Surface §`GET /requests` — list-all-requests surface.
+//
+// RailNav has linked to `/requests` since SPEC-037-3-01 but the route
+// was never implemented (404). This handler aggregates every request
+// across the allowlisted repos (via the dashboard stub) and renders the
+// kit-shape table view at `templates/views/requests.tsx`.
+//
+// All four KPIs (active / in-gate / completed-today / MTD cost) are
+// computed server-side here so the view stays purely presentational and
+// the route handler remains the single contract surface for tests.
+
+import type { Context } from "hono";
+
+import { renderPage } from "../lib/response-utils";
+import { loadDashboardStub } from "../stubs/repos";
+import type {
+    DashboardData,
+    DashboardRequest,
+    RequestsAggregatesProp,
+} from "../types/render";
+
+/**
+ * Twenty-four hours in milliseconds; used by the "Completed today" KPI
+ * to bound the lookback window from the supplied `now`.
+ */
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Returns `true` when `iso` is a parseable ISO-8601 timestamp within the
+ * trailing 24 hours of `now`. Defensive: any unparseable or future-dated
+ * value returns `false` so a single malformed stub row cannot inflate
+ * the KPI.
+ */
+function isWithin24h(iso: string | undefined, now: number): boolean {
+    if (!iso) return false;
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return false;
+    const delta = now - t;
+    return delta >= 0 && delta <= ONE_DAY_MS;
+}
+
+/**
+ * PLAN-Requests-Surface §Server-side aggregates. Pure — no I/O, no
+ * globals beyond the injected `now`. Exported so unit tests can pin
+ * each KPI independently of the route handler's HTTP plumbing.
+ *
+ * `totalCostMtdUsd` mirrors the Dashboard's `totalMtd` semantically but
+ * is sourced from per-request `cost` (not per-repo `monthlyCostUsd`) so
+ * the figure is consistent with the table column beneath it.
+ */
+export function computeRequestsAggregates(
+    requests: DashboardRequest[],
+    now: number = Date.now(),
+): RequestsAggregatesProp {
+    let activeCount = 0;
+    let inGateCount = 0;
+    let completedTodayCount = 0;
+    let totalCostMtdUsd = 0;
+    for (const r of requests) {
+        totalCostMtdUsd += r.cost ?? 0;
+        if (r.status === "gate") {
+            inGateCount++;
+        } else if (r.status === "done") {
+            if (isWithin24h(r.completedAt, now)) completedTodayCount++;
+        } else {
+            // Anything that isn't a terminal state is "active".
+            activeCount++;
+        }
+    }
+    return {
+        activeCount,
+        inGateCount,
+        completedTodayCount,
+        totalCostMtdUsd,
+    };
+}
+
+/**
+ * Pulls the canonical request list off the dashboard stub. Returns an
+ * empty array when the stub omits `requests` so callers never branch on
+ * `undefined`.
+ */
+function extractRequests(data: DashboardData): DashboardRequest[] {
+    return data.requests ?? [];
+}
+
+export const requestsHandler = async (c: Context): Promise<Response> => {
+    const data = await loadDashboardStub();
+    const items = extractRequests(data);
+    const aggregates = computeRequestsAggregates(items);
+    return renderPage(c, "requests", { items, aggregates });
+};
