@@ -10,3 +10,4 @@ bun.lockb
 package-lock.json
 coverage/
 .bun/
+bun.lock
