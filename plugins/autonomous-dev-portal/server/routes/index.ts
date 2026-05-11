@@ -1,5 +1,5 @@
-// SPEC-013-3-01 §`registerRoutes(app)` — single mount point for all nine
-// portal routes. Order is purely organizational (none of the patterns
+// SPEC-013-3-01 §`registerRoutes(app)` — single mount point for the
+// portal HTTP routes. Order is purely organizational (none of the patterns
 // overlap). Idempotency is not required (tests call once).
 //
 // SPEC-013-4-01 adds the static-asset mount at `/static/*` BEFORE the
@@ -10,23 +10,67 @@
 // SPEC-014-1-04 §Task 4.8 adds the optional /auth/* routes (login,
 // callback, logout). They are registered only when `options.authRoutes`
 // is supplied — server.ts derives that from `auth_mode === 'oauth-pkce'`.
+//
+// PLAN-037-2 wires the previously-unmounted action routes:
+//   - SSE event stream (events.ts) + typed-CONFIRM endpoints
+//     (confirmation-routes.ts)  — SPEC-037-2-01
+//   - GET /api/daemon-status                                — SPEC-037-2-02
+//   - POST /api/approvals/:id/{approve,reject,bulk-approve} — SPEC-037-2-03
+//   - POST /settings, /api/settings/allowlist,
+//     /api/settings/notifications/test/{discord,slack,send} — SPEC-037-2-04
+//   - POST /api/agents/:name/{promote,shadow,freeze} +
+//     GET  /api/agents/:name/inspect                        — SPEC-037-2-05
+//   - POST /repo/:repo/request/:id/gate/{approve,
+//          request-changes, reject} + /api/requests/:id/action
+//                                                           — SPEC-037-2-06
+//
+// Each action group has a `mountXyz()` helper that takes its own deps
+// object. server.ts wires production deps; tests opt-in per group. When
+// a dep is omitted, registerRoutes installs an explicit 503 stub so the
+// gap is visible to operators (no silent 404s).
 
 import type { Hono } from "hono";
 
 import { staticAssets } from "../middleware/static-assets";
+import type { SSEEventBus } from "../sse/SSEEventBus";
+import {
+    buildAgentActionRoutes,
+    type AgentActionDeps,
+} from "./agents-actions";
 import { approvalsHandler } from "./approvals";
+import {
+    buildApprovalsActionRoutes,
+    type ApprovalsActionDeps,
+} from "./approvals-actions";
 import { auditHandler } from "./audit";
 import type { AuthRouteDeps } from "./auth";
 import { registerAuthRoutes } from "./auth";
+import {
+    registerConfirmationRoutes,
+    type ConfirmationRouteDeps,
+} from "./confirmation-routes";
 import { costsHandler } from "./costs";
+import {
+    buildDaemonStatusHandler,
+    type DaemonStatusDeps,
+} from "./daemon-status";
 import { dashboardHandler } from "./dashboard";
 import { designSystemHandler } from "./design-system";
+import { eventsRoute } from "./events";
+import {
+    buildGateAndRequestActionRoutes,
+    type GateAndRequestActionDeps,
+} from "./gate-and-request-actions";
 import { healthHandler } from "./health";
 import { buildKillSwitchRoutes } from "./kill-switch";
 import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
 import { requestDetailHandler } from "./request-detail";
 import { settingsHandler } from "./settings";
+import {
+    buildSettingsActionRoutes,
+    type SettingsActionDeps,
+} from "./settings-actions";
 
 export interface RegisterRoutesOptions {
     /**
@@ -42,6 +86,49 @@ export interface RegisterRoutesOptions {
      * unreachable.
      */
     authRoutes?: AuthRouteDeps;
+
+    // -- PLAN-037-2 action surfaces ------------------------------------
+    /**
+     * SPEC-037-2-01 FR-1 — when present, mounts `GET /portal/events` via
+     * the SSE bus. When omitted, that path returns 503 `sse-disabled`.
+     */
+    sseBus?: SSEEventBus;
+    /**
+     * SPEC-037-2-01 FR-3 — when present, mounts the two confirmation
+     * endpoints; when omitted, both return 503 `confirmation-disabled`.
+     */
+    confirmation?: ConfirmationRouteDeps;
+    /**
+     * SPEC-037-2-02 — when present, mounts `GET /api/daemon-status`;
+     * when omitted, that path returns 503 `daemon-status-disabled`.
+     */
+    daemonStatus?: DaemonStatusDeps;
+    /**
+     * SPEC-037-2-03 — when present, mounts the three approvals action
+     * routes; when omitted, each returns 503 `approvals-actions-disabled`.
+     */
+    approvalsActions?: ApprovalsActionDeps;
+    /**
+     * SPEC-037-2-04 — when present, mounts the five settings action
+     * routes; when omitted, each returns 503 `settings-actions-disabled`.
+     */
+    settingsActions?: SettingsActionDeps;
+    /**
+     * SPEC-037-2-05 — when present, mounts the four agent action routes;
+     * when omitted, each returns 503 `agents-actions-disabled`.
+     */
+    agentsActions?: AgentActionDeps;
+    /**
+     * SPEC-037-2-06 — when present, mounts the gate-decision and generic
+     * request-action routes; when omitted, each returns 503
+     * `gate-actions-disabled`.
+     */
+    gateAndRequestActions?: GateAndRequestActionDeps;
+}
+
+function disabledHandler(error: string) {
+    return (c: import("hono").Context): Response =>
+        c.json({ error }, 503);
 }
 
 export function registerRoutes(
@@ -60,6 +147,137 @@ export function registerRoutes(
         registerAuthRoutes(app, options.authRoutes);
     }
 
+    // -----------------------------------------------------------------
+    // SPEC-037-2-01 — SSE + confirmation endpoints.
+    //
+    // Mount BEFORE the page handlers so that the SSE stream is reachable
+    // even when a page handler later in the chain errors out.
+    // -----------------------------------------------------------------
+    if (options.sseBus !== undefined) {
+        app.route("/", eventsRoute(options.sseBus));
+    } else {
+        app.get("/portal/events", disabledHandler("sse-disabled"));
+    }
+
+    if (options.confirmation !== undefined) {
+        registerConfirmationRoutes(app, options.confirmation);
+    } else {
+        app.post(
+            "/api/security/confirmation/request",
+            disabledHandler("confirmation-disabled"),
+        );
+        app.post(
+            "/api/security/confirmation/validate",
+            disabledHandler("confirmation-disabled"),
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // SPEC-037-2-02 — daemon-status read-only endpoint.
+    // -----------------------------------------------------------------
+    if (options.daemonStatus !== undefined) {
+        app.get(
+            "/api/daemon-status",
+            buildDaemonStatusHandler(options.daemonStatus),
+        );
+    } else {
+        app.get(
+            "/api/daemon-status",
+            disabledHandler("daemon-status-disabled"),
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // SPEC-037-2-03 — approvals action routes.
+    // -----------------------------------------------------------------
+    if (options.approvalsActions !== undefined) {
+        app.route("/", buildApprovalsActionRoutes(options.approvalsActions));
+    } else {
+        app.post(
+            "/api/approvals/:id/approve",
+            disabledHandler("approvals-actions-disabled"),
+        );
+        app.post(
+            "/api/approvals/:id/reject",
+            disabledHandler("approvals-actions-disabled"),
+        );
+        app.post(
+            "/api/approvals/bulk-approve",
+            disabledHandler("approvals-actions-disabled"),
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // SPEC-037-2-04 — settings action routes.
+    //
+    // The `POST /settings` route is dispatched by method, distinct from
+    // the `GET /settings` page handler below (Hono matches both).
+    // -----------------------------------------------------------------
+    if (options.settingsActions !== undefined) {
+        app.route("/", buildSettingsActionRoutes(options.settingsActions));
+    } else {
+        app.post(
+            "/settings",
+            disabledHandler("settings-actions-disabled"),
+        );
+        app.post(
+            "/api/settings/allowlist",
+            disabledHandler("settings-actions-disabled"),
+        );
+        for (const ch of ["discord", "slack", "send"] as const) {
+            app.post(
+                `/api/settings/notifications/test/${ch}`,
+                disabledHandler("settings-actions-disabled"),
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // SPEC-037-2-05 — agent action routes.
+    // -----------------------------------------------------------------
+    if (options.agentsActions !== undefined) {
+        app.route("/", buildAgentActionRoutes(options.agentsActions));
+    } else {
+        for (const verb of ["promote", "shadow", "freeze"] as const) {
+            app.post(
+                `/api/agents/:name/${verb}`,
+                disabledHandler("agents-actions-disabled"),
+            );
+        }
+        app.get(
+            "/api/agents/:name/inspect",
+            disabledHandler("agents-actions-disabled"),
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // SPEC-037-2-06 — gate + request action routes.
+    // -----------------------------------------------------------------
+    if (options.gateAndRequestActions !== undefined) {
+        app.route(
+            "/",
+            buildGateAndRequestActionRoutes(options.gateAndRequestActions),
+        );
+    } else {
+        for (const verb of [
+            "approve",
+            "request-changes",
+            "reject",
+        ] as const) {
+            app.post(
+                `/repo/:repo/request/:id/gate/${verb}`,
+                disabledHandler("gate-actions-disabled"),
+            );
+        }
+        app.post(
+            "/api/requests/:id/action",
+            disabledHandler("gate-actions-disabled"),
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // GET page routes — order is purely organizational.
+    // -----------------------------------------------------------------
     app.get("/", dashboardHandler);
     app.get("/repo/:repo/request/:id", requestDetailHandler);
     app.get("/approvals", approvalsHandler);
