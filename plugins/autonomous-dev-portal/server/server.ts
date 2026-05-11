@@ -16,6 +16,7 @@ import { resolveBindHostname, validateBindingConfig } from "./lib/binding";
 import { serverError } from "./lib/error-handlers";
 import { notFound } from "./lib/response-utils";
 import {
+    registerShutdownHook,
     setupGracefulShutdown,
     setupShutdownPreBoot,
 } from "./lib/shutdown";
@@ -24,6 +25,12 @@ import { validateAuthConfig } from "./lib/validation";
 import { enforceBindingWithLogging } from "./auth/security/binding-enforcer";
 import { applyMiddlewareChain } from "./middleware";
 import { registerRoutes } from "./routes";
+import {
+    InMemoryConfirmationStore,
+    type ConfirmationRouteDeps,
+} from "./routes/confirmation-routes";
+import { TypedConfirmationService } from "./security/confirmation-tokens";
+import { SSEEventBus } from "./sse/SSEEventBus";
 
 export interface ServerState {
     server?: Server<unknown>;
@@ -74,10 +81,43 @@ export async function startServer(): Promise<Server<unknown>> {
     const app = new Hono();
     applyMiddlewareChain(app, config);
 
+    // SPEC-037-2-01 — construct the SSE bus + typed-CONFIRM service so the
+    // previously-unmounted routes (`/portal/events`, the two confirmation
+    // POSTs) come up in production. Heartbeat emission is owned by the bus
+    // (its internal HeartbeatManager starts on construction).
+    const sseBus = new SSEEventBus({
+        logger: {
+            info: (msg) => phaseLog("sse_info", { message: msg }),
+            warn: (msg) => phaseLog("sse_warn", { message: msg }),
+            error: (msg) => phaseLog("sse_error", { message: msg }),
+        },
+    });
+    const confirmation: ConfirmationRouteDeps = {
+        service: new TypedConfirmationService(),
+        store: new InMemoryConfirmationStore(),
+    };
+
     // SPEC-013-3-01: register all nine portal routes (incl. JSON /health).
     // The legacy inline /health handler is removed in favour of the JSON
     // shape documented in SPEC-013-3-01 §`/health` Handler.
-    registerRoutes(app);
+    //
+    // PLAN-037-2: SSE bus + confirmation are wired in production. The four
+    // action-route groups (approvals/settings/agents/gate) remain at the
+    // explicit 503 "wiring missing" path until their backing stores land
+    // (daemon RPC / config writer / agent factory). The 503 envelope is the
+    // documented operator signal — preferable to a silent 404.
+    registerRoutes(app, {
+        sseBus,
+        confirmation,
+    });
+
+    // SPEC-037-2-01 FR-7 — close SSE connections gracefully on signal so
+    // long-poll consumers see a `: shutdown` comment rather than a torn TCP
+    // socket. Registered AFTER routes are wired but before the listener
+    // opens — registerShutdownHook is idempotent w.r.t. registration order.
+    registerShutdownHook(async () => {
+        await sseBus.shutdown();
+    });
     // SPEC-013-3-02: HTMX-aware 404 / 500. The error-boundary middleware
     // registered in applyMiddlewareChain catches PortalError-class errors
     // for API-style consumers (Accept: application/json); app.onError is
