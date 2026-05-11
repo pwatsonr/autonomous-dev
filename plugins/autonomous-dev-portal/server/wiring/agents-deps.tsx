@@ -48,6 +48,30 @@ function registryPath(): string {
 async function readAgentRecord(
     name: string,
 ): Promise<AgentInspectRecord | null> {
+    // Prefer the live CLI (sees freeze/unfreeze state, no stale file).
+    // Falls back to a pre-written registry file if the CLI is unavailable.
+    try {
+        const proc = Bun.spawn(
+            ["autonomous-dev", "agent", "inspect", name, "--json"],
+            { stdout: "pipe", stderr: "pipe" },
+        );
+        const [stdout, code] = await Promise.all([
+            new Response(proc.stdout).text(),
+            proc.exited,
+        ]);
+        if (code === 0) {
+            const parsed = JSON.parse(stdout) as Partial<AgentInspectRecord> & {
+                error?: string;
+            };
+            if (parsed.error) return null;
+            if (typeof parsed.name === "string") {
+                return parsed as AgentInspectRecord;
+            }
+        }
+    } catch {
+        // fall through to file-based reader
+    }
+
     const file = await readJsonOrNull<RegistryFile>(registryPath());
     if (file === null || !Array.isArray(file.agents)) return null;
     return file.agents.find((a) => a.name === name) ?? null;
@@ -69,9 +93,12 @@ async function readAgentRecord(
 async function spawnAgentCli(
     verb: string,
     name: string,
+    arg?: string,
 ): Promise<AgentCliResult> {
     try {
-        const proc = Bun.spawn(["autonomous-dev", "agent", verb, name], {
+        const args = ["autonomous-dev", "agent", verb, name];
+        if (typeof arg === "string" && arg.length > 0) args.push(arg);
+        const proc = Bun.spawn(args, {
             stdout: "pipe",
             stderr: "pipe",
         });
