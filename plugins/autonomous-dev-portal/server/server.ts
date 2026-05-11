@@ -31,6 +31,16 @@ import {
 } from "./routes/confirmation-routes";
 import { TypedConfirmationService } from "./security/confirmation-tokens";
 import { SSEEventBus } from "./sse/SSEEventBus";
+import {
+    auditAdapter,
+    buildPortalAuditLogger,
+    structuredLogger,
+} from "./wiring/adapters";
+import { buildAgentsDeps } from "./wiring/agents-deps";
+import { FileApprovalsStore } from "./wiring/approvals-store";
+import { buildGateAndRequestDeps } from "./wiring/gate-store";
+import { buildFileWebhookDispatcher } from "./wiring/notification-dispatcher";
+import { FileSettingsStore } from "./wiring/settings-store";
 
 export interface ServerState {
     server?: Server<unknown>;
@@ -106,18 +116,43 @@ export async function startServer(): Promise<Server<unknown>> {
     // explicit 503 "wiring missing" path until their backing stores land
     // (daemon RPC / config writer / agent factory). The 503 envelope is the
     // documented operator signal — preferable to a silent 404.
+    // PLAN-037-2 wiring — adapters for the action route groups.
+    const log = structuredLogger();
+    const auditLogger = await buildPortalAuditLogger();
+    const audit = auditAdapter(auditLogger, log);
+
     registerRoutes(app, {
         sseBus,
         confirmation,
-        // SPEC-037-2-02 — daemon-status handler. Readers default to safe
-        // values (0 spend, 0 approvals, false kill-switch) until real
-        // backing stores are wired. heartbeatPath defaults to
-        // ~/.autonomous-dev/heartbeat.json which exists for the running
-        // daemon; status is classified from its mtime.
+        // SPEC-037-2-02 — daemon-status handler.
         daemonStatus: {
             readMtdSpend: async () => 0,
             readApprovalsCount: async () => 0,
             readKillSwitchEngaged: async () => false,
+        },
+        // SPEC-037-2-03 — approvals action routes (file-backed queue).
+        approvalsActions: {
+            store: new FileApprovalsStore(),
+            audit,
+            logger: log,
+        },
+        // SPEC-037-2-04 — settings + notifications action routes.
+        settingsActions: {
+            store: new FileSettingsStore(),
+            notifications: buildFileWebhookDispatcher(),
+            audit,
+            logger: log,
+        },
+        // SPEC-037-2-05 — agent action routes. promote/shadow/freeze
+        // intentionally DEFERRED (501) per agents-deps.tsx header note;
+        // inspect (GET) works.
+        agentActions: { ...buildAgentsDeps(), audit, logger: log },
+        // SPEC-037-2-06 — gate + request actions (marker-file pattern;
+        // daemon picks decisions up on next iteration).
+        gateAndRequestActions: {
+            ...buildGateAndRequestDeps(confirmation.store),
+            audit,
+            logger: log,
         },
     });
 
