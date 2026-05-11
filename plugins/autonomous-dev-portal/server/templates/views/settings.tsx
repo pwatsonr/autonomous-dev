@@ -203,8 +203,14 @@ const AllowlistCard: FC<{ data: SettingsData }> = ({ data }) => (
 );
 
 const VariantsPanel: FC<{ data: SettingsData }> = ({ data }) => (
-    <section class="card" aria-labelledby="variants-heading">
-        <h3 id="variants-heading">Pipeline variants</h3>
+    <section class="sec" aria-labelledby="variants-heading">
+        <div class="sec-head">
+            <h2 id="variants-heading">Pipeline variants</h2>
+        </div>
+        <p class="dim">
+            Phase sequences that requests follow. The default variant is
+            used when the request intake does not specify one.
+        </p>
         <table class="tbl">
             <thead>
                 <tr>
@@ -227,8 +233,15 @@ const VariantsPanel: FC<{ data: SettingsData }> = ({ data }) => (
 );
 
 const StandardsPanel: FC<{ data: SettingsData }> = ({ data }) => (
-    <section class="card" aria-labelledby="standards-heading">
-        <h3 id="standards-heading">Standards rules</h3>
+    <section class="sec" aria-labelledby="standards-heading">
+        <div class="sec-head">
+            <h2 id="standards-heading">Engineering standards</h2>
+        </div>
+        <p class="dim">
+            Rules are matched against requests via the <code>applies</code>
+            predicate. Blocking rules pause the pipeline until satisfied
+            or overridden.
+        </p>
         <table class="tbl">
             <thead>
                 <tr>
@@ -268,8 +281,14 @@ const StandardsPanel: FC<{ data: SettingsData }> = ({ data }) => (
 );
 
 const BackendsPanel: FC<{ data: SettingsData }> = ({ data }) => (
-    <section class="card" aria-labelledby="backends-heading">
-        <h3 id="backends-heading">Deploy backends</h3>
+    <section class="sec" aria-labelledby="backends-heading">
+        <div class="sec-head">
+            <h2 id="backends-heading">Deploy backends</h2>
+        </div>
+        <p class="dim">
+            Bundled backends ship with autonomous-dev. Plugin backends
+            require installation and credential bind.
+        </p>
         <table class="tbl">
             <thead>
                 <tr>
@@ -384,8 +403,15 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
             </Panel>
 
             <Panel id="agents" activeTab={activeTab}>
-                <section class="card" aria-labelledby="agents-heading">
-                    <h3 id="agents-heading">Agent factory</h3>
+                <section class="sec" aria-labelledby="agents-heading">
+                    <div class="sec-head">
+                        <h2 id="agents-heading">Agent factory</h2>
+                    </div>
+                    <p class="dim">
+                        Reviewers and executors that participate in the
+                        pipeline. Inspect any row to promote, shadow, or
+                        freeze the agent.
+                    </p>
                     <AgentTable agents={data.agents} />
                 </section>
             </Panel>
