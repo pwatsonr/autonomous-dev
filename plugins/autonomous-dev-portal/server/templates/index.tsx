@@ -22,6 +22,10 @@ import type { Context } from "hono";
 
 import type { Theme } from "../lib/theme";
 import { getThemeFromCookie } from "../lib/theme";
+import {
+    deriveShellRailState,
+    type ShellRailState,
+} from "../lib/shell-rail-state";
 import type { RenderProps, ViewName } from "../types/render";
 import { ShellLayout } from "../components/shell";
 import { ApprovalsView } from "./views/approvals";
@@ -149,6 +153,10 @@ function activePathFor(view: ViewName): string {
  * @param theme  SPEC-035-1-05 — server-rendered theme cookie value.
  *   Defaults to `"dark"` when omitted (SPEC-037-1-01 — dark-default kit
  *   baseline; tests and error pre-render get the new default for free).
+ * @param shellState SPEC-037-3-05 — pre-derived rail state. When omitted,
+ *   `deriveShellRailState()` is invoked to read heartbeat / cost ledger
+ *   / approvals queue. Tests / fragments can pass a stub to bypass disk
+ *   I/O. Homelab fields are deliberately absent from the type.
  */
 export async function renderFullPage<V extends ViewName>(
     view: V,
@@ -156,13 +164,21 @@ export async function renderFullPage<V extends ViewName>(
     activeOverride?: string,
     cspNonce: string = "",
     theme: Theme = "dark",
+    shellState?: ShellRailState,
 ): Promise<string> {
     const body = renderViewBody(view, props);
+    // SPEC-037-3-05 AC-01/02 — derive once when not supplied. The helper
+    // is internally fault-tolerant; a missing source yields `undefined`
+    // for its fields rather than throwing, so we never need a try/catch
+    // around it here.
+    const resolvedShellState: ShellRailState =
+        shellState ?? (await deriveShellRailState());
     const layout = (
         <ShellLayout
             activePath={activeOverride ?? activePathFor(view)}
             cspNonce={cspNonce}
             theme={theme}
+            {...resolvedShellState}
         >
             {body}
         </ShellLayout>
@@ -200,6 +216,11 @@ export async function renderViewToContext<V extends ViewName>(
     isHtmx: boolean,
     status = 200,
 ): Promise<Response> {
+    // SPEC-037-3-05 AC-06 — let routes inject `shellState` via context
+    // for request-scoped overrides (e.g. pre-computed counts in tests);
+    // when absent, `renderFullPage` falls through to the disk-derivation
+    // path so the default behavior remains zero-config for callers.
+    const ctxShellState = c.get("shellState") as ShellRailState | undefined;
     const html = isHtmx
         ? await renderFragment(view, props)
         : await renderFullPage(
@@ -208,6 +229,7 @@ export async function renderViewToContext<V extends ViewName>(
               undefined,
               c.get("cspNonce") ?? "",
               getThemeFromCookie(c),
+              ctxShellState,
           );
     // Cast to ContentfulStatusCode-compatible literal union.
     return c.html(
