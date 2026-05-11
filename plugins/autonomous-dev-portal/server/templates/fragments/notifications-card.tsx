@@ -35,15 +35,17 @@ const TONE: Record<WebhookTestStatus, "ok" | "warn" | "err" | "muted"> = {
 export const NotificationsCard: FC<Props> = ({ config, canSendTest }) => {
     const dndDisabled = config.notifyDefault === "none";
     return (
-        <section class="card" aria-labelledby="notifications-heading">
-            <h3 id="notifications-heading">Notifications</h3>
-            <p class="meta">
+        <section class="sec" aria-labelledby="notifications-heading">
+            <div class="sec-head">
+                <h2 id="notifications-heading">Notifications</h2>
+            </div>
+            <p class="dim">
                 Send approval / failure pings to Discord or Slack. Tokens
                 are sent server-side only — never from the browser.
             </p>
 
             {/* Discord webhook --------------------------------------- */}
-            <div class="field" data-channel="discord">
+            <div class="field stacked-field" data-channel="discord">
                 <label for="discord-webhook">Discord webhook URL</label>
                 <input
                     type="url"
@@ -71,7 +73,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest }) => {
             </div>
 
             {/* Slack webhook ----------------------------------------- */}
-            <div class="field" data-channel="slack">
+            <div class="field stacked-field" data-channel="slack">
                 <label for="slack-webhook">Slack webhook URL</label>
                 <input
                     type="url"
@@ -99,68 +101,69 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest }) => {
             </div>
 
             {/* Default method --------------------------------------- */}
-            <fieldset class="field" data-field="notify-default">
-                <legend>Default notification method</legend>
-                {DEFAULTS.map((opt) => (
-                    <label class="radio">
-                        <input
-                            type="radio"
-                            name="notify-default"
-                            value={opt}
-                            checked={config.notifyDefault === opt}
-                            data-validate="notify-default"
-                        />
-                        <span>{opt}</span>
-                    </label>
-                ))}
-            </fieldset>
+            <div class="field stacked-field" data-field="notify-default">
+                <label class="sub-label">Default notification method</label>
+                <select
+                    class="input"
+                    name="notify-default"
+                    data-validate="notify-default"
+                >
+                    {DEFAULTS.map((opt) => (
+                        <option value={opt} selected={config.notifyDefault === opt}>
+                            {opt}
+                        </option>
+                    ))}
+                </select>
+            </div>
 
             {/* DND hours -------------------------------------------- */}
-            <fieldset class="field" data-field="dnd-hours">
-                <legend>Do-Not-Disturb hours</legend>
-                <label class="checkbox">
+            <div class="field stacked-field" data-field="dnd-hours">
+                <label class="sub-label">Do-Not-Disturb hours</label>
+                <div class="dnd-row">
+                    <label class="checkbox dnd-toggle">
+                        <input
+                            type="checkbox"
+                            id="dnd-enabled"
+                            name="dndEnabled"
+                            checked={config.dndEnabled}
+                            disabled={dndDisabled}
+                        />
+                        <span>Enable DND</span>
+                    </label>
+                    <label class="dnd-time-label" for="dnd-start">Start</label>
                     <input
-                        type="checkbox"
-                        id="dnd-enabled"
-                        name="dndEnabled"
-                        checked={config.dndEnabled}
+                        type="time"
+                        id="dnd-start"
+                        name="dndStart"
+                        class="input dnd-time"
+                        value={config.dndStart}
                         disabled={dndDisabled}
+                        data-validate="dnd-time"
                     />
-                    <span>Enable DND</span>
-                </label>
-                <label for="dnd-start">Start</label>
-                <input
-                    type="time"
-                    id="dnd-start"
-                    name="dndStart"
-                    class="input"
-                    value={config.dndStart}
-                    disabled={dndDisabled}
-                    data-validate="dnd-time"
-                />
-                <label for="dnd-end">End</label>
-                <input
-                    type="time"
-                    id="dnd-end"
-                    name="dndEnd"
-                    class="input"
-                    value={config.dndEnd}
-                    disabled={dndDisabled}
-                    data-validate="dnd-time"
-                />
+                    <label class="dnd-time-label" for="dnd-end">End</label>
+                    <input
+                        type="time"
+                        id="dnd-end"
+                        name="dndEnd"
+                        class="input dnd-time"
+                        value={config.dndEnd}
+                        disabled={dndDisabled}
+                        data-validate="dnd-time"
+                    />
+                </div>
                 {dndDisabled ? (
-                    <p class="meta">
+                    <p class="dim small">
                         DND has no effect when notifications are off.
                     </p>
                 ) : null}
-            </fieldset>
+            </div>
 
             <div class="form-actions">
                 <Btn
                     kind="primary"
                     disabled={!canSendTest}
                     hx-post="/api/settings/notifications/test/send"
-                    hx-target="closest .card"
+                    hx-target="closest .sec"
                     hx-swap="outerHTML"
                 >
                     Send test notification now

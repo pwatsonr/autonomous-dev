@@ -105,3 +105,98 @@
    .input rule is geared at <input>; explicitly include <select> so it
    gets the same height + border treatment. */
 select.input { height: 32px; padding: 0 10px; }
+
+/* PLAN-038 polish round 3 — Notifications card layout.
+   The vendored .field { flex-direction: column } stacks every child
+   one per row. Notifications needs:
+     - Webhook field: label on top, input + chip + Test button on one row
+     - Default method: label on top, select below (single-row, full width)
+     - DND hours: label on top, then a single row [checkbox][Start][time][End][time]
+   The `.stacked-field` modifier preserves vertical label/control stacking
+   but pulls inline children (chip, button, prefix etc.) onto one row.   */
+.field.stacked-field { display: block; margin-bottom: 18px; }
+.field.stacked-field > label,
+.field.stacked-field > .sub-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-1);
+    margin-bottom: 6px;
+}
+.field.stacked-field > .input { display: inline-block; width: 100%; box-sizing: border-box; }
+.field.stacked-field[data-channel] .input { width: calc(100% - 200px); }
+.field.stacked-field[data-channel] .webhook-status,
+.field.stacked-field[data-channel] .btn {
+    display: inline-flex;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.dnd-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+.dnd-row .dnd-toggle { display: inline-flex; align-items: center; gap: 6px; }
+.dnd-row .dnd-time-label { font-size: 12px; color: var(--fg-2); }
+.dnd-row .dnd-time { width: 110px; flex-shrink: 0; }
+
+/* Section-level vertical breathing — give every section's content room. */
+section.sec > p.dim { margin: 4px 0 14px; line-height: 1.55; }
+section.sec > .sec-head { margin-bottom: 8px; }
+
+/* Form action row at bottom of a section — primary button right-aligned. */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+/* Disabled buttons — kit pattern uses both reduced opacity and a
+   slightly muted background tint. Apply on Bulk approve etc. so the
+   "you can't click this right now" affordance is unmistakable. */
+.btn:disabled, .btn[disabled],
+button.btn:disabled, button.btn[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.btn.primary:disabled, .btn.primary[disabled] {
+    background: var(--bg-2);
+    border-color: var(--line-1);
+    color: var(--fg-2);
+}
+
+/* `.dim.small` — used by Notifications DND helper text. */
+.dim.small { font-size: 11px; margin-top: 4px; }
+
+/* Settings tab strip — make the tabs look like a flush row matching the
+   kit's `seg seg-tabs` pattern, not a compact pill. */
+.seg.seg-tabs {
+    display: inline-flex;
+    border-bottom: 1px solid var(--line-1);
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 20px;
+    gap: 0;
+}
+.seg.seg-tabs .seg-btn,
+.seg.seg-tabs a.seg-btn {
+    border: 0;
+    background: transparent;
+    border-radius: 0;
+    padding: 10px 16px;
+    color: var(--fg-2);
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+}
+.seg.seg-tabs .seg-btn:hover { color: var(--fg-0); }
+.seg.seg-tabs .seg-btn.on,
+.seg.seg-tabs a.seg-btn[aria-current="page"] {
+    color: var(--fg-0);
+    border-bottom-color: var(--brand);
+    background: transparent;
+}
