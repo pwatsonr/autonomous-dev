@@ -38,7 +38,7 @@ describe("RailNav — SPEC-037-3-01 (7-item nav)", () => {
             "/approvals",
             "/requests",
             "/costs",
-            "/settings#agents",
+            "/agents",
             "/settings",
             "/ops",
         ]);
@@ -69,7 +69,7 @@ describe("RailNav — SPEC-037-3-01 (7-item nav)", () => {
             "/costs",
         ]);
         expect(system.map((i) => i.href)).toEqual([
-            "/settings#agents",
+            "/agents",
             "/settings",
             "/ops",
         ]);
@@ -112,7 +112,6 @@ describe("RailNav — SPEC-037-3-01 (7-item nav)", () => {
             import.meta.dir,
             "..",
             "..",
-            "server",
             "static",
             "icons",
             "sliders.svg",
@@ -213,7 +212,7 @@ describe("RailNav — SPEC-037-3-02 (count badges)", () => {
         );
         const countMatches = html.match(/<span class="count">/g) ?? [];
         expect(countMatches.length).toBe(1);
-        const start = html.indexOf('href="/settings#agents"');
+        const start = html.indexOf('href="/agents"');
         const end = html.indexOf("</a>", start);
         expect(html.slice(start, end)).toContain(
             '<span class="count">4</span>',

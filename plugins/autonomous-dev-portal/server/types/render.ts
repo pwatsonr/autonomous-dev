@@ -20,6 +20,8 @@ export type ViewName =
     | "logs"
     | "ops"
     | "audit"
+    | "agents" // PLAN-038 TASK-005 — net-new /agents surface
+    | "repos" //  PLAN-038 TASK-005 — net-new /repos surface
     | "404"
     | "500";
 
@@ -703,4 +705,65 @@ export interface RenderProps {
     };
     "404": { path: string };
     "500": { message: string };
+    // PLAN-038 TASK-007 — Agents surface input. See AgentsPageData below.
+    agents: AgentsPageData;
+    // PLAN-038 TASK-007 — Repos surface input. See ReposPageData below.
+    repos: ReposPageData;
+}
+
+// PLAN-038 TASK-007 / TDD-037 §5.1.1a — Agents surface data shape.
+//
+// `agent-states.json` (daemon-side, see plugins/autonomous-dev/bin/agent-cli.ts)
+// only tracks `{frozen[], shadowed[]}` — none of the rich metrics the kit
+// screenshot implies (runs30d, fpRate, lastDispatchAt) are persisted today.
+// Those fields are therefore OPTIONAL on AgentRow; the view renders `—` when
+// absent. The canonical agent list comes from scanning the plugin's
+// `agents/*.md` manifest directory (TASK-010 wires this composition).
+export interface AgentRow {
+    /** Agent name (matches the markdown file basename in `agents/`). */
+    name: string;
+    /** Plugin version that ships this agent (from `.claude-plugin/plugin.json`). */
+    version: string;
+    /** Lifecycle state. Default `"baseline"` when the agent is in neither the
+     *  frozen nor shadowed list. */
+    status: "baseline" | "frozen" | "shadow" | "promoted";
+    /** Operator-facing mode. Currently always `"active"`; reserved for future
+     *  per-agent enable/disable flags. */
+    mode: "active" | "disabled";
+    /** ISO 8601 of last dispatch. `null` when the daemon hasn't recorded one
+     *  (or doesn't track this field at all on this install). */
+    lastDispatchAt?: string | null;
+    /** Run count in the trailing 30 days. `null` when not tracked. */
+    runs30d?: number | null;
+    /** Fraction in `[0, 1]` of runs that returned a blocking finding that
+     *  was later overridden. `null` when not tracked. */
+    fpRate?: number | null;
+}
+
+export interface AgentsPageData {
+    kpis: {
+        totalAgents: number;
+        frozenCount: number;
+        shadowCount: number;
+    };
+    agents: AgentRow[];
+}
+
+// PLAN-038 TASK-007 / TDD-037 §5.1.1a — Repos surface data shape.
+//
+// Composes the portal-settings allowlist + per-repo aggregates from the
+// request ledger (TASK-010 composition reader). Re-uses the existing
+// `RepoSummary` interface above for the row shape (Agent 2's recommendation:
+// extend, don't fork).
+export interface ReposPageData {
+    kpis: {
+        totalRepos: number;
+        /** Repos with at least one RUNNING or GATE request. */
+        activeRepos: number;
+        /** Allowlist entries whose path does not resolve on disk. */
+        allowlistMisses: number;
+    };
+    /** Full repo list, not truncated (the dashboard repos grid pulls a
+     *  subset; the `/repos` surface always shows everything). */
+    repos: RepoSummary[];
 }
