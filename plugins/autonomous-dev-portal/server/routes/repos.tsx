@@ -12,16 +12,11 @@
 import type { Context } from "hono";
 
 import { renderPage } from "../lib/response-utils";
-import type { ReposPageData } from "../types/render";
+import { readReposData } from "../wiring/repos-readers";
 
-function emptyReposPageData(): ReposPageData {
-    return {
-        kpis: { totalRepos: 0, activeRepos: 0, allowlistMisses: 0 },
-        repos: [],
-    };
-}
-
+/** PLAN-038 TASK-015 — wires the real composition reader (was empty-data
+ *  scaffolding in TASK-005). */
 export const reposHandler = async (c: Context): Promise<Response> => {
-    const data = emptyReposPageData();
+    const data = await readReposData();
     return renderPage(c, "repos", data);
 };

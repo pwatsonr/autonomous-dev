@@ -178,34 +178,51 @@ interface ApprovalQueueFile {
 }
 
 /**
- * Read counts from the approvals queue file. The file schema is shared
- * with the legacy `/approvals` route: a top-level object with `pending`
- * (awaiting human review), `active` (in-flight requests), and `agents`
- * (alerts needing attention). Missing arrays count as zero.
+ * PLAN-038 TASK-018/019 — read counts from the SAME readers the
+ * destination surfaces use, so the rail-nav badges and the surface KPIs
+ * cannot disagree (TDD-037 §5.1.3 honesty contract).
+ *
+ *   /approvals KPI  ← readApprovalsQueue().items.length
+ *   /requests  KPI  ← readRequestLedger() filtered by status
+ *   /agents    KPI  ← readAgentsData().kpis.totalAgents
+ *
+ * Previously this read a separate `approvals.json` file with a different
+ * schema (`{pending[], active[], agents[]}`); that file doesn't exist on
+ * any real install and the counts diverged from the surface KPIs.
  */
 async function readQueueCounts(): Promise<{
     approvalsCount?: number;
     requestsCount?: number;
     agentsAlertCount?: number;
 }> {
-    try {
-        const path = join(resolveStateDir(), "approvals.json");
-        const raw = await readFile(path, "utf8");
-        const parsed = JSON.parse(raw) as ApprovalQueueFile;
-        return {
-            approvalsCount: Array.isArray(parsed.pending)
-                ? parsed.pending.length
-                : 0,
-            requestsCount: Array.isArray(parsed.active)
-                ? parsed.active.length
-                : 0,
-            agentsAlertCount: Array.isArray(parsed.agents)
-                ? parsed.agents.length
-                : 0,
-        };
-    } catch {
-        return {};
-    }
+    // Imports kept local to avoid widening the module's eager dep graph;
+    // the readers are async and only touched when rail-state derives.
+    const { readApprovalsQueue } = await import(
+        "../wiring/approvals-reader"
+    );
+    const { readRequestLedger } = await import(
+        "../wiring/request-ledger-reader"
+    );
+    const { readAgentsData } = await import("../wiring/agents-readers");
+
+    const [approvals, requests, agents] = await Promise.all([
+        readApprovalsQueue().catch(() => ({ items: [] as never[] })),
+        readRequestLedger().catch(() => [] as never[]),
+        readAgentsData().catch(() => ({
+            kpis: { totalAgents: 0, frozenCount: 0, shadowCount: 0 },
+            agents: [],
+        })),
+    ]);
+
+    const activeRequests = requests.filter(
+        (r) => r.status === "running" || r.status === "gate",
+    );
+
+    return {
+        approvalsCount: approvals.items.length,
+        requestsCount: activeRequests.length,
+        agentsAlertCount: agents.kpis.totalAgents,
+    };
 }
 
 /**

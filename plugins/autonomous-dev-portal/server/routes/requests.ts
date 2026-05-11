@@ -12,9 +12,8 @@
 import type { Context } from "hono";
 
 import { renderPage } from "../lib/response-utils";
-import { loadDashboardStub } from "../stubs/repos";
+import { readRequestLedger } from "../wiring/request-ledger-reader";
 import type {
-    DashboardData,
     DashboardRequest,
     RequestsAggregatesProp,
 } from "../types/render";
@@ -75,18 +74,10 @@ export function computeRequestsAggregates(
     };
 }
 
-/**
- * Pulls the canonical request list off the dashboard stub. Returns an
- * empty array when the stub omits `requests` so callers never branch on
- * `undefined`.
- */
-function extractRequests(data: DashboardData): DashboardRequest[] {
-    return data.requests ?? [];
-}
-
 export const requestsHandler = async (c: Context): Promise<Response> => {
-    const data = await loadDashboardStub();
-    const items = extractRequests(data);
+    // PLAN-038 TASK-014 — swapped from loadDashboardStub() to the real
+    // request-ledger reader. Empty state-dir → honest empty table.
+    const items: DashboardRequest[] = await readRequestLedger();
     const aggregates = computeRequestsAggregates(items);
     return renderPage(c, "requests", { items, aggregates });
 };
