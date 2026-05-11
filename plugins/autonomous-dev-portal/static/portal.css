@@ -41,51 +41,67 @@
 .modal .stats-grid dt { font-family: var(--font-mono); font-size: 11px; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.05em; }
 .modal .stats-grid dd { margin: 0; color: var(--fg-0); }
 
-/* PLAN-038 polish — Settings page layout fixes.
-   The vendored .field rule (app.css:267) stacks everything vertically;
-   that's wrong for radio groups and `$ + input` cost-cap pairs. */
-
-/* Trust level radio group — horizontal layout. */
-.field[data-field="trust-level"] {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 16px;
-    align-items: center;
+/* Chip `muted` tone (used by AgentsView for BASELINE status). app.css
+   ships .chip.ok / .warn / .err / .info / .brand but not .muted, so the
+   chip fell back to the base which had been declared with `color: var(--fg-1)`
+   and `background: var(--bg-2)` — fine in light theme but in the modal
+   (which is also `var(--bg-1)`-ish) it ran black-on-black. Pin an explicit
+   muted tone with sufficient contrast. */
+.chip.muted, .chip.status.muted {
+    background: var(--bg-2);
+    border-color: var(--line-1);
+    color: var(--fg-1);
 }
-.field[data-field="trust-level"] .radio {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0;
+/* Inside the modal, the modal's background is lighter than `.chip.muted`'s
+   `var(--bg-2)` — flip to use `--bg-0` so the chip stays visible. */
+.modal .chip.muted, .modal .chip.status.muted {
+    background: var(--bg-0);
+    border-color: var(--line-2);
+    color: var(--fg-0);
 }
 
-/* Cost cap inputs — label on top, then `$ + input` on one row. */
-.field[data-cost-cap-group] { gap: 6px; }
-.field[data-cost-cap-group] label { font-size: 12px; font-weight: 500; color: var(--fg-1); }
-.field[data-cost-cap-group] .prefix {
-    display: inline-block;
+/* Modal content readability — explicit colors so no inherit chain
+   produces black-on-black. */
+.modal h3 { color: var(--fg-0); }
+.modal p { color: var(--fg-1); }
+.modal code { color: var(--fg-0); background: var(--bg-2); padding: 0 4px; border-radius: 2px; font-family: var(--font-mono); font-size: 11px; }
+
+/* PLAN-038 polish — Settings page kit-pattern adoption.
+   The General-tab sections now use the kit's `<section class="sec">`
+   pattern (see /tmp/portal-design-v2/.../ui_kits/portal/Settings.jsx).
+   `.sec` is defined in app.css with `margin-bottom: 28px` so sections
+   get proper breathing room.
+
+   Cost-cap inputs use a 2-row grid: label on top, `$` prefix inline
+   with the input on the second row. */
+.field[data-cost-cap-group] {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto auto;
+    column-gap: 8px;
+    row-gap: 4px;
+    align-items: center;
+    margin-bottom: 14px;
+}
+.field[data-cost-cap-group] > label {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-1);
+}
+.field[data-cost-cap-group] > .prefix {
+    grid-column: 1;
+    grid-row: 2;
     width: 18px;
     text-align: right;
     color: var(--fg-2);
     font-family: var(--font-mono);
 }
-/* Wrap prefix + input on a single row using a grid-like flex setup.
-   Two children (.prefix + .input) inside a vertical flex container —
-   target them with a positional selector to make them inline. */
-.field[data-cost-cap-group] .prefix + .input {
-    display: inline-block;
-    width: calc(100% - 28px);
-}
-/* Re-flow: make the cost-cap field a 2-row grid so prefix + input share the second row. */
-.field[data-cost-cap-group] {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-rows: auto auto;
-    column-gap: 8px;
-    row-gap: 4px;
-    align-items: center;
-}
-.field[data-cost-cap-group] > label { grid-column: 1 / -1; grid-row: 1; }
-.field[data-cost-cap-group] > .prefix { grid-column: 1; grid-row: 2; }
 .field[data-cost-cap-group] > .input { grid-column: 2; grid-row: 2; width: 100%; }
 .field[data-cost-cap-group] > [data-field-error] { grid-column: 1 / -1; grid-row: 3; }
+
+/* Generic `.input` styling for the Trust-level select. The vendored
+   .input rule is geared at <input>; explicitly include <select> so it
+   gets the same height + border treatment. */
+select.input { height: 32px; padding: 0 10px; }
