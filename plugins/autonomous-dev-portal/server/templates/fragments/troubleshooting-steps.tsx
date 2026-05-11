@@ -1,4 +1,9 @@
 // SPEC-013-4-03 §Troubleshooting Steps Fragment.
+// SPEC-034-2-05 §Voice/copy sweep — headings ("Daemon status",
+// "Troubleshooting steps") render in sentence case; status word and
+// shell commands render in mono via `<code>`; the heartbeat
+// timestamp is already classed `mono`. Status-class `status-{status}`
+// keeps the badge-style UPPERCASE rendering via CSS.
 //
 // 503-specific recovery guidance rendered inside <ErrorPage> when the
 // daemon health context is present. The shell commands are hard-coded

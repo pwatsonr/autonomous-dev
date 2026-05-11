@@ -1,6 +1,9 @@
 // SPEC-015-4-03 §degradation-banner — Hono JSX banner rendered above
 // every page when the daemon is stale or down. Returns null for the
 // `none` severity so BaseLayout can drop it cheaply.
+// SPEC-034-2-05 §Voice/copy sweep — the Retry button copy is sentence
+// case ("Retry"); message text is supplied by the health module and
+// is asserted to be sentence case in the daemon-status fixtures.
 //
 // ARIA contract:
 //   - severity=warning → role="status", aria-live="polite"

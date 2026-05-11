@@ -1,4 +1,7 @@
 // SPEC-015-2-01 §Clarifying Questions
+// SPEC-034-2-05 §Voice/copy sweep — heading already sentence case;
+// `askedAt` timestamp renders in compact ISO form with `class="mono"`
+// per TDD-034 §5.6 table/timestamp rule.
 //
 // Render an aside above the gate action panel whenever the orchestrator has
 // emitted an unresolved clarifying question (most-recent-unresolved entry
@@ -50,7 +53,7 @@ export const ClarifyingQuestions: FC<ClarifyingQuestion> = ({
         ) : null}
         <p class="clarifying-questions__meta">
             Asked at{" "}
-            <time datetime={askedAt}>{formatTime(askedAt)}</time>
+            <time datetime={askedAt} class="mono">{formatTime(askedAt)}</time>
         </p>
     </aside>
 );

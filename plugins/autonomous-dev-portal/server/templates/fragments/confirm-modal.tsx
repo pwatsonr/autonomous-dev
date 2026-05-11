@@ -1,4 +1,7 @@
 // SPEC-015-2-04 §Confirmation Modal
+// SPEC-034-2-05 §Voice/copy sweep — heading is sentence case ("Confirm
+// rejection"); the typed phrase and the cost value render in mono via
+// `<code>` per TDD-034 §5.6 IDs-in-mono rule.
 //
 // Hono JSX fragment for the typed-CONFIRM modal markup. The modal lives
 // hidden in the page DOM at all times; static/js/gate-confirmation.js
@@ -43,7 +46,7 @@ export const ConfirmModal: FC<Props> = ({ requiredText = "REJECT" }) => (
             <p class="modal-body">
                 You are rejecting{" "}
                 <strong id="confirm-modal-request-title"></strong> with cost{" "}
-                <strong id="confirm-modal-cost"></strong>.
+                <code id="confirm-modal-cost" class="mono"></code>.
             </p>
             <p>
                 Type <code id="confirm-modal-typed-text">{requiredText}</code>{" "}
