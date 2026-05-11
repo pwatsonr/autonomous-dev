@@ -291,17 +291,11 @@ export async function loadRequestStub(
     repo: string,
     id: string,
 ): Promise<RequestRecord | null> {
+    // PLAN-038 TASK-004 — return null on missing key so the route handler's
+    // existing null-check (request-detail.ts:33) fires `notFound(c)` instead
+    // of letting a synthesized minimal record reach the view and 500 during
+    // render. The earlier back-compat synthesizer was the source of the 500
+    // on /repo/<unknown>/request/REQ-<unknown> documented in TDD-037 §3.2.
     const key = `${repo}/${id}`;
-    if (key in STUB) {
-        return STUB[key] ?? null;
-    }
-    // For backward-compat with existing tests that pass arbitrary REQ-NNNNNN
-    // ids (e.g. REQ-000123 for repo-slug variants), fall through to a
-    // synthesized minimal record so route validation tests still pass.
-    return {
-        id,
-        repo,
-        summary: "",
-        phases: [],
-    };
+    return STUB[key] ?? null;
 }

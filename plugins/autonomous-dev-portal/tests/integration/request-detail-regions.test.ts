@@ -135,9 +135,29 @@ describe("Request Detail — deploy variant (REQ-000004)", () => {
 });
 
 describe("Request Detail — 404 path", () => {
-    test("malformed REQ id returns 404", async () => {
+    test("malformed REQ id returns 404 (regex guard)", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-1234567");
         expect([400, 404]).toContain(res.status);
+    });
+
+    // PLAN-038 TASK-004 / TDD-037 AC-3705 — store-miss path returns 404, not
+    // 500. Pin both the regex-rejected case (above) and this valid-format
+    // store-miss case so the route handler's null-branch is exercised.
+    test("valid-format slug that does not exist in store returns 404", async () => {
+        const app = freshApp();
+        const res = await app.request(
+            "/repo/no-such-repo/request/REQ-999999",
+        );
+        expect(res.status).toBe(404);
+        // Must not be a 500 — that was the bug.
+        expect(res.status).not.toBe(500);
+    });
+
+    test("valid-format slug under a known repo with unknown id returns 404", async () => {
+        const app = freshApp();
+        const res = await app.request("/repo/acme/request/REQ-999999");
+        expect(res.status).toBe(404);
+        expect(res.status).not.toBe(500);
     });
 });
