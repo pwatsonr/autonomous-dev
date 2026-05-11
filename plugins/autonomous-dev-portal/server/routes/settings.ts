@@ -31,12 +31,14 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
     data.activeTab = resolveActiveTab(c.req.query("tab"));
 
     // PLAN-038 TASK-020 — swap the fake `/Users/op/repos/*` allowlist for
-    // the real portal-settings allowlist. Other settings tabs (general /
-    // variants / standards / backends / agents) remain on the stub for
-    // now; their wiring is tracked as follow-up under PRD-018 NG-3702.
+    // the real portal-settings allowlist. The allowlist lives on
+    // SettingsData (data.allowlist), not SettingsView (config). Other
+    // settings tabs (general / variants / standards / backends / agents)
+    // remain on the stub for now; their wiring is tracked as follow-up
+    // under PRD-018 NG-3702.
     const realSettings = await readPortalSettings();
     if (realSettings.allowlist.length > 0) {
-        config.allowlist = realSettings.allowlist.map((entry, i) => ({
+        data.allowlist = realSettings.allowlist.map((entry) => ({
             id: entry.id,
             path: entry.path,
             // Real-source allowlist entries don't carry the legacy
@@ -46,7 +48,7 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
             addedAt: new Date().toISOString(),
         }));
     } else {
-        config.allowlist = [];
+        data.allowlist = [];
     }
 
     return renderPage(c, "settings", { config, data });

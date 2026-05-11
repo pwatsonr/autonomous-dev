@@ -15,9 +15,14 @@ import {
     readRepoAggregates,
     type RepoAggregationOptions,
 } from "./repo-aggregation-reader";
-import { readPortalSettings } from "./settings-reader";
+import {
+    readPortalSettings,
+    type SettingsReaderOptions,
+} from "./settings-reader";
 
-export type DashboardReaderOptions = RepoAggregationOptions;
+export interface DashboardReaderOptions
+    extends RepoAggregationOptions,
+        SettingsReaderOptions {}
 
 export async function readDashboardData(
     opts: DashboardReaderOptions = {},
