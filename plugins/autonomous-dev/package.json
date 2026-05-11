@@ -17,7 +17,8 @@
     "test:perf": "ts-node --transpile-only --compiler-options '{\"module\":\"commonjs\"}' tests/perf/test-validation-pipeline.bench.ts",
     "test:cred-proxy": "jest tests/cred-proxy",
     "test:kind": "RUN_KIND_TESTS=1 jest tests/integration/test-cred-proxy-scope.test.ts --runInBand",
-    "lint:no-tbd-shas": "bash ../../scripts/lint/no-tbd-shas.sh"
+    "lint:no-tbd-shas": "bash ../../scripts/lint/no-tbd-shas.sh",
+    "build:cli": "bun build intake/adapters/cli_adapter.ts --outfile=intake/adapters/cli_adapter.js --target=node --external better-sqlite3 --external \"@aws-sdk/*\" --external \"@azure/*\" --external \"@google-cloud/*\" --external \"@kubernetes/*\" --external \"@slack/*\" --external discord.js --external express"
   },
   "dependencies": {
     "@aws-sdk/client-sts": "^3.1041.0",
