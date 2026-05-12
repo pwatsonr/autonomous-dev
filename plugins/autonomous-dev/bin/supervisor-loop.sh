@@ -29,6 +29,7 @@ readonly CONFIG_FILE="${HOME}/.claude/autonomous-dev.json"
 export AUTONOMOUS_DEV_CONFIG="${CONFIG_FILE}"
 readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
 readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
+readonly PORTAL_REQUEST_ACTIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/request-actions"
 
 # --- Runtime State Variables -------------------------------------------------
 
@@ -1946,6 +1947,132 @@ update_request_state() {
 }
 
 ###############################################################################
+# Portal Request Action Writer (SPEC-039-3-01, SPEC-039-3-02)
+###############################################################################
+
+# write_portal_request_action(request_id, project) -> int
+#   Reads state.json for the given request and writes a portal-facing JSON file
+#   at ${PORTAL_REQUEST_ACTIONS_DIR}/<request_id>.json. Computes waitedMin for
+#   gated requests. Returns 0 on success, 0 on tolerated errors (missing state).
+write_portal_request_action() {
+    local request_id="$1"
+    local project="$2"
+
+    if ! validate_request_id "$request_id"; then
+        log_warn "Invalid request ID in write_portal_request_action: $request_id"
+        return 0
+    fi
+
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+    local out_file="${PORTAL_REQUEST_ACTIONS_DIR}/${request_id}.json"
+    local tmp_file="${out_file}.tmp.$$"
+
+    # Ensure portal directory exists
+    mkdir -p "${PORTAL_REQUEST_ACTIONS_DIR}"
+
+    # Check if state.json exists and is readable
+    if [[ ! -f "$state_file" ]]; then
+        log_warn "State file missing for $request_id, writing minimal cancelled action"
+        # Write minimal cancelled action for reconcile_orphans case
+        local ts
+        ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        jq -n \
+            --arg id "$request_id" \
+            --arg ts "$ts" \
+            '{
+                id: $id,
+                status: "cancelled",
+                completedAt: $ts
+            }' > "$tmp_file"
+        mv "$tmp_file" "$out_file"
+        return 0
+    fi
+
+    # Compute waitedMin for gated requests (SPEC-039-3-02)
+    local waited_min=0
+    local status
+    status=$(jq -r '.status // ""' "$state_file" 2>/dev/null || echo "")
+
+    if [[ "$status" == "gate" ]]; then
+        local gate_entered_at
+        gate_entered_at=$(jq -r '.current_phase_metadata.gate_entered_at // ""' "$state_file" 2>/dev/null || echo "")
+
+        if [[ -n "$gate_entered_at" ]]; then
+            local now_epoch entered_epoch
+            now_epoch=$(date +%s)
+            # Try GNU date first, then gdate (macOS with coreutils), fall back to 0
+            if entered_epoch=$(date -d "$gate_entered_at" +%s 2>/dev/null); then
+                waited_min=$(( (now_epoch - entered_epoch) / 60 ))
+            elif entered_epoch=$(gdate -d "$gate_entered_at" +%s 2>/dev/null); then
+                waited_min=$(( (now_epoch - entered_epoch) / 60 ))
+            else
+                # Date parsing failed, leave waited_min as 0
+                log_warn "Failed to parse gate_entered_at timestamp: $gate_entered_at"
+                waited_min=0
+            fi
+
+            # Ensure non-negative
+            if [[ "$waited_min" -lt 0 ]]; then
+                waited_min=0
+            fi
+        fi
+    fi
+
+    # Extract and transform fields from state.json
+    local repo_basename
+    repo_basename=$(basename "$project")
+
+    # Build the portal action file using jq with safe field extraction
+    jq -n \
+        --arg id "$(jq -r '.id // ""' "$state_file" 2>/dev/null || echo "$request_id")" \
+        --arg repo "$repo_basename" \
+        --arg title "$(jq -r '.title // ""' "$state_file" 2>/dev/null || echo "")" \
+        --arg phase "$(jq -r '.current_phase // ""' "$state_file" 2>/dev/null | tr '[:lower:]' '[:upper:]')" \
+        --arg status "$status" \
+        --argjson cost "$(jq -r '.cost_accrued_usd // 0' "$state_file" 2>/dev/null || echo "0")" \
+        --arg variant "$(jq -r '.variant // ""' "$state_file" 2>/dev/null || echo "")" \
+        --arg created_at "$(jq -r '.created_at // ""' "$state_file" 2>/dev/null || echo "")" \
+        --argjson waited_min "$waited_min" \
+        --argjson turns "$(jq -r '.turn_count // 0' "$state_file" 2>/dev/null || echo "0")" \
+        '{
+            id: $id,
+            repo: $repo,
+            title: $title,
+            phase: $phase,
+            status: $status,
+            cost: $cost,
+            variant: $variant,
+            createdAt: $created_at,
+            waitedMin: $waited_min,
+            turns: $turns
+        }' > "$tmp_file"
+
+    # Add completedAt for terminal statuses
+    if [[ "$status" == "done" || "$status" == "cancelled" || "$status" == "failed" ]]; then
+        local completed_at
+        completed_at=$(jq -r '.updated_at // ""' "$state_file" 2>/dev/null || echo "")
+        if [[ -n "$completed_at" ]]; then
+            # Add completedAt field to the existing JSON
+            jq --arg completed_at "$completed_at" '. + {completedAt: $completed_at}' "$tmp_file" > "${tmp_file}.2"
+            mv "${tmp_file}.2" "$tmp_file"
+        fi
+    fi
+
+    # Add score if present
+    local score
+    score=$(jq -r '.score // empty' "$state_file" 2>/dev/null || echo "")
+    if [[ -n "$score" ]]; then
+        jq --argjson score "$score" '. + {score: $score}' "$tmp_file" > "${tmp_file}.2"
+        mv "${tmp_file}.2" "$tmp_file"
+    fi
+
+    # Atomic rename
+    mv "$tmp_file" "$out_file"
+
+    return 0
+}
+
+###############################################################################
 # Phase Advancement (SPEC-039-2-05)
 ###############################################################################
 
@@ -2072,7 +2199,8 @@ advance_phase() {
                 log_info "Phase advanced: $request_id $current_phase -> $next_phase (status=$next_status)"
             fi
 
-            # TODO(PR-4): write_portal_request_action "$request_id" "$project"
+            # Write portal request action after state update
+            write_portal_request_action "$request_id" "$project"
             ;;
 
         "fail"|"error")
@@ -2120,6 +2248,9 @@ advance_phase() {
 
                 log_info "Review phase $current_phase failed, reset to author phase $author_phase"
             fi
+
+            # Write portal request action after all failure handling
+            write_portal_request_action "$request_id" "$project"
             ;;
 
         *)
@@ -2181,6 +2312,10 @@ intake_to_prd_if_needed() {
         echo "$event" >> "$events_file"
 
         log_info "Auto-transitioned $request_id from intake to prd"
+
+        # Write portal request action after state transition
+        write_portal_request_action "$request_id" "$project"
+
         return 0
     fi
 
@@ -2426,9 +2561,12 @@ reconcile_orphans() {
         local state_file="${target_repo}/.autonomous-dev/requests/${request_id}/state.json"
         if [[ ! -f "$state_file" ]]; then
             log_info "Marking orphan SQLite row as cancelled: ${request_id} (state file missing)"
-            bun "${PLUGIN_DIR}/scripts/mark-request-cancelled.ts" "$request_id" "state-file-lost" || {
+            if bun "${PLUGIN_DIR}/scripts/mark-request-cancelled.ts" "$request_id" "state-file-lost"; then
+                # Write portal request action for the cancelled orphan
+                write_portal_request_action "$request_id" "$target_repo"
+            else
                 log_error "Failed to mark ${request_id} as cancelled"
-            }
+            fi
         fi
     done <<< "$orphan_rows"
 
@@ -2580,6 +2718,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     mkdir -p "$DAEMON_HOME"
     mkdir -p "$LOG_DIR"
     mkdir -p "$ALERTS_DIR"
+    mkdir -p "$PORTAL_REQUEST_ACTIONS_DIR"
 
     log_info "Daemon starting (PID $$, once_mode=${ONCE_MODE})"
 
