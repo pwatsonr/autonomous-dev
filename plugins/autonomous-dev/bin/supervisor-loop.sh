@@ -1107,15 +1107,10 @@ dispatch_phase_session() {
     if [[ ${exit_code} -eq 124 ]]; then
         log_warn "Phase session timed out for ${request_id}/${phase} after ${timeout_duration}"
 
-        # Synthesize fail result
+        # Synthesize fail result using shared helper
         local result_file="${req_dir}/phase-result-${phase}.json"
-        local result_tmp="${result_file}.tmp.$$"
-        jq -n '{
-            status: "fail",
-            error: "WALL_CLOCK_TIMEOUT",
-            synthesized: true
-        }' > "${result_tmp}"
-        mv "${result_tmp}" "${result_file}"
+        # Use the shared write_synthesized_phase_result from spawn-session.sh
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'WALL_CLOCK_TIMEOUT' '124'"
     else
         # Extract session cost from claude JSON output if available
         if [[ -f "${output_file}" ]]; then
@@ -1939,6 +1934,248 @@ update_request_state() {
 }
 
 ###############################################################################
+# Phase Advancement (SPEC-039-2-05)
+###############################################################################
+
+# advance_phase(request_id, project) -> void
+#   Reads phase-result-<phase>.json, decides the next phase per TDD §7.1
+#   transition table, atomically updates state.json (current_phase, status,
+#   updated_at), appends to events.jsonl. Implements retry budget enforcement:
+#   on MAX_RETRIES_PER_PHASE exhaustion, marks status='failed' per SPEC-039-1-06.
+advance_phase() {
+    local request_id="$1"
+    local project="$2"
+
+    if ! validate_request_id "$request_id"; then
+        log_error "Invalid request ID in advance_phase: $request_id"
+        return 1
+    fi
+
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+    local events_file="${project}/.autonomous-dev/requests/${request_id}/events.jsonl"
+
+    # Read current phase
+    local current_phase
+    current_phase=$(jq -r '.current_phase // .status' "$state_file" 2>/dev/null || echo "")
+    if [[ -z "$current_phase" ]]; then
+        log_error "Cannot determine current_phase from state file: $state_file"
+        return 1
+    fi
+
+    local req_dir="${project}/.autonomous-dev/requests/${request_id}"
+    local result_file="${req_dir}/phase-result-${current_phase}.json"
+
+    # Read result status
+    local result_status
+    if [[ -f "$result_file" ]]; then
+        result_status=$(jq -r '.status // "pass"' "$result_file" 2>/dev/null || echo "pass")
+        local synthesized
+        synthesized=$(jq -r '.synthesized // false' "$result_file" 2>/dev/null || echo "false")
+        if [[ "$synthesized" == "true" ]]; then
+            log_warn "synthesized phase result for $request_id $current_phase (exit code only; trust=low)"
+        fi
+    else
+        log_warn "phase-result missing for $request_id phase $current_phase; treating as pass"
+        result_status="pass"
+    fi
+
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    case "$result_status" in
+        "pass")
+            # Determine next phase
+            local next_phase
+            next_phase=$(next_phase_for_state "$state_file")
+
+            if [[ -z "$next_phase" ]]; then
+                # Terminal - mark done
+                local tmp="${state_file}.tmp.$$"
+                jq --arg ts "$ts" \
+                   '.status = "done" | .updated_at = $ts' \
+                   "$state_file" > "$tmp"
+                mv "$tmp" "$state_file"
+
+                # Append completed event
+                local event
+                event=$(jq -n \
+                    --arg ts "$ts" \
+                    --arg req "$request_id" \
+                    --arg phase "$current_phase" \
+                    '{
+                        event: "completed",
+                        timestamp: $ts,
+                        request_id: $req,
+                        phase: $phase
+                    }')
+                echo "$event" >> "$events_file"
+
+                log_info "Request $request_id completed successfully"
+            else
+                # Advance to next phase
+                local next_status
+                if [[ "$next_phase" == *_review ]]; then
+                    next_status="gate"
+                else
+                    next_status="running"
+                fi
+
+                local tmp="${state_file}.tmp.$$"
+                if [[ "$next_status" == "gate" ]]; then
+                    jq --arg phase "$next_phase" \
+                       --arg status "$next_status" \
+                       --arg ts "$ts" \
+                       '.current_phase = $phase |
+                        .status = $status |
+                        .updated_at = $ts |
+                        .current_phase_metadata.gate_entered_at = $ts' \
+                       "$state_file" > "$tmp"
+                else
+                    jq --arg phase "$next_phase" \
+                       --arg status "$next_status" \
+                       --arg ts "$ts" \
+                       '.current_phase = $phase |
+                        .status = $status |
+                        .updated_at = $ts' \
+                       "$state_file" > "$tmp"
+                fi
+                mv "$tmp" "$state_file"
+
+                # Append phase_advance event
+                local event
+                event=$(jq -n \
+                    --arg ts "$ts" \
+                    --arg req "$request_id" \
+                    --arg from "$current_phase" \
+                    --arg to "$next_phase" \
+                    '{
+                        event: "phase_advance",
+                        timestamp: $ts,
+                        request_id: $req,
+                        from: $from,
+                        to: $to
+                    }')
+                echo "$event" >> "$events_file"
+
+                log_info "Phase advanced: $request_id $current_phase -> $next_phase (status=$next_status)"
+            fi
+
+            # TODO(PR-4): write_portal_request_action "$request_id" "$project"
+            ;;
+
+        "fail"|"error")
+            # Increment escalation_count
+            local escalation_count
+            escalation_count=$(jq -r '.escalation_count // 0' "$state_file" 2>/dev/null || echo "0")
+            escalation_count=$((escalation_count + 1))
+
+            # Update escalation_count atomically
+            local tmp="${state_file}.tmp.$$"
+            jq --argjson count "$escalation_count" \
+               --arg ts "$ts" \
+               '.escalation_count = $count | .updated_at = $ts' \
+               "$state_file" > "$tmp"
+            mv "$tmp" "$state_file"
+
+            # Append phase_failed event
+            local event
+            event=$(jq -n \
+                --arg ts "$ts" \
+                --arg req "$request_id" \
+                --arg phase "$current_phase" \
+                --argjson count "$escalation_count" \
+                '{
+                    event: "phase_failed",
+                    timestamp: $ts,
+                    request_id: $req,
+                    phase: $phase,
+                    escalation_count: $count
+                }')
+            echo "$event" >> "$events_file"
+
+            # Handle phase failure (calls handle_phase_failure which checks retry exhaustion)
+            handle_phase_failure "$request_id" "$state_file"
+
+            # If this is a review phase failure and not exhausted, reset to author phase
+            if [[ "$current_phase" == *_review && "$escalation_count" -lt "$MAX_RETRIES_PER_PHASE" ]]; then
+                local author_phase="${current_phase%_review}"
+                local tmp="${state_file}.tmp.$$"
+                jq --arg phase "$author_phase" \
+                   --arg ts "$ts" \
+                   '.current_phase = $phase | .updated_at = $ts' \
+                   "$state_file" > "$tmp"
+                mv "$tmp" "$state_file"
+
+                log_info "Review phase $current_phase failed, reset to author phase $author_phase"
+            fi
+            ;;
+
+        *)
+            log_warn "unknown phase-result.status: $result_status; treating as pass"
+            # Recursive call with pass status
+            result_status="pass"
+            advance_phase "$request_id" "$project"
+            ;;
+    esac
+}
+
+###############################################################################
+# Intake to PRD Auto-Transition (SPEC-039-2-06)
+###############################################################################
+
+# intake_to_prd_if_needed(request_id, project) -> int
+#   Checks if request is in queued/intake state and auto-transitions to running/prd.
+#   Returns 0 if transition happened, 1 if no transition needed.
+intake_to_prd_if_needed() {
+    local request_id="$1"
+    local project="$2"
+
+    if ! validate_request_id "$request_id"; then
+        log_error "Invalid request ID in intake_to_prd_if_needed: $request_id"
+        return 1
+    fi
+
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+    local events_file="${project}/.autonomous-dev/requests/${request_id}/events.jsonl"
+
+    # Check current state
+    local current_phase status
+    current_phase=$(jq -r '.current_phase // ""' "$state_file" 2>/dev/null || echo "")
+    status=$(jq -r '.status // ""' "$state_file" 2>/dev/null || echo "")
+
+    if [[ "$current_phase" == "intake" && "$status" == "queued" ]]; then
+        local ts
+        ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        # Atomically transition to running/prd
+        local tmp="${state_file}.tmp.$$"
+        jq --arg ts "$ts" \
+           '.current_phase = "prd" | .status = "running" | .updated_at = $ts' \
+           "$state_file" > "$tmp"
+        mv "$tmp" "$state_file"
+
+        # Append intake_to_prd event
+        local event
+        event=$(jq -n \
+            --arg ts "$ts" \
+            --arg req "$request_id" \
+            '{
+                event: "intake_to_prd",
+                timestamp: $ts,
+                request_id: $req,
+                from: "intake",
+                to: "prd"
+            }')
+        echo "$event" >> "$events_file"
+
+        log_info "Auto-transitioned $request_id from intake to prd"
+        return 0
+    fi
+
+    return 1
+}
+
+###############################################################################
 # Cost Ledger (SPEC-001-2-04 Task 8)
 ###############################################################################
 
@@ -2126,10 +2363,26 @@ handle_phase_failure() {
 
         # Create updated state atomically
         local tmp_file="${state_file}.tmp.$$"
-        jq '.status = "failed" | .error = "MAX_RETRIES_EXCEEDED" | .updated_at = now | strftime("%Y-%m-%dT%H:%M:%SZ")' \
+        local ts
+        ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        jq --arg ts "$ts" \
+           '.status = "failed" | .error = "MAX_RETRIES_EXCEEDED" | .updated_at = $ts' \
            "$state_file" > "$tmp_file" && mv "$tmp_file" "$state_file"
 
-        # TODO(PR-2): emit event to events.jsonl
+        # Emit failed event to events.jsonl
+        local events_file="${state_file%state.json}events.jsonl"
+        local event
+        event=$(jq -n \
+            --arg ts "$ts" \
+            --arg req "$request_id" \
+            '{
+                event: "failed",
+                timestamp: $ts,
+                request_id: $req,
+                reason: "max_retries_exceeded"
+            }')
+        echo "$event" >> "$events_file"
+
         log_info "Request ${request_id} marked as failed due to retry exhaustion"
     else
         log_info "Request ${request_id} escalation_count ${escalation_count} < ${MAX_RETRIES_PER_PHASE}, not marking as failed"
@@ -2250,9 +2503,15 @@ main_loop() {
         IFS='|' read -r request_id project <<< "${selection}"
         log_info "Work selected: request=${request_id} project=${project}"
 
-        # Spawn a Claude session for the selected request
+        # Check for intake -> prd auto-transition
+        if intake_to_prd_if_needed "$request_id" "$project"; then
+            [[ "${ONCE_MODE}" == "true" ]] && break
+            continue  # Poll again to pick up under phase prd
+        fi
+
+        # Dispatch a Claude session for the selected request
         local session_result
-        session_result=$(spawn_session "${request_id}" "${project}")
+        session_result=$(dispatch_phase_session "${request_id}" "${project}")
 
         local exit_code session_cost output_file
         IFS='|' read -r exit_code session_cost output_file <<< "${session_result}"
@@ -2261,10 +2520,10 @@ main_loop() {
         # Three-way branching: turn exhaustion / success / hard failure (SPEC-001-3-02)
         if [[ ${exit_code} -ne 0 ]] && detect_turn_exhaustion "${exit_code}" "${output_file}"; then
             # Turn exhaustion: treat as soft failure
-            local status
-            status=$(jq -r '.status' "${project}/.autonomous-dev/requests/${request_id}/state.json" 2>/dev/null || echo "unknown")
-            log_warn "Turn budget exhausted for ${request_id}. Consider increasing max_turns for phase '${status}'."
-            log_warn "Hint: Set daemon.max_turns_by_phase.${status} in ~/.claude/autonomous-dev.json"
+            local current_phase
+            current_phase=$(jq -r '.current_phase // .status' "${project}/.autonomous-dev/requests/${request_id}/state.json" 2>/dev/null || echo "unknown")
+            log_warn "Turn budget exhausted for ${request_id}. Consider increasing max_turns for phase '${current_phase}'."
+            log_warn "Hint: Set daemon.max_turns_by_phase.${current_phase} in ~/.claude/autonomous-dev.json"
 
             # Still counts as an error for retry purposes, but does NOT trip the circuit breaker
             update_request_state "${request_id}" "${project}" "error" "${session_cost}" "${exit_code}"
@@ -2273,7 +2532,7 @@ main_loop() {
             update_cost_ledger "${session_cost}" "${request_id}"
         elif [[ ${exit_code} -eq 0 ]]; then
             record_success
-            update_request_state "${request_id}" "${project}" "success" "${session_cost}"
+            advance_phase "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
         else
             record_crash "${request_id}" "${exit_code}"

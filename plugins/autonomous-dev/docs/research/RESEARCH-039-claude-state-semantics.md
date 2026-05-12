@@ -98,6 +98,18 @@ claude --print --output-format json \
 Where:
 - `req_dir` = `dirname(state_file)` (makes state.json readable via Read tool)
 - `project` = project root (makes codebase readable)
+
+## Spec amendments needed
+
+The following SPEC files on the docs/spec branch should be amended to reflect the corrected CLI contract:
+
+**SPEC-039-2-01-claude-state-semantics-research.md**: Update to reflect that `--state` flag was confirmed non-existent and the working mechanism is `--print` + `--add-dir` + prompt naming the state file.
+
+**SPEC-039-2-02-resolve-agent-phase-map.md**: Note the actual agent mapping shipped: `*_review` doc phases → `doc-reviewer` (no separate `prd-reviewer`/`tdd-reviewer` files exist), `code_review` → `quality-reviewer`, `security_review` → `security-reviewer`.
+
+**SPEC-039-2-03-dispatch-phase-session.md**: Replace all references to `--state` and `--bug-context-path` with the corrected `--add-dir` + prompt mechanism. Update the example invocations accordingly.
+
+**SPEC-039-2-08-claude-state-fallback-apply.md**: Update to reflect that the fallback is no longer needed since the correct CLI contract is now known and implemented.
 - `phase_prompt` = positional arg containing instructions to Read state.json and perform the phase
 - `phase_budget` = per-phase cost cap (replaces `--max-turns`)
 

@@ -542,9 +542,20 @@ File: `plugins/autonomous-dev/bin/supervisor-loop.sh`, replacing the current `sp
 
 This function is the daemon's single entry point for running a phase session. It resolves the agent name from the current phase, prepares the state file, and delegates CLI assembly and execution to `spawn_session_typed()` in `spawn-session.sh`.
 
-**`--state` vs `--prompt` note**: `spawn_session_typed()` passes `--state <state-file>` to `claude`. The `--state` flag causes Claude to resume from a prior conversation state file. For initial phase dispatch (no prior state), the state file is the request's `state.json`, which Claude reads as context. The daemon does NOT pass `--prompt` separately; instead, the phase-specific context (prior artifacts, review feedback, output path expectations) is written into `state.json.current_phase_metadata` before dispatch, where the agent can read it. This avoids the need to construct and shell-escape large prompt strings in bash.
+**Corrected `claude` CLI invocation**: Per RESEARCH-039, the `--state` and `--bug-context-path` flags do not exist in the actual `claude` CLI. The working invocation is:
 
-**`turn_limit` precedence**: The daemon passes `--max-turns <N>` on the CLI invocation (via the `resolve_max_turns()` function). The `code-executor.md` agent spec declares `turn_limit: 50` in its frontmatter. CLI `--max-turns` always overrides agent frontmatter `turn_limit` -- the CLI flag is the authoritative budget; agent frontmatter is informational only. For the `code` phase, the daemon budgets 200 turns via `resolve_max_turns("code")`, which overrides the agent's `turn_limit: 50`.
+```bash
+claude --print --output-format json \
+       --agent "${agent}" \
+       --add-dir "${req_dir}" --add-dir "${project}" \
+       --permission-mode acceptEdits \
+       --max-budget-usd "${phase_budget}" \
+       "${phase_prompt}"
+```
+
+The `--add-dir` grants the agent's Read tool access to both the request directory (containing `state.json`) and the project root (codebase). The phase prompt instructs the agent to read the state file and write the phase result. Bug context collapses into the prompt itself since `state.json` already contains bug metadata. Expedited reviews use `--append-system-prompt`. Cost capping uses `--max-budget-usd` instead of the non-existent `--max-turns`.
+
+**Revision history**: v1.2 (PLAN-039 PR-3): corrected the claude CLI invocation per RESEARCH-039; --state/--bug-context-path/--expedited/--max-turns do not exist.
 
 ```bash
 # dispatch_phase_session(request_id, project) -> string

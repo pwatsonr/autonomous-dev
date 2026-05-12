@@ -58,6 +58,29 @@ resolve_phase_prompt() {
     echo "Read your request context from ${state_file}, then perform the ${phase} phase. Write your phase result to phase-result-${phase}.json as JSON."
 }
 
+# write_synthesized_phase_result(path, status, error, exit_code) -> void
+#   Writes a synthesized phase-result.json when the agent didn't create one.
+#   Used as fallback in spawn_session_typed() and by dispatch_phase_session()
+#   timeout handling.
+write_synthesized_phase_result() {
+    local path="$1" status="$2" error_msg="$3" exit_code="${4:-0}"
+    local tmp="${path}.tmp.$$"
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    jq -n --arg s "$status" --arg e "$error_msg" --argjson rc "$exit_code" \
+        --arg ts "$ts" \
+        '{
+            status: $s,
+            error: $e,
+            exit_code: $rc,
+            synthesized: true,
+            synthesized_at: $ts,
+            artifacts: []
+        }' > "$tmp"
+    mv "$tmp" "$path"
+}
+
 # assemble_spawn_command(state_file, target_phase, agent) -> void
 #   Writes the assembled command (one line, space-separated) to stdout.
 #   Uses corrected claude flags: --print, --add-dir, --max-budget-usd.
@@ -184,6 +207,7 @@ spawn_session_typed() {
     fi
 
     # Execute corrected claude command
+    local exit_code=0
     if [[ "${req_type}" == "infra" && "${target_phase}" != *"_review" ]]; then
         local gates="${ENHANCED_GATES_CSV:-${DEFAULT_ENHANCED_GATES}}"
         env "ENHANCED_GATES=${gates}" claude \
@@ -195,6 +219,7 @@ spawn_session_typed() {
             --max-budget-usd "${phase_budget}" \
             "${args[@]}" \
             "${phase_prompt}"
+        exit_code=$?
     else
         claude \
             --print --output-format json \
@@ -205,7 +230,24 @@ spawn_session_typed() {
             --max-budget-usd "${phase_budget}" \
             "${args[@]}" \
             "${phase_prompt}"
+        exit_code=$?
     fi
+
+    # Synthesize phase-result.json if agent didn't write one
+    local result_path="${req_dir}/phase-result-${target_phase}.json"
+    if [[ ! -f "$result_path" ]]; then
+        local status error_msg
+        if [[ $exit_code -eq 0 ]]; then
+            status="pass"
+            error_msg=""
+        else
+            status="fail"
+            error_msg="AGENT_EXITED_NONZERO"
+        fi
+        write_synthesized_phase_result "$result_path" "$status" "$error_msg" "$exit_code"
+    fi
+
+    return $exit_code
 }
 
 main() {
