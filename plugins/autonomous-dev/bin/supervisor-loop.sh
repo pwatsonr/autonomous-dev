@@ -155,6 +155,23 @@ validate_request_id() {
     [[ "$id" =~ ^REQ-[0-9]{6}$ ]]
 }
 
+# resolve_timeout_bin() -> string
+#   Echoes the path to a GNU-style `timeout` (or `gtimeout` on macOS w/
+#   coreutils), or empty string if neither is available. macOS has no
+#   `timeout` by default; without it, phase sessions run without a
+#   wall-clock cap (a hung session blocks the daemon — install coreutils
+#   to get the cap). Warns once per process when absent.
+_TIMEOUT_BIN_WARNED=false
+resolve_timeout_bin() {
+    local bin
+    bin=$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || echo "")
+    if [[ -z "${bin}" && "${_TIMEOUT_BIN_WARNED}" != "true" ]]; then
+        log_warn "Neither 'timeout' nor 'gtimeout' found; phase sessions will run without a wall-clock cap. Install GNU coreutils (e.g. 'brew install coreutils') to enable it."
+        _TIMEOUT_BIN_WARNED=true
+    fi
+    echo "${bin}"
+}
+
 ###############################################################################
 # Lock File Management
 ###############################################################################
@@ -1098,14 +1115,25 @@ dispatch_phase_session() {
     local prompt_override
     prompt_override=$(resolve_phase_prompt "${phase}" "${request_id}" "${project}")
 
-    # Use a subshell with explicit error handling
+    # Use a subshell with explicit error handling. Wrap in `timeout`/`gtimeout`
+    # when available; otherwise run directly (no wall-clock cap — see
+    # resolve_timeout_bin). Exit 124 is the GNU-timeout "timed out" code.
+    local timeout_bin
+    timeout_bin=$(resolve_timeout_bin)
     (
         set -euo pipefail
-        timeout --kill-after=10s "${timeout_duration}" \
+        if [[ -n "${timeout_bin}" ]]; then
+            "${timeout_bin}" --kill-after=10s "${timeout_duration}" \
+                bash "${PLUGIN_DIR}/bin/spawn-session.sh" \
+                     "${state_file}" "${phase}" "${agent}" \
+                     "${prompt_override}" \
+            > "${output_file}" 2>&1
+        else
             bash "${PLUGIN_DIR}/bin/spawn-session.sh" \
                  "${state_file}" "${phase}" "${agent}" \
                  "${prompt_override}" \
-        > "${output_file}" 2>&1
+            > "${output_file}" 2>&1
+        fi
     )
     exit_code=$?
 
