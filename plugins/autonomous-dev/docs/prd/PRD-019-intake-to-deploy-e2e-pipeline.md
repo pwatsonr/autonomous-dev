@@ -378,6 +378,12 @@ Deliverables:
 
 ---
 
+## Amendment: failed status (PLAN-039)
+
+The status enum is extended to `{queued, running, gate, done, cancelled, failed}`. The new `failed` value indicates that the agent exhausted `MAX_RETRIES_PER_PHASE` attempts at a phase and the request is terminal pending operator action. It is distinct from `cancelled` (user-driven termination).
+
+---
+
 ## 12. References
 
 - [PRD-001: System Core & Daemon Engine](./PRD-001-system-core.md) -- State machine, daemon supervision, request lifecycle, phase definitions

@@ -23,6 +23,7 @@ import type { DuplicateDetector } from '../core/duplicate_detector';
 import type { InjectionRule } from '../core/sanitizer';
 import { sanitize } from '../core/sanitizer';
 import { parseRequest } from '../core/request_parser';
+import { writeStateJson, StateJsonError } from '../lib/state_json_writer';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -158,6 +159,18 @@ export class SubmitHandler implements CommandHandler {
         ? flagPriority
         : 'normal';
 
+    const flagType =
+      typeof command.flags['--type'] === 'string'
+        ? command.flags['--type']
+        : typeof command.flags['type'] === 'string'
+          ? command.flags['type']
+          : null;
+    const requestType: 'feature' | 'bug' | 'infra' | 'refactor' | 'hotfix' =
+      flagType === 'feature' || flagType === 'bug' || flagType === 'infra' ||
+      flagType === 'refactor' || flagType === 'hotfix'
+        ? flagType
+        : 'feature';
+
     // Stage 3: Duplicate detection
     if (this.deps.duplicateDetector) {
       const duplicateResult = await this.deps.duplicateDetector.detectDuplicate(
@@ -220,11 +233,42 @@ export class SubmitHandler implements CommandHandler {
       promotion_count: 0,
       last_promoted_at: null,
       paused_at_phase: null,
+      type: requestType,
+      source: 'cli',
+      adapter_metadata: {},
       created_at: now,
       updated_at: now,
     };
 
     this.db.insertRequest(request);
+
+    // Write state.json file per TDD §6.2 SQLite-first ordering
+    if (targetRepo) {
+      try {
+        writeStateJson({
+          request_id: request.request_id,
+          status: request.status,
+          current_phase: request.current_phase,
+          priority: request.priority,
+          created_at: request.created_at,
+          updated_at: request.updated_at,
+          title: request.title,
+          description: request.description,
+          target_repo: request.target_repo || '',
+          source_channel: request.source_channel,
+          type: request.type,
+        }, targetRepo);
+      } catch (err) {
+        if (err instanceof StateJsonError) {
+          this.logger?.warn('state_json_write_failed', {
+            request_id: request.request_id,
+            code: err.code
+          });
+          throw err;
+        }
+        throw err;
+      }
+    }
 
     const position = this.db.getQueuePosition(requestId);
     const avgDuration = this.db.getAveragePipelineDuration(20);

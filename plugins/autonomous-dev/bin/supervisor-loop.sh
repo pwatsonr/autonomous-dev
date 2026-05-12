@@ -53,6 +53,8 @@ ITERATION_COUNT=0
 EFFECTIVE_CONFIG=""
 CONSECUTIVE_CRASHES=0
 CIRCUIT_BREAKER_TRIPPED=false
+POLL_COUNT=0
+RECONCILE_EVERY_N_POLLS=${RECONCILE_EVERY_N_POLLS:-60}
 
 # Per-process dedup table for the legacy phase-fallback warning
 # (SPEC-018-2-01 §Warning Deduplication). Keyed by absolute state file path.
@@ -138,6 +140,18 @@ validate_dependencies() {
     if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
         log_warn "WARNING: bash ${BASH_VERSION} detected. bash 4+ is recommended. Install via Homebrew: brew install bash"
     fi
+}
+
+###############################################################################
+# Utility Functions
+###############################################################################
+
+# validate_request_id(id) -> bool
+#   Validates that a request ID matches ^REQ-[0-9]{6}$.
+#   Returns 0 (true) if valid, 1 (false) if invalid.
+validate_request_id() {
+    local id="$1"
+    [[ "$id" =~ ^REQ-[0-9]{6}$ ]]
 }
 
 ###############################################################################
@@ -1878,6 +1892,103 @@ check_gates() {
     return 0
 }
 
+# handle_phase_failure(request_id, state_file) -> void
+#   Stub for TASK-031: handle phase failure when retries exhausted.
+#   Sets status='failed', error='MAX_RETRIES_EXCEEDED' atomically.
+#   NOTE: This is a minimal implementation for PR-1. Full advance_phase
+#   logic will be implemented in PR-2/PR-3.
+handle_phase_failure() {
+    local request_id="$1"
+    local state_file="$2"
+
+    if ! validate_request_id "$request_id"; then
+        log_error "Invalid request ID in handle_phase_failure: $request_id"
+        return 1
+    fi
+
+    # Read current escalation count
+    local escalation_count
+    escalation_count=$(jq -r '.escalation_count // 0' "$state_file" 2>/dev/null || echo "0")
+
+    # Check if retries exhausted
+    if [[ "$escalation_count" -ge "$MAX_RETRIES_PER_PHASE" ]]; then
+        log_info "Retries exhausted for ${request_id}, marking as failed"
+
+        # Create updated state atomically
+        local tmp_file="${state_file}.tmp.$$"
+        jq '.status = "failed" | .error = "MAX_RETRIES_EXCEEDED" | .updated_at = now | strftime("%Y-%m-%dT%H:%M:%SZ")' \
+           "$state_file" > "$tmp_file" && mv "$tmp_file" "$state_file"
+
+        # TODO(PR-2): emit event to events.jsonl
+        log_info "Request ${request_id} marked as failed due to retry exhaustion"
+    else
+        log_info "Request ${request_id} escalation_count ${escalation_count} < ${MAX_RETRIES_PER_PHASE}, not marking as failed"
+    fi
+}
+
+###############################################################################
+# Orphan Reconciliation
+###############################################################################
+
+# reconcile_orphans() -> void
+#   Reconcile orphan SQLite rows and state.json files per SPEC-039-1-04.
+#   Runs at startup and every RECONCILE_EVERY_N_POLLS iterations.
+reconcile_orphans() {
+    log_info "Starting orphan reconciliation"
+
+    # Find orphan SQLite rows (queued + older than 24h)
+    local orphan_rows
+    if ! orphan_rows=$(bun "${PLUGIN_DIR}/scripts/find-orphan-sqlite-rows.ts" 2>/dev/null); then
+        log_error "Failed to query orphan SQLite rows"
+        return 1
+    fi
+
+    # Process each orphan SQLite row
+    while IFS='|' read -r request_id target_repo created_at; do
+        [[ -z "$request_id" ]] && continue
+
+        # Check if state.json exists
+        local state_file="${target_repo}/.autonomous-dev/requests/${request_id}/state.json"
+        if [[ ! -f "$state_file" ]]; then
+            log_info "Marking orphan SQLite row as cancelled: ${request_id} (state file missing)"
+            bun "${PLUGIN_DIR}/scripts/mark-request-cancelled.ts" "$request_id" "state-file-lost" || {
+                log_error "Failed to mark ${request_id} as cancelled"
+            }
+        fi
+    done <<< "$orphan_rows"
+
+    # Find orphan state.json files
+    local known_repos
+    known_repos=$(jq -r '.repos[]?' "$EFFECTIVE_CONFIG" 2>/dev/null || echo "")
+
+    while read -r repo_path; do
+        [[ -z "$repo_path" || ! -d "$repo_path" ]] && continue
+        local requests_dir="${repo_path}/.autonomous-dev/requests"
+        [[ ! -d "$requests_dir" ]] && continue
+
+        # Walk through state.json files
+        while IFS= read -r -d '' state_file; do
+            # Extract request_id from path
+            local req_dir
+            req_dir=$(dirname "$state_file")
+            local request_id
+            request_id=$(basename "$req_dir")
+
+            # Check if SQLite row exists
+            local has_sqlite_row
+            if has_sqlite_row=$(bun "${PLUGIN_DIR}/scripts/check-sqlite-row.ts" "$request_id" 2>/dev/null); then
+                if [[ "$has_sqlite_row" != "true" ]]; then
+                    log_warn "Orphan state.json file found: ${state_file} (no SQLite row for ${request_id})"
+                fi
+            else
+                log_warn "Failed to check SQLite row for ${request_id}"
+            fi
+        done < <(find "$requests_dir" -name "state.json" -print0 2>/dev/null || true)
+    done <<< "$known_repos"
+
+    log_info "Orphan reconciliation complete"
+}
+
 ###############################################################################
 # Main Loop
 ###############################################################################
@@ -1889,7 +2000,13 @@ check_gates() {
 main_loop() {
     while true; do
         ITERATION_COUNT=$(( ITERATION_COUNT + 1 ))
+        POLL_COUNT=$(( POLL_COUNT + 1 ))
         write_heartbeat
+
+        # Run orphan reconciliation on first poll and every N polls
+        if [[ $(( POLL_COUNT % RECONCILE_EVERY_N_POLLS )) -eq 1 ]]; then
+            reconcile_orphans || log_error "Orphan reconciliation failed"
+        fi
 
         # Check shutdown flag
         if [[ "${SHUTDOWN_REQUESTED}" == "true" ]]; then
