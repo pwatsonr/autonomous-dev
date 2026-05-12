@@ -65,7 +65,7 @@ export interface DashboardRequest {
     /** Lifecycle status. `"done"` (PLAN-Requests-Surface) marks a completed
      *  request; the legacy Dashboard table filters those out, the new
      *  `/requests` surface aggregates them for "Completed today" KPIs. */
-    status: "running" | "gate" | "done";
+    status: "queued" | "running" | "gate" | "done" | "cancelled" | "failed";
     cost: number;
     turns: number;
     score: number;
