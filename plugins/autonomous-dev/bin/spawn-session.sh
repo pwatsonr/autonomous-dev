@@ -218,8 +218,7 @@ spawn_session_typed() {
             --permission-mode acceptEdits \
             --max-budget-usd "${phase_budget}" \
             "${args[@]}" \
-            "${phase_prompt}"
-        exit_code=$?
+            "${phase_prompt}" || exit_code=$?
     else
         claude \
             --print --output-format json \
@@ -229,8 +228,7 @@ spawn_session_typed() {
             --permission-mode acceptEdits \
             --max-budget-usd "${phase_budget}" \
             "${args[@]}" \
-            "${phase_prompt}"
-        exit_code=$?
+            "${phase_prompt}" || exit_code=$?
     fi
 
     # Synthesize phase-result.json if agent didn't write one
