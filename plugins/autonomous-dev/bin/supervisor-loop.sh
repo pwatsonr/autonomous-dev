@@ -1093,12 +1093,17 @@ dispatch_phase_session() {
     local exit_code session_cost=0
     local timeout_duration="${DISPATCH_TIMEOUT:-30m}"
 
+    # Resolve prompt using supervisor-loop.sh's rich version (includes code-phase instructions)
+    local prompt_override
+    prompt_override=$(resolve_phase_prompt "${phase}" "${request_id}" "${project}")
+
     # Use a subshell with explicit error handling
     (
         set -euo pipefail
         timeout --kill-after=10s "${timeout_duration}" \
             bash "${PLUGIN_DIR}/bin/spawn-session.sh" \
                  "${state_file}" "${phase}" "${agent}" \
+                 "${prompt_override}" \
         > "${output_file}" 2>&1
     )
     exit_code=$?

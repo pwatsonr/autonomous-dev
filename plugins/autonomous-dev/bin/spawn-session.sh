@@ -49,6 +49,7 @@ resolve_phase_budget() {
 }
 
 # Simple phase prompt resolution (basic fallback)
+# NOTE: Duplication with supervisor-loop.sh::resolve_phase_prompt is intentional-for-now
 resolve_phase_prompt() {
     local phase="${1:-}"
     local request_id="${2:-}"
@@ -169,12 +170,13 @@ assemble_spawn_command() {
     printf '%s\n' "${out}"
 }
 
-# spawn_session_typed(state_file, target_phase, agent) -> int
+# spawn_session_typed(state_file, target_phase, agent, [prompt_override]) -> int
 #   Public entry. When CAPTURE_SPAWN_TO is set, appends the assembled
 #   command to that file and returns 0 (test mode). Otherwise execs claude
 #   via the corrected flags.
 spawn_session_typed() {
     local state_file="$1" target_phase="$2" agent="$3"
+    local prompt_override="${4:-}"
 
     local cmd_line
     cmd_line=$(assemble_spawn_command "${state_file}" "${target_phase}" "${agent}")
@@ -197,7 +199,12 @@ spawn_session_typed() {
 
     local phase_budget phase_prompt
     phase_budget=$(resolve_phase_budget "${target_phase}")
-    phase_prompt=$(resolve_phase_prompt "${target_phase}" "${req_id}" "${project}")
+    # Use prompt_override if provided, otherwise use local resolution
+    if [[ -n "${prompt_override}" ]]; then
+        phase_prompt="${prompt_override}"
+    else
+        phase_prompt=$(resolve_phase_prompt "${target_phase}" "${req_id}" "${project}")
+    fi
 
     local -a args=()
 
@@ -250,7 +257,7 @@ spawn_session_typed() {
 
 main() {
     if [[ $# -lt 3 ]]; then
-        echo "Usage: $(basename "$0") <state-file> <target-phase> <agent>" >&2
+        echo "Usage: $(basename "$0") <state-file> <target-phase> <agent> [prompt]" >&2
         exit 2
     fi
     spawn_session_typed "$@"
