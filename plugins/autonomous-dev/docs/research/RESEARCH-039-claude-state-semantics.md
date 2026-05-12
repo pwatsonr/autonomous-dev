@@ -71,6 +71,55 @@ Alternative considered and rejected: `--resume <session-id>` — wrong semantics
 
 TDD-038 §6.2 needs a one-paragraph amendment replacing `--state <file>` with the `--print` + `--add-dir` + prompt mechanism above. Filed as a follow-up doc-PR (referenced from SPEC-039-2-08). The rest of §6.2 (agent selection via `--agent`, the phase-to-agent table, the 30-min `timeout` wrapper) is unaffected.
 
+## Full flag audit (PR-2)
+
+Survey of actual `claude --help` (v2.1.139) revealed these bogus flags in existing code:
+
+### Bogus flags in current codebase
+
+| Function | File | Line | Bogus Flag | Status |
+|----------|------|------|------------|--------|
+| `spawn_session()` | `bin/supervisor-loop.sh` | ~1035 | `--max-turns`, `--project-directory`, `--prompt` | Invalid |
+| `spawn_session_typed()` | `bin/spawn-session.sh` | 81, 138, 140 | `--state`, `--bug-context-path`, `--expedited` | Invalid |
+
+### Corrected canonical invocation
+
+The working `claude` invocation for phase dispatch is:
+
+```bash
+claude --print --output-format json \
+       --agent "${agent}" \
+       --add-dir "${req_dir}" --add-dir "${project}" \
+       --permission-mode acceptEdits \
+       --max-budget-usd "${phase_budget}" \
+       "${phase_prompt}"
+```
+
+Where:
+- `req_dir` = `dirname(state_file)` (makes state.json readable via Read tool)
+- `project` = project root (makes codebase readable)
+- `phase_prompt` = positional arg containing instructions to Read state.json and perform the phase
+- `phase_budget` = per-phase cost cap (replaces `--max-turns`)
+
+### Flag mapping changes
+
+| Old (bogus) | New (working) | Notes |
+|-------------|---------------|-------|
+| `--state <file>` | `--add-dir <dirname>` + prompt mentions file | State data via Read tool |
+| `--bug-context-path <file>` | (collapsed) | Bug fields already in state.json |
+| `--expedited` | `--append-system-prompt "Expedited..."` | When expedited + review phase |
+| `--max-turns <N>` | `--max-budget-usd <amount>` | Cost capping via budget |
+| `--prompt <text>` | positional arg | Prompt as final argument |
+| `--project-directory <dir>` | `--add-dir <dir>` | Directory access |
+
+### Snapshot fixture impact
+
+The bats snapshot fixtures (`tests/fixtures/snapshots/spawn-*.txt`) were re-baselined as part of PR-2 to reflect the corrected command shape. The old snapshots expected `--state` and `--bug-context-path`; the new ones show `--add-dir` and `--max-budget-usd`.
+
+### Amendment requirement
+
+TDD-038 §6.2 + SPEC-039-2-01/02/03/08 need a follow-up amendment doc-PR to match the corrected claude flags discovered in this audit.
+
 ## Status
 
 - OQ-039-1: **RESOLVED** — `--state` does not exist; use `--print` + positional prompt + `--add-dir`.
