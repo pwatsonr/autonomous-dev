@@ -34,14 +34,38 @@ set -euo pipefail
 
 DEFAULT_ENHANCED_GATES="security_review,cost_analysis,rollback_plan"
 
+# Simple phase budget resolution (mirrors supervisor-loop.sh)
+resolve_phase_budget() {
+    local phase="${1:-}"
+    case "${phase}" in
+        intake)                                                       echo "1.0"  ;;
+        prd|tdd|plan|spec)                                            echo "5.0"  ;;
+        prd_review|tdd_review|plan_review|spec_review|security_review) echo "2.0"  ;;
+        code_review)                                                  echo "2.0"  ;;
+        code)                                                         echo "10.0" ;;
+        deploy)                                                       echo "5.0"  ;;
+        *)                                                            echo "5.0"  ;;
+    esac
+}
+
+# Simple phase prompt resolution (basic fallback)
+resolve_phase_prompt() {
+    local phase="${1:-}"
+    local request_id="${2:-}"
+    local project="${3:-}"
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+
+    echo "Read your request context from ${state_file}, then perform the ${phase} phase. Write your phase result to phase-result-${phase}.json as JSON."
+}
+
 # assemble_spawn_command(state_file, target_phase, agent) -> void
 #   Writes the assembled command (one line, space-separated) to stdout.
+#   Uses corrected claude flags: --print, --add-dir, --max-budget-usd.
 #   Pure: does not invoke claude. Used by spawn_session and by the bats
 #   snapshot tests.
 #
-#   Path normalization: when CAPTURE_SPAWN_TO is set, the absolute state
-#   directory is replaced with the literal "${STATE_DIR}" so committed
-#   snapshots are stable across hosts.
+#   Path normalization: when CAPTURE_SPAWN_TO is set, absolute paths are
+#   replaced with placeholders for stable snapshots.
 assemble_spawn_command() {
     local state_file="$1" target_phase="$2" agent="$3"
 
@@ -49,18 +73,19 @@ assemble_spawn_command() {
     req_type=$(jq -r '.type // "feature"' "${state_file}" 2>/dev/null || echo "feature")
     expedited=$(jq -r '.expedited_reviews // false' "${state_file}" 2>/dev/null || echo "false")
 
+    # Derive request_id and project from state_file path
+    local req_dir req_id project
+    req_dir=$(dirname "${state_file}")
+    req_id=$(basename "${req_dir}")
+    project=$(dirname "$(dirname "$(dirname "${req_dir}")")")
+
+    # Resolve phase budget and build phase prompt
+    local phase_budget phase_prompt
+    phase_budget=$(resolve_phase_budget "${target_phase}")
+    phase_prompt=$(resolve_phase_prompt "${target_phase}" "${req_id}" "${project}")
+
     local -a args=()
     local -a env_prefix=()
-
-    # Rule 1: bug + tdd -> --bug-context-path
-    if [[ "${req_type}" == "bug" && "${target_phase}" == "tdd" ]]; then
-        args+=(--bug-context-path "${state_file}")
-    fi
-
-    # Rule 3: expedited + *_review -> --expedited
-    if [[ "${expedited}" == "true" && "${target_phase}" == *"_review" ]]; then
-        args+=(--expedited)
-    fi
 
     # Rule 2: infra + non-review -> env ENHANCED_GATES=...
     if [[ "${req_type}" == "infra" && "${target_phase}" != *"_review" ]]; then
@@ -68,20 +93,28 @@ assemble_spawn_command() {
         env_prefix=(env "ENHANCED_GATES=${gates}")
     fi
 
-    # Build the line. Order: env-prefix, then `claude --agent <agent>`,
-    # then per-type flags, then --state <state>.
+    # Rule 3: expedited + *_review -> --append-system-prompt
+    if [[ "${expedited}" == "true" && "${target_phase}" == *"_review" ]]; then
+        args+=(--append-system-prompt "Expedited review: prioritize blocking issues; skip nitpicks.")
+    fi
+
+    # Build the corrected claude command
     local -a line=()
     if [[ ${#env_prefix[@]} -gt 0 ]]; then
         line+=("${env_prefix[@]}")
     fi
-    line+=(claude --agent "${agent}")
+    line+=(claude --print --output-format json)
+    line+=(--agent "${agent}")
+    line+=(--add-dir "${req_dir}")
+    line+=(--add-dir "${project}")
+    line+=(--permission-mode acceptEdits)
+    line+=(--max-budget-usd "${phase_budget}")
     if [[ ${#args[@]} -gt 0 ]]; then
         line+=("${args[@]}")
     fi
-    line+=(--state "${state_file}")
+    line+=("${phase_prompt}")
 
-    # When capturing, normalize the absolute state directory to ${STATE_DIR}
-    # for snapshot stability.
+    # When capturing, normalize paths to placeholders for snapshot stability
     local out=""
     local first=1
     local token
@@ -89,8 +122,18 @@ assemble_spawn_command() {
         if [[ -n "${CAPTURE_SPAWN_TO:-}" ]]; then
             local state_dir
             state_dir=$(dirname "${state_file}")
-            # Replace ONLY the directory prefix, leaving the basename intact.
+            local project_dir
+            project_dir=$(dirname "$(dirname "$(dirname "${state_dir}")")")
+
+            # Replace directory paths with placeholders
             token="${token//${state_dir}/\$\{STATE_DIR\}}"
+            token="${token//${project_dir}/\$\{PROJECT_DIR\}}"
+
+            # Replace the prompt text with a placeholder for readability
+            # Check if this token contains the prompt (it may be modified by path replacement)
+            if [[ "${token}" == *"Read your request context from"* ]]; then
+                token="\${PHASE_PROMPT}"
+            fi
         fi
         if [[ ${first} -eq 1 ]]; then
             out="${token}"
@@ -106,7 +149,7 @@ assemble_spawn_command() {
 # spawn_session_typed(state_file, target_phase, agent) -> int
 #   Public entry. When CAPTURE_SPAWN_TO is set, appends the assembled
 #   command to that file and returns 0 (test mode). Otherwise execs claude
-#   via the assembled prefix and arguments.
+#   via the corrected flags.
 spawn_session_typed() {
     local state_file="$1" target_phase="$2" agent="$3"
 
@@ -118,26 +161,50 @@ spawn_session_typed() {
         return 0
     fi
 
-    # Re-derive the actual (non-normalized) command and exec it. We rebuild
-    # rather than parsing the captured string to avoid round-tripping
-    # whitespace-sensitive arguments through a string split.
+    # Re-derive the actual (non-normalized) command and exec it
     local req_type expedited
     req_type=$(jq -r '.type // "feature"' "${state_file}" 2>/dev/null || echo "feature")
     expedited=$(jq -r '.expedited_reviews // false' "${state_file}" 2>/dev/null || echo "false")
 
+    # Derive paths and budget
+    local req_dir req_id project
+    req_dir=$(dirname "${state_file}")
+    req_id=$(basename "${req_dir}")
+    project=$(dirname "$(dirname "$(dirname "${req_dir}")")")
+
+    local phase_budget phase_prompt
+    phase_budget=$(resolve_phase_budget "${target_phase}")
+    phase_prompt=$(resolve_phase_prompt "${target_phase}" "${req_id}" "${project}")
+
     local -a args=()
-    if [[ "${req_type}" == "bug" && "${target_phase}" == "tdd" ]]; then
-        args+=(--bug-context-path "${state_file}")
-    fi
+
+    # Rule 3: expedited + *_review -> --append-system-prompt
     if [[ "${expedited}" == "true" && "${target_phase}" == *"_review" ]]; then
-        args+=(--expedited)
+        args+=(--append-system-prompt "Expedited review: prioritize blocking issues; skip nitpicks.")
     fi
 
+    # Execute corrected claude command
     if [[ "${req_type}" == "infra" && "${target_phase}" != *"_review" ]]; then
         local gates="${ENHANCED_GATES_CSV:-${DEFAULT_ENHANCED_GATES}}"
-        env "ENHANCED_GATES=${gates}" claude --agent "${agent}" "${args[@]}" --state "${state_file}"
+        env "ENHANCED_GATES=${gates}" claude \
+            --print --output-format json \
+            --agent "${agent}" \
+            --add-dir "${req_dir}" \
+            --add-dir "${project}" \
+            --permission-mode acceptEdits \
+            --max-budget-usd "${phase_budget}" \
+            "${args[@]}" \
+            "${phase_prompt}"
     else
-        claude --agent "${agent}" "${args[@]}" --state "${state_file}"
+        claude \
+            --print --output-format json \
+            --agent "${agent}" \
+            --add-dir "${req_dir}" \
+            --add-dir "${project}" \
+            --permission-mode acceptEdits \
+            --max-budget-usd "${phase_budget}" \
+            "${args[@]}" \
+            "${phase_prompt}"
     fi
 }
 
