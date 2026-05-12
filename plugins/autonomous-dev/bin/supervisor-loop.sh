@@ -1123,6 +1123,13 @@ dispatch_phase_session() {
         fi
     fi
 
+    # Belt-and-suspenders: synthesize fail result for ANY nonzero exit if no phase-result exists
+    local result_file="${req_dir}/phase-result-${phase}.json"
+    if [[ ${exit_code} -ne 0 && ${exit_code} -ne 124 && ! -f "${result_file}" ]]; then
+        log_warn "spawn-session.sh exited ${exit_code} without creating phase-result; synthesizing fail result"
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}'"
+    fi
+
     # Clear session active flag
     jq '.current_phase_metadata.session_active = false' "${state_file}" > "${tmp}"
     mv "${tmp}" "${state_file}"
