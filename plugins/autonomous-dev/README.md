@@ -26,7 +26,8 @@ A continuously-running, self-improving development pipeline that receives produc
 9. [Security and Safety](#security-and-safety)
 10. [Troubleshooting](#troubleshooting)
 11. [Project Structure](#project-structure)
-12. [Contributing](#contributing)
+12. [Documentation](#documentation)
+13. [Contributing](#contributing)
 
 ---
 
@@ -1817,6 +1818,21 @@ The pipeline phases are defined by the state machine configuration in `config_de
 2. Place your adapter in `intake/adapters/<name>/`.
 3. Register it with the intake router in `intake/core/intake_router.ts`.
 4. Add tests in `intake/__tests__/`.
+
+---
+
+## Documentation
+
+For detailed technical documentation and operator guides:
+
+- **[Integration Guide](docs/INTEGRATION.md)** - End-to-end pipeline integration, state management, troubleshooting
+- **[Manual Verification Runbook](docs/manual_verification/PLAN-039-e2e-pipeline-verification.md)** - Step-by-step validation procedures
+- **[Smoke E2E Test](test/e2e/smoke-e2e.sh)** - Automated pipeline verification
+
+Technical specifications:
+- **[TDD-038](docs/tdd/TDD-038-intake-to-deploy-e2e-pipeline.md)** - Technical design document
+- **[PRD-019](docs/prd/PRD-019-intake-to-deploy-e2e-pipeline.md)** - Product requirements
+- **[RESEARCH-039](docs/research/RESEARCH-039-claude-state-semantics.md)** - Claude CLI analysis
 
 ---
 
