@@ -3,7 +3,6 @@
  * Tests TASK-002/TASK-023 acceptance criteria for atomic writes and schema compliance.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { writeStateJson, StateJsonError, type RequestEntity } from '../../lib/state_json_writer';
 import * as fs from 'fs';
 import * as path from 'path';

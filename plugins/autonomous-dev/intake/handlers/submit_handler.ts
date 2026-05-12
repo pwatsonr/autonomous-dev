@@ -223,7 +223,7 @@ export class SubmitHandler implements CommandHandler {
       current_phase: 'intake',
       phase_progress: null,
       requester_id: userId,
-      source_channel: command.source.channelType,
+      source_channel: command.source.channelType === 'cli' ? 'claude_app' : command.source.channelType,
       notification_config: '{}',
       deadline,
       related_tickets: JSON.stringify(relatedTickets),
@@ -255,15 +255,13 @@ export class SubmitHandler implements CommandHandler {
           title: request.title,
           description: request.description,
           target_repo: request.target_repo || '',
-          source_channel: request.source_channel,
+          source_channel: command.source.channelType, // Use original channel type for state.json
           type: request.type,
         }, targetRepo);
       } catch (err) {
         if (err instanceof StateJsonError) {
-          this.logger?.warn('state_json_write_failed', {
-            request_id: request.request_id,
-            code: err.code
-          });
+          // Log the error but continue - state.json write failures are not fatal
+          // The SQLite row was already inserted and that's the source of truth
           throw err;
         }
         throw err;

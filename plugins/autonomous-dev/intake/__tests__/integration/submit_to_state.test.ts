@@ -3,7 +3,6 @@
  * Tests TASK-003/TASK-004 acceptance criteria for end-to-end flow.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { initRouter } from '../../adapters/cli_adapter';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -11,52 +10,78 @@ import * as os from 'os';
 
 describe('submit_to_state integration', () => {
   let tempDir: string;
+  let originalHome: string;
   let router: any;
 
   beforeEach(async () => {
+    // Save original HOME
+    originalHome = process.env.HOME || '';
+
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-submit-state-'));
 
-    // Override HOME for the test
+    // Set HOME to temp directory
     process.env.HOME = tempDir;
 
+    // Create a temporary config directory structure
+    const autonomousDir = path.join(tempDir, '.autonomous-dev');
+    fs.mkdirSync(autonomousDir, { recursive: true });
+
+    // Create minimal auth config file
+    const authConfig = `
+version: 1
+users:
+  - internal_id: test-user
+    identities:
+      cli_user: test-user
+    role: contributor
+`;
+    fs.writeFileSync(path.join(autonomousDir, 'intake-auth.yaml'), authConfig);
+
+    // Initialize router after setup
     router = await initRouter();
   });
 
   afterEach(() => {
+    // Restore original HOME
+    process.env.HOME = originalHome;
+
+    // Clean up temp directory
     if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true });
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
-  const createSubmitCommand = (description: string, type: string = 'feature') => ({
-    command: 'submit' as const,
-    args: [description],
-    flags: {
-      '--repo': tempDir,
-      '--type': type
-    },
-    source: {
-      channelType: 'cli' as const,
-      userId: 'test-user'
-    }
-  });
+  const createSubmitCommand = (description: string, type: string = 'feature', targetRepo?: string) => {
+    const repo = targetRepo || createTestRepo();
+    return {
+      commandName: 'submit',
+      args: [description],
+      flags: {
+        'repo': repo,
+        'type': type
+      },
+      rawText: `submit "${description}" --repo ${repo} --type ${type}`,
+      source: {
+        channelType: 'cli' as const,
+        userId: 'test-user'
+      }
+    };
+  };
 
-  const createContext = () => ({
-    userId: 'test-user',
-    channelType: 'cli' as const,
-    isAuthenticated: true,
-    userRole: 'contributor' as const,
-    permissions: {},
-    rateLimitRemaining: 100
-  });
+  // Create a test repo for submissions
+  const createTestRepo = () => {
+    const testRepo = path.join(tempDir, 'test-repo-' + Date.now());
+    fs.mkdirSync(testRepo, { recursive: true });
+    return testRepo;
+  };
 
   it('submit_creates_both_sqlite_and_state_json - both exist with matching id+type after submit', async () => {
     // AC-038-08: After successful submit, both SQLite row AND state.json exist with matching fields
-    const description = 'Add dark mode to dashboard';
-    const command = createSubmitCommand(description, 'feature');
-    const context = createContext();
+    const description = 'Add dark mode to dashboard for better user experience';
+    const testRepo = createTestRepo();
+    const command = createSubmitCommand(description, 'feature', testRepo);
 
-    const result = await router.route(command, context);
+    const result = await router.route(command);
 
     expect(result.success).toBe(true);
 
@@ -65,7 +90,7 @@ describe('submit_to_state integration', () => {
       expect(requestId).toMatch(/^REQ-\d{6}$/);
 
       // Check state.json file exists
-      const stateFile = path.join(tempDir, '.autonomous-dev', 'requests', requestId, 'state.json');
+      const stateFile = path.join(testRepo, '.autonomous-dev', 'requests', requestId, 'state.json');
       expect(fs.existsSync(stateFile)).toBe(true);
 
       // Parse state.json and verify fields
@@ -74,7 +99,7 @@ describe('submit_to_state integration', () => {
       expect(state.type).toBe('feature');
       expect(state.status).toBe('queued');
       expect(state.title).toBe(description);
-      expect(state.target_repo).toBe(tempDir);
+      expect(state.target_repo).toBe(testRepo);
 
       // Check SQLite row exists (this is verified by the successful submit)
       // The router's successful response indicates the SQLite insert succeeded
@@ -82,11 +107,11 @@ describe('submit_to_state integration', () => {
   });
 
   it('type_propagation - --type bug ends up in both state.json and SQLite', async () => {
-    const description = 'Fix login button bug';
-    const command = createSubmitCommand(description, 'bug');
-    const context = createContext();
+    const description = 'Fix login button bug affecting user authentication';
+    const testRepo = createTestRepo();
+    const command = createSubmitCommand(description, 'bug', testRepo);
 
-    const result = await router.route(command, context);
+    const result = await router.route(command);
 
     expect(result.success).toBe(true);
 
@@ -94,27 +119,27 @@ describe('submit_to_state integration', () => {
       const requestId = result.data.requestId;
 
       // Check state.json contains bug type
-      const stateFile = path.join(tempDir, '.autonomous-dev', 'requests', requestId, 'state.json');
+      const stateFile = path.join(testRepo, '.autonomous-dev', 'requests', requestId, 'state.json');
       const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
       expect(state.type).toBe('bug');
     }
   });
 
   it('sqlite_first_ordering - when writeStateJson throws, SQLite row exists', async () => {
-    const description = 'Test error handling';
-    const command = createSubmitCommand(description, 'feature');
-    const context = createContext();
+    const description = 'Test error handling for file system issues';
+    const testRepo = createTestRepo();
+    const command = createSubmitCommand(description, 'feature', testRepo);
 
     // Create a scenario where state.json write will fail but SQLite succeeds
     // Make the target repo read-only after creating it
-    const reqDir = path.join(tempDir, '.autonomous-dev');
+    const reqDir = path.join(testRepo, '.autonomous-dev');
     fs.mkdirSync(reqDir, { recursive: true });
 
     // This test is challenging to implement properly in a unit test environment
     // because the database and filesystem operations are tightly coupled.
     // For now, we'll just verify that normal operation works correctly.
 
-    const result = await router.route(command, context);
+    const result = await router.route(command);
 
     expect(result.success).toBe(true);
 
@@ -122,7 +147,7 @@ describe('submit_to_state integration', () => {
       const requestId = result.data.requestId;
 
       // Verify state.json was created successfully in normal case
-      const stateFile = path.join(tempDir, '.autonomous-dev', 'requests', requestId, 'state.json');
+      const stateFile = path.join(testRepo, '.autonomous-dev', 'requests', requestId, 'state.json');
       expect(fs.existsSync(stateFile)).toBe(true);
     }
   });
@@ -133,23 +158,23 @@ describe('submit_to_state integration', () => {
     fs.mkdirSync(restrictedDir);
     fs.chmodSync(restrictedDir, 0o444); // read-only
 
-    const description = 'Test error handling';
+    const description = 'Test error handling for permission issues';
     const command = {
-      command: 'submit' as const,
+      commandName: 'submit',
       args: [description],
       flags: {
-        '--repo': restrictedDir,
-        '--type': 'feature'
+        'repo': restrictedDir,
+        'type': 'feature'
       },
+      rawText: `submit "${description}" --repo ${restrictedDir} --type feature`,
       source: {
         channelType: 'cli' as const,
         userId: 'test-user'
       }
     };
-    const context = createContext();
 
     try {
-      const result = await router.route(command, context);
+      const result = await router.route(command);
 
       // The submit might fail at various points - SQLite, state.json, or validation
       // If it returns an error result, check the error information
@@ -170,21 +195,21 @@ describe('submit_to_state integration', () => {
     }
   });
 
-  it('all_required_state_fields_present - state.json has all 19 TDD fields', async () => {
-    const description = 'Comprehensive field test';
-    const command = createSubmitCommand(description, 'infra');
-    const context = createContext();
+  it('all_required_state_fields_present - state.json has all 20 TDD fields', async () => {
+    const description = 'Comprehensive field test for infrastructure improvements';
+    const testRepo = createTestRepo();
+    const command = createSubmitCommand(description, 'infra', testRepo);
 
-    const result = await router.route(command, context);
+    const result = await router.route(command);
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       const requestId = result.data.requestId;
-      const stateFile = path.join(tempDir, '.autonomous-dev', 'requests', requestId, 'state.json');
+      const stateFile = path.join(testRepo, '.autonomous-dev', 'requests', requestId, 'state.json');
       const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
 
-      // Check all 19 fields from TDD §6.1
+      // Check all 20 fields from TDD §6.1
       const requiredFields = [
         'id', 'status', 'current_phase', 'priority', 'created_at', 'updated_at',
         'title', 'description', 'target_repo', 'source', 'type', 'blocked_by',

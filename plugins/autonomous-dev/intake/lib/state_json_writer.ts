@@ -44,6 +44,13 @@ export class StateJsonError extends Error {
   }
 }
 
+/** True for filesystem errors that indicate a permission/read-only problem. */
+function isPermissionError(err: unknown): boolean {
+  if (!(err instanceof Error) || !('code' in err)) return false;
+  const code = (err as NodeJS.ErrnoException).code;
+  return code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
+}
+
 // ---------------------------------------------------------------------------
 // Implementation
 // ---------------------------------------------------------------------------
@@ -145,7 +152,7 @@ export function writeStateJson(request: RequestEntity, targetRepo: string): stri
     // Create parent directories
     fs.mkdirSync(reqDir, { recursive: true });
   } catch (err) {
-    if (err instanceof Error && 'code' in err && err.code === 'EACCES') {
+    if (isPermissionError(err)) {
       throw new StateJsonError(
         'PERMISSION_DENIED',
         `cannot create directory ${reqDir}: permission denied. Check that the target repository is writable.`
@@ -173,7 +180,7 @@ export function writeStateJson(request: RequestEntity, targetRepo: string): stri
       // Ignore cleanup errors
     }
 
-    if (err instanceof Error && 'code' in err && err.code === 'EACCES') {
+    if (isPermissionError(err)) {
       throw new StateJsonError(
         'PERMISSION_DENIED',
         `cannot write state file ${stateFile}: permission denied`
