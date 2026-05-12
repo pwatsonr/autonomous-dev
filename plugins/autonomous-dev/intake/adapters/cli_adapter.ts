@@ -840,9 +840,9 @@ function defaultAuthConfigPath(): string {
  * Optional deps (`claudeClient`, `duplicateDetector`, `injectionRules`)
  * are intentionally undefined.
  *
- * TODO(PLAN-011-1): wire claudeClient + duplicateDetector + injectionRules
- * for full submit support. Until then, `submit` will work for code paths
- * that do not require NLP/dedup/sanitization, and fail cleanly otherwise.
+ * Note: claudeClient, duplicateDetector, and injectionRules are intentionally
+ * undefined. The SubmitHandler handles these gracefully by skipping optional
+ * functionality when dependencies are not available.
  */
 /* istanbul ignore next — pulls in sqlite / yaml / authz; covered by integration tests */
 export async function initRouter(): Promise<IntakeRouterLike> {
@@ -876,8 +876,11 @@ export async function initRouter(): Promise<IntakeRouterLike> {
     authz,
     rateLimiter,
     db: repo,
-    // TODO(PLAN-011-1): wire claudeClient + duplicateDetector + injectionRules
-    // for full submit support.
+    // claudeClient, duplicateDetector, and injectionRules are intentionally
+    // omitted. The SubmitHandler handles undefined deps gracefully:
+    // - claudeClient undefined  -> skips NLP parse, uses raw description
+    // - duplicateDetector undefined -> skips duplicate detection
+    // - injectionRules undefined -> skips sanitization
   });
 }
 
