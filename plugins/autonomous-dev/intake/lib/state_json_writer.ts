@@ -44,11 +44,26 @@ export class StateJsonError extends Error {
   }
 }
 
-/** True for filesystem errors that indicate a permission/read-only problem. */
+/**
+ * True for filesystem errors that indicate a permission/read-only problem.
+ * Checks the `.code` property and, as a fallback, the stringified error —
+ * `fs.mkdirSync(..., { recursive: true })` can surface a wrapped value whose
+ * `.code` is unset (and which may not even pass `instanceof Error` across
+ * module realms) but whose text still names the errno.
+ */
 function isPermissionError(err: unknown): boolean {
-  if (!(err instanceof Error) || !('code' in err)) return false;
-  const code = (err as NodeJS.ErrnoException).code;
-  return code === 'EACCES' || code === 'EPERM' || code === 'EROFS';
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? (err as { code?: unknown }).code
+      : undefined;
+  if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') return true;
+  let text = '';
+  try {
+    text = err instanceof Error ? err.message : String(err);
+  } catch {
+    text = '';
+  }
+  return /\b(EACCES|EPERM|EROFS)\b/.test(text);
 }
 
 // ---------------------------------------------------------------------------
