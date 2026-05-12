@@ -30,7 +30,7 @@ interface RequestActionFile {
     repo?: string;
     title?: string;
     phase?: string;
-    status?: "running" | "gate" | "done";
+    status?: "queued" | "running" | "gate" | "done" | "cancelled" | "failed";
     cost?: number;
     variant?: string;
     createdAt?: string;
