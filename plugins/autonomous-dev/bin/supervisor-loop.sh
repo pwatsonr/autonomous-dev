@@ -2166,6 +2166,52 @@ write_gate_decision() {
     return 0
 }
 
+# update_state_cost(request_id, project, session_cost) -> void
+#   Adds session_cost to state.json.cost_accrued_usd atomically.
+#   Defensive - does not crash daemon on errors.
+update_state_cost() {
+    local request_id="$1"
+    local project="$2"
+    local session_cost="$3"
+
+    if ! validate_request_id "$request_id"; then
+        log_warn "Invalid request ID in update_state_cost: $request_id"
+        return 0
+    fi
+
+    # Validate session_cost is numeric
+    if ! echo "${session_cost}" | jq -e 'tonumber' >/dev/null 2>&1; then
+        log_warn "Non-numeric session_cost '${session_cost}' in update_state_cost, defaulting to 0"
+        session_cost="0"
+    fi
+
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+
+    if [[ ! -f "$state_file" ]]; then
+        log_warn "State file missing in update_state_cost: $state_file"
+        return 0
+    fi
+
+    local tmp="${state_file}.tmp.$$"
+
+    # Add session cost to cost_accrued_usd atomically
+    if ! jq --argjson cost "${session_cost}" \
+        '.cost_accrued_usd = ((.cost_accrued_usd // 0) + $cost)' \
+        "$state_file" > "$tmp" 2>/dev/null; then
+        log_warn "Failed to update cost in state file for request $request_id"
+        rm -f "$tmp" 2>/dev/null || true
+        return 0
+    fi
+
+    if ! mv "$tmp" "$state_file" 2>/dev/null; then
+        log_warn "Failed to move updated state file for request $request_id"
+        rm -f "$tmp" 2>/dev/null || true
+        return 0
+    fi
+
+    return 0
+}
+
 ###############################################################################
 # Phase Advancement (SPEC-039-2-05)
 ###############################################################################
@@ -2793,16 +2839,19 @@ main_loop() {
             log_warn "Hint: Set daemon.max_turns_by_phase.${current_phase} in ~/.claude/autonomous-dev.json"
 
             # Still counts as an error for retry purposes, but does NOT trip the circuit breaker
+            update_state_cost "${request_id}" "${project}" "${session_cost}"
             update_request_state "${request_id}" "${project}" "error" "${session_cost}" "${exit_code}"
             check_retry_exhaustion "${request_id}" "${project}"
             # Do NOT call record_crash -- turn exhaustion is not a crash
             update_cost_ledger "${session_cost}" "${request_id}"
         elif [[ ${exit_code} -eq 0 ]]; then
             record_success
+            update_state_cost "${request_id}" "${project}" "${session_cost}"
             advance_phase "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
         else
             record_crash "${request_id}" "${exit_code}"
+            update_state_cost "${request_id}" "${project}" "${session_cost}"
             update_request_state "${request_id}" "${project}" "error" "${session_cost}" "${exit_code}"
             check_retry_exhaustion "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
