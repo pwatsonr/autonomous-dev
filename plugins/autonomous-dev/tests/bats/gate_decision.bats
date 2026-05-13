@@ -3,12 +3,11 @@
 # Gate decision file creation tests (FR-020-03)
 
 setup() {
-    # Source supervisor-loop functions
-    source "${BATS_TEST_DIRNAME}/../../bin/supervisor-loop.sh" 2>/dev/null || true
-
     # Create temp directory for test
     TEST_DIR=$(mktemp -d)
-    export GATE_DECISIONS_DIR="${TEST_DIR}/gate-decisions"
+
+    # Set up test-specific gate decisions directory (don't source supervisor-loop yet)
+    export TEST_GATE_DECISIONS_DIR="${TEST_DIR}/gate-decisions"
 }
 
 teardown() {
@@ -19,27 +18,25 @@ teardown() {
     # Test that write_gate_decision creates a properly structured JSON file
 
     # Create the function if not sourced (test isolation)
-    if ! command -v write_gate_decision >/dev/null 2>&1; then
-        write_gate_decision() {
-            local request_id="$1"
-            local project="$2"
-            local phase="$3"
-            local repo_basename
-            repo_basename=$(basename "$project")
-            local out_file="${GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
-            local ts
-            ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    write_gate_decision() {
+        local request_id="$1"
+        local project="$2"
+        local phase="$3"
+        local repo_basename
+        repo_basename=$(basename "$project")
+        local out_file="${TEST_GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
+        local ts
+        ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-            mkdir -p "${GATE_DECISIONS_DIR}" 2>/dev/null
-            echo "{\"id\":\"$request_id\",\"repo\":\"$repo_basename\",\"phase\":\"$phase\",\"state\":\"pending\",\"waitedMin\":0,\"gate_entered_at\":\"$ts\"}" > "$out_file"
-        }
-    fi
+        mkdir -p "${TEST_GATE_DECISIONS_DIR}" 2>/dev/null
+        echo "{\"id\":\"$request_id\",\"repo\":\"$repo_basename\",\"phase\":\"$phase\",\"state\":\"pending\",\"waitedMin\":0,\"gate_entered_at\":\"$ts\"}" > "$out_file"
+    }
 
     # Call write_gate_decision
     write_gate_decision "REQ-123456" "/path/to/test-repo" "prd_review"
 
     # Check file exists
-    local expected_file="${GATE_DECISIONS_DIR}/test-repo__REQ-123456.json"
+    local expected_file="${TEST_GATE_DECISIONS_DIR}/test-repo__REQ-123456.json"
     [[ -f "$expected_file" ]]
 
     # Check file has valid JSON
@@ -84,35 +81,33 @@ teardown() {
     [[ $status -eq 0 ]]
 
     # No file should be created
-    [[ ! -f "${GATE_DECISIONS_DIR}/repo__invalid-id.json" ]]
+    [[ ! -f "${TEST_GATE_DECISIONS_DIR}/repo__invalid-id.json" ]]
 }
 
 @test "write_gate_decision creates gate decisions directory if missing" {
     # Remove gate decisions directory
-    rm -rf "${GATE_DECISIONS_DIR}"
-    [[ ! -d "${GATE_DECISIONS_DIR}" ]]
+    rm -rf "${TEST_GATE_DECISIONS_DIR}"
+    [[ ! -d "${TEST_GATE_DECISIONS_DIR}" ]]
 
     # Create the function if not sourced
-    if ! command -v write_gate_decision >/dev/null 2>&1; then
-        write_gate_decision() {
-            local request_id="$1"
-            local project="$2"
-            local phase="$3"
-            local repo_basename
-            repo_basename=$(basename "$project")
-            local out_file="${GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
+    write_gate_decision() {
+        local request_id="$1"
+        local project="$2"
+        local phase="$3"
+        local repo_basename
+        repo_basename=$(basename "$project")
+        local out_file="${TEST_GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
 
-            mkdir -p "${GATE_DECISIONS_DIR}" 2>/dev/null
-            echo "{\"id\":\"$request_id\"}" > "$out_file"
-        }
-    fi
+        mkdir -p "${TEST_GATE_DECISIONS_DIR}" 2>/dev/null
+        echo "{\"id\":\"$request_id\"}" > "$out_file"
+    }
 
     # Call function
     write_gate_decision "REQ-123456" "/path/to/test-repo" "prd_review"
 
     # Directory should be created
-    [[ -d "${GATE_DECISIONS_DIR}" ]]
+    [[ -d "${TEST_GATE_DECISIONS_DIR}" ]]
 
     # File should exist
-    [[ -f "${GATE_DECISIONS_DIR}/test-repo__REQ-123456.json" ]]
+    [[ -f "${TEST_GATE_DECISIONS_DIR}/test-repo__REQ-123456.json" ]]
 }

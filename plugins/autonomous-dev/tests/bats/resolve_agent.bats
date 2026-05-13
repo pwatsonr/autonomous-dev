@@ -76,9 +76,15 @@ setup() {
     [[ $? -eq 0 ]]
 }
 
-@test "security_review maps to security-reviewer" {
-    result=$(resolve_agent "security_review")
-    [[ "${result}" == "security-reviewer" ]]
+@test "integration maps to test-executor" {
+    result=$(resolve_agent "integration")
+    [[ "${result}" == "test-executor" ]]
+    [[ $? -eq 0 ]]
+}
+
+@test "monitor maps to performance-analyst" {
+    result=$(resolve_agent "monitor")
+    [[ "${result}" == "performance-analyst" ]]
     [[ $? -eq 0 ]]
 }
 
