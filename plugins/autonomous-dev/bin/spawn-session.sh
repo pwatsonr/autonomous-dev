@@ -34,52 +34,41 @@ set -euo pipefail
 
 DEFAULT_ENHANCED_GATES="security_review,cost_analysis,rollback_plan"
 
-# Simple phase budget resolution (mirrors supervisor-loop.sh)
-resolve_phase_budget() {
-    local phase="${1:-}"
-    case "${phase}" in
-        intake)                                                       echo "1.0"  ;;
-        prd|tdd|plan|spec)                                            echo "5.0"  ;;
-        prd_review|tdd_review|plan_review|spec_review|security_review) echo "2.0"  ;;
-        code_review)                                                  echo "2.0"  ;;
-        code)                                                         echo "10.0" ;;
-        integration)                                                  echo "5.0"  ;;
-        deploy)                                                       echo "5.0"  ;;
-        monitor)                                                      echo "2.0"  ;;
-        *)                                                            echo "5.0"  ;;
-    esac
-}
+# Source shared phase helper functions
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/lib" && pwd)"
+# shellcheck source=bin/lib/phase-helpers.sh
+if [[ -f "${LIB_DIR}/phase-helpers.sh" ]]; then
+    source "${LIB_DIR}/phase-helpers.sh"
+fi
 
-# Simple phase prompt resolution (basic fallback)
-# NOTE: Duplication with supervisor-loop.sh::resolve_phase_prompt is intentional-for-now
-resolve_phase_prompt() {
-    local phase="${1:-}"
-    local request_id="${2:-}"
-    local project="${3:-}"
-    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
-
-    echo "Read your request context from ${state_file}, then perform the ${phase} phase. Write your phase result to phase-result-${phase}.json as JSON."
-}
-
-# write_synthesized_phase_result(path, status, error, exit_code) -> void
+# write_synthesized_phase_result(path, status, error, exit_code, phase) -> void
 #   Writes a synthesized phase-result.json when the agent didn't create one.
 #   Used as fallback in spawn_session_typed() and by dispatch_phase_session()
 #   timeout handling.
 write_synthesized_phase_result() {
-    local path="$1" status="$2" error_msg="$3" exit_code="${4:-0}"
+    local path="$1" status="$2" error_msg="$3" exit_code="${4:-0}" phase="${5:-}"
     local tmp="${path}.tmp.$$"
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+    # Construct feedback message
+    local feedback
+    if [[ -n "$error_msg" ]]; then
+        feedback="synthesized from exit code $exit_code ($error_msg)"
+    else
+        feedback="synthesized from exit code $exit_code"
+    fi
+
     jq -n --arg s "$status" --arg e "$error_msg" --argjson rc "$exit_code" \
-        --arg ts "$ts" \
+        --arg ts "$ts" --arg p "$phase" --arg f "$feedback" \
         '{
             status: $s,
-            error: $e,
-            exit_code: $rc,
+            phase: $p,
+            feedback: $f,
+            artifacts: [],
             synthesized: true,
-            synthesized_at: $ts,
-            artifacts: []
+            exit_code: $rc,
+            completed_at: $ts
         }' > "$tmp"
     mv "$tmp" "$path"
 }
@@ -133,7 +122,7 @@ assemble_spawn_command() {
     line+=(--agent "${agent}")
     line+=(--add-dir "${req_dir}")
     line+=(--add-dir "${project}")
-    line+=(--permission-mode acceptEdits)
+    line+=(--permission-mode bypassPermissions)
     line+=(--max-budget-usd "${phase_budget}")
     if [[ ${#args[@]} -gt 0 ]]; then
         line+=("${args[@]}")
@@ -157,7 +146,7 @@ assemble_spawn_command() {
 
             # Replace the prompt text with a placeholder for readability
             # Check if this token contains the prompt (it may be modified by path replacement)
-            if [[ "${token}" == *"Read your request context from"* ]]; then
+            if [[ "${token}" == *"You are an autonomous development agent"* || "${token}" == *"Read your request context from"* ]]; then
                 token="\${PHASE_PROMPT}"
             fi
         fi
@@ -224,7 +213,7 @@ spawn_session_typed() {
             --agent "${agent}" \
             --add-dir "${req_dir}" \
             --add-dir "${project}" \
-            --permission-mode acceptEdits \
+            --permission-mode bypassPermissions \
             --max-budget-usd "${phase_budget}" \
             "${args[@]}" \
             "${phase_prompt}" || exit_code=$?
@@ -234,7 +223,7 @@ spawn_session_typed() {
             --agent "${agent}" \
             --add-dir "${req_dir}" \
             --add-dir "${project}" \
-            --permission-mode acceptEdits \
+            --permission-mode bypassPermissions \
             --max-budget-usd "${phase_budget}" \
             "${args[@]}" \
             "${phase_prompt}" || exit_code=$?
@@ -251,7 +240,7 @@ spawn_session_typed() {
             status="fail"
             error_msg="AGENT_EXITED_NONZERO"
         fi
-        write_synthesized_phase_result "$result_path" "$status" "$error_msg" "$exit_code"
+        write_synthesized_phase_result "$result_path" "$status" "$error_msg" "$exit_code" "$target_phase"
     fi
 
     return $exit_code

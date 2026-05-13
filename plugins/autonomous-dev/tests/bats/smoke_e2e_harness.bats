@@ -34,7 +34,7 @@ setup() {
 
     [ "$status" -eq 0 ]
     [[ "$output" == *"total_cost_usd"* ]]
-    [ -f "${proj}/docs/prd/smoke-feature.md" ]
+    [ -f "${proj}/docs/prd/REQ-000001-smoke-feature.md" ]
     [ -f "${req}/phase-result-prd.json" ]
     [ "$(jq -r '.status' "${req}/phase-result-prd.json")" = "pass" ]
 
@@ -57,7 +57,7 @@ setup() {
     [[ "$output" == *"total_cost_usd"* ]]
     [ -f "${req}/phase-result-tdd.json" ]
     [ "$(jq -r '.status' "${req}/phase-result-tdd.json")" = "pass" ]
-    [ ! -f "${proj}/docs/prd/smoke-feature.md" ]
+    [ ! -f "${proj}/docs/prd/REQ-000001-smoke-feature.md" ]
 
     rm -rf "${tmp}"
 }

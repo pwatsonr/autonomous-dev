@@ -976,37 +976,6 @@ resolve_max_turns() {
     echo "${turns}"
 }
 
-# resolve_phase_budget(phase: string) -> string
-#   Determines the budget (USD) for a given phase. Checks the effective config
-#   for a phase-specific override first; falls back to built-in defaults.
-#
-# Arguments:
-#   $1 -- phase: The current phase name (e.g., "code", "intake").
-#
-# Stdout:
-#   Budget amount as string (e.g., "10.0").
-resolve_phase_budget() {
-    local phase="${1:-}"
-
-    local budget
-    budget=$(jq -r ".daemon.max_budget_usd_by_phase.\"${phase}\" // null" "${EFFECTIVE_CONFIG}")
-
-    if [[ "${budget}" == "null" || -z "${budget}" ]]; then
-        case "${phase}" in
-            intake)                                                       budget="1.0"  ;;
-            prd|tdd|plan|spec)                                            budget="5.0"  ;;
-            prd_review|tdd_review|plan_review|spec_review|security_review) budget="2.0"  ;;
-            code_review)                                                  budget="2.0"  ;;
-            code)                                                         budget="10.0" ;;
-            integration)                                                  budget="5.0"  ;;
-            deploy)                                                       budget="5.0"  ;;
-            monitor)                                                      budget="2.0"  ;;
-            *)                                                            budget="5.0"  ;;
-        esac
-    fi
-
-    echo "${budget}"
-}
 
 ###############################################################################
 # Phase-to-Agent Resolution (TASK-008)
@@ -1160,7 +1129,7 @@ dispatch_phase_session() {
         # Synthesize fail result using shared helper
         local result_file="${req_dir}/phase-result-${phase}.json"
         # Use the shared write_synthesized_phase_result from spawn-session.sh
-        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'WALL_CLOCK_TIMEOUT' '124'"
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'WALL_CLOCK_TIMEOUT' '124' '${phase}'"
     else
         # Extract session cost from claude JSON output if available
         if [[ -f "${output_file}" ]]; then
@@ -1172,7 +1141,7 @@ dispatch_phase_session() {
     local result_file="${req_dir}/phase-result-${phase}.json"
     if [[ ${exit_code} -ne 0 && ${exit_code} -ne 124 && ! -f "${result_file}" ]]; then
         log_warn "spawn-session.sh exited ${exit_code} without creating phase-result; synthesizing fail result"
-        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}'"
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}' '${phase}'"
     fi
 
     # Clear session active flag
@@ -1187,82 +1156,6 @@ dispatch_phase_session() {
 # Phase Prompt Resolution (SPEC-001-2-03 Task 5)
 ###############################################################################
 
-# resolve_phase_prompt(phase: string, request_id: string, project: string) -> string
-#   Looks up the phase-specific prompt template and performs variable
-#   substitution. Falls back to a generic prompt when no template exists.
-#   For code phase, appends branch/commit/PR instructions.
-#
-# Arguments:
-#   $1 -- phase:      Current phase (e.g., "intake", "code", "prd_review").
-#   $2 -- request_id: The request ID (e.g., "REQ-20260408-abcd").
-#   $3 -- project:    Absolute path to the project/repository root.
-#
-# Stdout:
-#   The resolved prompt string.
-resolve_phase_prompt() {
-    local phase="${1:-}"
-    local request_id="${2:-}"
-    local project="${3:-}"
-
-    local prompt_file="${PLUGIN_DIR}/phase-prompts/${phase}.md"
-    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
-
-    local base_prompt=""
-    if [[ -f "${prompt_file}" ]]; then
-        local prompt_template
-        prompt_template=$(cat "${prompt_file}")
-
-        base_prompt="${prompt_template}"
-        base_prompt="${base_prompt//\{\{REQUEST_ID\}\}/${request_id}}"
-        base_prompt="${base_prompt//\{\{PROJECT\}\}/${project}}"
-        base_prompt="${base_prompt//\{\{STATE_FILE\}\}/${state_file}}"
-        base_prompt="${base_prompt//\{\{PHASE\}\}/${phase}}"
-    else
-        local req_dir="${project}/.autonomous-dev/requests/${request_id}"
-        base_prompt="You are an autonomous development agent working on request ${request_id}.
-
-Your current phase is: ${phase}
-
-Read the request state file at: ${state_file}
-Read the project context at: ${project}
-
-Perform the work required for the '${phase}' phase as described in the state file.
-
-When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\": \"pass\" | \"fail\", \"feedback\": \"<short summary; for a review, the verdict + any blocking findings>\", \"artifacts\": [ { \"kind\": \"...\", \"path\": \"...\", \"title\": \"...\" } ] }\`.
-
-**Do NOT modify \`current_phase\` or \`status\` in \`${state_file}\` — the daemon owns all phase transitions.** You MAY append an entry to \`phase_history[]\` and set \`current_phase_metadata.${phase}_completed_at\`, but never change \`current_phase\`. If you hit an error you can't resolve, still write \`phase-result-${phase}.json\` with \`\"status\": \"fail\"\` and the error in \`\"feedback\"\`."
-
-        log_info "No prompt file for phase '${phase}'. Using fallback prompt."
-    fi
-
-    # Add code-phase specific instructions
-    if [[ "${phase}" == "code" ]]; then
-        # Validate request_id first (TASK-011 requirement)
-        if ! validate_request_id "${request_id}"; then
-            log_error "Invalid request_id for code phase: ${request_id}"
-            echo "ERROR: Invalid request_id format"
-            return 1
-        fi
-
-        local code_instructions="
-
-## Branch and PR Instructions
-
-1. Create a branch named 'autonomous/${request_id}' (single-quoted in any shell command):
-   git checkout -b 'autonomous/${request_id}'
-
-2. Make commits using Conventional Commits format (feat:, fix:, docs:, etc.).
-
-3. When implementation is done, create a PR:
-   gh pr create --base main --head 'autonomous/${request_id}' --title <conventional-title> --body <summary>
-
-4. Write the resulting PR URL into phase-result-code.json artifacts[] with kind: 'github_pr'."
-
-        base_prompt="${base_prompt}${code_instructions}"
-    fi
-
-    echo "${base_prompt}"
-}
 
 ###############################################################################
 # Session Spawning (SPEC-001-2-03 Task 6)
@@ -2888,6 +2781,12 @@ main_loop() {
 # shellcheck source=bin/lib/phase-legacy.sh
 if [[ -f "${LIB_DIR}/phase-legacy.sh" ]]; then
     source "${LIB_DIR}/phase-legacy.sh"
+fi
+
+# Source shared phase helper functions
+# shellcheck source=bin/lib/phase-helpers.sh
+if [[ -f "${LIB_DIR}/phase-helpers.sh" ]]; then
+    source "${LIB_DIR}/phase-helpers.sh"
 fi
 
 # Guard: allow the script to be sourced for unit testing without executing main.

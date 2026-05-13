@@ -47,8 +47,8 @@ teardown() {
 @test "write_synthesized_phase_result: creates pass result for exit 0" {
     local result_path="$TEST_REQ_DIR/phase-result-prd.json"
 
-    # Execute
-    run write_synthesized_phase_result "$result_path" "pass" "" "0"
+    # Execute with phase parameter
+    run write_synthesized_phase_result "$result_path" "pass" "" "0" "prd"
 
     # Verify
     [ "$status" -eq 0 ]
@@ -58,6 +58,14 @@ teardown() {
     status_val=$(jq -r '.status' "$result_path")
     [ "$status_val" = "pass" ]
 
+    local phase_val
+    phase_val=$(jq -r '.phase' "$result_path")
+    [ "$phase_val" = "prd" ]
+
+    local feedback_val
+    feedback_val=$(jq -r '.feedback' "$result_path")
+    [ "$feedback_val" = "synthesized from exit code 0" ]
+
     local exit_code_val
     exit_code_val=$(jq -r '.exit_code' "$result_path")
     [ "$exit_code_val" = "0" ]
@@ -66,25 +74,21 @@ teardown() {
     synthesized_val=$(jq -r '.synthesized' "$result_path")
     [ "$synthesized_val" = "true" ]
 
-    local error_val
-    error_val=$(jq -r '.error' "$result_path")
-    [ "$error_val" = "" ]
-
     local artifacts_len
     artifacts_len=$(jq '.artifacts | length' "$result_path")
     [ "$artifacts_len" = "0" ]
 
-    # Verify timestamp format
+    # Verify timestamp format (now completed_at instead of synthesized_at)
     local ts
-    ts=$(jq -r '.synthesized_at' "$result_path")
+    ts=$(jq -r '.completed_at' "$result_path")
     [[ "$ts" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]
 }
 
 @test "write_synthesized_phase_result: creates fail result for nonzero exit" {
     local result_path="$TEST_REQ_DIR/phase-result-prd.json"
 
-    # Execute
-    run write_synthesized_phase_result "$result_path" "fail" "AGENT_EXITED_NONZERO" "1"
+    # Execute with phase parameter
+    run write_synthesized_phase_result "$result_path" "fail" "AGENT_EXITED_NONZERO" "1" "prd"
 
     # Verify
     [ "$status" -eq 0 ]
@@ -94,6 +98,14 @@ teardown() {
     status_val=$(jq -r '.status' "$result_path")
     [ "$status_val" = "fail" ]
 
+    local phase_val
+    phase_val=$(jq -r '.phase' "$result_path")
+    [ "$phase_val" = "prd" ]
+
+    local feedback_val
+    feedback_val=$(jq -r '.feedback' "$result_path")
+    [ "$feedback_val" = "synthesized from exit code 1 (AGENT_EXITED_NONZERO)" ]
+
     local exit_code_val
     exit_code_val=$(jq -r '.exit_code' "$result_path")
     [ "$exit_code_val" = "1" ]
@@ -101,10 +113,6 @@ teardown() {
     local synthesized_val
     synthesized_val=$(jq -r '.synthesized' "$result_path")
     [ "$synthesized_val" = "true" ]
-
-    local error_val
-    error_val=$(jq -r '.error' "$result_path")
-    [ "$error_val" = "AGENT_EXITED_NONZERO" ]
 }
 
 @test "spawn_session_typed: synthesizes pass result when mock claude exits 0" {
@@ -123,6 +131,14 @@ teardown() {
     status_val=$(jq -r '.status' "$result_path")
     [ "$status_val" = "pass" ]
 
+    local phase_val
+    phase_val=$(jq -r '.phase' "$result_path")
+    [ "$phase_val" = "prd" ]
+
+    local feedback_val
+    feedback_val=$(jq -r '.feedback' "$result_path")
+    [ "$feedback_val" = "synthesized from exit code 0" ]
+
     local exit_code_val
     exit_code_val=$(jq -r '.exit_code' "$result_path")
     [ "$exit_code_val" = "0" ]
@@ -130,10 +146,6 @@ teardown() {
     local synthesized_val
     synthesized_val=$(jq -r '.synthesized' "$result_path")
     [ "$synthesized_val" = "true" ]
-
-    local error_val
-    error_val=$(jq -r '.error' "$result_path")
-    [ "$error_val" = "" ]
 }
 
 @test "spawn_session_typed: synthesizes fail result when mock claude exits 1" {
@@ -154,6 +166,14 @@ teardown() {
     local status_val
     status_val=$(jq -r '.status' "$result_path")
     [ "$status_val" = "fail" ]
+
+    local phase_val
+    phase_val=$(jq -r '.phase' "$result_path")
+    [ "$phase_val" = "prd" ]
+
+    local feedback_val
+    feedback_val=$(jq -r '.feedback' "$result_path")
+    [ "$feedback_val" = "synthesized from exit code 1 (AGENT_EXITED_NONZERO)" ]
 
     local exit_code_val
     exit_code_val=$(jq -r '.exit_code' "$result_path")
