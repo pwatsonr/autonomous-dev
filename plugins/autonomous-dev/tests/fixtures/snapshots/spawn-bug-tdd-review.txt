@@ -1,1 +1,1 @@
-claude --agent tdd-reviewer --expedited --state ${STATE_DIR}/state.json
+claude --print --output-format json --agent tdd-reviewer --add-dir ${STATE_DIR} --add-dir ${PROJECT_DIR} --permission-mode acceptEdits --max-budget-usd 2.0 --append-system-prompt Expedited review: prioritize blocking issues; skip nitpicks. ${PHASE_PROMPT}

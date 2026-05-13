@@ -2,11 +2,17 @@
 ###############################################################################
 # test_spawn_session_flags.bats - Snapshot tests for type-aware spawn flags
 #
-# Covers SPEC-018-2-03 acceptance criteria for spawn-session.sh's flag
-# assembly: --bug-context-path, ENHANCED_GATES, --expedited.
+# Covers SPEC-018-2-03 (type-aware injection) as re-baselined by PLAN-039
+# SPEC-039-2-08 / RESEARCH-039: spawn-session.sh now emits the *real* claude
+# CLI contract (--print --output-format json --agent --add-dir --permission-mode
+# --max-budget-usd <prompt>). The bogus --state / --bug-context-path /
+# --expedited / --max-turns flags are gone. Type-aware behaviour now maps to:
+#   - bug + tdd      -> (no extra flag; state.json carries bug fields, named in the prompt)
+#   - infra + !review -> env ENHANCED_GATES=... prefix (env var, not a CLI flag)
+#   - expedited + review -> --append-system-prompt "Expedited review: ..."
 #
-# Snapshots use the literal string ${STATE_DIR} (not interpolated) as the
-# placeholder for the absolute path of the BATS_TEST_TMPDIR/state directory.
+# Snapshots use the literal placeholders ${STATE_DIR}, ${PROJECT_DIR},
+# ${PHASE_PROMPT} (not interpolated) for host-stable diffing.
 # Set BATS_UPDATE_SNAPSHOTS=1 to regenerate snapshots in place.
 ###############################################################################
 
@@ -49,11 +55,14 @@ assert_snapshot() {
     fi
 }
 
-@test "bug + tdd spawn appends --bug-context-path" {
+@test "bug + tdd spawn: corrected claude flags, no --bug-context-path (state via --add-dir + prompt)" {
     cp "${FIXTURES}/bug.json" "${STATE_FILE}"
     run "${SPAWN}" "${STATE_FILE}" tdd tdd-author
     [ "${status}" -eq 0 ]
     assert_snapshot "spawn-bug-tdd.txt"
+    [[ "$(cat "${CAPTURE}")" != *"--bug-context-path"* ]]
+    [[ "$(cat "${CAPTURE}")" != *"--state "* ]]
+    [[ "$(cat "${CAPTURE}")" == *"--add-dir"* ]]
 }
 
 @test "infra + tdd spawn prefixes env ENHANCED_GATES" {
@@ -63,11 +72,13 @@ assert_snapshot() {
     assert_snapshot "spawn-infra-tdd.txt"
 }
 
-@test "bug + tdd_review spawn appends --expedited" {
+@test "expedited tdd_review uses --append-system-prompt, not --expedited" {
     cp "${FIXTURES}/bug.json" "${STATE_FILE}"
     run "${SPAWN}" "${STATE_FILE}" tdd_review tdd-reviewer
     [ "${status}" -eq 0 ]
     assert_snapshot "spawn-bug-tdd-review.txt"
+    [[ "$(cat "${CAPTURE}")" != *"--expedited"* ]]
+    [[ "$(cat "${CAPTURE}")" == *"--append-system-prompt"* ]]
 }
 
 @test "feature + tdd does NOT append --bug-context-path or --expedited" {
