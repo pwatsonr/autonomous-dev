@@ -50,18 +50,26 @@ The `state.json` file is the canonical runtime state for each request:
 
 ## Phase-to-Agent Mapping
 
+This is the `resolve_agent()` table in `bin/supervisor-loop.sh`. There are no
+`prd-reviewer`/`tdd-reviewer`/etc. agent files, so the document-review phases
+all route to `doc-reviewer` (which reviews PRDs/TDDs/plans/specs); code review
+uses `quality-reviewer`.
+
 | Phase | Agent | Purpose |
 |-------|-------|---------|
+| `intake` | _(none — bookkeeping; auto-transitions to `prd`)_ | — |
 | `prd` | `prd-author` | Write Product Requirements Document |
-| `prd_review` | `prd-reviewer` | Review and approve/reject PRD |
+| `prd_review` | `doc-reviewer` | Review and approve/reject PRD |
 | `tdd` | `tdd-author` | Write Technical Design Document |
-| `tdd_review` | `tdd-reviewer` | Review and approve/reject TDD |
+| `tdd_review` | `doc-reviewer` | Review and approve/reject TDD |
 | `plan` | `plan-author` | Write Implementation Plan |
-| `plan_review` | `plan-reviewer` | Review and approve/reject Plan |
+| `plan_review` | `doc-reviewer` | Review and approve/reject Plan |
 | `spec` | `spec-author` | Write Implementation Specifications |
-| `spec_review` | `spec-reviewer` | Review and approve/reject Specs |
-| `code` | `code-author` | Implement code changes |
-| `code_review` | `doc-reviewer` | Review code artifacts |
+| `spec_review` | `doc-reviewer` | Review and approve/reject Specs |
+| `code` | `code-executor` | Implement code changes; create branch + PR |
+| `code_review` | `quality-reviewer` | Review code for bugs/security/performance |
+| `security_review` | `security-reviewer` | Focused security review |
+| `deploy` | `deploy-executor` | Run the deployment workflow |
 
 ## State Machine
 
