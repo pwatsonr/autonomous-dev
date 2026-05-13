@@ -4,6 +4,7 @@
  */
 
 import { initRouter } from '../../adapters/cli_adapter';
+import { ALL_PIPELINE_PHASES, PHASE_OVERRIDE_MATRIX } from '../../types/phase-override';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -226,7 +227,12 @@ users:
       expect(state.current_phase).toBe('intake');
       expect(state.type).toBe('infra');
       expect(state.source).toBe('cli');
-      expect(state.phase_overrides).toEqual([]);
+      // PRD-020 FR-020-02: state_json_writer now seeds phase_overrides from the
+      // canonical pipeline minus the request type's skippedPhases.
+      const expectedOverrides = ALL_PIPELINE_PHASES.filter(
+        (p) => !(PHASE_OVERRIDE_MATRIX['infra']?.skippedPhases ?? []).includes(p),
+      );
+      expect(state.phase_overrides).toEqual(expectedOverrides);
       expect(state.cost_accrued_usd).toBe(0);
       expect(state.turn_count).toBe(0);
       expect(state.escalation_count).toBe(0);
