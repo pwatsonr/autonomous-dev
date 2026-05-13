@@ -12,7 +12,7 @@ set -euo pipefail
 # --- Constants ---------------------------------------------------------------
 # All paths derived from $HOME and the script's own location.
 
-readonly PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+readonly PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly LIB_DIR="${PLUGIN_DIR}/bin/lib"
 readonly DAEMON_HOME="${HOME}/.autonomous-dev"
 readonly LOCK_FILE="${DAEMON_HOME}/daemon.lock"
@@ -65,6 +65,7 @@ RECONCILE_EVERY_N_POLLS=${RECONCILE_EVERY_N_POLLS:-60}
 if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
     declare -gA _phase_legacy_warned=()
 fi
+
 
 ###############################################################################
 # Logging Functions
@@ -829,7 +830,11 @@ next_phase_for_state() {
 
     # Check if phase_overrides key exists (regardless of length)
     local has_overrides_key
-    has_overrides_key=$(jq -e 'has("phase_overrides")' "${state_file}" 2>/dev/null && echo "true" || echo "false")
+    if jq -e 'has("phase_overrides")' "${state_file}" >/dev/null 2>&1; then
+        has_overrides_key="true"
+    else
+        has_overrides_key="false"
+    fi
 
     local -a phases=()
     if [[ "${has_overrides_key}" == "true" ]]; then
@@ -842,14 +847,10 @@ next_phase_for_state() {
 
         # If phase_overrides is empty, fall back to legacy sequence but without warning
         if [[ ${#phases[@]} -eq 0 ]]; then
-            # shellcheck source=lib/phase-legacy.sh
-            source "${LIB_DIR}/phase-legacy.sh"
             phases=("${LEGACY_PHASES[@]}")
         fi
     else
         # v1.0 fallback: phase_overrides key is missing - warn once
-        # shellcheck source=lib/phase-legacy.sh
-        source "${LIB_DIR}/phase-legacy.sh"
         warn_legacy_fallback_once "${state_file}"
         phases=("${LEGACY_PHASES[@]}")
     fi
@@ -2882,6 +2883,12 @@ main_loop() {
 ###############################################################################
 # Main Entry Point
 ###############################################################################
+
+# Source the legacy phase sequence once at startup
+# shellcheck source=bin/lib/phase-legacy.sh
+if [[ -f "${LIB_DIR}/phase-legacy.sh" ]]; then
+    source "${LIB_DIR}/phase-legacy.sh"
+fi
 
 # Guard: allow the script to be sourced for unit testing without executing main.
 # When sourced, the caller can invoke individual functions directly.
