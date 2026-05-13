@@ -63,6 +63,7 @@ export interface RequestEntity {
   promotion_count: number;
   last_promoted_at: string | null;
   paused_at_phase: string | null;
+  type: 'feature' | 'bug' | 'infra' | 'refactor' | 'hotfix' | string;
   // v2 (002_add_source_metadata.sql):
   /** Channel/adapter that originated this request. Defaults to 'cli'. */
   source: RequestSource;
@@ -1075,6 +1076,41 @@ export class Repository {
   /** Force a WAL checkpoint (TRUNCATE mode). */
   checkpoint(): void {
     this.db.pragma('wal_checkpoint(TRUNCATE)');
+  }
+
+  // =========================================================================
+  // Orphan reconciliation
+  // =========================================================================
+
+  /** Find orphan SQLite rows (queued status, older than 24h). */
+  findOrphanRows(): Array<{request_id: string, target_repo: string, created_at: string}> {
+    const cutoff = new Date();
+    cutoff.setHours(cutoff.getHours() - 24);
+    const cutoffIso = cutoff.toISOString();
+
+    return this.db
+      .prepare(
+        `SELECT request_id, target_repo, created_at
+         FROM requests
+         WHERE status = 'queued'
+         AND created_at < ?
+         ORDER BY created_at ASC`,
+      )
+      .all(cutoffIso) as Array<{request_id: string, target_repo: string, created_at: string}>;
+  }
+
+  /** Mark a request as cancelled with a reason. */
+  markRequestCancelled(requestId: string, reason: string): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `UPDATE requests
+         SET status = 'cancelled',
+             cancelled_reason = ?,
+             updated_at = ?
+         WHERE request_id = ?`,
+      )
+      .run(reason, now, requestId);
   }
 
   // =========================================================================
