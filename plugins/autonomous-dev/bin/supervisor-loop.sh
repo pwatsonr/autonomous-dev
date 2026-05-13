@@ -827,19 +827,27 @@ next_phase_for_state() {
         return 2
     fi
 
-    local overrides_len
-    overrides_len=$(jq -r '(.phase_overrides // []) | length' "${state_file}" 2>/dev/null || echo "0")
+    # Check if phase_overrides key exists (regardless of length)
+    local has_overrides_key
+    has_overrides_key=$(jq -e 'has("phase_overrides")' "${state_file}" 2>/dev/null && echo "true" || echo "false")
 
     local -a phases=()
-    if [[ "${overrides_len}" -gt 0 ]]; then
-        # v1.1 path: read phase_overrides[] in order
+    if [[ "${has_overrides_key}" == "true" ]]; then
+        # v1.1 path: phase_overrides key exists - use it (even if empty)
         local phases_raw
         phases_raw=$(jq -r '.phase_overrides[]' "${state_file}" 2>/dev/null || true)
         while IFS= read -r p; do
             [[ -n "${p}" ]] && phases+=("${p}")
         done <<< "${phases_raw}"
+
+        # If phase_overrides is empty, fall back to legacy sequence but without warning
+        if [[ ${#phases[@]} -eq 0 ]]; then
+            # shellcheck source=lib/phase-legacy.sh
+            source "${LIB_DIR}/phase-legacy.sh"
+            phases=("${LEGACY_PHASES[@]}")
+        fi
     else
-        # v1.0 fallback: source legacy sequence and warn once
+        # v1.0 fallback: phase_overrides key is missing - warn once
         # shellcheck source=lib/phase-legacy.sh
         source "${LIB_DIR}/phase-legacy.sh"
         warn_legacy_fallback_once "${state_file}"
