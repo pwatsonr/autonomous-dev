@@ -133,7 +133,7 @@ assemble_spawn_command() {
     line+=(--agent "${agent}")
     line+=(--add-dir "${req_dir}")
     line+=(--add-dir "${project}")
-    line+=(--permission-mode acceptEdits)
+    line+=(--permission-mode bypassPermissions)
     line+=(--max-budget-usd "${phase_budget}")
     if [[ ${#args[@]} -gt 0 ]]; then
         line+=("${args[@]}")
@@ -224,7 +224,7 @@ spawn_session_typed() {
             --agent "${agent}" \
             --add-dir "${req_dir}" \
             --add-dir "${project}" \
-            --permission-mode acceptEdits \
+            --permission-mode bypassPermissions \
             --max-budget-usd "${phase_budget}" \
             "${args[@]}" \
             "${phase_prompt}" || exit_code=$?
@@ -234,7 +234,7 @@ spawn_session_typed() {
             --agent "${agent}" \
             --add-dir "${req_dir}" \
             --add-dir "${project}" \
-            --permission-mode acceptEdits \
+            --permission-mode bypassPermissions \
             --max-budget-usd "${phase_budget}" \
             "${args[@]}" \
             "${phase_prompt}" || exit_code=$?

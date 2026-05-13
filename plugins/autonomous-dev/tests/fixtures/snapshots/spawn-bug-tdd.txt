@@ -1,1 +1,1 @@
-claude --print --output-format json --agent tdd-author --add-dir ${STATE_DIR} --add-dir ${PROJECT_DIR} --permission-mode acceptEdits --max-budget-usd 5.0 ${PHASE_PROMPT}
+claude --print --output-format json --agent tdd-author --add-dir ${STATE_DIR} --add-dir ${PROJECT_DIR} --permission-mode bypassPermissions --max-budget-usd 5.0 ${PHASE_PROMPT}
