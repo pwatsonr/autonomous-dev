@@ -34,32 +34,12 @@ set -euo pipefail
 
 DEFAULT_ENHANCED_GATES="security_review,cost_analysis,rollback_plan"
 
-# Simple phase budget resolution (mirrors supervisor-loop.sh)
-resolve_phase_budget() {
-    local phase="${1:-}"
-    case "${phase}" in
-        intake)                                                       echo "1.0"  ;;
-        prd|tdd|plan|spec)                                            echo "5.0"  ;;
-        prd_review|tdd_review|plan_review|spec_review|security_review) echo "2.0"  ;;
-        code_review)                                                  echo "2.0"  ;;
-        code)                                                         echo "10.0" ;;
-        integration)                                                  echo "5.0"  ;;
-        deploy)                                                       echo "5.0"  ;;
-        monitor)                                                      echo "2.0"  ;;
-        *)                                                            echo "5.0"  ;;
-    esac
-}
-
-# Simple phase prompt resolution (basic fallback)
-# NOTE: Duplication with supervisor-loop.sh::resolve_phase_prompt is intentional-for-now
-resolve_phase_prompt() {
-    local phase="${1:-}"
-    local request_id="${2:-}"
-    local project="${3:-}"
-    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
-
-    echo "Read your request context from ${state_file}, then perform the ${phase} phase. Write your phase result to phase-result-${phase}.json as JSON."
-}
+# Source shared phase helper functions
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/lib" && pwd)"
+# shellcheck source=bin/lib/phase-helpers.sh
+if [[ -f "${LIB_DIR}/phase-helpers.sh" ]]; then
+    source "${LIB_DIR}/phase-helpers.sh"
+fi
 
 # write_synthesized_phase_result(path, status, error, exit_code, phase) -> void
 #   Writes a synthesized phase-result.json when the agent didn't create one.
@@ -166,7 +146,7 @@ assemble_spawn_command() {
 
             # Replace the prompt text with a placeholder for readability
             # Check if this token contains the prompt (it may be modified by path replacement)
-            if [[ "${token}" == *"Read your request context from"* ]]; then
+            if [[ "${token}" == *"You are an autonomous development agent"* || "${token}" == *"Read your request context from"* ]]; then
                 token="\${PHASE_PROMPT}"
             fi
         fi
