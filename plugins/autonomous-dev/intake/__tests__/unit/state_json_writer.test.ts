@@ -109,17 +109,46 @@ describe('state_json_writer', () => {
     expect(typeof state.schema_version).toBe('number');
   });
 
-  it('phase_overrides_present - phase_overrides is always empty array on initial write', () => {
-    // SUGGESTION-1: phase_overrides: [] always present
-    const request = createValidRequest();
+  it('phase_overrides_computed - phase_overrides computed from matrix for request type', () => {
+    // FR-020-02: phase_overrides computed from PHASE_OVERRIDE_MATRIX
+    const request = createValidRequest(); // type: 'feature'
 
     writeStateJson(request, tempDir);
 
     const stateFile = path.join(tempDir, '.autonomous-dev', 'requests', 'REQ-123456', 'state.json');
     const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
 
-    expect(state.phase_overrides).toEqual([]);
+    // Feature requests skip no phases, so should include all 14 phases
     expect(Array.isArray(state.phase_overrides)).toBe(true);
+    expect(state.phase_overrides.length).toBe(14);
+    expect(state.phase_overrides).toContain('intake');
+    expect(state.phase_overrides).toContain('prd');
+    expect(state.phase_overrides).toContain('monitor');
+
+    // Feature requests should have no skipped phases
+    const expectedPhases = [
+      'intake', 'prd', 'prd_review', 'tdd', 'tdd_review',
+      'plan', 'plan_review', 'spec', 'spec_review',
+      'code', 'code_review', 'integration', 'deploy', 'monitor'
+    ];
+    expect(state.phase_overrides).toEqual(expectedPhases);
+  });
+
+  it('phase_overrides_computed_bug - bug requests skip prd phases', () => {
+    // Test that bug requests skip prd/prd_review per PHASE_OVERRIDE_MATRIX
+    const request = { ...createValidRequest(), type: 'bug', request_id: 'REQ-654321' };
+
+    writeStateJson(request, tempDir);
+
+    const stateFile = path.join(tempDir, '.autonomous-dev', 'requests', 'REQ-654321', 'state.json');
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+
+    expect(Array.isArray(state.phase_overrides)).toBe(true);
+    expect(state.phase_overrides.length).toBe(12); // 14 - 2 skipped (prd, prd_review)
+    expect(state.phase_overrides).toContain('intake');
+    expect(state.phase_overrides).toContain('tdd');
+    expect(state.phase_overrides).not.toContain('prd');
+    expect(state.phase_overrides).not.toContain('prd_review');
   });
 
   it('request_id_validation - non-REQ-NNNNNN ids throw VALIDATION_ERROR', () => {
