@@ -61,25 +61,34 @@ resolve_phase_prompt() {
     echo "Read your request context from ${state_file}, then perform the ${phase} phase. Write your phase result to phase-result-${phase}.json as JSON."
 }
 
-# write_synthesized_phase_result(path, status, error, exit_code) -> void
+# write_synthesized_phase_result(path, status, error, exit_code, phase) -> void
 #   Writes a synthesized phase-result.json when the agent didn't create one.
 #   Used as fallback in spawn_session_typed() and by dispatch_phase_session()
 #   timeout handling.
 write_synthesized_phase_result() {
-    local path="$1" status="$2" error_msg="$3" exit_code="${4:-0}"
+    local path="$1" status="$2" error_msg="$3" exit_code="${4:-0}" phase="${5:-}"
     local tmp="${path}.tmp.$$"
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+    # Construct feedback message
+    local feedback
+    if [[ -n "$error_msg" ]]; then
+        feedback="synthesized from exit code $exit_code ($error_msg)"
+    else
+        feedback="synthesized from exit code $exit_code"
+    fi
+
     jq -n --arg s "$status" --arg e "$error_msg" --argjson rc "$exit_code" \
-        --arg ts "$ts" \
+        --arg ts "$ts" --arg p "$phase" --arg f "$feedback" \
         '{
             status: $s,
-            error: $e,
-            exit_code: $rc,
+            phase: $p,
+            feedback: $f,
+            artifacts: [],
             synthesized: true,
-            synthesized_at: $ts,
-            artifacts: []
+            exit_code: $rc,
+            completed_at: $ts
         }' > "$tmp"
     mv "$tmp" "$path"
 }
@@ -251,7 +260,7 @@ spawn_session_typed() {
             status="fail"
             error_msg="AGENT_EXITED_NONZERO"
         fi
-        write_synthesized_phase_result "$result_path" "$status" "$error_msg" "$exit_code"
+        write_synthesized_phase_result "$result_path" "$status" "$error_msg" "$exit_code" "$target_phase"
     fi
 
     return $exit_code

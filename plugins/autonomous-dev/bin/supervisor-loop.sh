@@ -1160,7 +1160,7 @@ dispatch_phase_session() {
         # Synthesize fail result using shared helper
         local result_file="${req_dir}/phase-result-${phase}.json"
         # Use the shared write_synthesized_phase_result from spawn-session.sh
-        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'WALL_CLOCK_TIMEOUT' '124'"
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'WALL_CLOCK_TIMEOUT' '124' '${phase}'"
     else
         # Extract session cost from claude JSON output if available
         if [[ -f "${output_file}" ]]; then
@@ -1172,7 +1172,7 @@ dispatch_phase_session() {
     local result_file="${req_dir}/phase-result-${phase}.json"
     if [[ ${exit_code} -ne 0 && ${exit_code} -ne 124 && ! -f "${result_file}" ]]; then
         log_warn "spawn-session.sh exited ${exit_code} without creating phase-result; synthesizing fail result"
-        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}'"
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}' '${phase}'"
     fi
 
     # Clear session active flag
@@ -1228,7 +1228,7 @@ Read the project context at: ${project}
 
 Perform the work required for the '${phase}' phase as described in the state file.
 
-When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\": \"pass\" | \"fail\", \"feedback\": \"<short summary; for a review, the verdict + any blocking findings>\", \"artifacts\": [ { \"kind\": \"...\", \"path\": \"...\", \"title\": \"...\" } ] }\`.
+When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\": \"pass\" | \"fail\", \"phase\": \"${phase}\", \"feedback\": \"<short summary; for a review, the verdict + any blocking findings>\", \"artifacts\": [ { \"kind\": \"...\", \"path\": \"...\", \"title\": \"...\" } ] }\`.
 
 **Do NOT modify \`current_phase\` or \`status\` in \`${state_file}\` — the daemon owns all phase transitions.** You MAY append an entry to \`phase_history[]\` and set \`current_phase_metadata.${phase}_completed_at\`, but never change \`current_phase\`. If you hit an error you can't resolve, still write \`phase-result-${phase}.json\` with \`\"status\": \"fail\"\` and the error in \`\"feedback\"\`."
 
