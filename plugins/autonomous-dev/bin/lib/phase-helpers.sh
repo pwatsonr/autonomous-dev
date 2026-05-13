@@ -89,7 +89,37 @@ Your current phase is: ${phase}
 Read the request state file at: ${state_file}
 Read the project context at: ${project}
 
-Perform the work required for the '${phase}' phase as described in the state file.
+Perform the work required for the '${phase}' phase as described in the state file."
+
+        # Add artifact location instructions for authoring phases
+        case "${phase}" in
+            prd)
+                local artifact_slug="${request_id}-$(echo "${request_id}" | sed 's/REQ-[0-9]*-//' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')"
+                base_prompt="${base_prompt}
+
+Write the PRD document to \`${project}/docs/prd/${artifact_slug}.md\` (mkdir -p the dir). List that path in \`phase-result-${phase}.json.artifacts[]\` with \`kind: '${phase}'\`."
+                ;;
+            tdd)
+                local artifact_slug="${request_id}-$(echo "${request_id}" | sed 's/REQ-[0-9]*-//' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')"
+                base_prompt="${base_prompt}
+
+Write the TDD document to \`${project}/docs/tdd/${artifact_slug}.md\` (mkdir -p the dir). List that path in \`phase-result-${phase}.json.artifacts[]\` with \`kind: '${phase}'\`."
+                ;;
+            plan)
+                local artifact_slug="${request_id}-$(echo "${request_id}" | sed 's/REQ-[0-9]*-//' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')"
+                base_prompt="${base_prompt}
+
+Write the Plan document to \`${project}/docs/plans/${artifact_slug}.md\` (mkdir -p the dir). List that path in \`phase-result-${phase}.json.artifacts[]\` with \`kind: '${phase}'\`."
+                ;;
+            spec)
+                local artifact_slug="${request_id}-$(echo "${request_id}" | sed 's/REQ-[0-9]*-//' | tr '[:upper:]' '[:lower:]' | sed 's/_/-/g')"
+                base_prompt="${base_prompt}
+
+Write the Spec document to \`${project}/docs/specs/${artifact_slug}.md\` (mkdir -p the dir). List that path in \`phase-result-${phase}.json.artifacts[]\` with \`kind: '${phase}'\`."
+                ;;
+        esac
+
+        base_prompt="${base_prompt}
 
 When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\": \"pass\" | \"fail\", \"phase\": \"${phase}\", \"feedback\": \"<short summary; for a review, the verdict + any blocking findings>\", \"artifacts\": [ { \"kind\": \"...\", \"path\": \"...\", \"title\": \"...\" } ] }\`.
 
