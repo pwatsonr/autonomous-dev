@@ -1097,8 +1097,10 @@ dispatch_phase_session() {
     iso_timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     jq --arg timestamp "${iso_timestamp}" \
+       --arg phase "${phase}" \
        '.current_phase_metadata.session_active = true |
-        .current_phase_metadata.dispatched_at = $timestamp' \
+        .current_phase_metadata.dispatched_at = $timestamp |
+        .current_phase_metadata.dispatched_phase = $phase' \
        "${state_file}" > "${tmp}"
     mv "${tmp}" "${state_file}"
 
@@ -1206,6 +1208,7 @@ resolve_phase_prompt() {
         base_prompt="${base_prompt//\{\{STATE_FILE\}\}/${state_file}}"
         base_prompt="${base_prompt//\{\{PHASE\}\}/${phase}}"
     else
+        local req_dir="${project}/.autonomous-dev/requests/${request_id}"
         base_prompt="You are an autonomous development agent working on request ${request_id}.
 
 Your current phase is: ${phase}
@@ -1214,8 +1217,10 @@ Read the request state file at: ${state_file}
 Read the project context at: ${project}
 
 Perform the work required for the '${phase}' phase as described in the state file.
-When complete, update the state file to reflect your progress.
-If you encounter an error you cannot resolve, write the error details to the state file's current_phase_metadata.last_error field."
+
+When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\": \"pass\" | \"fail\", \"feedback\": \"<short summary; for a review, the verdict + any blocking findings>\", \"artifacts\": [ { \"kind\": \"...\", \"path\": \"...\", \"title\": \"...\" } ] }\`.
+
+**Do NOT modify \`current_phase\` or \`status\` in \`${state_file}\` — the daemon owns all phase transitions.** You MAY append an entry to \`phase_history[]\` and set \`current_phase_metadata.${phase}_completed_at\`, but never change \`current_phase\`. If you hit an error you can't resolve, still write \`phase-result-${phase}.json\` with \`\"status\": \"fail\"\` and the error in \`\"feedback\"`."
 
         log_info "No prompt file for phase '${phase}'. Using fallback prompt."
     fi
@@ -2125,9 +2130,9 @@ advance_phase() {
     local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
     local events_file="${project}/.autonomous-dev/requests/${request_id}/events.jsonl"
 
-    # Read current phase
+    # Read current phase (prefer dispatched_phase to avoid agent-mutated current_phase)
     local current_phase
-    current_phase=$(jq -r '.current_phase // .status' "$state_file" 2>/dev/null || echo "")
+    current_phase=$(jq -r '.current_phase_metadata.dispatched_phase // .current_phase // .status' "$state_file" 2>/dev/null || echo "")
     if [[ -z "$current_phase" ]]; then
         log_error "Cannot determine current_phase from state file: $state_file"
         return 1
@@ -2155,6 +2160,14 @@ advance_phase() {
 
     case "$result_status" in
         "pass")
+            # Before computing next phase, ensure current_phase reflects the dispatched phase
+            # (in case agent mutated it during the session)
+            local tmp_restore="${state_file}.restore.$$"
+            jq --arg phase "$current_phase" \
+               '.current_phase = $phase' \
+               "$state_file" > "$tmp_restore"
+            mv "$tmp_restore" "$state_file"
+
             # Determine next phase
             local next_phase
             next_phase=$(next_phase_for_state "$state_file")
@@ -2163,7 +2176,9 @@ advance_phase() {
                 # Terminal - mark done
                 local tmp="${state_file}.tmp.$$"
                 jq --arg ts "$ts" \
-                   '.status = "done" | .updated_at = $ts' \
+                   '.status = "done" |
+                    .updated_at = $ts |
+                    .current_phase_metadata.dispatched_phase = null' \
                    "$state_file" > "$tmp"
                 mv "$tmp" "$state_file"
 
@@ -2199,7 +2214,8 @@ advance_phase() {
                        '.current_phase = $phase |
                         .status = $status |
                         .updated_at = $ts |
-                        .current_phase_metadata.gate_entered_at = $ts' \
+                        .current_phase_metadata.gate_entered_at = $ts |
+                        .current_phase_metadata.dispatched_phase = null' \
                        "$state_file" > "$tmp"
                 else
                     jq --arg phase "$next_phase" \
@@ -2207,7 +2223,8 @@ advance_phase() {
                        --arg ts "$ts" \
                        '.current_phase = $phase |
                         .status = $status |
-                        .updated_at = $ts' \
+                        .updated_at = $ts |
+                        .current_phase_metadata.dispatched_phase = null' \
                        "$state_file" > "$tmp"
                 fi
                 mv "$tmp" "$state_file"
