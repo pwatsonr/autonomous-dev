@@ -627,47 +627,6 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
                 </div>
             </SettingsSection>
 
-            <SettingsSection id="notifications" title="Notifications">
-                <div class="field">
-                    <label for="slack-webhook">Slack webhook URL</label>
-                    <input
-                        type="url"
-                        id="slack-webhook"
-                        name="notifications.slack.webhook"
-                        value={valueOrEmpty(
-                            settings.notifications?.slack?.webhook,
-                        )}
-                        class={fieldClass(
-                            "input",
-                            fe,
-                            "notifications.slack.webhook",
-                        )}
-                    />
-                    <FieldError
-                        field="notifications.slack.webhook"
-                        message={fe["notifications.slack.webhook"]}
-                    />
-                </div>
-                <div class="field">
-                    <label for="notify-email">Notification email</label>
-                    <input
-                        type="email"
-                        id="notify-email"
-                        name="notifications.email.to"
-                        value={valueOrEmpty(settings.notifications?.email?.to)}
-                        class={fieldClass(
-                            "input",
-                            fe,
-                            "notifications.email.to",
-                        )}
-                    />
-                    <FieldError
-                        field="notifications.email.to"
-                        message={fe["notifications.email.to"]}
-                    />
-                </div>
-            </SettingsSection>
-
             <div class="form-actions">
                 <button type="submit" class="btn-primary">
                     Save settings

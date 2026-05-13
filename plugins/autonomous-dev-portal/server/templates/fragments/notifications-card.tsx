@@ -105,7 +105,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest }) => {
                 <label class="sub-label">Default notification method</label>
                 <select
                     class="input"
-                    name="notify-default"
+                    name="notifyDefault"
                     data-validate="notify-default"
                 >
                     {DEFAULTS.map((opt) => (
@@ -161,6 +161,15 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest }) => {
             <div class="form-actions">
                 <Btn
                     kind="primary"
+                    hx-post="/api/settings/notifications"
+                    hx-include="closest .sec"
+                    hx-target="closest .sec"
+                    hx-swap="outerHTML"
+                >
+                    Save notifications
+                </Btn>
+                <Btn
+                    kind="secondary"
                     disabled={!canSendTest}
                     hx-post="/api/settings/notifications/test/send"
                     hx-target="closest .sec"
