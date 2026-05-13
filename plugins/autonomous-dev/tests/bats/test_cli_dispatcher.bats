@@ -350,15 +350,16 @@ make_sandbox_dispatcher() {
     [[ "$output" == *"node command not found"* ]]
 }
 
-@test "subprocess: missing cli_adapter.js exits 2" {
+@test "subprocess: missing cli_adapter.js and no source still tries to build" {
     local sandbox="${BATS_TMP}/no-adapter"
     mkdir -p "${sandbox}/bin"
     cp "${DISPATCHER}" "${sandbox}/bin/autonomous-dev.sh"
     chmod +x "${sandbox}/bin/autonomous-dev.sh"
-    # Intentionally do NOT create intake/adapters/cli_adapter.js.
-    run "${sandbox}/bin/autonomous-dev.sh" request submit "x"
+    # Intentionally do NOT create intake/adapters/cli_adapter.js OR cli_adapter.ts.
+    # The dispatcher will try to build anyway since .js is missing.
+    PATH="/usr/bin:/bin" run "${sandbox}/bin/autonomous-dev.sh" request submit "x"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"CLI adapter not found"* ]]
+    [[ "$output" == *"bun command not found"* ]]
 }
 
 @test "subprocess: node nonzero exit propagates" {
@@ -374,4 +375,132 @@ EOF
     chmod +x "${shim_dir}/node"
     PATH="${shim_dir}:${PATH}" run "${sandbox_disp}" request submit "x"
     [ "$status" -eq 7 ]
+}
+
+###############################################################################
+# Group 7: CLI build-if-absent functionality (FR-020-10c)
+###############################################################################
+
+@test "cli-build: builds adapter when missing" {
+    local sandbox="${BATS_TMP}/build-test"
+    mkdir -p "${sandbox}/bin" "${sandbox}/intake/adapters"
+    cp "${DISPATCHER}" "${sandbox}/bin/autonomous-dev.sh"
+    chmod +x "${sandbox}/bin/autonomous-dev.sh"
+
+    # Create a dummy TypeScript source
+    echo "// dummy source" > "${sandbox}/intake/adapters/cli_adapter.ts"
+
+    # Create mock bun that creates the expected output
+    local bun_dir="${BATS_TMP}/mock-bun-bin"
+    mkdir -p "${bun_dir}"
+    cat > "${bun_dir}/bun" <<EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "run" && "\$2" == "build:cli" ]]; then
+    echo "// built cli" > intake/adapters/cli_adapter.js
+    exit 0
+fi
+exit 1
+EOF
+    chmod +x "${bun_dir}/bun"
+
+    # Create mock node that succeeds
+    local node_dir="${BATS_TMP}/mock-node-bin"
+    mkdir -p "${node_dir}"
+    cat > "${node_dir}/node" <<'EOF'
+#!/usr/bin/env bash
+echo "node called with: $*"
+exit 0
+EOF
+    chmod +x "${node_dir}/node"
+
+    # Run the dispatcher with missing adapter
+    PATH="${bun_dir}:${node_dir}:${PATH}" run "${sandbox}/bin/autonomous-dev.sh" request submit "test"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Building CLI adapter"* ]]
+    [[ "$output" == *"node called with"* ]]
+    # Verify the .js file was created
+    [[ -f "${sandbox}/intake/adapters/cli_adapter.js" ]]
+}
+
+@test "cli-build: rebuilds when source is newer" {
+    local sandbox="${BATS_TMP}/rebuild-test"
+    mkdir -p "${sandbox}/bin" "${sandbox}/intake/adapters"
+    cp "${DISPATCHER}" "${sandbox}/bin/autonomous-dev.sh"
+    chmod +x "${sandbox}/bin/autonomous-dev.sh"
+
+    # Create source and old built file
+    echo "// old built" > "${sandbox}/intake/adapters/cli_adapter.js"
+    sleep 1
+    echo "// newer source" > "${sandbox}/intake/adapters/cli_adapter.ts"
+
+    # Create mock bun
+    local bun_dir="${BATS_TMP}/mock-bun-bin2"
+    mkdir -p "${bun_dir}"
+    cat > "${bun_dir}/bun" <<EOF
+#!/usr/bin/env bash
+if [[ "\$1" == "run" && "\$2" == "build:cli" ]]; then
+    echo "// rebuilt cli" > intake/adapters/cli_adapter.js
+    exit 0
+fi
+exit 1
+EOF
+    chmod +x "${bun_dir}/bun"
+
+    # Create mock node
+    local node_dir="${BATS_TMP}/mock-node-bin2"
+    mkdir -p "${node_dir}"
+    cat > "${node_dir}/node" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${node_dir}/node"
+
+    # Run the dispatcher
+    PATH="${bun_dir}:${node_dir}:${PATH}" run "${sandbox}/bin/autonomous-dev.sh" request submit "test"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Building CLI adapter"* ]]
+    # Verify file was rebuilt
+    [[ "$(cat "${sandbox}/intake/adapters/cli_adapter.js")" == "// rebuilt cli" ]]
+}
+
+@test "cli-build: exits 2 when bun missing" {
+    local sandbox="${BATS_TMP}/no-bun-test"
+    mkdir -p "${sandbox}/bin" "${sandbox}/intake/adapters"
+    cp "${DISPATCHER}" "${sandbox}/bin/autonomous-dev.sh"
+    chmod +x "${sandbox}/bin/autonomous-dev.sh"
+
+    # Create source but no built file
+    echo "// source" > "${sandbox}/intake/adapters/cli_adapter.ts"
+
+    # Make sure bun is not on PATH
+    PATH="/usr/bin:/bin" run "${sandbox}/bin/autonomous-dev.sh" request submit "test"
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"bun command not found"* ]]
+}
+
+@test "cli-build: exits 2 when build fails" {
+    local sandbox="${BATS_TMP}/build-fail-test"
+    mkdir -p "${sandbox}/bin" "${sandbox}/intake/adapters"
+    cp "${DISPATCHER}" "${sandbox}/bin/autonomous-dev.sh"
+    chmod +x "${sandbox}/bin/autonomous-dev.sh"
+
+    # Create source but no built file
+    echo "// source" > "${sandbox}/intake/adapters/cli_adapter.ts"
+
+    # Create failing bun mock
+    local bun_dir="${BATS_TMP}/fail-bun-bin"
+    mkdir -p "${bun_dir}"
+    cat > "${bun_dir}/bun" <<'EOF'
+#!/usr/bin/env bash
+exit 1
+EOF
+    chmod +x "${bun_dir}/bun"
+
+    PATH="${bun_dir}:/usr/bin:/bin" run "${sandbox}/bin/autonomous-dev.sh" request submit "test"
+
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"failed to build the intake CLI"* ]]
 }

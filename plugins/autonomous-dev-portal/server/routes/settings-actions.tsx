@@ -223,6 +223,81 @@ export function buildSettingsActionRoutes(
     });
 
     // -----------------------------------------------------------------
+    // POST /api/settings/notifications — save notifications config
+    // -----------------------------------------------------------------
+    router.post("/api/settings/notifications", async (c) => {
+        let form: Record<string, unknown> = {};
+        try {
+            form = (await c.req.parseBody()) as Record<string, unknown>;
+        } catch {
+            return c.html(genericErrorFragment("invalid form body"), 422);
+        }
+        const actor = resolveActor(c.get("auth"));
+
+        // Validate webhook URLs
+        for (const field of ["discordWebhook", "slackWebhook"]) {
+            const value = form[field];
+            if (typeof value === "string" && value.length > 0) {
+                try {
+                    const url = new URL(value);
+                    if (field === "discordWebhook" && !url.hostname.includes("discord.com")) {
+                        return c.html(genericErrorFragment("Discord webhook must be from discord.com"), 422);
+                    }
+                    if (field === "slackWebhook" && !url.hostname.includes("slack.com")) {
+                        return c.html(genericErrorFragment("Slack webhook must be from slack.com"), 422);
+                    }
+                } catch {
+                    return c.html(genericErrorFragment(`Invalid ${field.replace("Webhook", " webhook")} URL format`), 422);
+                }
+            }
+        }
+
+        // Validate default notification method coherence
+        const notifyDefault = form["notifyDefault"] as string;
+        const hasDiscord = typeof form["discordWebhook"] === "string" && form["discordWebhook"].length > 0;
+        const hasSlack = typeof form["slackWebhook"] === "string" && form["slackWebhook"].length > 0;
+
+        if (notifyDefault === "discord" && !hasDiscord) {
+            return c.html(genericErrorFragment("Cannot set Discord as default without a Discord webhook"), 422);
+        }
+        if (notifyDefault === "slack" && !hasSlack) {
+            return c.html(genericErrorFragment("Cannot set Slack as default without a Slack webhook"), 422);
+        }
+        if (notifyDefault === "both" && (!hasDiscord || !hasSlack)) {
+            return c.html(genericErrorFragment("Cannot set both channels as default without both webhook URLs"), 422);
+        }
+
+        // Validate DND time format if enabled
+        if (form["dndEnabled"]) {
+            const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            if (form["dndStart"] && !timeRegex.test(form["dndStart"] as string)) {
+                return c.html(genericErrorFragment("DND start time must be in HH:MM format"), 422);
+            }
+            if (form["dndEnd"] && !timeRegex.test(form["dndEnd"] as string)) {
+                return c.html(genericErrorFragment("DND end time must be in HH:MM format"), 422);
+            }
+        }
+
+        let result: SettingsFormSaveResult;
+        try {
+            result = await deps.store.saveFromForm(form, actor);
+        } catch (err) {
+            logger.error("settings_notifications_save_failed", {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return c.html(genericErrorFragment("save failed"), 500);
+        }
+        if (!result.ok) {
+            return c.html(result.fragment, 422);
+        }
+        await deps.audit.append({
+            event: "settings_notifications_saved",
+            actor,
+        });
+        return c.html(result.fragment);
+    });
+
+    // -----------------------------------------------------------------
     // POST /api/settings/notifications/test/{channel}
     // -----------------------------------------------------------------
     for (const channel of ["discord", "slack", "send"] as const) {

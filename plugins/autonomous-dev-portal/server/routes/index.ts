@@ -231,6 +231,10 @@ export function registerRoutes(
             "/api/settings/allowlist",
             disabledHandler("settings-actions-disabled"),
         );
+        app.post(
+            "/api/settings/notifications",
+            disabledHandler("settings-actions-disabled"),
+        );
         for (const ch of ["discord", "slack", "send"] as const) {
             app.post(
                 `/api/settings/notifications/test/${ch}`,
