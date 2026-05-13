@@ -958,6 +958,7 @@ resolve_max_turns() {
             code)                                                         turns=200 ;;
             integration)                                                  turns=100 ;;
             deploy)                                                       turns=30  ;;
+            monitor)                                                      turns=20  ;;
             *)                                                            turns=50  ;;
         esac
     fi
@@ -987,7 +988,9 @@ resolve_phase_budget() {
             prd_review|tdd_review|plan_review|spec_review|security_review) budget="2.0"  ;;
             code_review)                                                  budget="2.0"  ;;
             code)                                                         budget="10.0" ;;
+            integration)                                                  budget="5.0"  ;;
             deploy)                                                       budget="5.0"  ;;
+            monitor)                                                      budget="2.0"  ;;
             *)                                                            budget="5.0"  ;;
         esac
     fi
@@ -1015,6 +1018,7 @@ resolve_agent() {
     local phase="${1:-}"
 
     case "${phase}" in
+        intake)         echo ""; return 1 ;;
         prd)            echo "prd-author" ;;
         prd_review)     echo "doc-reviewer" ;;
         tdd)            echo "tdd-author" ;;
@@ -1025,9 +1029,9 @@ resolve_agent() {
         spec_review)    echo "doc-reviewer" ;;
         code)           echo "code-executor" ;;
         code_review)    echo "quality-reviewer" ;;
-        security_review) echo "security-reviewer" ;;
+        integration)    echo "test-executor" ;;
         deploy)         echo "deploy-executor" ;;
-        intake)         echo ""; return 1 ;;
+        monitor)        echo "performance-analyst" ;;
         *)              echo ""; return 1 ;;
     esac
 }

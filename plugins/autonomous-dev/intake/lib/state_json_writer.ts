@@ -10,6 +10,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { ALL_PIPELINE_PHASES, PHASE_OVERRIDE_MATRIX, type PipelinePhase } from '../types/phase-override';
+import { RequestType } from '../types/request-type';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -139,6 +141,11 @@ export function writeStateJson(request: RequestEntity, targetRepo: string): stri
   const priorityMap: Record<string, number> = { high: 0, normal: 1, low: 2 };
   const priorityValue = priorityMap[request.priority] ?? 1;
 
+  // Compute phase_overrides from the canonical matrix (FR-020-02)
+  const requestType = request.type as RequestType;
+  const skippedPhases = PHASE_OVERRIDE_MATRIX[requestType]?.skippedPhases ?? [];
+  const phaseOverrides = ALL_PIPELINE_PHASES.filter(phase => !skippedPhases.includes(phase));
+
   // Build state object with exactly the 19 fields from TDD §6.1
   const state = {
     id: request.request_id,
@@ -154,7 +161,7 @@ export function writeStateJson(request: RequestEntity, targetRepo: string): stri
     type: request.type,
     blocked_by: [],
     phase_history: [],
-    phase_overrides: [],  // Always present per SUGGESTION-1
+    phase_overrides: phaseOverrides,  // Computed from canonical matrix (FR-020-02)
     current_phase_metadata: {},
     cost_accrued_usd: 0,
     turn_count: 0,

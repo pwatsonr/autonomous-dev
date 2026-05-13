@@ -43,7 +43,9 @@ resolve_phase_budget() {
         prd_review|tdd_review|plan_review|spec_review|security_review) echo "2.0"  ;;
         code_review)                                                  echo "2.0"  ;;
         code)                                                         echo "10.0" ;;
+        integration)                                                  echo "5.0"  ;;
         deploy)                                                       echo "5.0"  ;;
+        monitor)                                                      echo "2.0"  ;;
         *)                                                            echo "5.0"  ;;
     esac
 }
