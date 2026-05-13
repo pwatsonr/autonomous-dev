@@ -11,7 +11,7 @@
       "name": "autonomous-dev",
       "source": "./plugins/autonomous-dev",
       "description": "Autonomous AI development system — continuously-running, self-improving development pipeline that receives product requests, decomposes them through PRD→TDD→Plan→Spec→Code, reviews at every gate, monitors production, and generates its own improvement PRDs.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "pwatsonr",
         "url": "https://github.com/pwatsonr"
