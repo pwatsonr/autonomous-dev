@@ -30,6 +30,7 @@ export AUTONOMOUS_DEV_CONFIG="${CONFIG_FILE}"
 readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
 readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
 readonly PORTAL_REQUEST_ACTIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/request-actions"
+readonly GATE_DECISIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/gate-decisions"
 
 # --- Runtime State Variables -------------------------------------------------
 
@@ -2109,6 +2110,62 @@ write_portal_request_action() {
     return 0
 }
 
+# write_gate_decision(request_id, project, phase) -> int
+#   Writes a gate decision file for portal /approvals consumption.
+#   Returns 0 on success or tolerated errors (defensive - never crashes daemon).
+write_gate_decision() {
+    local request_id="$1"
+    local project="$2"
+    local phase="$3"
+
+    if ! validate_request_id "$request_id"; then
+        log_warn "Invalid request ID in write_gate_decision: $request_id"
+        return 0
+    fi
+
+    local repo_basename
+    repo_basename=$(basename "$project")
+    local out_file="${GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
+    local tmp_file="${out_file}.tmp.$$"
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Ensure gate decisions directory exists
+    mkdir -p "${GATE_DECISIONS_DIR}" 2>/dev/null || {
+        log_warn "Failed to create gate decisions directory: $GATE_DECISIONS_DIR"
+        return 0
+    }
+
+    # Write gate decision file with defensive error handling
+    if ! jq -n \
+        --arg id "$request_id" \
+        --arg repo "$repo_basename" \
+        --arg phase "$phase" \
+        --arg state "pending" \
+        --arg entered_at "$ts" \
+        '{
+            id: $id,
+            repo: $repo,
+            phase: $phase,
+            state: $state,
+            waitedMin: 0,
+            gate_entered_at: $entered_at
+        }' > "$tmp_file" 2>/dev/null; then
+        log_warn "Failed to write gate decision file for $request_id"
+        rm -f "$tmp_file" 2>/dev/null || true
+        return 0
+    fi
+
+    # Atomic rename with error handling
+    if ! mv "$tmp_file" "$out_file" 2>/dev/null; then
+        log_warn "Failed to move gate decision file for $request_id"
+        rm -f "$tmp_file" 2>/dev/null || true
+        return 0
+    fi
+
+    return 0
+}
+
 ###############################################################################
 # Phase Advancement (SPEC-039-2-05)
 ###############################################################################
@@ -2196,6 +2253,12 @@ advance_phase() {
                     }')
                 echo "$event" >> "$events_file"
 
+                # Clean up gate decision file for completed request
+                local repo_basename
+                repo_basename=$(basename "$project")
+                local gate_file="${GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
+                rm -f "$gate_file" 2>/dev/null || true
+
                 log_info "Request $request_id completed successfully"
             else
                 # Advance to next phase
@@ -2246,6 +2309,11 @@ advance_phase() {
                 echo "$event" >> "$events_file"
 
                 log_info "Phase advanced: $request_id $current_phase -> $next_phase (status=$next_status)"
+
+                # Write gate decision when entering a gate
+                if [[ "$next_status" == "gate" ]]; then
+                    write_gate_decision "$request_id" "$project" "$next_phase"
+                fi
             fi
 
             # Write portal request action after state update
@@ -2768,6 +2836,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     mkdir -p "$LOG_DIR"
     mkdir -p "$ALERTS_DIR"
     mkdir -p "$PORTAL_REQUEST_ACTIONS_DIR"
+    mkdir -p "$GATE_DECISIONS_DIR"
 
     log_info "Daemon starting (PID $$, once_mode=${ONCE_MODE})"
 
