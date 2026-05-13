@@ -76,3 +76,7 @@ resolve_agent() {
 
 - `bash -n bin/supervisor-loop.sh`
 - `bats tests/bats/resolve_agent.bats`
+
+## Amendment (PRD-020)
+
+The shipped `resolve_agent` covers the canonical 14 phases: `intake`→none; `prd`→`prd-author`; `*_review` doc phases→`doc-reviewer`; `code`→`code-executor`; `code_review`→`quality-reviewer`; `integration`→`test-executor`; `deploy`→`deploy-executor`; `monitor`→`performance-analyst`. This is reconciled with `ALL_PIPELINE_PHASES` (`intake/types/phase-override.ts`) and `LEGACY_PHASES`. There is no `security_review` *phase* (it's a gate, not a phase).

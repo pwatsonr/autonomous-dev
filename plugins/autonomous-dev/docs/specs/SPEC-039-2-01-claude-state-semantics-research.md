@@ -64,3 +64,7 @@ N/A — this is a research artifact, not code. The deliverable IS the documentat
 - The reproducer command exits 0 OR produces a clearly captured error message.
 - Findings included in research artifact with no hand-waving.
 - Either: TDD-038 unchanged (Scenario A) — close OQ-039-1 in PLAN-039 notes, OR a follow-up doc-PR amends TDD-038 §6.2 (Scenario B/C).
+
+## Amendment (PRD-020)
+
+The shipped implementation uses the real `claude` CLI contract: `claude --print --output-format json --agent <name> --add-dir <req_dir> --add-dir <project> --permission-mode bypassPermissions --max-budget-usd <amt> "<prompt>"`. No `--state`/`--bug-context-path`/`--expedited`/`--max-turns`/`--prompt`/`--project-directory` flags are used. See `docs/research/RESEARCH-039-claude-state-semantics.md` for the authoritative CLI contract.

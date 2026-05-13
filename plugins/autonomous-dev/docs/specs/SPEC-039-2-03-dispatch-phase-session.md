@@ -90,3 +90,7 @@ dispatch_phase_session() {
 - `shellcheck bin/supervisor-loop.sh`
 - `bats tests/bats/dispatch_phase.bats`
 - Manual: submit a request, run daemon `--once`, observe `spawn_session_typed` invocation in logs.
+
+## Amendment (PRD-020)
+
+The real `claude` CLI contract is `claude --print --output-format json --agent <name> --add-dir <req_dir> --add-dir <project> --permission-mode bypassPermissions --max-budget-usd <amt> "<prompt>"` (no `--state`/`--bug-context-path`/`--expedited`/`--max-turns`/`--prompt`/`--project-directory`) — see `docs/research/RESEARCH-039-claude-state-semantics.md`. (`bypassPermissions` per B-12.)

@@ -81,3 +81,7 @@ mkdir -p "${HOME}/.autonomous-dev/portal/request-actions"
 - `bash -n bin/supervisor-loop.sh`
 - `bats tests/bats/portal_request_action_write.bats`
 - Manual: drive a state transition, `cat ~/.autonomous-dev/portal/request-actions/REQ-*.json` shows the latest status.
+
+## Amendment (PRD-020)
+
+The daemon writes to `${AUTONOMOUS_DEV_STATE_DIR:-$HOME/.autonomous-dev}/request-actions/<id>.json` (no `portal/` segment — matches `state-paths.ts`), and also `gate-decisions/<repo>__<id>.json` on entering a gate (FR-020-03).
