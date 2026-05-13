@@ -180,11 +180,21 @@ exec_node_cli() {
     local subcmd="$1"
     shift
     local cli_path="${PLUGIN_DIR}/intake/adapters/cli_adapter.js"
+    local cli_src="${PLUGIN_DIR}/intake/adapters/cli_adapter.ts"
 
-    if [[ ! -f "$cli_path" ]]; then
-        echo "ERROR: CLI adapter not found at $cli_path. Run plugin install or rebuild." >&2
-        exit 2
+    # Build CLI adapter if missing or source is newer
+    if [[ ! -f "$cli_path" || ( -f "$cli_src" && "$cli_src" -nt "$cli_path" ) ]]; then
+        if ! command -v bun >/dev/null 2>&1; then
+            echo "ERROR: bun command not found. Install bun to build CLI adapter." >&2
+            exit 2
+        fi
+        echo "Building CLI adapter..." >&2
+        if ! (cd "$PLUGIN_DIR" && bun run build:cli) >/dev/null 2>&1; then
+            echo "ERROR: failed to build the intake CLI (bun run build:cli)" >&2
+            exit 2
+        fi
     fi
+
     if ! command -v node >/dev/null 2>&1; then
         echo "ERROR: node command not found. Install Node.js 18+ to use request subcommands." >&2
         exit 2
