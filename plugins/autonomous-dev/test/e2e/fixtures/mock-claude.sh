@@ -58,7 +58,10 @@ while [[ $# -gt 0 ]]; do
             PHASE_BUDGET="$2"
             shift 2
             ;;
-        --print|--output-format|--permission-mode)
+        --print)
+            shift 1
+            ;;
+        --output-format|--permission-mode|--append-system-prompt|--model)
             shift 2
             ;;
         -*)

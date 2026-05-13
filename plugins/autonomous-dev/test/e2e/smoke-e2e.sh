@@ -2,275 +2,220 @@
 set -euo pipefail
 
 ###############################################################################
-# smoke-e2e.sh - End-to-End Smoke Test for PLAN-039
+# smoke-e2e.sh - End-to-end smoke test for PLAN-039 (intake-to-deploy pipeline)
 #
-# Tests the complete submit→daemon-pickup→dispatch→artifact loop without
-# spending real Anthropic API credits. Sets up a hermetic environment with:
-#   - Temporary repo and state directories
-#   - Mock claude binary on PATH
-#   - Minimal config for daemon
-#   - SQLite intake database
+# Proves the submit -> daemon-pickup -> dispatch -> artifact loop works WITHOUT
+# spending real Anthropic API. Hermetic: temp repo + temp $HOME + temp state
+# dir + a mock `claude` on PATH that writes the stub artifacts. Drives the
+# REAL daemon (`bin/supervisor-loop.sh --once` x N), not spawn-session.sh
+# directly, so it exercises intake->prd auto-transition, dispatch_phase_session,
+# spawn-session.sh, advance_phase, and the portal-action write.
 #
 # Exit codes:
-#   0  success - PRD artifact produced
-#   1  missing artifact
-#   2  daemon crashed/timeout
-#   3  setup failure
-#   4  timeout
+#   0  success           - PRD artifact produced AND request advanced past `prd`
+#   1  missing artifact   - daemon ran but produced no docs/prd/*.md (or no advance)
+#   2  daemon crash       - supervisor-loop.sh exited non-zero
+#   3  setup failure      - couldn't build the temp environment
+#   4  timeout            - a daemon iteration exceeded the watchdog
 ###############################################################################
 
 readonly PLUGIN_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 readonly SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Temp directories
-TMP=""
-TMP_REPO=""
-TMP_STATE=""
-TMP_CONFIG=""
-TMP_HOME=""
-
-# Exit codes as constants
 readonly EXIT_SUCCESS=0
 readonly EXIT_MISSING_ARTIFACT=1
 readonly EXIT_DAEMON_CRASH=2
 readonly EXIT_SETUP_FAILURE=3
 readonly EXIT_TIMEOUT=4
 
-# Cleanup function
+readonly DAEMON_ITERS="${SMOKE_DAEMON_ITERS:-5}"   # enough to walk intake->prd->prd_review->tdd...
+
+TMP=""
+PRESERVE_TMP="${SMOKE_PRESERVE_TMP:-0}"
+REPO=""; STATE_DIR=""; FAKE_HOME=""; MOCK_BIN=""; MOCK_LOG=""
+REQ_ID=""; STATE_FILE=""
+
 cleanup() {
-    local exit_code=$?
-    if [[ -n "${TMP:-}" ]]; then
-        rm -rf "$TMP"
+    local rc=$?
+    if [[ -n "${TMP:-}" && "${PRESERVE_TMP}" != "1" ]]; then
+        rm -rf "${TMP}"
+    elif [[ -n "${TMP:-}" ]]; then
+        echo "[smoke-e2e] temp dir preserved at ${TMP}" >&2
     fi
-    return $exit_code
+    return "${rc}"
 }
 trap cleanup EXIT
 
-log() {
-    echo "[smoke-e2e] $*" >&2
-}
+log()  { echo "[smoke-e2e] $*" >&2; }
+fail() { log "FAIL: $1"; exit "${2:-1}"; }
 
-# Create isolated test environment
+# --------------------------------------------------------------------------
 setup_environment() {
-    log "Setting up isolated test environment"
+    log "setting up isolated environment"
+    TMP=$(mktemp -d) || fail "mktemp failed" "${EXIT_SETUP_FAILURE}"
 
-    TMP=$(mktemp -d)
-    TMP_REPO="$TMP/repo"
-    TMP_STATE="$TMP/state"
-    TMP_CONFIG="$TMP/config.json"
-    TMP_HOME="$TMP/home"
+    REPO="${TMP}/repo"
+    STATE_DIR="${TMP}/state"
+    FAKE_HOME="${TMP}/home"
+    MOCK_BIN="${TMP}/bin"
+    MOCK_LOG="${TMP}/mock-claude.log"
 
-    # Create directories
-    mkdir -p "$TMP_HOME/.autonomous-dev" "$TMP_HOME/.claude" "$TMP_STATE"
+    mkdir -p "${FAKE_HOME}/.claude" "${FAKE_HOME}/.autonomous-dev" "${STATE_DIR}" "${MOCK_BIN}" \
+        || fail "mkdir failed" "${EXIT_SETUP_FAILURE}"
 
-    # Initialize git repo
-    git init -q "$TMP_REPO"
-    cd "$TMP_REPO"
-    git config user.email "smoke@example.com"
-    git config user.name "Smoke Test"
-    echo "# Smoke Test Repo" > README.md
-    git add README.md
-    git commit -q -m "Initial commit"
+    git init -q "${REPO}" || fail "git init failed" "${EXIT_SETUP_FAILURE}"
+    git -C "${REPO}" config user.email smoke@example.com
+    git -C "${REPO}" config user.name "Smoke Test"
+    echo "# smoke repo" > "${REPO}/README.md"
+    git -C "${REPO}" add README.md
+    git -C "${REPO}" commit -q -m "initial"
 
-    log "Temp repo created at $TMP_REPO"
-
-    # Write minimal auth config for intake
-    cat > "$TMP_HOME/.autonomous-dev/intake-auth.yaml" <<'EOF'
+    # intake auth (consumed by cli_adapter's AuthzEngine)
+    cat > "${FAKE_HOME}/.autonomous-dev/intake-auth.yaml" <<'YAML'
 version: 1
 users:
   - internal_id: smoke
     identities:
       cli_user: smoke
     role: contributor
-EOF
+YAML
 
-    # Write daemon config with allowlist
-    cat > "$TMP_HOME/.claude/autonomous-dev.json" <<EOF
+    # daemon config with the temp repo on the allowlist
+    cat > "${FAKE_HOME}/.claude/autonomous-dev.json" <<JSON
 {
-  "repositories": {
-    "allowlist": ["$TMP_REPO"]
-  },
+  "repositories": { "allowlist": ["${REPO}"] },
   "daemon": {
     "poll_interval_seconds": 1,
-    "circuit_breaker_threshold": 3,
-    "heartbeat_interval_seconds": 30,
-    "idle_backoff_max_seconds": 10,
-    "graceful_shutdown_timeout_seconds": 30,
-    "error_backoff_base_seconds": 5,
-    "error_backoff_max_seconds": 60,
     "max_retries_per_phase": 3,
-    "log_max_size_mb": 50,
-    "log_retention_days": 7,
-    "daily_cost_cap_usd": 50.00,
-    "monthly_cost_cap_usd": 500.00
+    "daily_cost_cap_usd": 50.0,
+    "monthly_cost_cap_usd": 500.0
   },
-  "trust": {
-    "trust_level": "high"
-  },
-  "cost_limits": {
-    "daily_cap_usd": 50.00,
-    "monthly_cap_usd": 500.00
-  }
+  "trust": { "trust_level": "high" },
+  "cost_limits": { "daily_cap_usd": 50.0, "monthly_cap_usd": 500.0 }
 }
-EOF
+JSON
 
-    log "Config written to $TMP_HOME/.claude/autonomous-dev.json"
-}
+    cp "${SCRIPT_DIR}/fixtures/mock-claude.sh" "${MOCK_BIN}/claude" || fail "copy mock-claude failed" "${EXIT_SETUP_FAILURE}"
+    chmod +x "${MOCK_BIN}/claude"
 
-# Setup mock claude on PATH
-setup_mock_claude() {
-    log "Setting up mock claude"
-
-    mkdir -p "$TMP/bin"
-    cp "$SCRIPT_DIR/fixtures/mock-claude.sh" "$TMP/bin/claude"
-    chmod +x "$TMP/bin/claude"
-
-    # Prepend to PATH
-    export PATH="$TMP/bin:$PATH"
-    export SMOKE_MOCK_LOG="$TMP/mock-claude.log"
-
-    log "Mock claude installed at $TMP/bin/claude"
+    export HOME="${FAKE_HOME}"
+    export AUTONOMOUS_DEV_STATE_DIR="${STATE_DIR}"
+    export PATH="${MOCK_BIN}:${PATH}"
+    export SMOKE_MOCK_LOG="${MOCK_LOG}"
+    log "temp env: repo=${REPO} state=${STATE_DIR} home=${FAKE_HOME}"
 }
 
-# Create a test request manually (bypassing the submission system for simplicity)
-create_test_request() {
-    log "Creating test request manually"
+# --------------------------------------------------------------------------
+# Try the real `submit` CLI; fall back to writing state.json directly.
+submit_request() {
+    log "submitting request"
+    local desc="Add a hello-world section to the README"
+    local state_file=""
 
-    # Create request directory structure
-    local req_dir="$TMP_REPO/.autonomous-dev/requests/REQ-000001"
-    mkdir -p "$req_dir"
+    if bun "${PLUGIN_DIR}/intake/adapters/cli_adapter.ts" submit "${desc}" \
+            --repo "${REPO}" --type feature > "${TMP}/submit.out" 2>&1; then
+        log "submit CLI succeeded:"
+        sed 's/^/  /' < "${TMP}/submit.out" >&2 || true
+        state_file=$(find "${REPO}/.autonomous-dev/requests" -name state.json 2>/dev/null | head -1 || echo "")
+        [[ -n "${state_file}" ]] && log "submit produced ${state_file}"
+    else
+        log "submit CLI failed (see below); falling back to a hand-written state.json"
+        sed 's/^/  /' < "${TMP}/submit.out" >&2 || true
+    fi
 
-    # Create state.json file manually
-    cat > "$req_dir/state.json" <<EOF
+    if [[ -z "${state_file}" ]]; then
+        REQ_ID="REQ-000001"
+        state_file="${REPO}/.autonomous-dev/requests/${REQ_ID}/state.json"
+        mkdir -p "$(dirname "${state_file}")"
+        local now; now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        cat > "${state_file}" <<JSON
 {
-  "id": "REQ-000001",
-  "status": "queued",
-  "current_phase": "intake",
-  "priority": 1,
-  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "title": "Add a hello-world section to the README",
-  "description": "Add a hello-world section to the README",
-  "target_repo": "$TMP_REPO",
-  "source": "cli",
-  "type": "feature",
-  "blocked_by": [],
-  "phase_history": [],
-  "phase_overrides": [],
-  "current_phase_metadata": {},
-  "cost_accrued_usd": 0,
-  "turn_count": 0,
-  "escalation_count": 0,
-  "schema_version": 1,
-  "error": null
+  "id": "${REQ_ID}", "status": "queued", "current_phase": "intake", "priority": 1,
+  "created_at": "${now}", "updated_at": "${now}",
+  "title": "${desc}", "description": "${desc}", "target_repo": "${REPO}",
+  "source": "claude_app", "type": "feature",
+  "blocked_by": [], "phase_history": [], "phase_overrides": [],
+  "current_phase_metadata": {}, "cost_accrued_usd": 0, "turn_count": 0,
+  "escalation_count": 0, "schema_version": 1, "error": null
 }
-EOF
-
-    log "Test request created at $req_dir"
-
-    # Verify state.json was created
-    if [[ -f "$req_dir/state.json" ]]; then
-        log "state.json created successfully"
+JSON
+        log "wrote ${state_file}"
     else
-        log "ERROR: Failed to create state.json"
-        exit $EXIT_SETUP_FAILURE
+        REQ_ID=$(jq -r '.id' "${state_file}")
     fi
+
+    [[ -f "${state_file}" ]] || fail "no state.json after submit" "${EXIT_SETUP_FAILURE}"
+    STATE_FILE="${state_file}"
+    log "request id=${REQ_ID} state=${STATE_FILE}"
 }
 
-# Run daemon iterations to process the request
-run_daemon_iterations() {
-    log "Running daemon iterations"
-
-    export HOME="$TMP_HOME"
-    export AUTONOMOUS_DEV_STATE_DIR="$TMP_STATE"
-
-
-    # Test spawn-session.sh directly to generate artifacts
-    local req_state_file="$(find "$TMP_REPO/.autonomous-dev/requests" -name "state.json" | head -1)"
-    if [[ -n "$req_state_file" ]]; then
-        log "Testing spawn-session.sh directly: $req_state_file, prd, prd-author"
-        if env PATH="$PATH" bash "$PLUGIN_DIR/bin/spawn-session.sh" "$req_state_file" "prd" "prd-author" 2>"$TMP/spawn-debug.log"; then
-            log "Direct spawn-session.sh test succeeded"
-        else
-            local spawn_exit=$?
-            log "Direct spawn-session.sh test failed with exit code $spawn_exit"
-            log "Spawn debug log:"
-            cat "$TMP/spawn-debug.log" | sed 's/^/  /' || true
-            exit $EXIT_SETUP_FAILURE
+# --------------------------------------------------------------------------
+run_daemon() {
+    log "running daemon for up to ${DAEMON_ITERS} one-shot iterations"
+    local i rc phase status
+    for ((i = 1; i <= DAEMON_ITERS; i++)); do
+        rc=0
+        bash "${PLUGIN_DIR}/bin/supervisor-loop.sh" --once \
+            > "${TMP}/daemon-iter-${i}.log" 2>&1 || rc=$?
+        phase=$(jq -r '.current_phase // "?"' "${STATE_FILE}" 2>/dev/null || echo "?")
+        status=$(jq -r '.status // "?"' "${STATE_FILE}" 2>/dev/null || echo "?")
+        log "  iter ${i}: daemon exit=${rc}  -> ${status}/${phase}"
+        if [[ ${rc} -ne 0 ]]; then
+            log "  daemon iteration ${i} log:"; sed 's/^/    /' < "${TMP}/daemon-iter-${i}.log" >&2 || true
+            fail "daemon exited ${rc} on iteration ${i}" "${EXIT_DAEMON_CRASH}"
         fi
+        if [[ "${phase}" != "intake" && "${phase}" != "prd" ]]; then
+            log "  request advanced to ${status}/${phase}; stopping daemon iterations"
+            break
+        fi
+    done
+}
+
+# --------------------------------------------------------------------------
+verify() {
+    log "verifying artifacts + state"
+
+    # 1. PRD artifact produced by the mock prd-author
+    local prd
+    prd=$(find "${REPO}/docs/prd" -name '*.md' 2>/dev/null | head -1 || echo "")
+    if [[ -z "${prd}" ]]; then
+        log "no PRD artifact under ${REPO}/docs/prd/"
+        log "repo contents:"; find "${REPO}" -type f 2>/dev/null | sed 's/^/  /' | head -30 >&2 || true
+        log "mock-claude log:"; sed 's/^/  /' < "${MOCK_LOG}" >&2 2>/dev/null || true
+        fail "missing PRD artifact" "${EXIT_MISSING_ARTIFACT}"
+    fi
+    log "PRD artifact: ${prd}"
+
+    # 2. request state advanced past `prd` (proves dispatch + advance_phase ran)
+    local phase status
+    phase=$(jq -r '.current_phase' "${STATE_FILE}")
+    status=$(jq -r '.status' "${STATE_FILE}")
+    if [[ "${phase}" == "intake" || "${phase}" == "prd" ]]; then
+        fail "request still at ${status}/${phase} — daemon did not advance past prd" "${EXIT_MISSING_ARTIFACT}"
+    fi
+    log "request advanced to ${status}/${phase}"
+
+    # 3. portal action file written (proves PR-4 wiring)
+    local action
+    action=$(find "${STATE_DIR}/request-actions" -name '*.json' 2>/dev/null | head -1 || echo "")
+    if [[ -n "${action}" ]]; then
+        log "portal action: ${action} -> $(jq -c '{id,phase,status,waitedMin}' "${action}" 2>/dev/null)"
     else
-        log "ERROR: No state.json file found for direct test"
-        exit $EXIT_SETUP_FAILURE
+        log "WARN: no portal request-action file under ${STATE_DIR}/request-actions/"
     fi
 }
 
-# Verify artifacts were produced
-verify_artifacts() {
-    log "Verifying artifacts were produced"
-
-    # Check for PRD artifacts
-    local prd_files
-    if [[ -d "$TMP_REPO/docs/prd" ]]; then
-        prd_files=$(find "$TMP_REPO/docs/prd" -name "*.md" 2>/dev/null | wc -l || echo "0")
-        log "Found $prd_files PRD file(s)"
-
-        if [[ "$prd_files" -gt 0 ]]; then
-            local prd_file
-            prd_file=$(find "$TMP_REPO/docs/prd" -name "*.md" | head -1)
-            log "SUCCESS: PRD artifact found at $prd_file"
-
-            # Show a snippet of the artifact
-            log "PRD content preview:"
-            head -5 "$prd_file" | sed 's/^/  /'
-
-            return $EXIT_SUCCESS
-        fi
-    fi
-
-    log "ERROR: No PRD artifacts found in $TMP_REPO/docs/prd/"
-
-    # Debug info
-    log "Debug: contents of $TMP_REPO:"
-    find "$TMP_REPO" -type f 2>/dev/null | head -20 | sed 's/^/  /' || true
-
-    # Check request state
-    local state_file
-    state_file=$(find "$TMP_REPO/.autonomous-dev/requests" -name "state.json" | head -1 2>/dev/null || echo "")
-    if [[ -n "$state_file" ]]; then
-        log "Request state:"
-        jq -r '.status, .current_phase' "$state_file" 2>/dev/null | sed 's/^/  /' || cat "$state_file" | sed 's/^/  /'
-    fi
-
-    # Check mock claude log
-    if [[ -f "$TMP/mock-claude.log" ]]; then
-        log "Mock claude log:"
-        cat "$TMP/mock-claude.log" | sed 's/^/  /' || true
-    fi
-
-    return $EXIT_MISSING_ARTIFACT
-}
-
-# Main execution
+# --------------------------------------------------------------------------
 main() {
-    log "Starting smoke E2E test"
-    local start_time
-    start_time=$(date +%s)
-
+    local t0; t0=$(date +%s)
+    log "start"
     setup_environment
-    setup_mock_claude
-    create_test_request
-    run_daemon_iterations
-    verify_artifacts
-
-    local end_time elapsed
-    end_time=$(date +%s)
-    elapsed=$((end_time - start_time))
-
-    log "PASS: smoke E2E completed successfully in ${elapsed}s"
-    log "Temp repo preserved at: $TMP_REPO"
-
-    return $EXIT_SUCCESS
+    submit_request
+    run_daemon
+    verify
+    local t1; t1=$(date +%s)
+    log "PASS: smoke E2E ok in $((t1 - t0))s (PRD artifact produced; request advanced past prd)"
+    exit "${EXIT_SUCCESS}"
 }
 
-# Run main function
 main "$@"
