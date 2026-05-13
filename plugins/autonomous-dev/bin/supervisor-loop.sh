@@ -12,7 +12,7 @@ set -euo pipefail
 # --- Constants ---------------------------------------------------------------
 # All paths derived from $HOME and the script's own location.
 
-readonly PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+readonly PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly LIB_DIR="${PLUGIN_DIR}/bin/lib"
 readonly DAEMON_HOME="${HOME}/.autonomous-dev"
 readonly LOCK_FILE="${DAEMON_HOME}/daemon.lock"
@@ -30,6 +30,7 @@ export AUTONOMOUS_DEV_CONFIG="${CONFIG_FILE}"
 readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
 readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
 readonly PORTAL_REQUEST_ACTIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/request-actions"
+readonly GATE_DECISIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/gate-decisions"
 
 # --- Runtime State Variables -------------------------------------------------
 
@@ -64,6 +65,7 @@ RECONCILE_EVERY_N_POLLS=${RECONCILE_EVERY_N_POLLS:-60}
 if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
     declare -gA _phase_legacy_warned=()
 fi
+
 
 ###############################################################################
 # Logging Functions
@@ -826,21 +828,29 @@ next_phase_for_state() {
         return 2
     fi
 
-    local overrides_len
-    overrides_len=$(jq -r '(.phase_overrides // []) | length' "${state_file}" 2>/dev/null || echo "0")
+    # Check if phase_overrides key exists (regardless of length)
+    local has_overrides_key
+    if jq -e 'has("phase_overrides")' "${state_file}" >/dev/null 2>&1; then
+        has_overrides_key="true"
+    else
+        has_overrides_key="false"
+    fi
 
     local -a phases=()
-    if [[ "${overrides_len}" -gt 0 ]]; then
-        # v1.1 path: read phase_overrides[] in order
+    if [[ "${has_overrides_key}" == "true" ]]; then
+        # v1.1 path: phase_overrides key exists - use it (even if empty)
         local phases_raw
         phases_raw=$(jq -r '.phase_overrides[]' "${state_file}" 2>/dev/null || true)
         while IFS= read -r p; do
             [[ -n "${p}" ]] && phases+=("${p}")
         done <<< "${phases_raw}"
+
+        # If phase_overrides is empty, fall back to legacy sequence but without warning
+        if [[ ${#phases[@]} -eq 0 ]]; then
+            phases=("${LEGACY_PHASES[@]}")
+        fi
     else
-        # v1.0 fallback: source legacy sequence and warn once
-        # shellcheck source=lib/phase-legacy.sh
-        source "${LIB_DIR}/phase-legacy.sh"
+        # v1.0 fallback: phase_overrides key is missing - warn once
         warn_legacy_fallback_once "${state_file}"
         phases=("${LEGACY_PHASES[@]}")
     fi
@@ -958,6 +968,7 @@ resolve_max_turns() {
             code)                                                         turns=200 ;;
             integration)                                                  turns=100 ;;
             deploy)                                                       turns=30  ;;
+            monitor)                                                      turns=20  ;;
             *)                                                            turns=50  ;;
         esac
     fi
@@ -987,7 +998,9 @@ resolve_phase_budget() {
             prd_review|tdd_review|plan_review|spec_review|security_review) budget="2.0"  ;;
             code_review)                                                  budget="2.0"  ;;
             code)                                                         budget="10.0" ;;
+            integration)                                                  budget="5.0"  ;;
             deploy)                                                       budget="5.0"  ;;
+            monitor)                                                      budget="2.0"  ;;
             *)                                                            budget="5.0"  ;;
         esac
     fi
@@ -1015,6 +1028,7 @@ resolve_agent() {
     local phase="${1:-}"
 
     case "${phase}" in
+        intake)         echo ""; return 1 ;;
         prd)            echo "prd-author" ;;
         prd_review)     echo "doc-reviewer" ;;
         tdd)            echo "tdd-author" ;;
@@ -1025,9 +1039,9 @@ resolve_agent() {
         spec_review)    echo "doc-reviewer" ;;
         code)           echo "code-executor" ;;
         code_review)    echo "quality-reviewer" ;;
-        security_review) echo "security-reviewer" ;;
+        integration)    echo "test-executor" ;;
         deploy)         echo "deploy-executor" ;;
-        intake)         echo ""; return 1 ;;
+        monitor)        echo "performance-analyst" ;;
         *)              echo ""; return 1 ;;
     esac
 }
@@ -1093,8 +1107,10 @@ dispatch_phase_session() {
     iso_timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
     jq --arg timestamp "${iso_timestamp}" \
+       --arg phase "${phase}" \
        '.current_phase_metadata.session_active = true |
-        .current_phase_metadata.dispatched_at = $timestamp' \
+        .current_phase_metadata.dispatched_at = $timestamp |
+        .current_phase_metadata.dispatched_phase = $phase' \
        "${state_file}" > "${tmp}"
     mv "${tmp}" "${state_file}"
 
@@ -1202,6 +1218,7 @@ resolve_phase_prompt() {
         base_prompt="${base_prompt//\{\{STATE_FILE\}\}/${state_file}}"
         base_prompt="${base_prompt//\{\{PHASE\}\}/${phase}}"
     else
+        local req_dir="${project}/.autonomous-dev/requests/${request_id}"
         base_prompt="You are an autonomous development agent working on request ${request_id}.
 
 Your current phase is: ${phase}
@@ -1210,8 +1227,10 @@ Read the request state file at: ${state_file}
 Read the project context at: ${project}
 
 Perform the work required for the '${phase}' phase as described in the state file.
-When complete, update the state file to reflect your progress.
-If you encounter an error you cannot resolve, write the error details to the state file's current_phase_metadata.last_error field."
+
+When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\": \"pass\" | \"fail\", \"feedback\": \"<short summary; for a review, the verdict + any blocking findings>\", \"artifacts\": [ { \"kind\": \"...\", \"path\": \"...\", \"title\": \"...\" } ] }\`.
+
+**Do NOT modify \`current_phase\` or \`status\` in \`${state_file}\` — the daemon owns all phase transitions.** You MAY append an entry to \`phase_history[]\` and set \`current_phase_metadata.${phase}_completed_at\`, but never change \`current_phase\`. If you hit an error you can't resolve, still write \`phase-result-${phase}.json\` with \`\"status\": \"fail\"\` and the error in \`\"feedback\"\`."
 
         log_info "No prompt file for phase '${phase}'. Using fallback prompt."
     fi
@@ -2100,6 +2119,108 @@ write_portal_request_action() {
     return 0
 }
 
+# write_gate_decision(request_id, project, phase) -> int
+#   Writes a gate decision file for portal /approvals consumption.
+#   Returns 0 on success or tolerated errors (defensive - never crashes daemon).
+write_gate_decision() {
+    local request_id="$1"
+    local project="$2"
+    local phase="$3"
+
+    if ! validate_request_id "$request_id"; then
+        log_warn "Invalid request ID in write_gate_decision: $request_id"
+        return 0
+    fi
+
+    local repo_basename
+    repo_basename=$(basename "$project")
+    local out_file="${GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
+    local tmp_file="${out_file}.tmp.$$"
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Ensure gate decisions directory exists
+    mkdir -p "${GATE_DECISIONS_DIR}" 2>/dev/null || {
+        log_warn "Failed to create gate decisions directory: $GATE_DECISIONS_DIR"
+        return 0
+    }
+
+    # Write gate decision file with defensive error handling
+    if ! jq -n \
+        --arg id "$request_id" \
+        --arg repo "$repo_basename" \
+        --arg phase "$phase" \
+        --arg state "pending" \
+        --arg entered_at "$ts" \
+        '{
+            id: $id,
+            repo: $repo,
+            phase: $phase,
+            state: $state,
+            waitedMin: 0,
+            gate_entered_at: $entered_at
+        }' > "$tmp_file" 2>/dev/null; then
+        log_warn "Failed to write gate decision file for $request_id"
+        rm -f "$tmp_file" 2>/dev/null || true
+        return 0
+    fi
+
+    # Atomic rename with error handling
+    if ! mv "$tmp_file" "$out_file" 2>/dev/null; then
+        log_warn "Failed to move gate decision file for $request_id"
+        rm -f "$tmp_file" 2>/dev/null || true
+        return 0
+    fi
+
+    return 0
+}
+
+# update_state_cost(request_id, project, session_cost) -> void
+#   Adds session_cost to state.json.cost_accrued_usd atomically.
+#   Defensive - does not crash daemon on errors.
+update_state_cost() {
+    local request_id="$1"
+    local project="$2"
+    local session_cost="$3"
+
+    if ! validate_request_id "$request_id"; then
+        log_warn "Invalid request ID in update_state_cost: $request_id"
+        return 0
+    fi
+
+    # Validate session_cost is numeric
+    if ! echo "${session_cost}" | jq -e 'tonumber' >/dev/null 2>&1; then
+        log_warn "Non-numeric session_cost '${session_cost}' in update_state_cost, defaulting to 0"
+        session_cost="0"
+    fi
+
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+
+    if [[ ! -f "$state_file" ]]; then
+        log_warn "State file missing in update_state_cost: $state_file"
+        return 0
+    fi
+
+    local tmp="${state_file}.tmp.$$"
+
+    # Add session cost to cost_accrued_usd atomically
+    if ! jq --argjson cost "${session_cost}" \
+        '.cost_accrued_usd = ((.cost_accrued_usd // 0) + $cost)' \
+        "$state_file" > "$tmp" 2>/dev/null; then
+        log_warn "Failed to update cost in state file for request $request_id"
+        rm -f "$tmp" 2>/dev/null || true
+        return 0
+    fi
+
+    if ! mv "$tmp" "$state_file" 2>/dev/null; then
+        log_warn "Failed to move updated state file for request $request_id"
+        rm -f "$tmp" 2>/dev/null || true
+        return 0
+    fi
+
+    return 0
+}
+
 ###############################################################################
 # Phase Advancement (SPEC-039-2-05)
 ###############################################################################
@@ -2121,9 +2242,9 @@ advance_phase() {
     local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
     local events_file="${project}/.autonomous-dev/requests/${request_id}/events.jsonl"
 
-    # Read current phase
+    # Read current phase (prefer dispatched_phase to avoid agent-mutated current_phase)
     local current_phase
-    current_phase=$(jq -r '.current_phase // .status' "$state_file" 2>/dev/null || echo "")
+    current_phase=$(jq -r '.current_phase_metadata.dispatched_phase // .current_phase // .status' "$state_file" 2>/dev/null || echo "")
     if [[ -z "$current_phase" ]]; then
         log_error "Cannot determine current_phase from state file: $state_file"
         return 1
@@ -2151,6 +2272,14 @@ advance_phase() {
 
     case "$result_status" in
         "pass")
+            # Before computing next phase, ensure current_phase reflects the dispatched phase
+            # (in case agent mutated it during the session)
+            local tmp_restore="${state_file}.restore.$$"
+            jq --arg phase "$current_phase" \
+               '.current_phase = $phase' \
+               "$state_file" > "$tmp_restore"
+            mv "$tmp_restore" "$state_file"
+
             # Determine next phase
             local next_phase
             next_phase=$(next_phase_for_state "$state_file")
@@ -2159,7 +2288,9 @@ advance_phase() {
                 # Terminal - mark done
                 local tmp="${state_file}.tmp.$$"
                 jq --arg ts "$ts" \
-                   '.status = "done" | .updated_at = $ts' \
+                   '.status = "done" |
+                    .updated_at = $ts |
+                    .current_phase_metadata.dispatched_phase = null' \
                    "$state_file" > "$tmp"
                 mv "$tmp" "$state_file"
 
@@ -2176,6 +2307,12 @@ advance_phase() {
                         phase: $phase
                     }')
                 echo "$event" >> "$events_file"
+
+                # Clean up gate decision file for completed request
+                local repo_basename
+                repo_basename=$(basename "$project")
+                local gate_file="${GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
+                rm -f "$gate_file" 2>/dev/null || true
 
                 log_info "Request $request_id completed successfully"
             else
@@ -2195,7 +2332,8 @@ advance_phase() {
                        '.current_phase = $phase |
                         .status = $status |
                         .updated_at = $ts |
-                        .current_phase_metadata.gate_entered_at = $ts' \
+                        .current_phase_metadata.gate_entered_at = $ts |
+                        .current_phase_metadata.dispatched_phase = null' \
                        "$state_file" > "$tmp"
                 else
                     jq --arg phase "$next_phase" \
@@ -2203,7 +2341,8 @@ advance_phase() {
                        --arg ts "$ts" \
                        '.current_phase = $phase |
                         .status = $status |
-                        .updated_at = $ts' \
+                        .updated_at = $ts |
+                        .current_phase_metadata.dispatched_phase = null' \
                        "$state_file" > "$tmp"
                 fi
                 mv "$tmp" "$state_file"
@@ -2225,6 +2364,11 @@ advance_phase() {
                 echo "$event" >> "$events_file"
 
                 log_info "Phase advanced: $request_id $current_phase -> $next_phase (status=$next_status)"
+
+                # Write gate decision when entering a gate
+                if [[ "$next_status" == "gate" ]]; then
+                    write_gate_decision "$request_id" "$project" "$next_phase"
+                fi
             fi
 
             # Write portal request action after state update
@@ -2704,16 +2848,19 @@ main_loop() {
             log_warn "Hint: Set daemon.max_turns_by_phase.${current_phase} in ~/.claude/autonomous-dev.json"
 
             # Still counts as an error for retry purposes, but does NOT trip the circuit breaker
+            update_state_cost "${request_id}" "${project}" "${session_cost}"
             update_request_state "${request_id}" "${project}" "error" "${session_cost}" "${exit_code}"
             check_retry_exhaustion "${request_id}" "${project}"
             # Do NOT call record_crash -- turn exhaustion is not a crash
             update_cost_ledger "${session_cost}" "${request_id}"
         elif [[ ${exit_code} -eq 0 ]]; then
             record_success
+            update_state_cost "${request_id}" "${project}" "${session_cost}"
             advance_phase "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
         else
             record_crash "${request_id}" "${exit_code}"
+            update_state_cost "${request_id}" "${project}" "${session_cost}"
             update_request_state "${request_id}" "${project}" "error" "${session_cost}" "${exit_code}"
             check_retry_exhaustion "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
@@ -2737,6 +2884,12 @@ main_loop() {
 # Main Entry Point
 ###############################################################################
 
+# Source the legacy phase sequence once at startup
+# shellcheck source=bin/lib/phase-legacy.sh
+if [[ -f "${LIB_DIR}/phase-legacy.sh" ]]; then
+    source "${LIB_DIR}/phase-legacy.sh"
+fi
+
 # Guard: allow the script to be sourced for unit testing without executing main.
 # When sourced, the caller can invoke individual functions directly.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
@@ -2747,6 +2900,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     mkdir -p "$LOG_DIR"
     mkdir -p "$ALERTS_DIR"
     mkdir -p "$PORTAL_REQUEST_ACTIONS_DIR"
+    mkdir -p "$GATE_DECISIONS_DIR"
 
     log_info "Daemon starting (PID $$, once_mode=${ONCE_MODE})"
 

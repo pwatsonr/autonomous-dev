@@ -58,12 +58,15 @@ source_supervisor_helpers() {
     PLUGIN_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
     LIB_DIR="${PLUGIN_DIR}/bin/lib"
     export PLUGIN_DIR LIB_DIR
+    # Source phase-legacy.sh again since it's not in the temp file
+    # shellcheck disable=SC1090
+    source "${LIB_DIR}/phase-legacy.sh"
 }
 
 @test "feature-typed state advances intake -> prd" {
     source_supervisor_helpers
     local sf; sf=$(copy_fixture feature.json)
-    run next_phase_for_state "${sf}"
+    run --separate-stderr next_phase_for_state "${sf}"
     [ "${status}" -eq 0 ]
     [ "${output}" = "prd" ]
 }
@@ -71,7 +74,7 @@ source_supervisor_helpers() {
 @test "bug-typed state advances intake -> tdd (PRD skipped)" {
     source_supervisor_helpers
     local sf; sf=$(copy_fixture bug.json)
-    run next_phase_for_state "${sf}"
+    run --separate-stderr next_phase_for_state "${sf}"
     [ "${status}" -eq 0 ]
     [ "${output}" = "tdd" ]
 }
@@ -96,7 +99,7 @@ source_supervisor_helpers() {
     run check_phase_advancement_blocked "${sf}"
     [ "${status}" -eq 0 ]
     # And the next phase progression returns plan
-    run next_phase_for_state "${sf}"
+    run --separate-stderr next_phase_for_state "${sf}"
     [ "${status}" -eq 0 ]
     [ "${output}" = "plan" ]
 }
@@ -104,7 +107,7 @@ source_supervisor_helpers() {
 @test "refactor-typed state advances intake -> tdd" {
     source_supervisor_helpers
     local sf; sf=$(copy_fixture refactor.json)
-    run next_phase_for_state "${sf}"
+    run --separate-stderr next_phase_for_state "${sf}"
     [ "${status}" -eq 0 ]
     [ "${output}" = "tdd" ]
 }
@@ -123,8 +126,8 @@ source_supervisor_helpers() {
     source_supervisor_helpers
     local sf; sf=$(copy_fixture bug.json)
     # Mutate to terminal phase
-    jq '.current_phase = "validate"' "${sf}" > "${sf}.tmp" && mv "${sf}.tmp" "${sf}"
-    run next_phase_for_state "${sf}"
+    jq '.current_phase = "monitor"' "${sf}" > "${sf}.tmp" && mv "${sf}.tmp" "${sf}"
+    run --separate-stderr next_phase_for_state "${sf}"
     [ "${status}" -eq 0 ]
     [ "${output}" = "" ]
 }

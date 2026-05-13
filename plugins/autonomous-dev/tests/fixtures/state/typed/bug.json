@@ -9,9 +9,9 @@
     "intake",
     "tdd", "tdd_review",
     "plan", "plan_review",
+    "spec", "spec_review",
     "code", "code_review",
-    "test", "test_review",
-    "validate"
+    "integration", "deploy", "monitor"
   ],
   "type_config": {
     "maxRetries": 5,
