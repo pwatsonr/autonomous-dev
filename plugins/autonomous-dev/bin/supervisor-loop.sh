@@ -731,9 +731,16 @@ select_request() {
             local req_id status priority created_at blocked_by_count next_retry_after
             IFS='|' read -r req_id status priority created_at blocked_by_count next_retry_after <<< "${parsed}"
 
-            # Filter non-actionable states
+            # Filter non-actionable lifecycle states (terminal + paused).
+            # PRD-019 statuses: queued|running|gate|done|cancelled; PRD-020 added
+            # `failed`. The terminal three (`done`, `cancelled`, `failed`) must
+            # be skipped — without `done` here, the daemon kept re-selecting
+            # completed requests and re-dispatching the `monitor` agent on them,
+            # wasting cost. See B-13 in docs/triage/PLAN-039-SMOKE-TEST-FINDINGS.md
+            # (Path-C build-out test 2026-05-13). (`monitor` was previously in this
+            # list but never matched — it's a phase, not a status.)
             case "${status}" in
-                paused|failed|cancelled|monitor) continue ;;
+                done|cancelled|failed|paused) continue ;;
             esac
 
             # Filter blocked requests
