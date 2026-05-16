@@ -2620,7 +2620,7 @@ reconcile_orphans() {
 
     # Find orphan SQLite rows (queued + older than 24h)
     local orphan_rows
-    if ! orphan_rows=$(bun "${PLUGIN_DIR}/scripts/find-orphan-sqlite-rows.ts" 2>/dev/null); then
+    if ! orphan_rows=$(node "${PLUGIN_DIR}/scripts/find-orphan-sqlite-rows-simple.js" 2>/dev/null); then
         log_error "Failed to query orphan SQLite rows"
         return 1
     fi
@@ -2633,7 +2633,7 @@ reconcile_orphans() {
         local state_file="${target_repo}/.autonomous-dev/requests/${request_id}/state.json"
         if [[ ! -f "$state_file" ]]; then
             log_info "Marking orphan SQLite row as cancelled: ${request_id} (state file missing)"
-            if bun "${PLUGIN_DIR}/scripts/mark-request-cancelled.ts" "$request_id" "state-file-lost"; then
+            if node "${PLUGIN_DIR}/scripts/mark-request-cancelled-simple.js" "$request_id" "state-file-lost"; then
                 # Write portal request action for the cancelled orphan
                 write_portal_request_action "$request_id" "$target_repo"
             else

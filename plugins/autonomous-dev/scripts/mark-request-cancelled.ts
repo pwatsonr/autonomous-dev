@@ -1,13 +1,14 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Mark a request as cancelled with a reason.
  *
- * Usage: bun scripts/mark-request-cancelled.ts <request_id> <reason>
+ * Usage: npx tsx scripts/mark-request-cancelled.ts <request_id> <reason>
  */
 
 import { Repository } from '../intake/db/repository';
 import { initializeDatabase } from '../intake/db/migrator';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 function defaultDbPath(): string {
   const home = process.env.HOME || process.cwd();
@@ -17,13 +18,14 @@ function defaultDbPath(): string {
 function main() {
   const args = process.argv.slice(2);
   if (args.length !== 2) {
-    console.error('Usage: bun scripts/mark-request-cancelled.ts <request_id> <reason>');
+    console.error('Usage: npx tsx scripts/mark-request-cancelled.ts <request_id> <reason>');
     process.exit(1);
   }
 
   const [requestId, reason] = args;
 
   const dbPath = defaultDbPath();
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const migrationsDir = path.resolve(__dirname, '..', 'intake', 'db', 'migrations');
   const { db } = initializeDatabase(dbPath, migrationsDir);
   const repo = new Repository(db);
