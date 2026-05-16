@@ -13,6 +13,7 @@ import type { Context } from "hono";
 
 import { renderPage } from "../lib/response-utils";
 import { readRequestLedger } from "../wiring/request-ledger-reader";
+import { readMtdSpend } from "../wiring/daemon-readers";
 import type {
     DashboardRequest,
     RequestsAggregatesProp,
@@ -43,20 +44,19 @@ function isWithin24h(iso: string | undefined, now: number): boolean {
  * globals beyond the injected `now`. Exported so unit tests can pin
  * each KPI independently of the route handler's HTTP plumbing.
  *
- * `totalCostMtdUsd` mirrors the Dashboard's `totalMtd` semantically but
- * is sourced from per-request `cost` (not per-repo `monthlyCostUsd`) so
- * the figure is consistent with the table column beneath it.
+ * Note: totalCostMtdUsd is now injected as a parameter since it comes from
+ * the cost-ledger reader (authoritative source) rather than being computed
+ * from per-request costs.
  */
 export function computeRequestsAggregates(
     requests: DashboardRequest[],
+    totalCostMtdUsd: number,
     now: number = Date.now(),
 ): RequestsAggregatesProp {
     let activeCount = 0;
     let inGateCount = 0;
     let completedTodayCount = 0;
-    let totalCostMtdUsd = 0;
     for (const r of requests) {
-        totalCostMtdUsd += r.cost ?? 0;
         if (r.status === "gate") {
             inGateCount++;
         } else if (r.status === "done") {
@@ -78,6 +78,7 @@ export const requestsHandler = async (c: Context): Promise<Response> => {
     // PLAN-038 TASK-014 — swapped from loadDashboardStub() to the real
     // request-ledger reader. Empty state-dir → honest empty table.
     const items: DashboardRequest[] = await readRequestLedger();
-    const aggregates = computeRequestsAggregates(items);
+    const totalCostMtdUsd = await readMtdSpend();
+    const aggregates = computeRequestsAggregates(items, totalCostMtdUsd);
     return renderPage(c, "requests", { items, aggregates });
 };

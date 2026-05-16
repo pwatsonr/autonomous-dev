@@ -17,6 +17,7 @@ import {
     totalBlockingHits as sumBlockingHits,
 } from "../lib/standards-drift";
 import { readDashboardData } from "../wiring/dashboard-readers";
+import { readMtdSpend } from "../wiring/daemon-readers";
 import type {
     DashboardAggregatesProp,
     DashboardData,
@@ -44,15 +45,19 @@ function buildGateBreakdownText(requests: DashboardRequest[]): string {
  * SPEC-036-1-01 §Server-side aggregates. Pure: no I/O, no globals.
  * Exported so unit tests can pin every aggregate independently of
  * the route handler's HTTP plumbing.
+ *
+ * Note: totalMtd is now injected as a parameter since it comes from
+ * the cost-ledger reader (authoritative source) rather than being
+ * computed from per-repo costs.
  */
 export function computeDashboardAggregates(
     data: DashboardData,
+    totalMtd: number,
 ): DashboardAggregatesProp {
     const repos = data.repos ?? [];
     const requests = data.requests ?? [];
     const standards = data.standards ?? [];
     const totalActive = repos.reduce((s, r) => s + r.activeRequests, 0);
-    const totalMtd = repos.reduce((s, r) => s + r.monthlyCostUsd, 0);
     const gates = requests.filter((r) => r.status === "gate");
     // Sort by waitedMin desc, slice top 3 (SPEC-036-1-04 AC #2).
     const topGates = [...gates]
@@ -75,6 +80,7 @@ export const dashboardHandler = async (c: Context): Promise<Response> => {
     // composition reader. Empty state-dir → honest zero KPIs (per the
     // tenet "Honesty over fidelity").
     const data = await readDashboardData();
-    const aggregates = computeDashboardAggregates(data);
+    const totalMtd = await readMtdSpend();
+    const aggregates = computeDashboardAggregates(data, totalMtd);
     return renderPage(c, "dashboard", { data, aggregates });
 };
