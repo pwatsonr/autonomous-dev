@@ -44,7 +44,7 @@ export const RequestsHeadActions: FC = () => (
             Refresh
         </a>
         <a
-            href="https://github.com/pwatsonr/autonomous-dev#submitting-a-request"
+            href="https://github.com/pwatsonr/autonomous-dev#step-5-submit-your-first-request"
             class="btn primary"
             target="_blank"
             rel="noopener"

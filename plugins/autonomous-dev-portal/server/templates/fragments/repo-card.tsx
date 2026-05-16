@@ -61,10 +61,11 @@ export const RepoCard: FC<RepoSummary> = (r) => {
             ? `border-left: 4px solid var(--phase-${phase})`
             : undefined;
     return (
-        <button
-            type="button"
+        <a
+            href="/requests"
             class={className}
             data-phase={r.phase ?? ""}
+            data-repo={r.repo}
             style={style}
         >
             {/* 1. Top row */}
@@ -117,7 +118,7 @@ export const RepoCard: FC<RepoSummary> = (r) => {
                     </span>
                 )}
             </div>
-        </button>
+        </a>
     );
 };
 

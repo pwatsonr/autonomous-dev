@@ -50,17 +50,29 @@ const TrustCard: FC<{ data: SettingsData }> = ({ data }) => (
             Determines which gates require human approval. Per-repo overrides
             take precedence over the global default.
         </p>
-        <select
-            class="input"
-            name="trust-level"
-            data-validate="trust-level"
+        <form
+            hx-post="/settings"
+            hx-swap="outerHTML"
+            hx-target="closest section"
         >
-            {TRUST_LEVEL_OPTIONS.map((opt) => (
-                <option value={opt.value} selected={data.trustLevel === opt.value}>
-                    {opt.label}
-                </option>
-            ))}
-        </select>
+            <input type="hidden" name="_csrf" value={data.csrfToken ?? ""} />
+            <select
+                class="input"
+                name="trust-level"
+                data-validate="trust-level"
+            >
+                {TRUST_LEVEL_OPTIONS.map((opt) => (
+                    <option value={opt.value} selected={data.trustLevel === opt.value}>
+                        {opt.label}
+                    </option>
+                ))}
+            </select>
+            <div class="form-actions">
+                <Btn kind="primary" type="submit">
+                    Save Trust Level
+                </Btn>
+            </div>
+        </form>
     </section>
 );
 
@@ -96,60 +108,70 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
         <p class="dim">
             Hard caps. Pipelines pause when reached until reset or override.
         </p>
-        <div class="field" data-cost-cap-group>
-            <label for="cost-cap-per-request">Per-request cap</label>
-            <span class="prefix">$</span>
-            <input
-                type="number"
-                id="cost-cap-per-request"
-                name="perRequest"
-                min="0"
-                step="0.01"
-                value={String(data.costCaps.perRequest)}
-                class="input"
-                data-validate="cost-cap"
-                data-cost-cap-field="perRequest"
-            />
-            <FieldError field="perRequest" message={undefined} />
-        </div>
-        <div class="field" data-cost-cap-group>
-            <label for="cost-cap-daily">Daily cap</label>
-            <span class="prefix">$</span>
-            <input
-                type="number"
-                id="cost-cap-daily"
-                name="daily"
-                min="0"
-                step="0.01"
-                value={String(data.costCaps.daily)}
-                class="input"
-                data-validate="cost-cap"
-                data-cost-cap-field="daily"
-            />
-            <FieldError field="daily" message={undefined} />
-        </div>
-        <div class="field" data-cost-cap-group>
-            <label for="cost-cap-monthly">Monthly cap</label>
-            <span class="prefix">$</span>
-            <input
-                type="number"
-                id="cost-cap-monthly"
-                name="monthly"
-                min="0"
-                step="0.01"
-                value={String(data.costCaps.monthly)}
-                class="input"
-                data-validate="cost-cap"
-                data-cost-cap-field="monthly"
-            />
-            <FieldError field="monthly" message={undefined} />
-        </div>
+        <form
+            hx-post="/settings"
+            hx-swap="outerHTML"
+            hx-target="closest section"
+        >
+            <input type="hidden" name="_csrf" value={data.csrfToken ?? ""} />
+            <div class="field" data-cost-cap-group>
+                <label for="cost-cap-per-request">Per-request cap</label>
+                <span class="prefix">$</span>
+                <input
+                    type="number"
+                    id="cost-cap-per-request"
+                    name="perRequest"
+                    min="0"
+                    step="0.01"
+                    value={String(data.costCaps.perRequest)}
+                    class="input"
+                    data-validate="cost-cap"
+                    data-cost-cap-field="perRequest"
+                />
+                <FieldError field="perRequest" message={undefined} />
+            </div>
+            <div class="field" data-cost-cap-group>
+                <label for="cost-cap-daily">Daily cap</label>
+                <span class="prefix">$</span>
+                <input
+                    type="number"
+                    id="cost-cap-daily"
+                    name="daily"
+                    min="0"
+                    step="0.01"
+                    value={String(data.costCaps.daily)}
+                    class="input"
+                    data-validate="cost-cap"
+                    data-cost-cap-field="daily"
+                />
+                <FieldError field="daily" message={undefined} />
+            </div>
+            <div class="field" data-cost-cap-group>
+                <label for="cost-cap-monthly">Monthly cap</label>
+                <span class="prefix">$</span>
+                <input
+                    type="number"
+                    id="cost-cap-monthly"
+                    name="monthly"
+                    min="0"
+                    step="0.01"
+                    value={String(data.costCaps.monthly)}
+                    class="input"
+                    data-validate="cost-cap"
+                    data-cost-cap-field="monthly"
+                />
+                <FieldError field="monthly" message={undefined} />
+            </div>
 
-        <div class="form-actions">
-            <Btn kind="ghost" data-action="reset-cost-caps">
-                Reset to defaults
-            </Btn>
-        </div>
+            <div class="form-actions">
+                <Btn kind="primary" type="submit">
+                    Save Cost Caps
+                </Btn>
+                <Btn kind="ghost" data-action="reset-cost-caps">
+                    Reset to defaults
+                </Btn>
+            </div>
+        </form>
 
         <h4>Current spend</h4>
         <div class="cost-rings">
@@ -182,6 +204,7 @@ const AllowlistCard: FC<{ data: SettingsData }> = ({ data }) => (
             hx-target="[data-fragment='allowlist-table']"
             hx-swap="outerHTML"
         >
+            <input type="hidden" name="_csrf" value={data.csrfToken ?? ""} />
             <div class="field">
                 <label for="allowlist-new-path">Add repo (absolute path)</label>
                 <input
@@ -387,6 +410,7 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
                 <NotificationsCard
                     config={data.notifications}
                     canSendTest={canSendTest}
+                    csrfToken={data.csrfToken}
                 />
             </Panel>
 
@@ -495,7 +519,7 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
         >
             <h1>Settings</h1>
 
-            <input type="hidden" name="csrfToken" value={csrfToken ?? ""} />
+            <input type="hidden" name="_csrf" value={csrfToken ?? ""} />
 
             {successMessage ? (
                 <div

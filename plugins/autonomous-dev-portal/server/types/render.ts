@@ -458,6 +458,8 @@ export interface SettingsData {
     defaultVariant?: string;
     /** SPEC-037-5-02 / 037-5-04 — currently-default backend id. */
     defaultBackend?: string;
+    /** CSRF token for form submissions */
+    csrfToken?: string;
 }
 
 export interface CostPoint {
