@@ -162,14 +162,25 @@ validate_request_id() {
 #   coreutils), or empty string if neither is available. macOS has no
 #   `timeout` by default; without it, phase sessions run without a
 #   wall-clock cap (a hung session blocks the daemon — install coreutils
-#   to get the cap). Warns once per process when absent.
+#   to get the cap). Warns once per daemon run when absent.
 _TIMEOUT_BIN_WARNED=false
 resolve_timeout_bin() {
     local bin
     bin=$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || echo "")
-    if [[ -z "${bin}" && "${_TIMEOUT_BIN_WARNED}" != "true" ]]; then
+
+    # PID-based file guard: this function is called inside subshells
+    # (`$(resolve_timeout_bin)` at L1118), so the in-process variable alone
+    # can't suppress the warning across calls. The file marker is the
+    # actual guard; the variable just short-circuits the no-subshell case.
+    # Uses $$ (always the daemon's parent-shell PID under bash) and the same
+    # state-dir resolution pattern as PORTAL_REQUEST_ACTIONS_DIR / GATE_DECISIONS_DIR.
+    local state_dir="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}"
+    local warn_file="${state_dir}/.timeout-warning-$$"
+    if [[ -z "${bin}" && "${_TIMEOUT_BIN_WARNED}" != "true" && ! -f "$warn_file" ]]; then
         log_warn "Neither 'timeout' nor 'gtimeout' found; phase sessions will run without a wall-clock cap. Install GNU coreutils (e.g. 'brew install coreutils') to enable it."
         _TIMEOUT_BIN_WARNED=true
+        mkdir -p "$state_dir" 2>/dev/null || true
+        touch "$warn_file" 2>/dev/null || true  # Ignore errors if state dir doesn't exist
     fi
     echo "${bin}"
 }
@@ -1947,13 +1958,24 @@ write_portal_request_action() {
         if [[ -n "$gate_entered_at" ]]; then
             local now_epoch entered_epoch
             now_epoch=$(date +%s)
-            # Try GNU date first, then gdate (macOS with coreutils), fall back to 0
+
+            # Parse ISO-8601 timestamp to epoch seconds
+            # Try multiple approaches for cross-platform compatibility
+
+            # Method 1: Try GNU date (Linux)
             if entered_epoch=$(date -d "$gate_entered_at" +%s 2>/dev/null); then
                 waited_min=$(( (now_epoch - entered_epoch) / 60 ))
+            # Method 2: Try gdate (macOS with GNU coreutils)
             elif entered_epoch=$(gdate -d "$gate_entered_at" +%s 2>/dev/null); then
                 waited_min=$(( (now_epoch - entered_epoch) / 60 ))
+            # Method 3: Use Node.js for cross-platform parsing.
+            # Passes the timestamp via argv to avoid string interpolation
+            # into JS source (untrusted state.json content otherwise
+            # could break out of the literal and execute code).
+            elif command -v node >/dev/null 2>&1 && entered_epoch=$(node -e "const d=new Date(process.argv[1]); if(isNaN(d.getTime()))process.exit(1); console.log(Math.floor(d.getTime()/1000))" "$gate_entered_at" 2>/dev/null) && [[ "$entered_epoch" =~ ^[0-9]+$ ]]; then
+                waited_min=$(( (now_epoch - entered_epoch) / 60 ))
             else
-                # Date parsing failed, leave waited_min as 0
+                # All parsing methods failed, leave waited_min as 0
                 log_warn "Failed to parse gate_entered_at timestamp: $gate_entered_at"
                 waited_min=0
             fi
@@ -2620,7 +2642,7 @@ reconcile_orphans() {
 
     # Find orphan SQLite rows (queued + older than 24h)
     local orphan_rows
-    if ! orphan_rows=$(bun "${PLUGIN_DIR}/scripts/find-orphan-sqlite-rows.ts" 2>/dev/null); then
+    if ! orphan_rows=$(node "${PLUGIN_DIR}/scripts/find-orphan-sqlite-rows-simple.js" 2>/dev/null); then
         log_error "Failed to query orphan SQLite rows"
         return 1
     fi
@@ -2633,7 +2655,7 @@ reconcile_orphans() {
         local state_file="${target_repo}/.autonomous-dev/requests/${request_id}/state.json"
         if [[ ! -f "$state_file" ]]; then
             log_info "Marking orphan SQLite row as cancelled: ${request_id} (state file missing)"
-            if bun "${PLUGIN_DIR}/scripts/mark-request-cancelled.ts" "$request_id" "state-file-lost"; then
+            if node "${PLUGIN_DIR}/scripts/mark-request-cancelled-simple.js" "$request_id" "state-file-lost"; then
                 # Write portal request action for the cancelled orphan
                 write_portal_request_action "$request_id" "$target_repo"
             else
