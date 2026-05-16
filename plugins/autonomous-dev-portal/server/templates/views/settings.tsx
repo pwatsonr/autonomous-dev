@@ -519,7 +519,7 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
         >
             <h1>Settings</h1>
 
-            <input type="hidden" name="csrfToken" value={csrfToken ?? ""} />
+            <input type="hidden" name="_csrf" value={csrfToken ?? ""} />
 
             {successMessage ? (
                 <div
