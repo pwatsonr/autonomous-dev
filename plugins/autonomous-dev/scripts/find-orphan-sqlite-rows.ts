@@ -1,15 +1,14 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Find orphan SQLite rows for reconciliation.
  * Emits pipe-delimited output: request_id|target_repo|created_at
  *
- * Usage: npx tsx scripts/find-orphan-sqlite-rows.ts
+ * Usage: bun scripts/find-orphan-sqlite-rows.ts
  */
 
 import { Repository } from '../intake/db/repository';
 import { initializeDatabase } from '../intake/db/migrator';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 
 function defaultDbPath(): string {
   const home = process.env.HOME || process.cwd();
@@ -18,7 +17,6 @@ function defaultDbPath(): string {
 
 function main() {
   const dbPath = defaultDbPath();
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const migrationsDir = path.resolve(__dirname, '..', 'intake', 'db', 'migrations');
   const { db } = initializeDatabase(dbPath, migrationsDir);
   const repo = new Repository(db);

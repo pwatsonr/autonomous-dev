@@ -168,11 +168,18 @@ resolve_timeout_bin() {
     local bin
     bin=$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || echo "")
 
-    # Use both variable and PID-based file guard to ensure warning appears only once per daemon run
-    local warn_file="${DAEMON_STATE_DIR}/.timeout-warning-${DAEMON_PID:-$$}"
+    # PID-based file guard: this function is called inside subshells
+    # (`$(resolve_timeout_bin)` at L1118), so the in-process variable alone
+    # can't suppress the warning across calls. The file marker is the
+    # actual guard; the variable just short-circuits the no-subshell case.
+    # Uses $$ (always the daemon's parent-shell PID under bash) and the same
+    # state-dir resolution pattern as PORTAL_REQUEST_ACTIONS_DIR / GATE_DECISIONS_DIR.
+    local state_dir="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}"
+    local warn_file="${state_dir}/.timeout-warning-$$"
     if [[ -z "${bin}" && "${_TIMEOUT_BIN_WARNED}" != "true" && ! -f "$warn_file" ]]; then
         log_warn "Neither 'timeout' nor 'gtimeout' found; phase sessions will run without a wall-clock cap. Install GNU coreutils (e.g. 'brew install coreutils') to enable it."
         _TIMEOUT_BIN_WARNED=true
+        mkdir -p "$state_dir" 2>/dev/null || true
         touch "$warn_file" 2>/dev/null || true  # Ignore errors if state dir doesn't exist
     fi
     echo "${bin}"
@@ -1961,8 +1968,11 @@ write_portal_request_action() {
             # Method 2: Try gdate (macOS with GNU coreutils)
             elif entered_epoch=$(gdate -d "$gate_entered_at" +%s 2>/dev/null); then
                 waited_min=$(( (now_epoch - entered_epoch) / 60 ))
-            # Method 3: Use Node.js for cross-platform parsing
-            elif command -v node >/dev/null 2>&1 && entered_epoch=$(node -e "console.log(Math.floor(new Date('$gate_entered_at').getTime() / 1000))" 2>/dev/null) && [[ "$entered_epoch" =~ ^[0-9]+$ ]]; then
+            # Method 3: Use Node.js for cross-platform parsing.
+            # Passes the timestamp via argv to avoid string interpolation
+            # into JS source (untrusted state.json content otherwise
+            # could break out of the literal and execute code).
+            elif command -v node >/dev/null 2>&1 && entered_epoch=$(node -e "const d=new Date(process.argv[1]); if(isNaN(d.getTime()))process.exit(1); console.log(Math.floor(d.getTime()/1000))" "$gate_entered_at" 2>/dev/null) && [[ "$entered_epoch" =~ ^[0-9]+$ ]]; then
                 waited_min=$(( (now_epoch - entered_epoch) / 60 ))
             else
                 # All parsing methods failed, leave waited_min as 0

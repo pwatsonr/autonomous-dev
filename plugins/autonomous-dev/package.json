@@ -37,7 +37,6 @@
     "js-yaml": "^3.14.1",
     "picomatch": "^4.0.4",
     "semver": "^7.7.4",
-    "tsx": "^4.22.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
