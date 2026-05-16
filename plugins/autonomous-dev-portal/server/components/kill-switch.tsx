@@ -123,6 +123,15 @@ export const KillSwitch: FC<KillSwitchProps> = ({
                             Confirm engage
                         </button>
                     </form>
+                    <button
+                        class="btn"
+                        type="button"
+                        hx-get="/ops/kill-switch-modal"
+                        hx-target="closest .ks-panel"
+                        hx-swap="outerHTML"
+                    >
+                        Cancel
+                    </button>
                 </div>
             </div>
         );

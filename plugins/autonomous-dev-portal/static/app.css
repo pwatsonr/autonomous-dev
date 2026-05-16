@@ -371,7 +371,7 @@ textarea.input { height: auto; min-height: 80px; padding: 8px 10px; font-family:
   display: flex; flex-direction: column; gap: 8px;
   background: var(--bg-1); border: 1px solid var(--line-1); border-left: 3px solid var(--phase-code);
   border-radius: 3px; padding: 14px 16px; cursor: pointer; text-align: left;
-  font-family: inherit; color: inherit;
+  font-family: inherit; color: inherit; text-decoration: none;
   transition: background var(--dur-fast) var(--ease-std);
 }
 .repo-card:hover { background: var(--bg-2); }
