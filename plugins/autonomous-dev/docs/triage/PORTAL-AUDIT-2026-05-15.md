@@ -455,3 +455,108 @@ The earlier triage listed 7 items. After the deep crawl, the picture is:
 5. `/requests` filter buttons need to actually filter the table.
 6. Dashboard repo tiles either need a target route (`/repo/<slug>`
    page) or should stop rendering as buttons.
+
+---
+
+# Follow-up items captured during the fix pass (not yet addressed)
+
+These were uncovered while shipping the audit fixes (PRs #265 + #266 +
+test fixup `945221b`) and are intentionally **out of scope** of those
+PRs. Each is its own future-PR-worth-of-work.
+
+## P0 — Plugin cache ships without `node_modules`
+
+**What it breaks:**
+- Daemon orphan reconciliation: `ERROR Failed to query orphan SQLite rows`
+  → `ERROR Orphan reconciliation failed`, every iteration.
+- CLI (`autonomous-dev request list`, `request submit`, etc.):
+  `ERROR: better-sqlite3 is required but not installed. Run: npm install
+  better-sqlite3`.
+
+**Root cause:** `~/.claude/plugins/cache/autonomous-dev/autonomous-dev/<version>/`
+contains source files but no `node_modules/`. The daemon scripts (and the
+CLI adapter) `import Database from 'better-sqlite3'`, which fails at
+runtime because Node's resolution can't find the package — the plugin
+cache is a leaf directory with no parent `node_modules`.
+
+**Workaround applied on 2026-05-15** (this repo, this machine):
+
+```bash
+cd ~/.claude/plugins/cache/autonomous-dev/autonomous-dev/0.1.0
+npm install --omit=dev --no-audit --no-fund
+# bun install --production refused with "lockfile is frozen" because the
+# cache has an npm-format package-lock.json; npm install worked first try.
+```
+
+After install: orphan reconciliation logged
+`Marking orphan SQLite row as cancelled: REQ-000003 (state file missing)` /
+`Orphan reconciliation complete`. CLI started returning JSON.
+
+**Why this should be a real fix, not a workaround:**
+
+1. `/plugin` update (the Claude-Code-driven path) probably wipes/replaces
+   the cache directory wholesale. Each cache refresh would re-break orphan
+   reconciliation and the CLI until the operator re-runs `npm install` in
+   the new cache dir. Today there's no documentation that says they need
+   to.
+2. The classifier auto-blocks `bun install` / `npm install` inside the
+   plugin cache as "self-modification of agent-loaded plugin code paths,"
+   which is right — but the user has to opt in explicitly each time.
+3. The bun-vs-npm asymmetry (the cache ships `package-lock.json` only,
+   no `bun.lockb`; `bun install` refuses; `npm install` works) is silent
+   in the install flow.
+
+**Suggested fixes:**
+
+- **Option A — plugin install runs `npm install` automatically.** Add a
+  post-install step to `autonomous-dev install-daemon` (or wherever the
+  marketplace-cache install runs) that does `npm install --omit=dev` in
+  the cached plugin dir if `package.json` is present and `node_modules`
+  is missing. Cost: ~3s install per refresh + ~150MB disk per plugin
+  version.
+- **Option B — bundle the SQLite calls.** Pre-bundle `find-orphan-sqlite-rows-simple.js`
+  and `mark-request-cancelled-simple.js` with `bun build --target=node
+  --external sqlite3 ...` so they ship as single files with their
+  dependency graph inlined. CLI adapter could go the same way (it already
+  uses `bun build` for `cli_adapter.js`; the missing `better-sqlite3`
+  external should resolve at runtime via a vendored copy or a smaller
+  pure-JS SQLite client).
+- **Option C — skip orphan reconciliation when deps are missing.** Detect
+  the missing `better-sqlite3` once at startup and `log_warn`-once that
+  reconciliation is disabled, instead of `log_error` every iteration.
+  Doesn't fix the underlying issue but stops the log spam.
+
+**Operator-side mitigation in the meantime:** add `npm install` to the
+"after `/plugin` update" runbook step alongside `autonomous-dev install-daemon`.
+
+## P1 — `gate-action-panel.tsx:235` uses `name="csrfToken"`
+
+Same CSRF-naming bug that was just fixed for `settings.tsx:522` in PR
+#265 (`75572f6`). Pre-existing on `main`; not part of the audit pass
+because that template wasn't on the audit's surface (gate-action panels
+only render inside the request-detail view). One-line fix:
+`name="csrfToken"` → `name="_csrf"` so the middleware (`csrf-protection.ts:447`)
+can validate the body.
+
+## P1 — Daemon writes `~/.autonomous-dev/effective-config.XXXXXX.json` with literal `XXXXXX`
+
+Observed during the 2026-05-15 fix pass: the daemon crash-looped on
+startup because `mktemp` failed on an existing file named *exactly*
+`effective-config.XXXXXX.json` (placeholder template, not substituted).
+Some script in the cached `supervisor-loop.sh` (or its callees) wrote
+the file with the template instead of letting `mktemp` substitute random
+chars. Manually `rm`-ing the file resolved the crash-loop, but the
+underlying bug — whichever code path wrote the placeholder — is still
+present. Hunt for `effective-config.XXXXXX` in the daemon bash and
+either fix the `mktemp` invocation or migrate to a proper temp-file
+helper.
+
+## P2 — Daemon issue 4 (synthesized phase result) is working-as-designed
+
+Already triaged in PR #266 (`a6a303d`). Logged for completeness: the
+`WARN synthesized phase result for REQ-000005 plan_review (exit code
+only; trust=low)` line comes from `spawn-session.sh:232-243` and is the
+documented fallback per SPEC-039-2-07 when the agent doesn't emit
+`phase-result-<phase>.json`. Fixing this is an agent-output-quality
+project, not a daemon project. Leaving here so the next audit doesn't
+re-discover it.
