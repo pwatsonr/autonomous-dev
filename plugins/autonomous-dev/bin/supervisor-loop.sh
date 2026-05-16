@@ -1947,13 +1947,21 @@ write_portal_request_action() {
         if [[ -n "$gate_entered_at" ]]; then
             local now_epoch entered_epoch
             now_epoch=$(date +%s)
-            # Try GNU date first, then gdate (macOS with coreutils), fall back to 0
+
+            # Parse ISO-8601 timestamp to epoch seconds
+            # Try multiple approaches for cross-platform compatibility
+
+            # Method 1: Try GNU date (Linux)
             if entered_epoch=$(date -d "$gate_entered_at" +%s 2>/dev/null); then
                 waited_min=$(( (now_epoch - entered_epoch) / 60 ))
+            # Method 2: Try gdate (macOS with GNU coreutils)
             elif entered_epoch=$(gdate -d "$gate_entered_at" +%s 2>/dev/null); then
                 waited_min=$(( (now_epoch - entered_epoch) / 60 ))
+            # Method 3: Use Node.js for cross-platform parsing
+            elif command -v node >/dev/null 2>&1 && entered_epoch=$(node -e "console.log(Math.floor(new Date('$gate_entered_at').getTime() / 1000))" 2>/dev/null) && [[ "$entered_epoch" =~ ^[0-9]+$ ]]; then
+                waited_min=$(( (now_epoch - entered_epoch) / 60 ))
             else
-                # Date parsing failed, leave waited_min as 0
+                # All parsing methods failed, leave waited_min as 0
                 log_warn "Failed to parse gate_entered_at timestamp: $gate_entered_at"
                 waited_min=0
             fi
