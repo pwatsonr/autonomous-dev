@@ -21,6 +21,8 @@ interface Props {
     /** Server-side derived: the saved configuration is valid. Drives the
      *  "Send test notification now" Btn enabled state. */
     canSendTest: boolean;
+    /** CSRF token for form submissions */
+    csrfToken?: string;
 }
 
 const DEFAULTS: NotifyDefault[] = ["discord", "slack", "both", "none"];
@@ -32,7 +34,7 @@ const TONE: Record<WebhookTestStatus, "ok" | "warn" | "err" | "muted"> = {
     muted: "muted",
 };
 
-export const NotificationsCard: FC<Props> = ({ config, canSendTest }) => {
+export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken }) => {
     const dndDisabled = config.notifyDefault === "none";
     return (
         <section class="sec" aria-labelledby="notifications-heading">
@@ -43,6 +45,9 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest }) => {
                 Send approval / failure pings to Discord or Slack. Tokens
                 are sent server-side only — never from the browser.
             </p>
+
+            {/* Hidden CSRF token for form submissions */}
+            <input type="hidden" name="_csrf" value={csrfToken ?? ""} />
 
             {/* Discord webhook --------------------------------------- */}
             <div class="field stacked-field" data-channel="discord">

@@ -30,6 +30,9 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
     const data = await loadSettingsData();
     data.activeTab = resolveActiveTab(c.req.query("tab"));
 
+    // Add CSRF token for form submissions
+    data.csrfToken = (c.get("csrfToken") as string | undefined) ?? "";
+
     // PLAN-038 TASK-020 — swap the fake `/Users/op/repos/*` allowlist for
     // the real portal-settings allowlist. The allowlist lives on
     // SettingsData (data.allowlist), not SettingsView (config). Other
