@@ -162,14 +162,18 @@ validate_request_id() {
 #   coreutils), or empty string if neither is available. macOS has no
 #   `timeout` by default; without it, phase sessions run without a
 #   wall-clock cap (a hung session blocks the daemon — install coreutils
-#   to get the cap). Warns once per process when absent.
+#   to get the cap). Warns once per daemon run when absent.
 _TIMEOUT_BIN_WARNED=false
 resolve_timeout_bin() {
     local bin
     bin=$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || echo "")
-    if [[ -z "${bin}" && "${_TIMEOUT_BIN_WARNED}" != "true" ]]; then
+
+    # Use both variable and PID-based file guard to ensure warning appears only once per daemon run
+    local warn_file="${DAEMON_STATE_DIR}/.timeout-warning-${DAEMON_PID:-$$}"
+    if [[ -z "${bin}" && "${_TIMEOUT_BIN_WARNED}" != "true" && ! -f "$warn_file" ]]; then
         log_warn "Neither 'timeout' nor 'gtimeout' found; phase sessions will run without a wall-clock cap. Install GNU coreutils (e.g. 'brew install coreutils') to enable it."
         _TIMEOUT_BIN_WARNED=true
+        touch "$warn_file" 2>/dev/null || true  # Ignore errors if state dir doesn't exist
     fi
     echo "${bin}"
 }
