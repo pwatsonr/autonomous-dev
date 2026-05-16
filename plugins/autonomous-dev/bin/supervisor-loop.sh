@@ -655,11 +655,27 @@ load_config() {
             exit 1
         fi
         # Deep recursive merge: defaults * user_config
-        EFFECTIVE_CONFIG=$(mktemp "${DAEMON_HOME}/effective-config.XXXXXX.json")
+        # BSD mktemp (macOS) only substitutes XXXXXX when it's trailing; if a
+        # `.json` extension follows the X's, the literal `XXXXXX` is written
+        # and any second mktemp call with the same template fails with
+        # `File exists`, leaving EFFECTIVE_CONFIG empty so `jq` later reads
+        # an empty path and the allowlist comes up empty (silent daemon
+        # idle). Create with trailing X's, then rename to add `.json`.
+        _tmp=$(mktemp "${DAEMON_HOME}/effective-config.XXXXXX")
+        EFFECTIVE_CONFIG="${_tmp}.json"
+        mv "${_tmp}" "${EFFECTIVE_CONFIG}"
         jq -s '.[0] * .[1]' "${DEFAULTS_FILE}" "${CONFIG_FILE}" > "${EFFECTIVE_CONFIG}"
     else
         # No user config -- use defaults as-is
-        EFFECTIVE_CONFIG=$(mktemp "${DAEMON_HOME}/effective-config.XXXXXX.json")
+        # BSD mktemp (macOS) only substitutes XXXXXX when it's trailing; if a
+        # `.json` extension follows the X's, the literal `XXXXXX` is written
+        # and any second mktemp call with the same template fails with
+        # `File exists`, leaving EFFECTIVE_CONFIG empty so `jq` later reads
+        # an empty path and the allowlist comes up empty (silent daemon
+        # idle). Create with trailing X's, then rename to add `.json`.
+        _tmp=$(mktemp "${DAEMON_HOME}/effective-config.XXXXXX")
+        EFFECTIVE_CONFIG="${_tmp}.json"
+        mv "${_tmp}" "${EFFECTIVE_CONFIG}"
         cp "${DEFAULTS_FILE}" "${EFFECTIVE_CONFIG}"
         log_info "No user config found at ${CONFIG_FILE}. Using defaults."
     fi
