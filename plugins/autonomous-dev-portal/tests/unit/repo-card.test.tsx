@@ -34,10 +34,12 @@ const baseRepo: RepoSummary = {
 };
 
 describe("RepoCard — SPEC-036-1-03 (updated by SPEC-037-6-01)", () => {
-    test("SPEC-037-6-01 AC: outer element is <button class=\"repo-card\"> (no <Card> wrapper)", async () => {
+    test("SPEC-037-6-01 AC: outer element is <a class=\"repo-card\"> (no <Card> wrapper)", async () => {
         const html = await render(<RepoCard {...baseRepo} />);
-        // Single-element outer wrapper: <button> carries the class.
-        expect(html).toMatch(/^<button [^>]*class="repo-card/);
+        // PORTAL-AUDIT-2026-05-15: outer was <button>, replaced with <a href="/requests"> so the
+        // hover affordance navigates somewhere (proper /repo/:slug filter is future work).
+        expect(html).toMatch(/^<a [^>]*class="repo-card/);
+        expect(html).toMatch(/href="\/requests"/);
         // No double-wrapper: the legacy <div class="card"> ... <div class="repo-card"> shape is gone.
         expect(html).not.toContain('class="card"');
     });
@@ -80,7 +82,7 @@ describe("RepoCard — SPEC-036-1-03 (updated by SPEC-037-6-01)", () => {
         expect(html).toContain('<span class="chip-phase code">CODE</span>');
     });
 
-    test("AC #1.6: phase left bar emitted inline on the <button class=\"repo-card\">", async () => {
+    test("AC #1.6: phase left bar emitted inline on the <a class=\"repo-card\">", async () => {
         const html = await render(<RepoCard {...baseRepo} phase="code" />);
         expect(html).toContain("border-left: 4px solid var(--phase-code)");
     });
