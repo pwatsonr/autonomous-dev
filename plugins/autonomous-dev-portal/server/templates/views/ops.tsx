@@ -155,7 +155,7 @@ export const OpsView: FC<RenderProps["ops"] & { csrfToken?: string }> = ({
         <div
             id="ops-body"
             hx-get="/ops"
-            hx-trigger="every 10s"
+            hx-trigger="every 10s [document.visibilityState === 'visible']"
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#ops-body"

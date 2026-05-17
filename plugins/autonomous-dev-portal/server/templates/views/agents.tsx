@@ -47,7 +47,7 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
         id="agents-body"
         class="agents-surface"
         hx-get="/agents"
-        hx-trigger="every 30s"
+        hx-trigger="every 30s [document.visibilityState === 'visible']"
         hx-target="this"
         hx-swap="outerHTML"
         hx-select="#agents-body"

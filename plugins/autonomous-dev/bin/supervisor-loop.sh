@@ -647,6 +647,18 @@ load_config() {
         exit 1
     fi
 
+    # 1a. One-time cleanup of the literal-placeholder file that older
+    # daemon builds left behind (PR #267 follow-up). Pre-fix daemons used
+    # `mktemp "...effective-config.XXXXXX.json"` which on BSD mktemp wrote
+    # a file with the literal `XXXXXX`. That file blocks subsequent
+    # mktemp calls. Operators upgrading from before #267 will still have
+    # one of these sitting in DAEMON_HOME the first time the new code
+    # runs; remove it so the new template substitutes cleanly.
+    if [[ -f "${DAEMON_HOME}/effective-config.XXXXXX.json" ]]; then
+        log_info "Cleaning up stale effective-config.XXXXXX.json placeholder from a pre-fix daemon run."
+        rm -f "${DAEMON_HOME}/effective-config.XXXXXX.json"
+    fi
+
     # 2/3. Merge with user config or use defaults as-is
     if [[ -f "${CONFIG_FILE}" ]]; then
         # Validate user config is valid JSON
@@ -654,28 +666,30 @@ load_config() {
             log_error "User config is invalid JSON: ${CONFIG_FILE}"
             exit 1
         fi
-        # Deep recursive merge: defaults * user_config
-        # BSD mktemp (macOS) only substitutes XXXXXX when it's trailing; if a
-        # `.json` extension follows the X's, the literal `XXXXXX` is written
-        # and any second mktemp call with the same template fails with
-        # `File exists`, leaving EFFECTIVE_CONFIG empty so `jq` later reads
-        # an empty path and the allowlist comes up empty (silent daemon
-        # idle). Create with trailing X's, then rename to add `.json`.
+        # Deep recursive merge: defaults * user_config.
+        # See PR #267 commit body for the BSD-mktemp template gotcha that
+        # made this look like a single `mktemp <path.XXXXXX.json>` call.
+        # `trap` covers a crash between mktemp and mv (would otherwise
+        # leak the temp file).
         _tmp=$(mktemp "${DAEMON_HOME}/effective-config.XXXXXX")
+        trap 'rm -f "${_tmp}" 2>/dev/null' RETURN
         EFFECTIVE_CONFIG="${_tmp}.json"
-        mv "${_tmp}" "${EFFECTIVE_CONFIG}"
+        if ! mv "${_tmp}" "${EFFECTIVE_CONFIG}"; then
+            log_error "Failed to rename effective-config temp file: ${_tmp} -> ${EFFECTIVE_CONFIG}"
+            rm -f "${_tmp}" 2>/dev/null
+            exit 1
+        fi
         jq -s '.[0] * .[1]' "${DEFAULTS_FILE}" "${CONFIG_FILE}" > "${EFFECTIVE_CONFIG}"
     else
-        # No user config -- use defaults as-is
-        # BSD mktemp (macOS) only substitutes XXXXXX when it's trailing; if a
-        # `.json` extension follows the X's, the literal `XXXXXX` is written
-        # and any second mktemp call with the same template fails with
-        # `File exists`, leaving EFFECTIVE_CONFIG empty so `jq` later reads
-        # an empty path and the allowlist comes up empty (silent daemon
-        # idle). Create with trailing X's, then rename to add `.json`.
+        # No user config -- use defaults as-is. Same mktemp-then-mv idiom.
         _tmp=$(mktemp "${DAEMON_HOME}/effective-config.XXXXXX")
+        trap 'rm -f "${_tmp}" 2>/dev/null' RETURN
         EFFECTIVE_CONFIG="${_tmp}.json"
-        mv "${_tmp}" "${EFFECTIVE_CONFIG}"
+        if ! mv "${_tmp}" "${EFFECTIVE_CONFIG}"; then
+            log_error "Failed to rename effective-config temp file: ${_tmp} -> ${EFFECTIVE_CONFIG}"
+            rm -f "${_tmp}" 2>/dev/null
+            exit 1
+        fi
         cp "${DEFAULTS_FILE}" "${EFFECTIVE_CONFIG}"
         log_info "No user config found at ${CONFIG_FILE}. Using defaults."
     fi

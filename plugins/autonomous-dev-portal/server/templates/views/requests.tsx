@@ -171,7 +171,7 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
         <div
             id="requests-body"
             hx-get="/requests"
-            hx-trigger="every 10s"
+            hx-trigger="every 10s [document.visibilityState === 'visible']"
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#requests-body"

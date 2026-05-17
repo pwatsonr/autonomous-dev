@@ -16,7 +16,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines }) => (
         id="logs-body"
         class="logs"
         hx-get="/logs"
-        hx-trigger="every 5s"
+        hx-trigger="every 5s [document.visibilityState === 'visible']"
         hx-target="this"
         hx-swap="outerHTML"
         hx-select="#logs-body"

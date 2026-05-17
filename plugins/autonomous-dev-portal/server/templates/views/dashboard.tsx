@@ -170,7 +170,7 @@ export const DashboardView: FC<DashboardViewProps> = ({
         <div
             id="dashboard-body"
             hx-get="/"
-            hx-trigger="every 10s"
+            hx-trigger="every 10s [document.visibilityState === 'visible']"
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#dashboard-body"
