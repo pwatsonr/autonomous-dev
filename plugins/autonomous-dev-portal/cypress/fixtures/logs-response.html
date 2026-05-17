@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logs</title>
+</head>
+<body>
+    <div
+        id="logs-body"
+        hx-get="/logs"
+        hx-trigger='every 5s [document.visibilityState === "visible"]'
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-select="#logs-body"
+    >
+        <h1>Logs</h1>
+        <div class="log-filters">
+            <select name="level">
+                <option>All</option>
+                <option>ERROR</option>
+                <option>INFO</option>
+            </select>
+        </div>
+        <div class="log-entries">
+            <div class="log-entry">
+                <span class="timestamp">2026-05-17T12:00:00Z</span>
+                <span class="level">INFO</span>
+                <span class="message">Portal started</span>
+            </div>
+            <div class="log-entry">
+                <span class="timestamp">2026-05-17T12:01:00Z</span>
+                <span class="level">DEBUG</span>
+                <span class="message">Request processed</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

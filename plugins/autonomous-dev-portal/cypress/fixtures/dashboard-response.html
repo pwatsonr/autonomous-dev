@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+    <div
+        id="dashboard-body"
+        hx-get="/"
+        hx-trigger='every 10s [document.visibilityState === "visible"]'
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-select="#dashboard-body"
+    >
+        <h1>Dashboard</h1>
+        <div class="kpi-strip">
+            <div class="kpi">Active: 5</div>
+            <div class="kpi">Gates: 2</div>
+            <div class="kpi">MTD: $12.34</div>
+        </div>
+        <div class="repo-grid">
+            <div class="repo-card">Demo Repo</div>
+        </div>
+        <div class="active-requests">
+            <table>
+                <tr><td>REQ-001</td><td>Running</td></tr>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Requests</title>
+</head>
+<body>
+    <div
+        id="requests-body"
+        hx-get="/requests"
+        hx-trigger='every 10s [document.visibilityState === "visible"]'
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-select="#requests-body"
+    >
+        <h1>Requests</h1>
+        <div class="request-filters">
+            <select name="status">
+                <option>All</option>
+                <option>Running</option>
+            </select>
+        </div>
+        <table class="requests-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Status</th>
+                    <th>Phase</th>
+                    <th>Cost</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>REQ-001</td>
+                    <td>running</td>
+                    <td>CODE</td>
+                    <td>$1.23</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
