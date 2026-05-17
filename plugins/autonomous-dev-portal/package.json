@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "bun run server/server.ts",
-    "portal:cypress": "PORTAL_PORT=19283 AUTONOMOUS_DEV_STATE_DIR=/tmp/cypress-state bun run server/server.ts",
+    "portal:cypress": "PORTAL_PORT=19283 AUTONOMOUS_DEV_STATE_DIR=/tmp/cypress-state PORTAL_TEST_MODE=1 bun run server/server.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint server/ tests/",
     "test": "bun test",
