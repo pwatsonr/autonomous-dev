@@ -57,6 +57,12 @@ CONSECUTIVE_CRASHES=0
 CIRCUIT_BREAKER_TRIPPED=false
 POLL_COUNT=0
 RECONCILE_EVERY_N_POLLS=${RECONCILE_EVERY_N_POLLS:-60}
+# Phase 1 of the marketplace auto-update: detect-and-log only. The
+# detector composes the helpers in lib/version-helpers.sh and emits a
+# `daemon_upgrade_available` log line when a newer cached version is
+# present. No state changes, no upgrade action — that lands in Phase 2.
+UPGRADE_CHECK_EVERY_N_POLLS=${UPGRADE_CHECK_EVERY_N_POLLS:-60}
+LAST_UPGRADE_LOGGED_VERSION=""
 
 # Per-process dedup table for the legacy phase-fallback warning
 # (SPEC-018-2-01 §Warning Deduplication). Keyed by absolute state file path.
@@ -2748,6 +2754,45 @@ reconcile_orphans() {
 }
 
 ###############################################################################
+# Marketplace auto-update (Phase 1: detect & log)
+###############################################################################
+
+# check_upgrade_available() -> int
+#   Composes the version-helpers primitives to see if a newer plugin
+#   version is sitting in the cache. Logs `daemon_upgrade_available`
+#   once per distinct newer version (so we don't flood the log).
+#
+#   This is the detect-only phase. No plist rewrite, no restart —
+#   Phase 2 wires those in. The goal here is to make the signal visible
+#   in `/logs` so operators can see "upgrade available" coming.
+check_upgrade_available() {
+    # shellcheck disable=SC1091
+    source "${LIB_DIR}/version-helpers.sh"
+    local running latest cmp
+    running=$(current_version "${BASH_SOURCE[0]}")
+    if [[ "${running}" == "unknown" ]]; then
+        # The script isn't running from the plugin cache layout (likely
+        # a dev checkout). Self-upgrade doesn't apply.
+        return 0
+    fi
+    latest=$(latest_cached_version)
+    if [[ -z "${latest}" ]]; then
+        return 0
+    fi
+    cmp=$(compare_semver "${running}" "${latest}")
+    if [[ "${cmp}" != "-1" ]]; then
+        # running >= latest; nothing to do.
+        return 0
+    fi
+    # Newer version cached. Log once per distinct version.
+    if [[ "${LAST_UPGRADE_LOGGED_VERSION}" != "${latest}" ]]; then
+        log_info "daemon_upgrade_available: running=${running} latest=${latest} cache=${HOME}/.claude/plugins/cache/autonomous-dev/autonomous-dev/${latest}"
+        LAST_UPGRADE_LOGGED_VERSION="${latest}"
+    fi
+    return 0
+}
+
+###############################################################################
 # Main Loop
 ###############################################################################
 
@@ -2764,6 +2809,11 @@ main_loop() {
         # Run orphan reconciliation on first poll and every N polls
         if [[ $(( POLL_COUNT % RECONCILE_EVERY_N_POLLS )) -eq 1 ]]; then
             reconcile_orphans || log_error "Orphan reconciliation failed"
+        fi
+
+        # Marketplace auto-update — Phase 1: detect & log only.
+        if [[ $(( POLL_COUNT % UPGRADE_CHECK_EVERY_N_POLLS )) -eq 1 ]]; then
+            check_upgrade_available || true
         fi
 
         # Check shutdown flag
