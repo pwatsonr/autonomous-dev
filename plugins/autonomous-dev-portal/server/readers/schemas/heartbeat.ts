@@ -17,9 +17,8 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 export function parseHeartbeat(input: unknown): ParseResult<Heartbeat> {
     if (!isPlainObject(input)) return { ok: false, error: "heartbeat must be object" };
-    if (input["version"] !== 1) return { ok: false, error: "heartbeat.version must be 1" };
-    if (typeof input["ts"] !== "string" || !ISO_DATETIME_RE.test(input["ts"])) {
-        return { ok: false, error: "heartbeat.ts must be ISO datetime" };
+    if (typeof input["timestamp"] !== "string" || !ISO_DATETIME_RE.test(input["timestamp"])) {
+        return { ok: false, error: "heartbeat.timestamp must be ISO datetime" };
     }
     if (
         typeof input["pid"] !== "number" ||
@@ -29,30 +28,21 @@ export function parseHeartbeat(input: unknown): ParseResult<Heartbeat> {
         return { ok: false, error: "heartbeat.pid must be a positive integer" };
     }
     if (
-        typeof input["uptime_s"] !== "number" ||
-        !Number.isInteger(input["uptime_s"]) ||
-        (input["uptime_s"] as number) < 0
+        typeof input["iteration_count"] !== "number" ||
+        !Number.isInteger(input["iteration_count"]) ||
+        (input["iteration_count"] as number) < 0
     ) {
-        return { ok: false, error: "heartbeat.uptime_s must be non-negative integer" };
+        return { ok: false, error: "heartbeat.iteration_count must be non-negative integer" };
     }
-    if (typeof input["daemon_version"] !== "string") {
-        return { ok: false, error: "heartbeat.daemon_version must be string" };
-    }
-    const active = input["active_requests"] ?? 0;
-    if (
-        typeof active !== "number" ||
-        !Number.isInteger(active) ||
-        (active as number) < 0
-    ) {
-        return { ok: false, error: "heartbeat.active_requests must be non-negative integer" };
+    const activeRequestId = input["active_request_id"];
+    if (activeRequestId !== null && typeof activeRequestId !== "string") {
+        return { ok: false, error: "heartbeat.active_request_id must be string or null" };
     }
     const value: Heartbeat = {
-        version: 1,
-        ts: input["ts"] as string,
+        timestamp: input["timestamp"] as string,
         pid: input["pid"] as number,
-        uptime_s: input["uptime_s"] as number,
-        daemon_version: input["daemon_version"] as string,
-        active_requests: active as number,
+        iteration_count: input["iteration_count"] as number,
+        active_request_id: activeRequestId as string | null,
     };
     return { ok: true, value };
 }
