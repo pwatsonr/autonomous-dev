@@ -9,11 +9,14 @@
   },
   "scripts": {
     "start": "bun run server/server.ts",
+    "portal:cypress": "PORTAL_PORT=19282 AUTONOMOUS_DEV_STATE_DIR=/tmp/cypress-state bun run server/server.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint server/ tests/",
     "test": "bun test",
     "test:visual": "npx playwright test tests/visual-regression/design-system.spec.ts",
-    "gen:visual-goldens": "UPDATE_GOLDEN=1 npx playwright test tests/visual-regression/design-system.spec.ts --project=golden-gen"
+    "gen:visual-goldens": "UPDATE_GOLDEN=1 npx playwright test tests/visual-regression/design-system.spec.ts --project=golden-gen",
+    "cypress:ci": "start-server-and-test portal:cypress http://localhost:19282 'npx cypress run'",
+    "cypress:open": "start-server-and-test portal:cypress http://localhost:19282 'npx cypress open'"
   },
   "dependencies": {
     "dompurify": "~3.0.5",
@@ -27,6 +30,8 @@
     "@types/jsdom": "~21.1.0",
     "@types/marked": "~5.0.0",
     "@types/node": "^22.0.0",
+    "cypress": "^15.15.0",
+    "start-server-and-test": "^3.0.5",
     "typescript": "^5.3.0"
   }
 }

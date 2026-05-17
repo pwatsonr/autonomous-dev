@@ -170,16 +170,16 @@ export function buildSettingsActionRoutes(
     // POST /api/settings/allowlist — add allowlist path
     // -----------------------------------------------------------------
     router.post("/api/settings/allowlist", async (c) => {
-        let body: AllowlistBody = {};
+        let form: Record<string, unknown> = {};
         try {
-            body = (await c.req.json()) as AllowlistBody;
+            form = (await c.req.parseBody()) as Record<string, unknown>;
         } catch {
             return c.json({ error: "invalid-body" }, 400);
         }
-        if (typeof body.path !== "string" || body.path.length === 0) {
+        if (typeof form.path !== "string" || form.path.length === 0) {
             return c.json({ error: "invalid-body" }, 400);
         }
-        const requested = body.path;
+        const requested = form.path;
 
         // Guard #1: realpath must resolve and live under the operator's home
         // tree (defeats symlink escapes and absolute paths into /etc).

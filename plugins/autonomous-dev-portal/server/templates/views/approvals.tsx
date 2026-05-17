@@ -18,6 +18,9 @@
 import type { FC } from "hono/jsx";
 
 import type { RenderProps } from "../../types/render";
+
+// Pre-computed hx-trigger value - using double quotes inside bracket expression
+const APPROVALS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
 import { Btn } from "../../components/primitives";
 import { ApprovalsKpiStrip } from "../fragments/approvals-kpi-strip";
 import { GateRow } from "../fragments/gate-row";
@@ -29,7 +32,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
     <div
         id="approvals-body"
         hx-get="/approvals"
-        hx-trigger="every 10s [document.visibilityState === 'visible']"
+        hx-trigger={APPROVALS_POLLING_TRIGGER}
         hx-target="this"
         hx-swap="outerHTML"
         hx-select="#approvals-body"

@@ -163,7 +163,10 @@ export function buildApprovalsActionRoutes(
         const isForm =
             contentType.includes("application/x-www-form-urlencoded") ||
             contentType.includes("multipart/form-data");
-        if (isForm && deps.bulkApproveByFilter !== undefined) {
+
+        if (isForm) {
+            // Handle form-encoded requests
+            if (deps.bulkApproveByFilter !== undefined) {
             const form = await c.req.formData();
             const rawFilter = String(form.get("filter") ?? "all");
             const filter = FILTER_VALUES.has(rawFilter) ? rawFilter : "all";
@@ -206,6 +209,10 @@ export function buildApprovalsActionRoutes(
                 </>
             );
             return c.html(body);
+            } else {
+                // Form submission received but bulk filter feature is not available
+                return c.json({ error: "bulk-filter-not-supported" }, 501);
+            }
         }
 
         let body: BulkBody = {};

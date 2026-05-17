@@ -13,6 +13,9 @@ import type { FC } from "hono/jsx";
 
 import type { RenderProps } from "../../types/render";
 
+// Pre-computed hx-trigger value - using double quotes inside bracket expression
+const REPOS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
+
 function fmtUsd(usd: number): string {
     return `$${usd.toFixed(2)}`;
 }
@@ -36,7 +39,7 @@ export const ReposView: FC<RenderProps["repos"]> = ({ kpis, repos }) => (
         id="repos-body"
         class="repos-surface"
         hx-get="/repos"
-        hx-trigger="every 10s [document.visibilityState === 'visible']"
+        hx-trigger={REPOS_POLLING_TRIGGER}
         hx-target="this"
         hx-swap="outerHTML"
         hx-select="#repos-body"

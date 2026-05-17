@@ -287,6 +287,27 @@ export function registerRoutes(
     }
 
     // -----------------------------------------------------------------
+    // PLAN-021 Phase 1A — Cypress test endpoint (debug-only).
+    // -----------------------------------------------------------------
+    if (process.env.NODE_ENV !== 'production') {
+        app.post("/__test/reset", async (c) => {
+            const cypressHeader = c.req.header("X-Cypress-Test");
+            if (cypressHeader !== "1") {
+                return c.json({ error: "forbidden" }, 403);
+            }
+
+            // Phase 1A stub — clears in-memory state and accepts fixtures
+            // Phase 1B will implement full database reset functionality
+            const body = await c.req.json().catch(() => ({}));
+
+            // TODO: Clear in-memory state
+            // TODO: Write any provided fixtures to disk
+
+            return c.json({ success: true, message: "Test state reset (Phase 1A stub)" });
+        });
+    }
+
+    // -----------------------------------------------------------------
     // GET page routes — order is purely organizational.
     // -----------------------------------------------------------------
     app.get("/", dashboardHandler);

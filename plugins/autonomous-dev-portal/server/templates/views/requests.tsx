@@ -32,6 +32,9 @@ import { EmptyState } from "../fragments/empty-state";
 import { KpiStrip } from "../fragments/kpi-strip";
 import type { KpiItem } from "../fragments/kpi-strip";
 
+// Pre-computed hx-trigger value - using double quotes inside bracket expression
+const REQUESTS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
+
 /**
  * PLAN-Requests-Surface §HeadActions — exposed as a stand-alone export
  * so tests / fragments can mount it on `ShellLayout.headActions`
@@ -171,7 +174,7 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
         <div
             id="requests-body"
             hx-get="/requests"
-            hx-trigger="every 10s [document.visibilityState === 'visible']"
+            hx-trigger={REQUESTS_POLLING_TRIGGER}
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#requests-body"

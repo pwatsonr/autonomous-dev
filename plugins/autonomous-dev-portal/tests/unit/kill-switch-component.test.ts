@@ -61,7 +61,10 @@ describe("KillSwitch — armed render (KS-U-03/04)", () => {
             onConfirm: "/ops/kill-switch",
         });
         expect(html).toContain('<div class="ks-panel armed">');
-        expect(html).toContain('<form method="POST" action="/ops/kill-switch">');
+        expect(html).toContain('hx-post="/ops/kill-switch"');
+        expect(html).toContain('hx-target="closest .ks-panel"');
+        expect(html).toContain('hx-swap="outerHTML"');
+        expect(html).toContain('method="POST" action="/ops/kill-switch"');
         expect(html).toContain('<input type="hidden" name="_csrf" value="tok-123"');
         expect(html).toContain(
             '<input type="hidden" name="armed_at" value="2026-05-09T20:00:00.000Z"',

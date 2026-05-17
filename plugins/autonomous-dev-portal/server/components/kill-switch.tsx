@@ -97,7 +97,13 @@ export const KillSwitch: FC<KillSwitchProps> = ({
                     </div>
                 </div>
                 <div class="ks-action">
-                    <form method="POST" action={onConfirm}>
+                    <form
+                        hx-post={onConfirm}
+                        hx-target="closest .ks-panel"
+                        hx-swap="outerHTML"
+                        method="POST"
+                        action={onConfirm}
+                    >
                         <input type="hidden" name="_csrf" value={csrf} />
                         <input
                             type="hidden"
