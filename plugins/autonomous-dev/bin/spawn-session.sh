@@ -206,6 +206,12 @@ spawn_session_typed() {
 
     # Execute corrected claude command
     local exit_code=0
+    # `${args[@]+"${args[@]}"}` is the bash-3.2-safe empty-array expansion;
+    # under `set -u` plain `"${args[@]}"` errors with `args[@]: unbound
+    # variable` on bash 3.2 (macOS system bash). The daemon invokes this
+    # script via `bash spawn-session.sh` (unqualified), which on a daemon
+    # PATH that lacks /opt/homebrew/bin resolves to /bin/bash@3.2, so this
+    # path matters in production.
     if [[ "${req_type}" == "infra" && "${target_phase}" != *"_review" ]]; then
         local gates="${ENHANCED_GATES_CSV:-${DEFAULT_ENHANCED_GATES}}"
         env "ENHANCED_GATES=${gates}" claude \
@@ -215,7 +221,7 @@ spawn_session_typed() {
             --add-dir "${project}" \
             --permission-mode bypassPermissions \
             --max-budget-usd "${phase_budget}" \
-            "${args[@]}" \
+            ${args[@]+"${args[@]}"} \
             "${phase_prompt}" || exit_code=$?
     else
         claude \
@@ -225,7 +231,7 @@ spawn_session_typed() {
             --add-dir "${project}" \
             --permission-mode bypassPermissions \
             --max-budget-usd "${phase_budget}" \
-            "${args[@]}" \
+            ${args[@]+"${args[@]}"} \
             "${phase_prompt}" || exit_code=$?
     fi
 
