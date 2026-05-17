@@ -29,7 +29,11 @@ import {
     InMemoryConfirmationStore,
     type ConfirmationRouteDeps,
 } from "./routes/confirmation-routes";
+import { setAuditReader } from "./routes/audit";
+import { type StandardsStore, type StandardRule } from "./routes/standards-actions";
+import { loadSettingsData } from "./stubs/settings";
 import { TypedConfirmationService } from "./security/confirmation-tokens";
+import { AuditLogReader, StaticAuditChainVerifier } from "./services/audit-log-reader";
 import { SSEEventBus } from "./sse/SSEEventBus";
 import {
     auditAdapter,
@@ -46,6 +50,7 @@ import {
 import { buildGateAndRequestDeps } from "./wiring/gate-store";
 import { buildFileWebhookDispatcher } from "./wiring/notification-dispatcher";
 import { FileSettingsStore } from "./wiring/settings-store";
+import { portalAuditPath } from "./wiring/state-paths";
 
 export interface ServerState {
     server?: Server<unknown>;
@@ -69,6 +74,46 @@ function phaseLog(phase: string, extra: Record<string, unknown> = {}): void {
             ...extra,
         }),
     );
+}
+
+/**
+ * Default implementation of StandardsStore that uses the stub settings data.
+ * This provides the basic functionality needed for the standards modal forms
+ * until a persistent standards store is implemented.
+ */
+class DefaultStandardsStore implements StandardsStore {
+    async get(id: string): Promise<StandardRule | null> {
+        const data = await loadSettingsData();
+        const rule = data.standards.find((r) => r.id === id);
+        return rule ?? null;
+    }
+
+    async update(
+        id: string,
+        patch: Partial<Pick<StandardRule, "desc" | "severity" | "applies">>,
+    ): Promise<StandardRule[]> {
+        const data = await loadSettingsData();
+        const next = data.standards.map((r) =>
+            r.id === id ? { ...r, ...patch } : r,
+        );
+        return next;
+    }
+}
+
+/**
+ * Load the audit key for reading the HMAC-chained audit log.
+ * Returns null if the key file doesn't exist (audit reader will work without verification).
+ */
+async function loadAuditKey(): Promise<Buffer | null> {
+    const keyPath = `${portalAuditPath()}.key`;
+    try {
+        const { promises: fs } = await import("node:fs");
+        const buf = await fs.readFile(keyPath);
+        if (buf.length >= 16) return buf;
+    } catch (err) {
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
+    return null;
 }
 
 export async function startServer(): Promise<Server<unknown>> {
@@ -126,6 +171,20 @@ export async function startServer(): Promise<Server<unknown>> {
     const auditLogger = await buildPortalAuditLogger();
     const audit = auditAdapter(auditLogger, log);
 
+    // BUG-13 fix: Wire the audit reader so the audit page renders filter form and pagination
+    try {
+        const auditKey = await loadAuditKey();
+        const auditVerifier = new StaticAuditChainVerifier(auditKey);
+        const auditReader = new AuditLogReader(portalAuditPath(), auditVerifier);
+        setAuditReader(auditReader);
+        phaseLog("audit_reader_wired", { path: portalAuditPath() });
+    } catch (err) {
+        phaseLog("audit_reader_failed", {
+            error: err instanceof Error ? err.message : String(err)
+        });
+        // Continue without audit reader - will fall back to stubs
+    }
+
     registerRoutes(app, {
         sseBus,
         confirmation,
@@ -161,6 +220,10 @@ export async function startServer(): Promise<Server<unknown>> {
             ...buildGateAndRequestDeps(confirmation.store),
             audit,
             logger: log,
+        },
+        // BUG-15 fix — standards action routes (new rule / edit modal).
+        standardsActions: {
+            store: new DefaultStandardsStore(),
         },
     });
 
