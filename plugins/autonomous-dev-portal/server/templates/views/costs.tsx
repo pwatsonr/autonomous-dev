@@ -16,6 +16,9 @@ import type { FC } from "hono/jsx";
 import { Chip } from "../../components/primitives";
 import type { ProjectionResult } from "../../lib/costs-projection";
 import type { CostSeries, RenderProps } from "../../types/render";
+
+// Pre-computed hx-trigger value - using double quotes inside bracket expression
+const COSTS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
 import { CostChart } from "../fragments/cost-chart";
 import { CostProjection } from "../fragments/cost-projection";
 import { EmptyState } from "../fragments/empty-state";
@@ -107,7 +110,7 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
         <div
             id="costs-body"
             hx-get="/costs"
-            hx-trigger="every 10s [document.visibilityState === 'visible']"
+            hx-trigger={COSTS_POLLING_TRIGGER}
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#costs-body"

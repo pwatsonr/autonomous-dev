@@ -4,6 +4,9 @@ import type { FC } from "hono/jsx";
 
 import type { RenderProps } from "../../types/render";
 
+// Pre-computed hx-trigger value - using double quotes inside bracket expression
+const LOGS_POLLING_TRIGGER = 'every 5s [document.visibilityState === "visible"]';
+
 /** Compact ISO format `YYYY-MM-DD HH:mm:ssZ` for log-line timestamps. */
 function formatTimestampCompact(iso: string): string {
     const ts = Date.parse(iso);
@@ -16,7 +19,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines }) => (
         id="logs-body"
         class="logs"
         hx-get="/logs"
-        hx-trigger="every 5s [document.visibilityState === 'visible']"
+        hx-trigger={LOGS_POLLING_TRIGGER}
         hx-target="this"
         hx-swap="outerHTML"
         hx-select="#logs-body"
