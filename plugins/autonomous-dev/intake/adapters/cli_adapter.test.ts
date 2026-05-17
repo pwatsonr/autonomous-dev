@@ -111,6 +111,23 @@ describe('Group 1: subcommand registration', () => {
     expect(router.calls()[0].args[0]).toBe('REQ-000002');
   });
 
+  test('cancel --yes pushes CONFIRM into args[1] (BUG-21)', async () => {
+    const { router } = await runProgram(['cancel', 'REQ-000002', '--yes']);
+    const cmd = router.calls()[0];
+    expect(cmd.commandName).toBe('cancel');
+    expect(cmd.args[0]).toBe('REQ-000002');
+    // cancel_handler reads args[1] === 'CONFIRM' to skip its prompt loop.
+    expect(cmd.args[1]).toBe('CONFIRM');
+    // --yes is consumed; not surfaced as a flag.
+    expect(cmd.flags.yes).toBeUndefined();
+  });
+
+  test('cancel without --yes does NOT push CONFIRM (BUG-21 guard)', async () => {
+    const { router } = await runProgram(['cancel', 'REQ-000002']);
+    const cmd = router.calls()[0];
+    expect(cmd.args[1]).toBeUndefined();
+  });
+
   test('pause subcommand routes with requestId', async () => {
     const { router } = await runProgram(['pause', 'REQ-000003']);
     expect(router.calls()[0].commandName).toBe('pause');

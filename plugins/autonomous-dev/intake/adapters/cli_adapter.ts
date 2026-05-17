@@ -430,6 +430,14 @@ export function buildCommand(
     args.push(payload.message);
     delete flags.message;
   }
+  // BUG-21 fix: cancel_handler reads `command.args[1] === 'CONFIRM'` to
+  // skip its interactive confirmation prompt. Surface that as a --yes
+  // flag on the CLI so operators have an actual escape from the prompt
+  // loop (the prior shape had no way to deliver args[1]).
+  if (commandName === 'cancel' && payload.yes === true) {
+    args.push('CONFIRM');
+    delete flags.yes;
+  }
 
   return {
     commandName,
@@ -721,8 +729,15 @@ export function buildProgram(
     .command('cancel <request-id>')
     .description('Cancel a request')
     .option('--reason <reason>', 'Optional cancellation reason')
+    .option('--yes', 'Skip the CONFIRM prompt and cancel immediately')
     .action(async (requestId: string, opts: Record<string, unknown>) => {
-      await dispatch('cancel', { reason: opts.reason }, requestId);
+      // BUG-21 fix: --yes passes "CONFIRM" as args[1] so cancel_handler
+      // doesn't loop on its confirmation prompt.
+      await dispatch(
+        'cancel',
+        { reason: opts.reason, yes: opts.yes === true },
+        requestId,
+      );
     });
 
   // -- pause --------------------------------------------------------------
