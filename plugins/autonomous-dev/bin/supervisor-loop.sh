@@ -70,6 +70,18 @@ LAST_UPGRADE_LOGGED_VERSION=""
 UPGRADE_THROTTLE_FILE="${DAEMON_HOME}/.upgrade-throttle"
 UPGRADE_THROTTLE_SECONDS=${UPGRADE_THROTTLE_SECONDS:-3600}
 LAST_GOOD_VERSION_FILE="${DAEMON_HOME}/.last-good-version"
+# Phase 3 rollback: trial flag + probation. When stage_upgrade hands off
+# to a new version, it leaves a JSON trial flag containing the target
+# version + a deadline. The new daemon at startup reads it; if its mtime
+# is past the deadline AND we're the target version, it means previous
+# attempts of THIS version's daemon kept crashing — roll back to the
+# version stored in .last-good-version. If we make it past
+# UPGRADE_TRIAL_PROBATION_ITERATIONS healthy iterations, we clear the
+# flag (trial passed).
+UPGRADE_TRIAL_FLAG="${DAEMON_HOME}/.upgrade-trial-pending"
+UPGRADE_TRIAL_DEADLINE_SECONDS=${UPGRADE_TRIAL_DEADLINE_SECONDS:-180}
+UPGRADE_TRIAL_PROBATION_ITERATIONS=${UPGRADE_TRIAL_PROBATION_ITERATIONS:-5}
+UPGRADE_TRIAL_PENDING=false
 
 # Per-process dedup table for the legacy phase-fallback warning
 # (SPEC-018-2-01 §Warning Deduplication). Keyed by absolute state file path.
@@ -2858,7 +2870,18 @@ stage_upgrade() {
     echo "${from_version}" > "${LAST_GOOD_VERSION_FILE}"
     touch "${UPGRADE_THROTTLE_FILE}"
 
-    log_info "daemon_upgrade_staging: from=${from_version} to=${to_version} installer=${installer}"
+    # Phase 3: leave a trial flag with the target version + deadline.
+    # The new daemon reads it on startup; clears it after probation
+    # iterations; or rolls back if the deadline passes without clearing.
+    local deadline now
+    now=$(date +%s)
+    deadline=$(( now + UPGRADE_TRIAL_DEADLINE_SECONDS ))
+    jq -n --arg target "${to_version}" --arg from "${from_version}" \
+        --argjson started "${now}" --argjson deadline "${deadline}" \
+        '{target: $target, from: $from, started: $started, deadline: $deadline}' \
+        > "${UPGRADE_TRIAL_FLAG}" 2>/dev/null || true
+
+    log_info "daemon_upgrade_staging: from=${from_version} to=${to_version} installer=${installer} trial_deadline=${deadline}"
 
     # Spawn detached helper. The helper sleeps a couple of seconds so
     # that the parent (us) has time to exit cleanly before launchctl
@@ -2873,6 +2896,90 @@ stage_upgrade() {
     log_info "daemon_upgrade_exiting: exiting cleanly so launchd respawns under ${to_version}"
     # Mark shutdown so the main loop terminates after this iteration.
     SHUTDOWN_REQUESTED=true
+    return 0
+}
+
+# check_upgrade_trial() -> int
+#   Called once at daemon startup. Reads the trial flag (if any) and
+#   decides one of three outcomes:
+#     1. No flag, or flag is stale (different target than us, or no
+#        valid JSON) — clear and return.
+#     2. Flag targets us, deadline not yet passed — enter probation
+#        (UPGRADE_TRIAL_PENDING=true). The main loop will clear the
+#        flag after UPGRADE_TRIAL_PROBATION_ITERATIONS healthy ticks.
+#     3. Flag targets us, deadline has passed — previous starts of
+#        this version must have crash-looped (we never made it to
+#        probation-clear). Roll back to .last-good-version by
+#        spawning a detached install-daemon.sh for that version, then
+#        exit. Mirrors stage_upgrade's mechanism but in reverse.
+check_upgrade_trial() {
+    if [[ ! -f "${UPGRADE_TRIAL_FLAG}" ]]; then
+        return 0
+    fi
+    # shellcheck disable=SC1091
+    source "${LIB_DIR}/version-helpers.sh"
+    local my_version target deadline now last_good installer
+    my_version=$(current_version "${BASH_SOURCE[0]}")
+    target=$(jq -r '.target // empty' "${UPGRADE_TRIAL_FLAG}" 2>/dev/null || echo "")
+    deadline=$(jq -r '.deadline // 0' "${UPGRADE_TRIAL_FLAG}" 2>/dev/null || echo 0)
+    if [[ -z "${target}" ]]; then
+        rm -f "${UPGRADE_TRIAL_FLAG}"
+        return 0
+    fi
+    if [[ "${target}" != "${my_version}" ]]; then
+        # Flag is for a different version — leftover from a different
+        # upgrade attempt. The new daemon (if any) will manage it.
+        return 0
+    fi
+    now=$(date +%s)
+    if (( now <= deadline )); then
+        log_info "upgrade_trial_probation: target=${target} deadline=${deadline} now=${now}"
+        UPGRADE_TRIAL_PENDING=true
+        return 0
+    fi
+    # Deadline passed without the previous run clearing the flag.
+    # We assume crash-loop and try to roll back to last-good.
+    if [[ ! -f "${LAST_GOOD_VERSION_FILE}" ]]; then
+        log_warn "upgrade_trial_failed but no .last-good-version on disk; clearing flag and continuing"
+        rm -f "${UPGRADE_TRIAL_FLAG}"
+        return 0
+    fi
+    last_good=$(cat "${LAST_GOOD_VERSION_FILE}" 2>/dev/null || echo "")
+    if [[ -z "${last_good}" || "${last_good}" == "${my_version}" ]]; then
+        rm -f "${UPGRADE_TRIAL_FLAG}"
+        return 0
+    fi
+    installer="${HOME}/.claude/plugins/cache/autonomous-dev/autonomous-dev/${last_good}/bin/install-daemon.sh"
+    if [[ ! -r "${installer}" ]]; then
+        log_warn "upgrade_trial_failed but rollback installer missing at ${installer}; clearing flag"
+        rm -f "${UPGRADE_TRIAL_FLAG}"
+        return 0
+    fi
+    log_warn "upgrade_trial_failed: rolling back ${my_version} → ${last_good}"
+    rm -f "${UPGRADE_TRIAL_FLAG}"
+    nohup bash -c "sleep 2 && '${installer}' --force" \
+        </dev/null \
+        >>"${LOG_DIR}/upgrade-helper.log" 2>&1 &
+    disown $! 2>/dev/null || true
+    # Exit ourselves so launchd respawns from the rolled-back plist.
+    SHUTDOWN_REQUESTED=true
+    return 0
+}
+
+# clear_upgrade_trial_if_probation_passed() -> int
+#   Called inside the main loop. When we're in probation
+#   (UPGRADE_TRIAL_PENDING=true) and we've reached the iteration
+#   threshold, clear the flag — the new version has proven itself.
+clear_upgrade_trial_if_probation_passed() {
+    if [[ "${UPGRADE_TRIAL_PENDING}" != "true" ]]; then
+        return 0
+    fi
+    if (( ITERATION_COUNT < UPGRADE_TRIAL_PROBATION_ITERATIONS )); then
+        return 0
+    fi
+    rm -f "${UPGRADE_TRIAL_FLAG}" 2>/dev/null || true
+    UPGRADE_TRIAL_PENDING=false
+    log_info "upgrade_trial_passed: cleared trial flag at iteration ${ITERATION_COUNT}"
     return 0
 }
 
@@ -2895,10 +3002,13 @@ main_loop() {
             reconcile_orphans || log_error "Orphan reconciliation failed"
         fi
 
-        # Marketplace auto-update — Phase 1: detect & log only.
+        # Marketplace auto-update.
         if [[ $(( POLL_COUNT % UPGRADE_CHECK_EVERY_N_POLLS )) -eq 1 ]]; then
             check_upgrade_available || true
         fi
+        # Phase 3: if we're in trial probation, clear the trial flag once
+        # we've completed enough healthy iterations.
+        clear_upgrade_trial_if_probation_passed || true
 
         # Check shutdown flag
         if [[ "${SHUTDOWN_REQUESTED}" == "true" ]]; then
@@ -3037,6 +3147,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 
     # Initialize cost ledger if it does not exist
     initialize_cost_ledger
+
+    # Marketplace auto-update Phase 3: check the trial flag. If we are
+    # the target of a still-running trial, enter probation. If the trial
+    # deadline has passed, roll back to .last-good-version and exit.
+    check_upgrade_trial || true
 
     # Enter the main supervisor loop
     main_loop
