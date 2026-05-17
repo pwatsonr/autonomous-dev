@@ -1718,11 +1718,32 @@ detect_turn_exhaustion() {
 
 # idle_backoff_sleep() -> void
 #   Sleeps with exponential backoff when no work is found.
+#
+#   BUG-20 fix: chunk the long backoff into HEARTBEAT_INTERVAL slices and
+#   re-write the heartbeat between each one. Without this, an idle daemon
+#   at max backoff (900s) only refreshes the heartbeat once every 15 min,
+#   which the portal correctly classifies as "dead". The total wait is
+#   still IDLE_BACKOFF_CURRENT — we just advertise liveness during it.
 idle_backoff_sleep() {
-    log_info "No actionable work. Sleeping ${IDLE_BACKOFF_CURRENT}s."
-    sleep "${IDLE_BACKOFF_CURRENT}" &
-    local sleep_pid=$!
-    wait "${sleep_pid}" 2>/dev/null || true
+    local remaining=${IDLE_BACKOFF_CURRENT}
+    local chunk=${HEARTBEAT_INTERVAL}
+    log_info "No actionable work. Sleeping ${remaining}s (${chunk}s heartbeat chunks)."
+    while (( remaining > 0 )); do
+        local this_chunk=${chunk}
+        if (( remaining < chunk )); then
+            this_chunk=${remaining}
+        fi
+        sleep "${this_chunk}" &
+        local sleep_pid=$!
+        wait "${sleep_pid}" 2>/dev/null || true
+        if [[ "${SHUTDOWN_REQUESTED}" == "true" ]]; then
+            return
+        fi
+        remaining=$(( remaining - this_chunk ))
+        # Re-write heartbeat so portal/operators see daemon is alive even
+        # while it's resting on long backoff.
+        write_heartbeat
+    done
     IDLE_BACKOFF_CURRENT=$(( IDLE_BACKOFF_CURRENT * 2 ))
     if [[ ${IDLE_BACKOFF_CURRENT} -gt ${IDLE_BACKOFF_MAX} ]]; then
         IDLE_BACKOFF_CURRENT=${IDLE_BACKOFF_MAX}
