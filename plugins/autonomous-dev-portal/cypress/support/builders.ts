@@ -1,7 +1,8 @@
 // PLAN-021 Phase 1A — Typed fixture builders for RequestActionFile.
 //
-// Provides aRequest, aGate, aFailed, aCancelled, aDone for creating
-// consistent test data. Phase 1B will add more complex builders.
+// FR-021-03 enhancement: Provides aRequest, aGate, aFailed, aCancelled, aDone
+// for creating consistent test data. Filesystem operations are handled via
+// Cypress tasks to avoid Node.js imports in browser-bundled code.
 
 interface RequestActionFile {
     id?: string;
@@ -20,13 +21,14 @@ interface RequestActionFile {
 
 /**
  * Basic request builder with sensible defaults.
+ * Updated for FR-021-03: phase defaults to PRD, unique IDs.
  */
 export function aRequest(overrides: Partial<RequestActionFile> = {}): RequestActionFile {
     return {
-        id: "test-request-1",
+        id: `REQ-CYTEST-${Date.now()}`,
         repo: "test-repo",
         title: "Test Request",
-        phase: "intake",
+        phase: "PRD",
         status: "running",
         cost: 0,
         variant: "standard",
@@ -43,7 +45,7 @@ export function aRequest(overrides: Partial<RequestActionFile> = {}): RequestAct
 export function aGate(overrides: Partial<RequestActionFile> = {}): RequestActionFile {
     return aRequest({
         status: "gate",
-        phase: "approval",
+        phase: "CODE_REVIEW",
         ...overrides,
     });
 }
@@ -83,4 +85,12 @@ export function aDone(overrides: Partial<RequestActionFile> = {}): RequestAction
         cost: 1.25,
         ...overrides,
     });
+}
+
+/**
+ * Get the unique request IDs from an array of fixtures.
+ * Useful for test assertions.
+ */
+export function getRequestIds(requests: RequestActionFile[]): string[] {
+    return requests.map(req => req.id).filter((id): id is string => typeof id === 'string');
 }
