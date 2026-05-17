@@ -15,6 +15,7 @@ set -euo pipefail
 readonly PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly LIB_DIR="${PLUGIN_DIR}/bin/lib"
 readonly DAEMON_HOME="${HOME}/.autonomous-dev"
+readonly INTAKE_DB="${DAEMON_HOME}/intake.db"
 readonly LOCK_FILE="${DAEMON_HOME}/daemon.lock"
 readonly HEARTBEAT_FILE="${DAEMON_HOME}/heartbeat.json"
 readonly CRASH_STATE_FILE="${DAEMON_HOME}/crash-state.json"
@@ -2713,12 +2714,51 @@ handle_phase_failure() {
 # reconcile_orphans() -> void
 #   Reconcile orphan SQLite rows and state.json files per SPEC-039-1-04.
 #   Runs at startup and every RECONCILE_EVERY_N_POLLS iterations.
+#
+#   Implementation note: shells out to the `sqlite3` CLI rather than to
+#   `node` + `better-sqlite3`. The latter requires a native binding that
+#   is rebuilt per Node version; under newer Node releases the cached
+#   plugin's prebuilt binding is missing and every reconcile iteration
+#   logged "Failed to query orphan SQLite rows". The `sqlite3` CLI ships
+#   with macOS and is a hard transitive dependency anyway (the daemon
+#   reads/writes the same intake.db), so this removes a runtime failure
+#   mode without changing semantics.
 reconcile_orphans() {
     log_info "Starting orphan reconciliation"
 
-    # Find orphan SQLite rows (queued + older than 24h)
+    if ! command -v sqlite3 >/dev/null 2>&1; then
+        log_error "Orphan reconciliation requires the sqlite3 CLI; skipping"
+        return 1
+    fi
+
+    if [[ ! -f "$INTAKE_DB" ]]; then
+        log_info "Intake DB ${INTAKE_DB} not present; skipping orphan reconciliation"
+        return 0
+    fi
+
+    # Cutoff = now minus 24 hours, in the same ISO8601-with-millis format the
+    # intake DB stores (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')). The string is
+    # lexicographically comparable in that format, so a literal `<` works.
+    local cutoff
+    cutoff=$(date -u -v-24H +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null \
+        || date -u -d "24 hours ago" +"%Y-%m-%dT%H:%M:%S.000Z" 2>/dev/null \
+        || true)
+    if [[ -z "$cutoff" ]]; then
+        log_error "Failed to compute reconciliation cutoff timestamp"
+        return 1
+    fi
+
+    # Find orphan SQLite rows (queued + older than 24h). Open the database
+    # read-only so the reconciliation pass cannot accidentally lock the
+    # writer path. COALESCE protects against NULL target_repo, which would
+    # otherwise yield a blank field and confuse the IFS='|' read below.
     local orphan_rows
-    if ! orphan_rows=$(node "${PLUGIN_DIR}/scripts/find-orphan-sqlite-rows-simple.js" 2>/dev/null); then
+    if ! orphan_rows=$(sqlite3 -readonly -separator '|' "$INTAKE_DB" \
+            "SELECT request_id, COALESCE(target_repo, ''), created_at
+             FROM requests
+             WHERE status = 'queued'
+               AND created_at < '${cutoff}'
+             ORDER BY created_at ASC;" 2>/dev/null); then
         log_error "Failed to query orphan SQLite rows"
         return 1
     fi
@@ -2729,9 +2769,23 @@ reconcile_orphans() {
 
         # Check if state.json exists
         local state_file="${target_repo}/.autonomous-dev/requests/${request_id}/state.json"
-        if [[ ! -f "$state_file" ]]; then
+        if [[ -n "$target_repo" && ! -f "$state_file" ]]; then
             log_info "Marking orphan SQLite row as cancelled: ${request_id} (state file missing)"
-            if node "${PLUGIN_DIR}/scripts/mark-request-cancelled-simple.js" "$request_id" "state-file-lost"; then
+            local now_iso
+            now_iso=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+            # Use parameter binding to avoid SQL injection from request_id /
+            # reason. sqlite3 CLI supports `.parameter set` since 3.43.
+            if sqlite3 "$INTAKE_DB" <<SQL >/dev/null 2>&1
+.parameter set :rid '${request_id//\'/\'\'}'
+.parameter set :reason 'state-file-lost'
+.parameter set :now '${now_iso}'
+UPDATE requests
+   SET status = 'cancelled',
+       cancelled_reason = :reason,
+       updated_at = :now
+ WHERE request_id = :rid;
+SQL
+            then
                 # Write portal request action for the cancelled orphan
                 write_portal_request_action "$request_id" "$target_repo"
             else
@@ -2757,10 +2811,14 @@ reconcile_orphans() {
             local request_id
             request_id=$(basename "$req_dir")
 
-            # Check if SQLite row exists
-            local has_sqlite_row
-            if has_sqlite_row=$(bun "${PLUGIN_DIR}/scripts/check-sqlite-row.ts" "$request_id" 2>/dev/null); then
-                if [[ "$has_sqlite_row" != "true" ]]; then
+            # Check if SQLite row exists. Quote single-quotes in request_id to
+            # avoid breaking out of the SQL literal (request IDs are typically
+            # alphanumeric but defense-in-depth is cheap here).
+            local escaped_id="${request_id//\'/\'\'}"
+            local row_count
+            if row_count=$(sqlite3 -readonly "$INTAKE_DB" \
+                    "SELECT COUNT(*) FROM requests WHERE request_id = '${escaped_id}';" 2>/dev/null); then
+                if [[ "$row_count" == "0" ]]; then
                     log_warn "Orphan state.json file found: ${state_file} (no SQLite row for ${request_id})"
                 fi
             else
