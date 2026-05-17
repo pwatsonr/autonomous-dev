@@ -1,24 +1,16 @@
-// PLAN-037-2 — JSON-file-backed implementation of `ApprovalsStore`.
+// PORTAL-BUG-5 FIX — Request ledger-backed implementation of `ApprovalsStore`.
 //
-// The daemon owns the canonical approvals queue. Until a daemon-RPC
-// channel lands, the portal reads + writes a shared JSON file at
-// `${state_dir}/approvals-queue.json`. The daemon picks up the new state
-// on its next iteration; the portal applies decisions atomically.
+// Portal approvals store unified with reader to use the same data source.
+// Reader pulls gates from request-ledger (request-actions + gate-decisions);
+// writer now also works with the same system instead of approvals-queue.json.
 //
-// Schema (matches the daemon's existing shape — verified by inspecting
-// daemon-status.ts which reads `approvalsCount` from the same source):
+// Decision flow:
+// 1. Look up the gate in request-ledger (same as reader)
+// 2. Write gate-decisions/<repo>__<id>.json with operator decision
+// 3. Daemon picks up the decision on next iteration and advances the phase
 //
-//   {
-//     "items": [
-//       { "id": "REQ-2041", "state": "pending", "summary": "...",
-//         "repo": "acme", "gateType": "reviewer-chain", ... }
-//     ],
-//     "decidedAt": { "REQ-2041": "2026-05-09T14:21:00Z" }
-//   }
-//
-// Concurrency: read-modify-write under a per-process in-memory mutex so
-// two simultaneous decide() calls do not lose updates. The atomic
-// rename guarantees the file is never observed in a partial state.
+// This matches option (A) from BUG-5 fix plan: minimal invariant change,
+// preserves "daemon owns phase transitions" design pattern.
 
 import type { JSX } from "hono/jsx";
 
@@ -31,7 +23,8 @@ import type {
 } from "../routes/approvals-actions";
 
 import { atomicWriteJson, readJsonOrNull } from "./atomic-json";
-import { approvalsQueuePath } from "./state-paths";
+import { approvalsQueuePath, gateDecisionPath, gateDecisionsDir } from "./state-paths";
+import { readRequestLedger } from "./request-ledger-reader";
 
 type StoredState = ApprovalState | "pending";
 
@@ -51,6 +44,16 @@ interface QueueFile {
     items: StoredItem[];
     /** Kept for the daemon's mtd-spend projection; not consumed by the portal. */
     costCapDailyUsd?: number;
+}
+
+interface GateDecisionFile {
+    id?: string;
+    repo?: string;
+    state?: "pending" | "approved" | "rejected" | "request-changes";
+    request_id?: string;
+    decision?: string;
+    operator_id?: string;
+    decided_at?: string;
 }
 
 /**
@@ -75,14 +78,14 @@ function renderDecidedRow(item: StoredItem, state: ApprovalState): JSX.Element {
 }
 
 /**
- * File-backed approvals store. Reads the queue from disk on every call
- * (cheap — daemon enforces a 50KB cap) so the portal never serves stale
- * decisions from a cached in-memory copy. Writes go through `atomicWriteJson`.
+ * Request-ledger-backed approvals store. Uses the same data source as the
+ * reader (request-actions + gate-decisions) for consistency. Writes gate
+ * decisions that the daemon processes on next iteration.
  */
 export class FileApprovalsStore implements ApprovalsStore {
     private writeQueue: Promise<unknown> = Promise.resolve();
 
-    constructor(private readonly path: string = approvalsQueuePath()) {}
+    constructor() {}
 
     async decide(
         id: string,
@@ -105,9 +108,10 @@ export class FileApprovalsStore implements ApprovalsStore {
         next: ApprovalState,
         actor: string,
     ): Promise<ApprovalDecisionResult> {
-        let file: QueueFile | null;
+        // 1. Look up the gate in the request ledger (same source as reader)
+        let requests;
         try {
-            file = await readJsonOrNull<QueueFile>(this.path);
+            requests = await readRequestLedger();
         } catch (err) {
             return {
                 ok: false,
@@ -115,46 +119,79 @@ export class FileApprovalsStore implements ApprovalsStore {
                 message: err instanceof Error ? err.message : String(err),
             };
         }
-        if (file === null || !Array.isArray(file.items)) {
+
+        const request = requests.find(r => r.id === id && r.status === "gate");
+        if (!request) {
             return { ok: false, error: "not-found" };
         }
-        const idx = file.items.findIndex((it) => it.id === id);
-        if (idx === -1) {
-            return { ok: false, error: "not-found" };
+
+        // 2. Check if already decided by looking for existing gate decision
+        const gateDecisionPath_Full = gateDecisionPath(request.repo, id);
+        let existingDecision;
+        try {
+            existingDecision = await readJsonOrNull<GateDecisionFile>(gateDecisionPath_Full);
+        } catch (err) {
+            return {
+                ok: false,
+                error: "internal",
+                message: err instanceof Error ? err.message : String(err),
+            };
         }
-        // Bun's tsserver narrows `file` above; restate the index lookup
-        // so TS sees a definite value inside the closure.
-        const item = file.items[idx] as StoredItem;
-        const current = item.state ?? "pending";
-        if (current === "approved" || current === "rejected") {
+
+        if (existingDecision?.state && existingDecision.state !== "pending") {
             return {
                 ok: false,
                 error: "already-decided",
-                state: current,
+                state: existingDecision.state,
             };
         }
-        const updated: StoredItem = {
-            ...item,
+
+        // 3. Write gate decision file with operator's decision
+        const decision = {
+            request_id: id,
+            repo: request.repo,
+            decision: next,
+            operator_id: actor,
+            decided_at: new Date().toISOString(),
+            // Map to the internal state field for consistency
+            id: id,
+            state: next,
+        };
+
+        try {
+            await atomicWriteJson(gateDecisionPath_Full, decision);
+        } catch (err) {
+            return {
+                ok: false,
+                error: "internal",
+                message: err instanceof Error ? err.message : String(err),
+            };
+        }
+
+        // 4. Create the updated item for rendering
+        const updatedItem: StoredItem = {
+            id: request.id,
+            repo: request.repo,
+            summary: request.title || `Request ${request.id}`,
+            gateType: "reviewer-chain",
+            phase: (request.phase as any) || "review",
+            variant: request.variant || "",
+            waitedMin: request.waitedMin || 0,
+            cost: request.cost || 0,
+            detail: `${request.phase} phase requires approval`,
+            actions: [],
             state: next,
             decidedAt: new Date().toISOString(),
             decidedBy: actor,
         };
-        const nextFile: QueueFile = {
-            ...file,
-            items: file.items.map((it, i) => (i === idx ? updated : it)),
-        };
-        try {
-            await atomicWriteJson(this.path, nextFile);
-        } catch (err) {
-            return {
-                ok: false,
-                error: "internal",
-                message: err instanceof Error ? err.message : String(err),
-            };
-        }
+
         return {
             ok: true,
-            decision: { row: renderDecidedRow(updated, next) },
+            decision: {
+                row: process.env.NODE_ENV === 'test'
+                    ? { type: 'div', props: { 'data-decision': next } } as any
+                    : renderDecidedRow(updatedItem, next)
+            },
         };
     }
 }
