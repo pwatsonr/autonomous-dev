@@ -16,6 +16,9 @@ import { Btn, Card, Chip, Dot } from "../../components/primitives";
 // rail-ops bar). Import retained-as-comment for git-blame discoverability.
 // import { KillSwitch } from "../../components/kill-switch";
 import type { OpsHealth, RenderProps } from "../../types/render";
+
+// Pre-computed hx-trigger value - using double quotes inside bracket expression
+const OPS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
 import { EmptyState } from "../fragments/empty-state";
 import { HeartbeatSparkline } from "../fragments/heartbeat-sparkline";
 import { KpiStrip } from "../fragments/kpi-strip";
@@ -155,7 +158,7 @@ export const OpsView: FC<RenderProps["ops"] & { csrfToken?: string }> = ({
         <div
             id="ops-body"
             hx-get="/ops"
-            hx-trigger="every 10s [document.visibilityState === 'visible']"
+            hx-trigger={OPS_POLLING_TRIGGER}
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#ops-body"

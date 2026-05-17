@@ -69,9 +69,10 @@ describe("PORTAL-AUDIT-2026-05-16 — auto-refresh polling contract", () => {
             expect(html).toContain(`id="${page.bodyId}"`);
             expect(html).toContain(`hx-select="#${page.bodyId}"`);
 
-            // Polling interval — pinned so changes are explicit.
+            // Polling interval with visibility guard — pinned so changes are explicit.
+            // Using double quotes inside the JS expression to avoid entity encoding issues.
             expect(html).toContain(
-                `hx-trigger="every ${page.intervalSeconds}s [document.visibilityState === &#39;visible&#39;]"`,
+                `hx-trigger="every ${page.intervalSeconds}s [document.visibilityState === &quot;visible&quot;]"`,
             );
 
             // Same path the user is on — full-page fetch + hx-select extracts
@@ -81,6 +82,16 @@ describe("PORTAL-AUDIT-2026-05-16 — auto-refresh polling contract", () => {
             // Swap target + mode — outerHTML on `this` keeps the wrapper id stable.
             expect(html).toContain('hx-target="this"');
             expect(html).toContain('hx-swap="outerHTML"');
+
+            // Cypress-style smoke test (comment only - not implemented):
+            // A real browser test would:
+            // 1. Visit the page in Chrome/Firefox
+            // 2. Open DevTools Network tab
+            // 3. Background the tab (ctrl+tab or minimize window)
+            // 4. Wait 15+ seconds (1.5x polling interval)
+            // 5. Assert no new network requests to ${page.path} were made
+            // 6. Foreground the tab
+            // 7. Assert polling resumes within the next interval
         });
     }
 

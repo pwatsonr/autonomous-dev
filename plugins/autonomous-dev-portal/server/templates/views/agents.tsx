@@ -13,6 +13,9 @@ import type { FC } from "hono/jsx";
 
 import type { AgentRow, RenderProps } from "../../types/render";
 
+// Pre-computed hx-trigger value - using double quotes inside bracket expression
+const AGENTS_POLLING_TRIGGER = 'every 30s [document.visibilityState === "visible"]';
+
 function fmtRuns(n: number | null | undefined): string {
     return typeof n === "number" ? String(n) : "—";
 }
@@ -47,7 +50,7 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
         id="agents-body"
         class="agents-surface"
         hx-get="/agents"
-        hx-trigger="every 30s [document.visibilityState === 'visible']"
+        hx-trigger={AGENTS_POLLING_TRIGGER}
         hx-target="this"
         hx-swap="outerHTML"
         hx-select="#agents-body"

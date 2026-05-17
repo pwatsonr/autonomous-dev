@@ -35,6 +35,9 @@ import type { KpiItem } from "../fragments/kpi-strip";
 import { RepoCardGrid } from "../fragments/repo-card";
 import { StandardsDriftSummary } from "../fragments/standards-drift";
 
+// Pre-computed hx-trigger value - using double quotes inside bracket expression
+const DASHBOARD_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
+
 export interface DashboardAggregates {
     /** Sum of `activeRequests` across all repos. */
     totalActive: number;
@@ -170,7 +173,7 @@ export const DashboardView: FC<DashboardViewProps> = ({
         <div
             id="dashboard-body"
             hx-get="/"
-            hx-trigger="every 10s [document.visibilityState === 'visible']"
+            hx-trigger={DASHBOARD_POLLING_TRIGGER}
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#dashboard-body"
@@ -272,6 +275,7 @@ export const DashboardView: FC<DashboardViewProps> = ({
                     <EmptyState noun="active requests" />
                 )}
             </section>
+
         </div>
     );
 };
