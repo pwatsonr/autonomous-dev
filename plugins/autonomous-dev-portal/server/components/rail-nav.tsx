@@ -63,8 +63,10 @@ export const NAV_ITEMS: readonly NavItem[] = [
     { href: "/", label: "Dashboard", group: "operate", iconName: "activity" },
     { href: "/approvals", label: "Approvals", group: "operate", iconName: "shield-alert" },
     { href: "/requests", label: "Requests", group: "operate", iconName: "git-pull-request" },
+    { href: "/logs", label: "Logs", group: "operate", iconName: "logs-viewer" },
     { href: "/costs", label: "Costs", group: "operate", iconName: "dollar-sign" },
     { href: "/agents", label: "Agents", group: "system", iconName: "bot" },
+    { href: "/repos", label: "Repos", group: "system", iconName: "git-branch" },
     { href: "/settings", label: "Settings", group: "system", iconName: "sliders" },
     { href: "/ops", label: "Ops", group: "system", iconName: "terminal" },
 ];

@@ -47,12 +47,9 @@ const ROUTES: RouteSpec[] = [
     { path: "/ops", label: "Operations", expectedHeading: "Operations" },
     { path: "/agents", label: "Agents", expectedHeading: "Agents" },
     { path: "/settings", label: "Settings", expectedHeading: "Settings" },
-    // BUG-22 (PORTAL-BUG-CATALOG-2026-05-16): /logs and /repos render fine
-    // but aren't in the primary rail. Operators can only reach them by
-    // typing the URL. Tagged `internalOnly` so the nav-coverage test
-    // doesn't fail; remove the flag once the rail entry lands.
-    { path: "/logs", label: "Logs", expectedHeading: "Logs", internalOnly: true },
-    { path: "/repos", label: "Repositories", expectedHeading: /Repos|Repositories/, internalOnly: true },
+    // BUG-22 landed: /logs + /repos now have rail-nav entries.
+    { path: "/logs", label: "Logs", expectedHeading: "Logs" },
+    { path: "/repos", label: "Repositories", expectedHeading: /Repos|Repositories/ },
     { path: "/audit", label: "Audit log", expectedHeading: /Audit/, internalOnly: true },
     { path: "/design-system", label: "Design system", expectedHeading: /design/i, internalOnly: true },
 ];
