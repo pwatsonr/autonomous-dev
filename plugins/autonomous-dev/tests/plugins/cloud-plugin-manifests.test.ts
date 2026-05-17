@@ -15,18 +15,20 @@
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+// Note: `autonomous-dev-deploy-gcp` and `autonomous-dev-deploy-k8s` previously
+// declared `extends` and `deployment_backend` blocks but had them stripped to
+// satisfy `claude plugin validate` (which rejects those as unrecognized keys),
+// unblocking `claude plugin tag` for release. The fields were unread at
+// runtime. AWS and Azure still carry the v2 extension surface and are
+// asserted here until they need similar release treatment.
 const PLUGINS = [
-  'autonomous-dev-deploy-gcp',
   'autonomous-dev-deploy-aws',
   'autonomous-dev-deploy-azure',
-  'autonomous-dev-deploy-k8s',
 ] as const;
 
 const EXPECTED_BACKEND_NAMES: Record<(typeof PLUGINS)[number], string> = {
-  'autonomous-dev-deploy-gcp': 'gcp',
   'autonomous-dev-deploy-aws': 'aws',
   'autonomous-dev-deploy-azure': 'azure',
-  'autonomous-dev-deploy-k8s': 'k8s',
 };
 
 /** Repo root resolved from this file's location (works regardless of cwd). */

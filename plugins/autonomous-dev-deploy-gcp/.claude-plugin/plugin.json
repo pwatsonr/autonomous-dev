@@ -5,25 +5,5 @@
   "author": {
     "name": "pwatsonr",
     "url": "https://github.com/pwatsonr"
-  },
-  "extends": [
-    "autonomous-dev"
-  ],
-  "deployment_backend": {
-    "name": "gcp",
-    "regions_supported": [
-      "us-central1",
-      "us-east1",
-      "us-west1",
-      "europe-west1",
-      "europe-west2",
-      "asia-northeast1",
-      "asia-southeast1"
-    ],
-    "services_supported": [
-      "cloud-run",
-      "cloud-build"
-    ],
-    "credential_provider": "credential-proxy"
   }
 }
