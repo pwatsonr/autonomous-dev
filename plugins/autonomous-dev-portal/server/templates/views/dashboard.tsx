@@ -167,7 +167,21 @@ export const DashboardView: FC<DashboardViewProps> = ({
     const kpiItems = buildKpiItems(repos.length, aggregates);
 
     return (
-        <>
+        <div
+            id="dashboard-body"
+            hx-get="/"
+            hx-trigger="every 10s"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-select="#dashboard-body"
+        >
+            {/* PORTAL-AUDIT-2026-05-16: polls the dashboard every 10s and
+                swaps itself with the matching `#dashboard-body` from the
+                response. Keeps KPIs / repos / requests table fresh so the
+                operator doesn't have to manually refresh while a request
+                is in flight. SSE infrastructure exists at /portal/events
+                but no template subscribes yet; polling is the smaller
+                step until SSE wiring lands. */}
             {/* Region 1: Page head — rendered inline (rather than via
                 ShellLayout's pageTitle/headActions slots) so the
                 Dashboard surface owns the action set and HTMX can
@@ -258,6 +272,6 @@ export const DashboardView: FC<DashboardViewProps> = ({
                     <EmptyState noun="active requests" />
                 )}
             </section>
-        </>
+        </div>
     );
 };

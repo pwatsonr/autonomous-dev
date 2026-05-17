@@ -168,7 +168,17 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
     const kpiItems = buildRequestsKpiItems(items, aggregates);
 
     return (
-        <>
+        <div
+            id="requests-body"
+            hx-get="/requests"
+            hx-trigger="every 10s"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-select="#requests-body"
+        >
+            {/* PORTAL-AUDIT-2026-05-16: polls every 10s so the requests
+                table stays fresh while a pipeline is running. See the
+                matching wrapper on the dashboard. */}
             <div class="page-head">
                 <h1>Requests</h1>
                 <div class="head-actions">
@@ -269,6 +279,6 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
                     </table>
                 )}
             </section>
-        </>
+        </div>
     );
 };
