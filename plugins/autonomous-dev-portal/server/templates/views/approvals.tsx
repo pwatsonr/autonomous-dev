@@ -26,7 +26,19 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
     items,
     costCapDailyUsd,
 }) => (
-    <>
+    <div
+        id="approvals-body"
+        hx-get="/approvals"
+        hx-trigger="every 10s"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-select="#approvals-body"
+    >
+        {/* PORTAL-AUDIT-2026-05-16: 10s polling so the gate queue stays
+            fresh while a request is in flight (the dashboard's polling
+            counterpart). The segmented-filter chips and Bulk-approve
+            button live inside this wrapper; chip clicks are instant
+            so a 10s re-render is unlikely to clobber an interaction. */}
         <div class="page-head">
             <h1>Approvals</h1>
             <div class="head-actions">
@@ -113,5 +125,5 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                 </div>
             )}
         </section>
-    </>
+    </div>
 );

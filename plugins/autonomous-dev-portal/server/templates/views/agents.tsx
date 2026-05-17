@@ -43,7 +43,20 @@ function statusToneClass(status: AgentRow["status"]): string {
 }
 
 export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
-    <section class="agents-surface">
+    <section
+        id="agents-body"
+        class="agents-surface"
+        hx-get="/agents"
+        hx-trigger="every 30s"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-select="#agents-body"
+    >
+        {/* PORTAL-AUDIT-2026-05-16: agents runtime data (last dispatch,
+            runs/30d, FP rate) updates slowly; 30s poll is plenty. The
+            row-click handler is a separate script and survives the
+            re-render because the modal lives in #modal-slot (in the
+            shell layout, outside this wrapper). */}
         <div class="page-head">
             <h1>Agents</h1>
         </div>

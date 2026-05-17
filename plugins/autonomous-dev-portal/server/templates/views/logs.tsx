@@ -12,7 +12,18 @@ function formatTimestampCompact(iso: string): string {
 }
 
 export const LogsView: FC<RenderProps["logs"]> = ({ lines }) => (
-    <section class="logs">
+    <section
+        id="logs-body"
+        class="logs"
+        hx-get="/logs"
+        hx-trigger="every 5s"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-select="#logs-body"
+    >
+        {/* PORTAL-AUDIT-2026-05-16: log tails update fast; poll every 5s
+            instead of the usual 10s so a live debugging session feels
+            responsive. */}
         <h1>Logs</h1>
         {lines.length === 0 ? (
             <p class="empty">No log entries.</p>

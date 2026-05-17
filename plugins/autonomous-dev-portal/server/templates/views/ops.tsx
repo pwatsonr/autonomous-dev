@@ -152,7 +152,19 @@ export const OpsView: FC<RenderProps["ops"] & { csrfToken?: string }> = ({
     const pluginChain = health.pluginChain ?? [];
 
     return (
-        <>
+        <div
+            id="ops-body"
+            hx-get="/ops"
+            hx-trigger="every 10s"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-select="#ops-body"
+        >
+            {/* PORTAL-AUDIT-2026-05-16: 10s polling. Heartbeat age,
+                daemon status pill, plugin-chain state, and recent log
+                events all tick. The reset-circuit-breaker form lives
+                in the head-actions; clicking it is instant so the
+                10s re-render won't disturb it. */}
             {/* Region 1: page head */}
             <div class="page-head">
                 <h1>Operations</h1>
@@ -359,6 +371,6 @@ export const OpsView: FC<RenderProps["ops"] & { csrfToken?: string }> = ({
                     )}
                 </dl>
             </section>
-        </>
+        </div>
     );
 };

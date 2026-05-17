@@ -32,7 +32,17 @@ function fmtRelative(iso: string | undefined): string {
 }
 
 export const ReposView: FC<RenderProps["repos"]> = ({ kpis, repos }) => (
-    <section class="repos-surface">
+    <section
+        id="repos-body"
+        class="repos-surface"
+        hx-get="/repos"
+        hx-trigger="every 10s"
+        hx-target="this"
+        hx-swap="outerHTML"
+        hx-select="#repos-body"
+    >
+        {/* PORTAL-AUDIT-2026-05-16: 10s polling so per-repo activity
+            counts and last-activity timestamps stay current. */}
         <div class="page-head">
             <h1>Repositories</h1>
         </div>
