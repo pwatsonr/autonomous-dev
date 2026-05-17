@@ -84,7 +84,12 @@ export async function readDaemonStatus(): Promise<DaemonStatus> {
     }
     const obj = parsed as Record<string, unknown>;
 
-    const lastSeen = obj["last_seen"];
+    // BUG-2 (PORTAL-BUG-CATALOG-2026-05-16): the daemon writes `timestamp` to
+    // heartbeat.json (per supervisor-loop.sh `write_heartbeat_atomic`); older
+    // versions of this reader looked for `last_seen` which never existed and
+    // forced /health to permanently report 503/dead. Accept either name with
+    // `timestamp` preferred so a future daemon rename doesn't re-break us.
+    const lastSeen = obj["timestamp"] ?? obj["last_seen"];
     if (typeof lastSeen !== "string" || lastSeen.length === 0) {
         return { ...DEAD };
     }
