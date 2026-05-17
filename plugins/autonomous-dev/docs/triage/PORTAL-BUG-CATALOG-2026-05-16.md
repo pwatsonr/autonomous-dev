@@ -10,6 +10,32 @@
 
 The catalog has **18 bugs**: 7 P0, 8 P1, 3 P2.
 
+> **Update 2026-05-17:** all 18 P0/P1/P2 catalog bugs above (#1–18) are
+> now fixed and merged. PRs #271, #272, #273, #275, #276, #277, #278,
+> #280, #281, #282, #283, #284, #285 — plus the **foundational #279**
+> which added `--allowedTools` to the daemon's claude invocation
+> (every prior pipeline run was producing fake "pass" results because
+> agents couldn't write files). End-to-end validation REQ-000010 walked
+> `prd → … → monitor → done` and **shipped real working code** (`hello.py`
+> + passing pytest) for the first time ever in the project's history.
+>
+> Four new bugs discovered after that work:
+> - **BUG-19**: design/review-phase agents (prd-author, tdd-author,
+>   plan-author, spec-author, *-reviewer, monitor agent) still synthesize
+>   their phase results — they have file tools now but choose not to
+>   write `phase-result-<phase>.json`. Pure execution phases (code,
+>   integration, deploy) do write them correctly.
+> - **BUG-20**: heartbeat goes 15+ min stale after laptop sleep — daemon
+>   process is alive but no fresh write until next iteration tick.
+>   Self-heals; cosmetic only.
+> - **BUG-21**: `autonomous-dev request cancel REQ-N` prompts for
+>   `CONFIRM` but no CLI flag accepts it. Subsequent calls just re-loop
+>   the same prompt. Operators are locked into `daemon stop` to halt a
+>   bad request.
+> - **BUG-22**: `/logs` and `/repos` are reachable but missing from the
+>   primary rail-nav — operators can only reach them by typing the URL.
+>   Surfaced by the Cypress Phase 1B nav-coverage test.
+
 ---
 
 ## BUG-1 — Settings General-tab save: "SAVED" but never persists (split reader/writer)
