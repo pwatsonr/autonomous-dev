@@ -136,10 +136,11 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
             {/* Region 9: run history (v1.1, always rendered) */}
             <RunHistory runs={request.runs} />
 
-            {/* Region 11: phase artifact modal (one per artifact) */}
+            {/* Region 11: phase artifact modal (one per phase) */}
             <PhaseArtifactModal
                 artifacts={phaseArtifacts}
                 requestId={request.id}
+                allPhases={phases}
             />
 
             {/* Page-level scripts — SPEC-037-7-03 shared modal helper +
