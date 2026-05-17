@@ -78,6 +78,10 @@ import {
     buildSettingsActionRoutes,
     type SettingsActionDeps,
 } from "./settings-actions";
+import {
+    buildStandardsActionRoutes,
+    type StandardsActionDeps,
+} from "./standards-actions";
 
 export interface RegisterRoutesOptions {
     /**
@@ -131,6 +135,12 @@ export interface RegisterRoutesOptions {
      * `gate-actions-disabled`.
      */
     gateAndRequestActions?: GateAndRequestActionDeps;
+    /**
+     * BUG-15 fix — when present, mounts the standards action routes
+     * (/api/standards/new, /api/standards/:id/edit); when omitted,
+     * each returns 503 `standards-actions-disabled`.
+     */
+    standardsActions?: StandardsActionDeps;
 }
 
 function disabledHandler(error: string) {
@@ -283,6 +293,22 @@ export function registerRoutes(
         app.post(
             "/api/requests/:id/action",
             disabledHandler("gate-actions-disabled"),
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // BUG-15 fix — standards action routes.
+    // -----------------------------------------------------------------
+    if (options.standardsActions !== undefined) {
+        app.route("/", buildStandardsActionRoutes(options.standardsActions));
+    } else {
+        app.get(
+            "/api/standards/new",
+            disabledHandler("standards-actions-disabled"),
+        );
+        app.get(
+            "/api/standards/:id/edit",
+            disabledHandler("standards-actions-disabled"),
         );
     }
 
