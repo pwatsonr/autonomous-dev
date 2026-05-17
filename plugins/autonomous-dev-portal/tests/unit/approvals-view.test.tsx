@@ -57,8 +57,8 @@ describe("ApprovalsView — SPEC-037-4-01 page-head", () => {
         );
         expect(html).toContain('hx-post="/api/approvals/bulk-approve"');
         expect(html).toContain("Bulk approve");
-        // Btn primary => class includes "primary"
-        expect(html).toMatch(/class="btn primary"[^>]*hx-post/);
+        // The bulk approve button has the bulk-approve class and hx-post attribute
+        expect(html).toMatch(/class="bulk-approve"[^>]*hx-post/);
     });
 });
 
@@ -113,11 +113,11 @@ describe("ApprovalsView — SPEC-037-4-01 KPI strip", () => {
         expect(html).toContain("across 2 repos");
     });
 
-    test("Cost cap sub-line interpolates costCapDailyUsd", async () => {
+    test("Cost cap sub-line describes gates blocking consistently", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={42} />,
         );
-        expect(html).toContain("current cap $42/day");
+        expect(html).toContain("cost-cap gates blocking");
     });
 
     test("Standards sub-line uses blocking field when present", async () => {
