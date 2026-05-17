@@ -49,6 +49,8 @@ const REQUEST_ACTIONS: ReadonlySet<string> = new Set([
     "skip",
     "cancel",
     "escalate",
+    "pause",
+    "kill",
 ]);
 
 export interface GateDecisionInput {
