@@ -51,6 +51,8 @@ import { buildGateAndRequestDeps } from "./wiring/gate-store";
 import { buildFileWebhookDispatcher } from "./wiring/notification-dispatcher";
 import { FileSettingsStore } from "./wiring/settings-store";
 import { portalAuditPath } from "./wiring/state-paths";
+import { FileLogsReader } from "./wiring/logs-reader";
+import { setLogsReader } from "./routes/logs";
 
 export interface ServerState {
     server?: Server<unknown>;
@@ -171,7 +173,11 @@ export async function startServer(): Promise<Server<unknown>> {
     const auditLogger = await buildPortalAuditLogger();
     const audit = auditAdapter(auditLogger, log);
 
-    // BUG-13 fix: Wire the audit reader so the audit page renders filter form and pagination
+    // BUG-14 — Initialize LogsReader for live daemon logs
+    const logsReader = new FileLogsReader();
+    setLogsReader(logsReader);
+
+    // BUG-13 — wire the audit reader so the audit page renders filter form and pagination
     try {
         const auditKey = await loadAuditKey();
         const auditVerifier = new StaticAuditChainVerifier(auditKey);
@@ -233,6 +239,7 @@ export async function startServer(): Promise<Server<unknown>> {
     // opens — registerShutdownHook is idempotent w.r.t. registration order.
     registerShutdownHook(async () => {
         await sseBus.shutdown();
+        logsReader.shutdown();
     });
     // SPEC-013-3-02: HTMX-aware 404 / 500. The error-boundary middleware
     // registered in applyMiddlewareChain catches PortalError-class errors

@@ -136,7 +136,14 @@ const OpsHeadActions: FC<{ health: OpsHealth; csrfToken?: string }> = ({
     void csrfToken;
     return (
         <>
-            <Btn>Refresh</Btn>
+            <Btn
+                hx-get="/ops"
+                hx-target="#ops-body"
+                hx-swap="outerHTML"
+                hx-select="#ops-body"
+            >
+                Refresh
+            </Btn>
         </>
     );
 };

@@ -10,6 +10,7 @@ import { renderPage } from "../lib/response-utils";
 import { loadSettingsData, loadSettingsStub } from "../stubs/settings";
 import { TAB_IDS, type TabId } from "../types/render";
 import { readPortalSettings } from "../wiring/settings-reader";
+import { readAgentsData } from "../wiring/agents-readers";
 
 /**
  * SPEC-036-4-01 AC-01 / AC-06 — pure function so it can be unit-tested
@@ -72,6 +73,20 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
         dndStart: realSettings.notifications.dndStart,
         dndEnd: realSettings.notifications.dndEnd
     };
+
+    // Agents - read live registry instead of hardcoded fixture
+    const agentsData = await readAgentsData();
+    data.agents = agentsData.agents.map((agent) => ({
+        name: agent.name,
+        role: agent.name.split("-")[0] ?? agent.name, // Extract role from name
+        state: agent.status === "baseline" ? "active" : agent.status, // Map status to state
+        approvalPct: 0, // Not tracked by daemon, default to 0
+        precisionPct: 0, // Not tracked by daemon, default to 0
+        recallPct: 0, // Not tracked by daemon, default to 0
+        version: agent.version,
+        lastTrainedAt: new Date().toISOString(), // Default to current time
+        recentRuns: [], // Not tracked by daemon, empty array
+    }));
 
     return renderPage(c, "settings", { config, data });
 };

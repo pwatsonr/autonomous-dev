@@ -27,6 +27,8 @@ import { NotificationsCard } from "../fragments/notifications-card";
 import { SettingsSection } from "../fragments/settings-section";
 import { SettingsTabs } from "../fragments/settings-tabs";
 import { TrustOverridesTable } from "../fragments/trust-overrides-table";
+import { VariantsPanel as VariantsFragment } from "../fragments/settings-variants";
+import { BackendsPanel as BackendsFragment } from "../fragments/settings-backends";
 
 // ---- Tab panel sub-views ---------------------------------------------------
 
@@ -231,7 +233,7 @@ const AllowlistCard: FC<{ data: SettingsData }> = ({ data }) => (
     </section>
 );
 
-const VariantsPanel: FC<{ data: SettingsData }> = ({ data }) => (
+const VariantsPlaceholder: FC<{ data: SettingsData }> = ({ data }) => (
     <section class="sec" aria-labelledby="variants-heading">
         <div class="sec-head">
             <h2 id="variants-heading">Pipeline variants</h2>
@@ -309,7 +311,7 @@ const StandardsPanel: FC<{ data: SettingsData }> = ({ data }) => (
     </section>
 );
 
-const BackendsPanel: FC<{ data: SettingsData }> = ({ data }) => (
+const BackendsPlaceholder: FC<{ data: SettingsData }> = ({ data }) => (
     <section class="sec" aria-labelledby="backends-heading">
         <div class="sec-head">
             <h2 id="backends-heading">Deploy backends</h2>
@@ -421,7 +423,7 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
             </Panel>
 
             <Panel id="variants" activeTab={activeTab}>
-                <VariantsPanel data={data} />
+                <VariantsFragment data={data} />
             </Panel>
 
             <Panel id="standards" activeTab={activeTab}>
@@ -429,7 +431,7 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
             </Panel>
 
             <Panel id="backends" activeTab={activeTab}>
-                <BackendsPanel data={data} />
+                <BackendsFragment data={data} />
             </Panel>
 
             <Panel id="agents" activeTab={activeTab}>

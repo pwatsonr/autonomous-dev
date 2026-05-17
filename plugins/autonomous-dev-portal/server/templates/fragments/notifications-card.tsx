@@ -133,7 +133,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                             id="dnd-enabled"
                             name="dndEnabled"
                             checked={config.dndEnabled}
-                            disabled={dndDisabled}
+                            {...(dndDisabled ? { disabled: true } : {})}
                         />
                         <span>Enable DND</span>
                     </label>
@@ -144,7 +144,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                         name="dndStart"
                         class="input dnd-time"
                         value={config.dndStart}
-                        disabled={dndDisabled}
+                        {...(dndDisabled ? { disabled: true } : {})}
                         data-validate="dnd-time"
                     />
                     <label class="dnd-time-label" for="dnd-end">End</label>
@@ -154,7 +154,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                         name="dndEnd"
                         class="input dnd-time"
                         value={config.dndEnd}
-                        disabled={dndDisabled}
+                        {...(dndDisabled ? { disabled: true } : {})}
                         data-validate="dnd-time"
                     />
                 </div>
