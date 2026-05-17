@@ -350,6 +350,88 @@ export function buildSettingsActionRoutes(
         );
     }
 
+    // -----------------------------------------------------------------
+    // POST /api/settings/default-variant — set default variant
+    // -----------------------------------------------------------------
+    router.post("/api/settings/default-variant", async (c) => {
+        let form: Record<string, unknown> = {};
+        try {
+            form = (await c.req.parseBody()) as Record<string, unknown>;
+        } catch {
+            // Try parsing as JSON for HTMX hx-vals
+            try {
+                form = await c.req.json();
+            } catch {
+                return c.html(genericErrorFragment("invalid form body"), 422);
+            }
+        }
+
+        if (typeof form.id !== "string" || form.id.length === 0) {
+            return c.html(genericErrorFragment("invalid variant id"), 400);
+        }
+
+        const actor = resolveActor(c.get("auth"));
+        let result: SettingsFormSaveResult;
+        try {
+            result = await deps.store.saveFromForm({ defaultVariant: form.id }, actor);
+        } catch (err) {
+            logger.error("settings_default_variant_failed", {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return c.html(genericErrorFragment("save failed"), 500);
+        }
+        if (!result.ok) {
+            return c.html(result.fragment, 422);
+        }
+        await deps.audit.append({
+            event: "settings_default_variant_saved",
+            actor,
+            variantId: form.id,
+        });
+        return c.html(<div class="chip ok">SAVED</div>);
+    });
+
+    // -----------------------------------------------------------------
+    // POST /api/settings/default-backend — set default backend
+    // -----------------------------------------------------------------
+    router.post("/api/settings/default-backend", async (c) => {
+        let form: Record<string, unknown> = {};
+        try {
+            form = (await c.req.parseBody()) as Record<string, unknown>;
+        } catch {
+            // Try parsing as JSON for HTMX hx-vals
+            try {
+                form = await c.req.json();
+            } catch {
+                return c.html(genericErrorFragment("invalid form body"), 422);
+            }
+        }
+
+        if (typeof form.id !== "string" || form.id.length === 0) {
+            return c.html(genericErrorFragment("invalid backend id"), 400);
+        }
+
+        const actor = resolveActor(c.get("auth"));
+        let result: SettingsFormSaveResult;
+        try {
+            result = await deps.store.saveFromForm({ defaultBackend: form.id }, actor);
+        } catch (err) {
+            logger.error("settings_default_backend_failed", {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return c.html(genericErrorFragment("save failed"), 500);
+        }
+        if (!result.ok) {
+            return c.html(result.fragment, 422);
+        }
+        await deps.audit.append({
+            event: "settings_default_backend_saved",
+            actor,
+            backendId: form.id,
+        });
+        return c.html(<div class="chip ok">SAVED</div>);
+    });
+
     return router;
 }
 
