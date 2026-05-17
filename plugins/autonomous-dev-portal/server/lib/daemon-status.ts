@@ -84,7 +84,11 @@ export async function readDaemonStatus(): Promise<DaemonStatus> {
     }
     const obj = parsed as Record<string, unknown>;
 
-    const timestamp = obj["timestamp"];
+    // BUG-2 (PORTAL-BUG-CATALOG-2026-05-16): the daemon writes `timestamp` to
+    // heartbeat.json. PR #273 unified to `timestamp`; this fallback to
+    // `last_seen` is defensive — older daemons (or future renames) won't
+    // re-break /health.
+    const timestamp = obj["timestamp"] ?? obj["last_seen"];
     if (typeof timestamp !== "string" || timestamp.length === 0) {
         return { ...DEAD };
     }
