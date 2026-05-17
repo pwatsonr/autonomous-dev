@@ -212,6 +212,26 @@ spawn_session_typed() {
     # script via `bash spawn-session.sh` (unqualified), which on a daemon
     # PATH that lacks /opt/homebrew/bin resolves to /bin/bash@3.2, so this
     # path matters in production.
+    # PORTAL-BUG-CATALOG-2026-05-16 followup: `--permission-mode bypassPermissions`
+    # alone does NOT give the spawned session access to file-modifying tools in
+    # --print mode. Without the explicit allowlist, every prd/tdd/plan/spec/code
+    # phase produced text-only output, never wrote phase-result-<phase>.json
+    # OR the requested artifact files, and the daemon fell back to its
+    # "synthesized from exit code 0" fake-pass. Investigated 2026-05-17 with
+    # session-1778990070.txt: claude itself reported "I don't have write
+    # permissions or access to a file writing tool in this context." Result:
+    # weeks of phase-walks that produced zero real artifacts at ~$0.20/phase.
+    # The allowlist below is the union of tools the agent .md definitions in
+    # plugins/autonomous-dev/agents/ declare; review phases get the read-only
+    # subset.
+    local tools_full="Read Write Edit Bash Glob Grep WebSearch WebFetch"
+    local tools_review="Read Glob Grep"
+    local agent_tools
+    if [[ "${target_phase}" == *"_review" ]]; then
+        agent_tools="${tools_review}"
+    else
+        agent_tools="${tools_full}"
+    fi
     if [[ "${req_type}" == "infra" && "${target_phase}" != *"_review" ]]; then
         local gates="${ENHANCED_GATES_CSV:-${DEFAULT_ENHANCED_GATES}}"
         env "ENHANCED_GATES=${gates}" claude \
@@ -220,6 +240,7 @@ spawn_session_typed() {
             --add-dir "${req_dir}" \
             --add-dir "${project}" \
             --permission-mode bypassPermissions \
+            --allowedTools "${agent_tools}" \
             --max-budget-usd "${phase_budget}" \
             ${args[@]+"${args[@]}"} \
             "${phase_prompt}" || exit_code=$?
@@ -230,6 +251,7 @@ spawn_session_typed() {
             --add-dir "${req_dir}" \
             --add-dir "${project}" \
             --permission-mode bypassPermissions \
+            --allowedTools "${agent_tools}" \
             --max-budget-usd "${phase_budget}" \
             ${args[@]+"${args[@]}"} \
             "${phase_prompt}" || exit_code=$?
