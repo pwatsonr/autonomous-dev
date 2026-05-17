@@ -1,27 +1,34 @@
 // PLAN-021 Phase 1A — Cypress custom commands.
 //
-// FR-021-03 enhancement: adds type declarations for fixture management tasks.
+// Type declarations + helpers used by all Phase 2 specs. The
+// `resetState`/`seedRequest`/`seedGateDecision` chainables wrap the
+// matching tasks defined in cypress.config.ts.
 
 /// <reference types="cypress" />
 
-// FR-021-03: Type declarations for custom tasks
 declare global {
     namespace Cypress {
         interface Chainable {
-            // Task type declarations
+            resetState(): Chainable<null>;
+            seedRequest(id: string, data: object): Chainable<null>;
+            seedGateDecision(repo: string, id: string, data: object): Chainable<null>;
         }
     }
 }
 
-// Extend Cypress task types for our custom tasks
-declare module 'cypress' {
-    interface Cypress {
-        env(): any;
-    }
-    namespace Cypress {
-        interface Tasks {
-            seedRequests(params: { stateDir: string; requests: any[] }): null;
-            cleanStateDir(stateDir: string): null;
-        }
-    }
-}
+Cypress.Commands.add("resetState", () => {
+    return cy.task("clearStateDir");
+});
+
+Cypress.Commands.add("seedRequest", (id: string, data: object) => {
+    return cy.task("writeRequestAction", { id, content: data });
+});
+
+Cypress.Commands.add(
+    "seedGateDecision",
+    (repo: string, id: string, data: object) => {
+        return cy.task("writeGateDecision", { repo, id, content: data });
+    },
+);
+
+export {};
