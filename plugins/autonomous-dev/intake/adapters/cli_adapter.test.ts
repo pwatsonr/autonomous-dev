@@ -154,11 +154,16 @@ describe('Group 1: subcommand registration', () => {
     expect(router.calls()[0].args[0]).toBe('REQ-000006');
   });
 
-  test('feedback subcommand routes with message flag', async () => {
+  test('feedback subcommand routes with message promoted into args', async () => {
+    // buildCommand() promotes payload.message out of flags into args[1]
+    // for the `feedback` subcommand (mirrors `submit`'s description handling).
+    // See cli_adapter.ts PLAN-038-follow-up block.
     const { router } = await runProgram(['feedback', 'REQ-000007', 'looks good']);
     const cmd = router.calls()[0];
     expect(cmd.commandName).toBe('feedback');
-    expect(cmd.flags.message).toBe('looks good');
+    expect(cmd.args[0]).toBe('REQ-000007');
+    expect(cmd.args[1]).toBe('looks good');
+    expect(cmd.flags.message).toBeUndefined();
   });
 
   test('kill subcommand routes with requestId', async () => {
