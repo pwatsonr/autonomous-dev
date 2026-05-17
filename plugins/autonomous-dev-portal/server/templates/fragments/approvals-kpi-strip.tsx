@@ -66,7 +66,7 @@ export const ApprovalsKpiStrip: FC<ApprovalsKpiStripProps> = ({
             <div class="kpi">
                 <div class="kpi-label">Cost cap</div>
                 <div class="kpi-num">{cost.length}</div>
-                <div class="kpi-sub">current cap ${costCapDailyUsd}/day</div>
+                <div class="kpi-sub">cost-cap gates blocking</div>
             </div>
         </div>
     );
