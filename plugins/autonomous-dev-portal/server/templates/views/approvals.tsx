@@ -29,7 +29,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
     <div
         id="approvals-body"
         hx-get="/approvals"
-        hx-trigger="every 10s"
+        hx-trigger="every 10s [document.visibilityState === 'visible']"
         hx-target="this"
         hx-swap="outerHTML"
         hx-select="#approvals-body"

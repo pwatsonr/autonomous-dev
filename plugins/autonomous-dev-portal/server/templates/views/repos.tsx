@@ -36,7 +36,7 @@ export const ReposView: FC<RenderProps["repos"]> = ({ kpis, repos }) => (
         id="repos-body"
         class="repos-surface"
         hx-get="/repos"
-        hx-trigger="every 10s"
+        hx-trigger="every 10s [document.visibilityState === 'visible']"
         hx-target="this"
         hx-swap="outerHTML"
         hx-select="#repos-body"

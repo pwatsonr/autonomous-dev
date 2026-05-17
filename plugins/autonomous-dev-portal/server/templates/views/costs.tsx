@@ -107,7 +107,7 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
         <div
             id="costs-body"
             hx-get="/costs"
-            hx-trigger="every 10s"
+            hx-trigger="every 10s [document.visibilityState === 'visible']"
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#costs-body"
