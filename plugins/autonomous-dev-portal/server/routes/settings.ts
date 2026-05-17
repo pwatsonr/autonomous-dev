@@ -33,26 +33,45 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
     // Add CSRF token for form submissions
     data.csrfToken = (c.get("csrfToken") as string | undefined) ?? "";
 
-    // PLAN-038 TASK-020 — swap the fake `/Users/op/repos/*` allowlist for
-    // the real portal-settings allowlist. The allowlist lives on
-    // SettingsData (data.allowlist), not SettingsView (config). Other
-    // settings tabs (general / variants / standards / backends / agents)
-    // remain on the stub for now; their wiring is tracked as follow-up
-    // under PRD-018 NG-3702.
+    // Read real settings from daemon config file and overlay onto stub data
     const realSettings = await readPortalSettings();
-    if (realSettings.allowlist.length > 0) {
-        data.allowlist = realSettings.allowlist.map((entry) => ({
-            id: entry.id,
-            path: entry.path,
-            // Real-source allowlist entries don't carry the legacy
-            // `status` / `addedAt` fields. Defaults preserve the view
-            // contract without lying about state.
-            status: "ok" as const,
-            addedAt: new Date().toISOString(),
-        }));
-    } else {
-        data.allowlist = [];
-    }
+
+    // Allowlist
+    data.allowlist = realSettings.allowlist.map((entry) => ({
+        id: entry.id,
+        path: entry.path,
+        status: "ok" as const,
+        addedAt: new Date().toISOString(),
+    }));
+
+    // Trust settings
+    data.trustLevel = realSettings.globalTrust as "L0" | "L1" | "L2" | "L3";
+    data.trustOverrides = Object.entries(realSettings.trustOverrides).map(([repo, level]) => ({
+        repo,
+        level,
+        source: "~/.claude/autonomous-dev.json",
+        immutable: false
+    }));
+
+    // Cost caps
+    data.costCaps = {
+        daily: realSettings.dailyCostCap,
+        perRequest: realSettings.perRequestCostCap,
+        monthly: realSettings.monthlyCostCap
+    };
+    data.dailyCap = realSettings.dailyCostCap;
+
+    // Notifications
+    data.notifications = {
+        discordWebhook: realSettings.notifications.discordWebhook,
+        slackWebhook: realSettings.notifications.slackWebhook,
+        discordStatus: "unknown", // Stub for now
+        slackStatus: "unknown",   // Stub for now
+        notifyDefault: realSettings.notifications.defaultMethod as "discord" | "slack" | "none",
+        dndEnabled: realSettings.notifications.dndEnabled,
+        dndStart: realSettings.notifications.dndStart,
+        dndEnd: realSettings.notifications.dndEnd
+    };
 
     return renderPage(c, "settings", { config, data });
 };

@@ -55,7 +55,9 @@ const TrustCard: FC<{ data: SettingsData }> = ({ data }) => (
             hx-swap="outerHTML"
             hx-target="closest section"
         >
-            <input type="hidden" name="_csrf" value={data.csrfToken ?? ""} />
+{data.csrfToken && data.csrfToken.length > 0 && (
+                <input type="hidden" name="_csrf" value={data.csrfToken} />
+            )}
             <select
                 class="input"
                 name="trust-level"
@@ -113,7 +115,9 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
             hx-swap="outerHTML"
             hx-target="closest section"
         >
-            <input type="hidden" name="_csrf" value={data.csrfToken ?? ""} />
+{data.csrfToken && data.csrfToken.length > 0 && (
+                <input type="hidden" name="_csrf" value={data.csrfToken} />
+            )}
             <div class="field" data-cost-cap-group>
                 <label for="cost-cap-per-request">Per-request cap</label>
                 <span class="prefix">$</span>
@@ -204,7 +208,9 @@ const AllowlistCard: FC<{ data: SettingsData }> = ({ data }) => (
             hx-target="[data-fragment='allowlist-table']"
             hx-swap="outerHTML"
         >
-            <input type="hidden" name="_csrf" value={data.csrfToken ?? ""} />
+{data.csrfToken && data.csrfToken.length > 0 && (
+                <input type="hidden" name="_csrf" value={data.csrfToken} />
+            )}
             <div class="field">
                 <label for="allowlist-new-path">Add repo (absolute path)</label>
                 <input
@@ -519,7 +525,9 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
         >
             <h1>Settings</h1>
 
-            <input type="hidden" name="_csrf" value={csrfToken ?? ""} />
+            {csrfToken && csrfToken.length > 0 && (
+                <input type="hidden" name="_csrf" value={csrfToken} />
+            )}
 
             {successMessage ? (
                 <div

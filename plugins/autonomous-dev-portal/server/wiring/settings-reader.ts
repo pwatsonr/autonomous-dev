@@ -1,10 +1,8 @@
 // PLAN-038 TASK-011 — portal settings reader (lightweight, read-only).
 //
-// Reads `<state-root>/portal-settings.json`. This is the file the
-// `kit-parity` fixture provides; in production the daemon (or operator
-// `autonomous-dev configure`) writes the same file. When absent, the
-// reader returns an empty allowlist — the honest empty-state per the
-// Tenet "Honesty over fidelity".
+// Reads `~/.claude/autonomous-dev.json` (daemon config file). Maps from
+// the daemon's nested shape to the view-model that settings.tsx expects.
+// When absent, the reader returns sensible defaults.
 //
 // Distinct from `settings-store.tsx` which is the mutating store (writer)
 // for the Settings surface. This file is the read-side composition input.
@@ -12,7 +10,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { stateDirRoot } from "./state-paths";
+import { userConfigPath } from "./state-paths";
 
 export interface AllowlistEntry {
     id: string;
@@ -25,46 +23,152 @@ export interface PortalSettings {
     trustOverrides: Record<string, string>;
     /** Global trust default (when no per-repo override). */
     globalTrust: string;
+    /** Daily cost cap from governance */
+    dailyCostCap: number;
+    /** Per-request cost cap from governance */
+    perRequestCostCap: number;
+    /** Monthly cost cap from governance */
+    monthlyCostCap: number;
+    /** Notification settings */
+    notifications: {
+        discordWebhook: string;
+        slackWebhook: string;
+        defaultMethod: string;
+        dndEnabled: boolean;
+        dndStart: string;
+        dndEnd: string;
+    };
 }
 
-interface PortalSettingsFile {
-    repositories?: {
-        allowlist?: AllowlistEntry[];
+/**
+ * Daemon config file shape - nested structure used by the daemon
+ */
+interface DaemonConfigFile {
+    governance?: {
+        daily_cost_cap_usd?: number;
+        monthly_cost_cap_usd?: number;
+        per_request_cost_cap_usd?: number;
     };
-    trustLevels?: {
-        global?: string;
-        perRepo?: Record<string, string>;
+    repositories?: {
+        allowlist?: string[]; // daemon uses string[] not AllowlistEntry[]
+    };
+    trust?: {
+        system_default_level?: number | string;
+        per_repo_overrides?: Record<string, string>;
+    };
+    notifications?: {
+        delivery?: {
+            discord?: { webhook_url?: string };
+            slack?: { webhook_url?: string };
+            default_method?: string;
+        };
+        // Legacy flat fields for backward compatibility
+        discordWebhook?: string;
+        slackWebhook?: string;
+        notifyDefault?: string;
+        dndEnabled?: boolean;
+        dndStart?: string;
+        dndEnd?: string;
     };
 }
 
 export interface SettingsReaderOptions {
-    /** Override the state-dir root (default: state-paths). */
-    stateRoot?: string;
+    /** Override the config file path (default: userConfigPath). */
+    configPath?: string;
 }
 
-export function portalSettingsPath(stateRoot?: string): string {
-    return join(stateRoot ?? stateDirRoot(), "portal-settings.json");
+export function portalSettingsPath(configPath?: string): string {
+    return configPath ?? userConfigPath();
+}
+
+/**
+ * Convert daemon trust level number to portal string format
+ */
+function formatTrustLevel(level: number | string | undefined): string {
+    if (typeof level === "string") return level;
+    if (typeof level === "number") return `L${level}`;
+    return "L1"; // default
+}
+
+/**
+ * Convert daemon allowlist (string[]) to portal format (AllowlistEntry[])
+ */
+function formatAllowlist(paths: string[] | undefined): AllowlistEntry[] {
+    if (!Array.isArray(paths)) return [];
+    return paths.map((path, index) => ({
+        id: `rep-${index.toString().padStart(3, '0')}`, // Generate stable IDs
+        path
+    }));
 }
 
 export async function readPortalSettings(
     opts: SettingsReaderOptions = {},
 ): Promise<PortalSettings> {
-    const path = portalSettingsPath(opts.stateRoot);
+    const path = portalSettingsPath(opts.configPath);
     let raw: string;
     try {
         raw = await readFile(path, "utf-8");
     } catch {
-        return { allowlist: [], trustOverrides: {}, globalTrust: "L1" };
+        // Return sensible defaults when file missing
+        return {
+            allowlist: [],
+            trustOverrides: {},
+            globalTrust: "L1",
+            dailyCostCap: 25,
+            perRequestCostCap: 10,
+            monthlyCostCap: 500,
+            notifications: {
+                discordWebhook: "",
+                slackWebhook: "",
+                defaultMethod: "none",
+                dndEnabled: false,
+                dndStart: "22:00",
+                dndEnd: "08:00"
+            }
+        };
     }
-    let parsed: PortalSettingsFile;
+    let parsed: DaemonConfigFile;
     try {
-        parsed = JSON.parse(raw) as PortalSettingsFile;
+        parsed = JSON.parse(raw) as DaemonConfigFile;
     } catch {
-        return { allowlist: [], trustOverrides: {}, globalTrust: "L1" };
+        // Return defaults on parse error
+        return {
+            allowlist: [],
+            trustOverrides: {},
+            globalTrust: "L1",
+            dailyCostCap: 25,
+            perRequestCostCap: 10,
+            monthlyCostCap: 500,
+            notifications: {
+                discordWebhook: "",
+                slackWebhook: "",
+                defaultMethod: "none",
+                dndEnabled: false,
+                dndStart: "22:00",
+                dndEnd: "08:00"
+            }
+        };
     }
+
+    // Map from daemon shape to portal view-model
+    const notifications = parsed.notifications ?? {};
+    const delivery = notifications.delivery ?? {};
+
     return {
-        allowlist: parsed.repositories?.allowlist ?? [],
-        trustOverrides: parsed.trustLevels?.perRepo ?? {},
-        globalTrust: parsed.trustLevels?.global ?? "L1",
+        allowlist: formatAllowlist(parsed.repositories?.allowlist),
+        trustOverrides: parsed.trust?.per_repo_overrides ?? {},
+        globalTrust: formatTrustLevel(parsed.trust?.system_default_level),
+        dailyCostCap: parsed.governance?.daily_cost_cap_usd ?? 25,
+        perRequestCostCap: parsed.governance?.per_request_cost_cap_usd ?? 10,
+        monthlyCostCap: parsed.governance?.monthly_cost_cap_usd ?? 500,
+        notifications: {
+            // Prefer nested daemon shape, fallback to legacy flat shape
+            discordWebhook: delivery.discord?.webhook_url ?? notifications.discordWebhook ?? "",
+            slackWebhook: delivery.slack?.webhook_url ?? notifications.slackWebhook ?? "",
+            defaultMethod: delivery.default_method ?? notifications.notifyDefault ?? "none",
+            dndEnabled: notifications.dndEnabled ?? false,
+            dndStart: notifications.dndStart ?? "22:00",
+            dndEnd: notifications.dndEnd ?? "08:00"
+        }
     };
 }

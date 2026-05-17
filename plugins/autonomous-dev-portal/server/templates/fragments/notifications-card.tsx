@@ -47,7 +47,9 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
             </p>
 
             {/* Hidden CSRF token for form submissions */}
-            <input type="hidden" name="_csrf" value={csrfToken ?? ""} />
+            {csrfToken && csrfToken.length > 0 && (
+                <input type="hidden" name="_csrf" value={csrfToken} />
+            )}
 
             {/* Discord webhook --------------------------------------- */}
             <div class="field stacked-field" data-channel="discord">
