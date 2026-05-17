@@ -104,7 +104,17 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
     };
 
     return (
-        <>
+        <div
+            id="costs-body"
+            hx-get="/costs"
+            hx-trigger="every 10s"
+            hx-target="this"
+            hx-swap="outerHTML"
+            hx-select="#costs-body"
+        >
+            {/* PORTAL-AUDIT-2026-05-16: 10s polling. The MTD-spend tile
+                and daily/projection chart tick up as the daemon writes
+                to ~/.autonomous-dev/cost-ledger.json. */}
             {/* Region 1: page head */}
             <div class="page-head">
                 <h1>Costs</h1>
@@ -261,6 +271,6 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                     <EmptyState noun="deploy spend" />
                 )}
             </section>
-        </>
+        </div>
     );
 };
