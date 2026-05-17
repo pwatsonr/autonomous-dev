@@ -99,12 +99,10 @@ export interface CostLedger {
 }
 
 export interface Heartbeat {
-    version: 1;
-    ts: string;
+    timestamp: string;
     pid: number;
-    uptime_s: number;
-    daemon_version: string;
-    active_requests: number;
+    iteration_count: number;
+    active_request_id: string | null;
 }
 
 export type LogLevel = "debug" | "info" | "warn" | "error";

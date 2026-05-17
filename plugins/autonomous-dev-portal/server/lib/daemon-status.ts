@@ -1,11 +1,11 @@
 // SPEC-013-3-03 §DaemonStatus Reader (used by /health in SPEC-013-3-01).
 //
 // Reads `~/.autonomous-dev/heartbeat.json` and classifies the daemon
-// freshness based on `last_seen`:
-//   fresh: now - last_seen <  60_000 ms
+// freshness based on `timestamp`:
+//   fresh: now - timestamp <  60_000 ms
 //   stale: 60_000 <= delta < 300_000 ms
 //   dead : everything else (missing file, malformed JSON, missing/future
-//          last_seen, or > 300_000 ms ago)
+//          timestamp, or > 300_000 ms ago)
 //
 // Per SPEC-013-3-04 the heartbeat directory is overridable via the
 // `AUTONOMOUS_DEV_STATE_DIR` env var so tests can write into a tmpdir
@@ -84,16 +84,16 @@ export async function readDaemonStatus(): Promise<DaemonStatus> {
     }
     const obj = parsed as Record<string, unknown>;
 
-    const lastSeen = obj["last_seen"];
-    if (typeof lastSeen !== "string" || lastSeen.length === 0) {
+    const timestamp = obj["timestamp"];
+    if (typeof timestamp !== "string" || timestamp.length === 0) {
         return { ...DEAD };
     }
-    const lastSeenMs = Date.parse(lastSeen);
-    if (Number.isNaN(lastSeenMs)) {
+    const timestampMs = Date.parse(timestamp);
+    if (Number.isNaN(timestampMs)) {
         return { ...DEAD };
     }
     const now = Date.now();
-    const status = classify(lastSeenMs, now);
+    const status = classify(timestampMs, now);
 
     const pidVal = obj["pid"];
     const pid = typeof pidVal === "number" && Number.isInteger(pidVal) ? pidVal : null;
@@ -109,7 +109,7 @@ export async function readDaemonStatus(): Promise<DaemonStatus> {
 
     return {
         status,
-        last_seen: lastSeen,
+        last_seen: timestamp,
         pid,
         active_requests: activeRequests,
         kill_switch_active: killSwitchActive,

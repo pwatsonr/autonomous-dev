@@ -10,12 +10,10 @@ import type { PipelineErrorPayload } from "../pipeline-types";
 
 const VALID = (n = 1): string =>
     JSON.stringify({
-        version: 1,
-        ts: "2026-05-02T00:00:00.000Z",
+        timestamp: "2026-05-02T00:00:00.000Z",
         pid: 1234,
-        uptime_s: n,
-        daemon_version: "0.1.0",
-        active_requests: 0,
+        iteration_count: n,
+        active_request_id: null,
     });
 
 class TimeoutError extends Error {
@@ -73,7 +71,7 @@ describe("HeartbeatPipeline", () => {
         );
         appendFileSync(filePath, VALID() + "\n");
         const payload = await got;
-        expect(payload.version).toBe(1);
+        expect(payload.timestamp).toBe("2026-05-02T00:00:00.000Z");
         expect(payload.pid).toBe(1234);
     });
 
@@ -94,7 +92,7 @@ describe("HeartbeatPipeline", () => {
         const err = await errPromise;
         expect(err.code).toBe("JSON_PARSE");
         const data = await dataPromise;
-        expect(data.version).toBe(1);
+        expect(data.timestamp).toBe("2026-05-02T00:00:00.000Z");
     });
 
     // SKIP: async file-watcher recovery race (PRD-016 triage: SKIP-WITH-NOTE)
