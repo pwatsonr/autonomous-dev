@@ -27,6 +27,11 @@ import { userConfigPath } from "./state-paths";
 
 interface ConfigForNotifications {
     notifications?: {
+        delivery?: {
+            discord?: { webhook_url?: string };
+            slack?: { webhook_url?: string };
+        };
+        // Legacy flat fields for backward compatibility
         discordWebhook?: string;
         slackWebhook?: string;
     };
@@ -45,30 +50,47 @@ function slackBody(payload: { title: string; body: string }): unknown {
     };
 }
 
-async function readWebhook(channel: NotificationChannel): Promise<string | null> {
-    const cfg = await readJsonOrNull<ConfigForNotifications>(userConfigPath());
+async function readWebhook(channel: NotificationChannel, configPath?: string): Promise<string | null> {
+    const path = configPath ?? userConfigPath();
+    const cfg = await readJsonOrNull<ConfigForNotifications>(path);
+
+    // Debug logging for tests (removed for production)
+
     if (cfg === null) return null;
     const n = cfg.notifications;
     if (n === undefined) return null;
+
     if (channel === "discord") {
-        return typeof n.discordWebhook === "string" && n.discordWebhook.length > 0
-            ? n.discordWebhook
-            : null;
+        // Prefer nested daemon shape, fallback to legacy flat shape
+        const nested = n.delivery?.discord?.webhook_url;
+        if (typeof nested === "string" && nested.length > 0) return nested;
+
+        const flat = n.discordWebhook;
+        if (typeof flat === "string" && flat.length > 0) return flat;
+
+        return null;
     }
     if (channel === "slack") {
-        return typeof n.slackWebhook === "string" && n.slackWebhook.length > 0
-            ? n.slackWebhook
-            : null;
+        // Prefer nested daemon shape, fallback to legacy flat shape
+        const nested = n.delivery?.slack?.webhook_url;
+        if (typeof nested === "string" && nested.length > 0) return nested;
+
+        const flat = n.slackWebhook;
+        if (typeof flat === "string" && flat.length > 0) return flat;
+
+        return null;
     }
     return null;
 }
 
 /**
  * Build a dispatcher backed by the user-config webhook URLs. Optional
- * `fetchImpl` lets tests inject a deterministic transport.
+ * `fetchImpl` lets tests inject a deterministic transport. Optional
+ * `configPath` lets tests specify a custom config file location.
  */
 export function buildFileWebhookDispatcher(
     fetchImpl: typeof fetch = fetch,
+    configPath?: string,
 ): NotificationDispatcher {
     return {
         async send(channel, payload): Promise<NotificationResult> {
@@ -83,7 +105,7 @@ export function buildFileWebhookDispatcher(
                     message: "send-channel-not-configured",
                 };
             }
-            const url = await readWebhook(channel);
+            const url = await readWebhook(channel, configPath);
             if (url === null) {
                 return {
                     ok: false,

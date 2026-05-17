@@ -24,17 +24,28 @@ import { atomicWriteJson, readJsonOrNull } from "./atomic-json";
 import { userConfigPath } from "./state-paths";
 
 /**
- * The persisted shape. Only the keys the portal mutates are typed; we
- * preserve any other keys via index-signature passthrough so the daemon's
+ * The persisted daemon config shape. We use the daemon's nested structure
+ * and preserve any other keys via index-signature passthrough so the daemon's
  * own settings survive a portal write.
  */
 interface UserConfigFile {
-    general?: {
-        dailyCap?: number;
-        defaultVariant?: string;
-        defaultBackend?: string;
+    governance?: {
+        daily_cost_cap_usd?: number;
+        monthly_cost_cap_usd?: number;
+        per_request_cost_cap_usd?: number;
+        max_concurrent_requests?: number;
+    };
+    trust?: {
+        system_default_level?: number;
+        per_repo_overrides?: Record<string, string>;
     };
     notifications?: {
+        delivery?: {
+            discord?: { webhook_url?: string };
+            slack?: { webhook_url?: string };
+            default_method?: string;
+        };
+        // Keep legacy flat fields for backward compatibility
         discordWebhook?: string;
         slackWebhook?: string;
         notifyDefault?: string;
@@ -43,7 +54,11 @@ interface UserConfigFile {
         dndEnd?: string;
     };
     repositories?: {
-        allowlist?: AllowlistEntry[];
+        allowlist?: string[]; // daemon uses string[] not AllowlistEntry[]
+    };
+    general?: {
+        defaultVariant?: string;
+        defaultBackend?: string;
     };
     [k: string]: unknown;
 }
@@ -101,52 +116,136 @@ export class FileSettingsStore implements SettingsStore {
         form: Record<string, unknown>,
         _actor: string,
     ): Promise<SettingsFormSaveResult> {
-        // Validate the only field that has a numeric constraint. The
-        // remaining fields are free-form strings (variant id, backend id,
-        // notification settings) — the daemon validates them on read.
-        if ("dailyCap" in form) {
-            const v = parseDailyCap(form["dailyCap"]);
+        // Validate numeric constraints - support both field naming patterns
+        const dailyField = "dailyCap" in form ? "dailyCap" : "daily";
+        const perRequestField = "perRequest" in form ? "perRequest" : "perRequest";
+        const monthlyField = "monthly" in form ? "monthly" : "monthly";
+
+        if (dailyField in form) {
+            const v = parseDailyCap(form[dailyField]);
             if (v === null) {
                 return {
                     ok: false,
-                    field: "dailyCap",
+                    field: dailyField,
                     fragment: settingsErrorFragment(
-                        "dailyCap must be a non-negative number",
-                        "dailyCap",
+                        `${dailyField} must be a non-negative number`,
+                        dailyField,
                     ),
                 };
             }
         }
+        if (perRequestField in form) {
+            const v = parseDailyCap(form[perRequestField]);
+            if (v === null) {
+                return {
+                    ok: false,
+                    field: perRequestField,
+                    fragment: settingsErrorFragment(
+                        `${perRequestField} must be a non-negative number`,
+                        perRequestField,
+                    ),
+                };
+            }
+        }
+        if (monthlyField in form) {
+            const v = parseDailyCap(form[monthlyField]);
+            if (v === null) {
+                return {
+                    ok: false,
+                    field: monthlyField,
+                    fragment: settingsErrorFragment(
+                        `${monthlyField} must be a non-negative number`,
+                        monthlyField,
+                    ),
+                };
+            }
+        }
+
         return await this.serialize(async () => {
             const current = (await this.readCurrent()) ?? {};
             const next: UserConfigFile = { ...current };
-            next.general = { ...(current.general ?? {}) };
-            if ("dailyCap" in form) {
-                next.general.dailyCap = parseDailyCap(form["dailyCap"]) ?? 0;
-            }
-            if (typeof form["defaultVariant"] === "string") {
-                next.general.defaultVariant = form["defaultVariant"];
-            }
-            if (typeof form["defaultBackend"] === "string") {
-                next.general.defaultBackend = form["defaultBackend"];
-            }
-            next.notifications = { ...(current.notifications ?? {}) };
-            for (const k of [
-                "discordWebhook",
-                "slackWebhook",
-                "notifyDefault",
-                "dndStart",
-                "dndEnd",
-            ] as const) {
-                if (typeof form[k] === "string") {
-                    (next.notifications as Record<string, unknown>)[k] = form[k];
+
+            // Governance section
+            if (dailyField in form || perRequestField in form || monthlyField in form) {
+                next.governance = { ...(current.governance ?? {}) };
+                if (dailyField in form) {
+                    next.governance.daily_cost_cap_usd = parseDailyCap(form[dailyField]) ?? 25;
+                }
+                if (perRequestField in form) {
+                    next.governance.per_request_cost_cap_usd = parseDailyCap(form[perRequestField]) ?? 10;
+                }
+                if (monthlyField in form) {
+                    next.governance.monthly_cost_cap_usd = parseDailyCap(form[monthlyField]) ?? 500;
                 }
             }
-            if ("dndEnabled" in form) {
-                const v = form["dndEnabled"];
-                next.notifications.dndEnabled =
-                    v === true || v === "true" || v === "on" || v === "1";
+
+            // Trust section
+            if ("trust-level" in form) {
+                next.trust = { ...(current.trust ?? {}) };
+                const trustLevel = form["trust-level"];
+                if (typeof trustLevel === "string" && trustLevel.match(/^L\d+$/)) {
+                    // Convert "L1" -> 1
+                    next.trust.system_default_level = parseInt(trustLevel.slice(1), 10);
+                }
             }
+
+            // General section (variants/backends)
+            if ("defaultVariant" in form || "defaultBackend" in form) {
+                next.general = { ...(current.general ?? {}) };
+                if (typeof form["defaultVariant"] === "string") {
+                    next.general.defaultVariant = form["defaultVariant"];
+                }
+                if (typeof form["defaultBackend"] === "string") {
+                    next.general.defaultBackend = form["defaultBackend"];
+                }
+            }
+
+            // Notifications section - use daemon's nested shape
+            if (this.hasNotificationFields(form)) {
+                next.notifications = { ...(current.notifications ?? {}) };
+
+                // Ensure delivery structure exists
+                next.notifications.delivery = { ...(next.notifications.delivery ?? {}) };
+
+                // Handle Discord webhook
+                if (typeof form["discordWebhook"] === "string") {
+                    next.notifications.delivery.discord = {
+                        ...(next.notifications.delivery.discord ?? {}),
+                        webhook_url: form["discordWebhook"]
+                    };
+                    // Also update legacy field for backward compatibility
+                    next.notifications.discordWebhook = form["discordWebhook"];
+                }
+
+                // Handle Slack webhook
+                if (typeof form["slackWebhook"] === "string") {
+                    next.notifications.delivery.slack = {
+                        ...(next.notifications.delivery.slack ?? {}),
+                        webhook_url: form["slackWebhook"]
+                    };
+                    next.notifications.slackWebhook = form["slackWebhook"];
+                }
+
+                // Handle default method
+                if (typeof form["defaultMethod"] === "string") {
+                    next.notifications.delivery.default_method = form["defaultMethod"];
+                    next.notifications.notifyDefault = form["defaultMethod"];
+                }
+
+                // Handle DND settings
+                for (const k of ["dndStart", "dndEnd"] as const) {
+                    if (typeof form[k] === "string") {
+                        next.notifications[k] = form[k];
+                    }
+                }
+
+                if ("dndEnabled" in form) {
+                    const v = form["dndEnabled"];
+                    next.notifications.dndEnabled =
+                        v === true || v === "true" || v === "on" || v === "1";
+                }
+            }
+
             try {
                 await atomicWriteJson(this.path, next);
             } catch (err) {
@@ -161,6 +260,14 @@ export class FileSettingsStore implements SettingsStore {
         });
     }
 
+    private hasNotificationFields(form: Record<string, unknown>): boolean {
+        const notificationFields = [
+            "discordWebhook", "slackWebhook", "defaultMethod",
+            "dndEnabled", "dndStart", "dndEnd"
+        ];
+        return notificationFields.some(field => field in form);
+    }
+
     async addAllowlist(
         realPath: string,
         _actor: string,
@@ -168,23 +275,27 @@ export class FileSettingsStore implements SettingsStore {
         return await this.serialize(async () => {
             const current = (await this.readCurrent()) ?? {};
             const list = current.repositories?.allowlist ?? [];
-            if (list.some((e) => e.path === realPath)) {
+            if (list.includes(realPath)) {
                 return {
                     ok: false,
                     message: "already-on-allowlist",
                 };
             }
+
+            // Create entry for UI purposes
             const entry: AllowlistEntry = {
                 id: `rep-${randomBytes(4).toString("hex")}`,
                 path: realPath,
                 status: "ok",
                 addedAt: new Date().toISOString(),
             };
+
+            // But store as string[] in daemon format
             const next: UserConfigFile = {
                 ...current,
                 repositories: {
                     ...(current.repositories ?? {}),
-                    allowlist: [...list, entry],
+                    allowlist: [...list, realPath],
                 },
             };
             try {
