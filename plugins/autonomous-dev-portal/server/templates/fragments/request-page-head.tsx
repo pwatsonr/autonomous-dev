@@ -34,8 +34,23 @@ export const RequestPageHead: FC<Props> = ({ requestId }) => (
             <span class="r-id meta-mono">{requestId}</span>
         </div>
         <div class="head-actions">
-            <Btn data-request-action="pause">Pause</Btn>
-            <Btn kind="destructive" data-request-action="kill">
+            <Btn
+                data-request-action="pause"
+                hx-post={`/api/requests/${requestId}/action`}
+                hx-vals='{"action":"pause"}'
+                hx-target="main.request-detail"
+                hx-swap="outerHTML"
+            >
+                Pause
+            </Btn>
+            <Btn
+                kind="destructive"
+                data-request-action="kill"
+                hx-post={`/api/requests/${requestId}/action`}
+                hx-vals='{"action":"kill"}'
+                hx-target="main.request-detail"
+                hx-swap="outerHTML"
+            >
                 Kill
             </Btn>
         </div>

@@ -28,49 +28,69 @@ import type { RequestArtifact } from "../../types/render";
 interface Props {
     artifacts: RequestArtifact[];
     requestId: string;
+    allPhases?: string[];
 }
 
-export const PhaseArtifactModal: FC<Props> = ({ artifacts, requestId }) => (
-    <>
-        {artifacts.map((artifact) => (
-            <div
-                class="modal-bg phase-artifact-modal"
-                data-modal={`artifact-${artifact.phase}`}
-                hidden
-            >
-                <div
-                    class="modal modal-wide"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby={`artifact-modal-${artifact.phase}-title`}
-                >
-                    <div class="modal-head">
-                        <div>
-                            <div class="modal-eyebrow">Phase artifact</div>
-                            <h3
-                                id={`artifact-modal-${artifact.phase}-title`}
-                            >
-                                {artifact.phase.toUpperCase()}-{requestId.slice(-4)}
-                            </h3>
-                        </div>
-                        <button
-                            type="button"
-                            class="modal-close"
-                            data-modal-close
-                            aria-label="Close"
+export const PhaseArtifactModal: FC<Props> = ({ artifacts, requestId, allPhases = [] }) => {
+    // Create a map of existing artifacts by phase
+    const artifactByPhase = new Map(artifacts.map(a => [a.phase, a]));
+
+    // Determine which phases to create modals for
+    const phasesToRender = allPhases.length > 0 ? allPhases : artifacts.map(a => a.phase);
+
+    return (
+        <>
+            {phasesToRender.map((phase) => {
+                const artifact = artifactByPhase.get(phase);
+                return (
+                    <div
+                        key={phase}
+                        class="modal-bg phase-artifact-modal"
+                        data-modal={`artifact-${phase}`}
+                        hidden
+                    >
+                        <div
+                            class="modal modal-wide"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby={`artifact-modal-${phase}-title`}
                         >
-                            ✕
-                        </button>
+                            <div class="modal-head">
+                                <div>
+                                    <div class="modal-eyebrow">Phase artifact</div>
+                                    <h3
+                                        id={`artifact-modal-${phase}-title`}
+                                    >
+                                        {phase.toUpperCase()}-{requestId.slice(-4)}
+                                    </h3>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="modal-close"
+                                    data-modal-close
+                                    aria-label="Close"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <div class="artifact-body">
+                                {artifact ? (
+                                    <ArtifactPane
+                                        phase={phase}
+                                        targetId={`artifact-modal-${phase}-body`}
+                                        artifact={artifact}
+                                    />
+                                ) : (
+                                    <div class="artifact-placeholder">
+                                        <h4>{phase.toUpperCase()} phase artifact</h4>
+                                        <p>This phase artifact will be available once the request progresses to this stage.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <div class="artifact-body">
-                        <ArtifactPane
-                            phase={artifact.phase}
-                            targetId={`artifact-modal-${artifact.phase}-body`}
-                            artifact={artifact}
-                        />
-                    </div>
-                </div>
-            </div>
-        ))}
-    </>
-);
+                );
+            })}
+        </>
+    );
+};
