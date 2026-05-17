@@ -57,12 +57,19 @@ CONSECUTIVE_CRASHES=0
 CIRCUIT_BREAKER_TRIPPED=false
 POLL_COUNT=0
 RECONCILE_EVERY_N_POLLS=${RECONCILE_EVERY_N_POLLS:-60}
-# Phase 1 of the marketplace auto-update: detect-and-log only. The
-# detector composes the helpers in lib/version-helpers.sh and emits a
-# `daemon_upgrade_available` log line when a newer cached version is
-# present. No state changes, no upgrade action — that lands in Phase 2.
+# Marketplace auto-update: detect newer cached versions and (Phase 2)
+# stage a self-upgrade when idle. See check_upgrade_available() and
+# stage_upgrade() for the mechanism.
 UPGRADE_CHECK_EVERY_N_POLLS=${UPGRADE_CHECK_EVERY_N_POLLS:-60}
 LAST_UPGRADE_LOGGED_VERSION=""
+# Phase 2: throttle file + last-good-version pointer. The throttle is a
+# touch file whose mtime gates additional attempts (default: 1 attempt
+# per hour). LAST_GOOD_VERSION_FILE is written before exec'ing into the
+# upgrade helper, so Phase 3 can roll back if the new daemon doesn't
+# settle.
+UPGRADE_THROTTLE_FILE="${DAEMON_HOME}/.upgrade-throttle"
+UPGRADE_THROTTLE_SECONDS=${UPGRADE_THROTTLE_SECONDS:-3600}
+LAST_GOOD_VERSION_FILE="${DAEMON_HOME}/.last-good-version"
 
 # Per-process dedup table for the legacy phase-fallback warning
 # (SPEC-018-2-01 §Warning Deduplication). Keyed by absolute state file path.
@@ -2754,17 +2761,16 @@ reconcile_orphans() {
 }
 
 ###############################################################################
-# Marketplace auto-update (Phase 1: detect & log)
+# Marketplace auto-update
 ###############################################################################
 
 # check_upgrade_available() -> int
 #   Composes the version-helpers primitives to see if a newer plugin
 #   version is sitting in the cache. Logs `daemon_upgrade_available`
-#   once per distinct newer version (so we don't flood the log).
-#
-#   This is the detect-only phase. No plist rewrite, no restart —
-#   Phase 2 wires those in. The goal here is to make the signal visible
-#   in `/logs` so operators can see "upgrade available" coming.
+#   once per distinct newer version. When called from an idle context
+#   (no active request) it also attempts to stage the upgrade —
+#   `stage_upgrade()` enforces the throttle and the active-request
+#   guard, so this function is safe to call from any iteration.
 check_upgrade_available() {
     # shellcheck disable=SC1091
     source "${LIB_DIR}/version-helpers.sh"
@@ -2781,14 +2787,92 @@ check_upgrade_available() {
     fi
     cmp=$(compare_semver "${running}" "${latest}")
     if [[ "${cmp}" != "-1" ]]; then
-        # running >= latest; nothing to do.
         return 0
     fi
-    # Newer version cached. Log once per distinct version.
     if [[ "${LAST_UPGRADE_LOGGED_VERSION}" != "${latest}" ]]; then
         log_info "daemon_upgrade_available: running=${running} latest=${latest} cache=${HOME}/.claude/plugins/cache/autonomous-dev/autonomous-dev/${latest}"
         LAST_UPGRADE_LOGGED_VERSION="${latest}"
     fi
+    # Phase 2: try to stage the upgrade. stage_upgrade is the gatekeeper —
+    # it skips when active, throttled, or the helper script is missing.
+    stage_upgrade "${running}" "${latest}" || true
+    return 0
+}
+
+# upgrade_throttled() -> 0 if a previous attempt is still within
+# UPGRADE_THROTTLE_SECONDS, 1 otherwise.
+upgrade_throttled() {
+    if [[ ! -f "${UPGRADE_THROTTLE_FILE}" ]]; then
+        return 1
+    fi
+    local last_mtime now age
+    last_mtime=$(stat -f %m "${UPGRADE_THROTTLE_FILE}" 2>/dev/null \
+        || stat -c %Y "${UPGRADE_THROTTLE_FILE}" 2>/dev/null \
+        || echo 0)
+    now=$(date +%s)
+    age=$(( now - last_mtime ))
+    if (( age < UPGRADE_THROTTLE_SECONDS )); then
+        return 0
+    fi
+    return 1
+}
+
+# stage_upgrade(from_version, to_version) -> int
+#   Detached helper that rewrites the plist for the new version and
+#   bootouts/bootstraps via launchctl. The running daemon exits 0 so
+#   `KeepAlive.SuccessfulExit: false` doesn't auto-respawn the old
+#   path. Detached helper then bootstraps the new version.
+#
+#   Skipped when:
+#     - The heartbeat reports an active request (don't upgrade mid-phase)
+#     - The throttle file says we attempted within the last hour
+#     - The new version's install-daemon.sh isn't readable
+stage_upgrade() {
+    local from_version="${1:-}"
+    local to_version="${2:-}"
+    if [[ -z "${to_version}" || "${to_version}" == "${from_version}" ]]; then
+        return 1
+    fi
+
+    # Guard: don't upgrade mid-request. The heartbeat is the authoritative
+    # source — we wrote it at the top of this iteration.
+    local active_id
+    active_id=$(jq -r '.active_request_id // empty' "${HEARTBEAT_FILE}" 2>/dev/null || echo "")
+    if [[ -n "${active_id}" ]]; then
+        return 1
+    fi
+
+    if upgrade_throttled; then
+        return 1
+    fi
+
+    local cache_root="${HOME}/.claude/plugins/cache/autonomous-dev/autonomous-dev"
+    local installer="${cache_root}/${to_version}/bin/install-daemon.sh"
+    if [[ ! -x "${installer}" && ! -r "${installer}" ]]; then
+        log_warn "stage_upgrade: installer not readable at ${installer}; skipping"
+        return 1
+    fi
+
+    # Record current as last-known-good BEFORE handing off. Phase 3 reads
+    # this to roll back if the new daemon doesn't settle.
+    echo "${from_version}" > "${LAST_GOOD_VERSION_FILE}"
+    touch "${UPGRADE_THROTTLE_FILE}"
+
+    log_info "daemon_upgrade_staging: from=${from_version} to=${to_version} installer=${installer}"
+
+    # Spawn detached helper. The helper sleeps a couple of seconds so
+    # that the parent (us) has time to exit cleanly before launchctl
+    # bootouts the daemon job. nohup + disown means it survives our
+    # exit; >/dev/null silences output to the launchd stdout/stderr
+    # files which the new install will inherit.
+    nohup bash -c "sleep 2 && '${installer}' --force" \
+        </dev/null \
+        >"${LOG_DIR}/upgrade-helper.log" 2>&1 &
+    disown $! 2>/dev/null || true
+
+    log_info "daemon_upgrade_exiting: exiting cleanly so launchd respawns under ${to_version}"
+    # Mark shutdown so the main loop terminates after this iteration.
+    SHUTDOWN_REQUESTED=true
     return 0
 }
 
