@@ -11,3 +11,8 @@ package-lock.json
 coverage/
 .bun/
 bun.lock
+
+# PLAN-021 Phase 1A — Cypress artifacts
+cypress/videos/
+cypress/screenshots/
+cypress/downloads/
