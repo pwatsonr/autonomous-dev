@@ -225,7 +225,13 @@ spawn_session_typed() {
     # plugins/autonomous-dev/agents/ declare; review phases get the read-only
     # subset.
     local tools_full="Read Write Edit Bash Glob Grep WebSearch WebFetch"
-    local tools_review="Read Glob Grep"
+    # BUG-19 fix: review phases need Write so they can emit
+    # `phase-result-<phase>.json` with their verdict. Without it, the agent
+    # exits clean (exit 0) without writing the result file and the daemon
+    # falls back to its synthesized "pass" — making every review a no-op.
+    # The prompt already instructs reviewers to ONLY write the phase-result
+    # file; this allowlist just unblocks that single artifact.
+    local tools_review="Read Write Glob Grep"
     local agent_tools
     if [[ "${target_phase}" == *"_review" ]]; then
         agent_tools="${tools_review}"
