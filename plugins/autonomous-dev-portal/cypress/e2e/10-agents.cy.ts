@@ -47,22 +47,19 @@ describe('Agent Management (FR-021-10)', () => {
         cy.get('h1').should('contain', 'Agents');
 
         // Verify table exists and has expected structure
-        cy.get('table[data-fragment="agent-table"]').should('exist');
-        cy.get('table thead tr th').should('have.length', 8); // Name, Role, State, Approval, Precision, Recall, Version, Action
+        cy.get('table.tbl').should('exist');
+        cy.get('table.tbl thead tr th').should('have.length', 7);
 
         // The real registry should have 18 agents
         cy.get('table tbody tr[data-agent]').should('have.length', 18);
 
-        // Verify table headers are present
-        cy.get('table thead').within(() => {
-            cy.contains('th', 'Name');
-            cy.contains('th', 'Role');
-            cy.contains('th', 'State');
-            cy.contains('th', 'Approval');
-            cy.contains('th', 'Precision');
-            cy.contains('th', 'Recall');
+        // Verify the actual rendered headers (Agent/Version/Status/Mode/
+        // Last dispatch/Runs (30d)/FP rate).
+        cy.get('table.tbl thead').within(() => {
+            cy.contains('th', 'Agent');
             cy.contains('th', 'Version');
-            cy.contains('th', 'Action');
+            cy.contains('th', 'Status');
+            cy.contains('th', 'Mode');
         });
     });
 
