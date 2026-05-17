@@ -6,9 +6,6 @@
     "name": "pwatsonr",
     "url": "https://github.com/pwatsonr"
   },
-  "extends": [
-    "autonomous-dev"
-  ],
   "userConfig": {
     "port": {
       "type": "number",
