@@ -27,8 +27,10 @@ async function render(node: unknown): Promise<string> {
     return typeof v === "string" ? v : String(v);
 }
 
-describe("RailNav — SPEC-037-3-01 (7-item nav)", () => {
-    test("N-08: renders seven anchors with the documented hrefs in order", async () => {
+describe("RailNav — SPEC-037-3-01 (9-item nav)", () => {
+    test("N-08: renders nine anchors with the documented hrefs in order", async () => {
+        // BUG-22 (PR #296) added Logs (OPERATE) and Repos (SYSTEM) so
+        // operators can discover those pages without typing the URL.
         const html = await render(<RailNav activePath="/" />);
         const hrefs = [...html.matchAll(/href=["']([^"']+)["']/g)].map(
             (m) => m[1],
@@ -37,8 +39,10 @@ describe("RailNav — SPEC-037-3-01 (7-item nav)", () => {
             "/",
             "/approvals",
             "/requests",
+            "/logs",
             "/costs",
             "/agents",
+            "/repos",
             "/settings",
             "/ops",
         ]);
@@ -59,17 +63,19 @@ describe("RailNav — SPEC-037-3-01 (7-item nav)", () => {
         expect(groups).toEqual(["operate", "system"]);
     });
 
-    test("N-10: Operate group has 4 items, System group has 3", () => {
+    test("N-10: Operate group has 5 items, System group has 4 (post-BUG-22)", () => {
         const operate = NAV_ITEMS.filter((i) => i.group === "operate");
         const system = NAV_ITEMS.filter((i) => i.group === "system");
         expect(operate.map((i) => i.href)).toEqual([
             "/",
             "/approvals",
             "/requests",
+            "/logs",
             "/costs",
         ]);
         expect(system.map((i) => i.href)).toEqual([
             "/agents",
+            "/repos",
             "/settings",
             "/ops",
         ]);
@@ -99,7 +105,7 @@ describe("RailNav — SPEC-037-3-01 (7-item nav)", () => {
         const anchorSegments = [...html.matchAll(/<a[^>]*>[\s\S]*?<\/a>/g)].map(
             (m) => m[0],
         );
-        expect(anchorSegments.length).toBe(7);
+        expect(anchorSegments.length).toBe(9);
         for (const segment of anchorSegments) {
             // Each anchor has an `<span class="ic">` that contains an
             // inline <svg> (Lucide markup).
@@ -185,12 +191,12 @@ describe("RailNav — SPEC-037-3-01 (7-item nav)", () => {
         expect(html).not.toContain('class="count"');
     });
 
-    test("NAV_ITEMS exposes 7 entries split 4/3 across operate/system", () => {
-        expect(NAV_ITEMS.length).toBe(7);
+    test("NAV_ITEMS exposes 9 entries split 5/4 across operate/system (post-BUG-22)", () => {
+        expect(NAV_ITEMS.length).toBe(9);
         const operate = NAV_ITEMS.filter((i) => i.group === "operate");
         const system = NAV_ITEMS.filter((i) => i.group === "system");
-        expect(operate.length).toBe(4);
-        expect(system.length).toBe(3);
+        expect(operate.length).toBe(5);
+        expect(system.length).toBe(4);
     });
 });
 

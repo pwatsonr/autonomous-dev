@@ -33,9 +33,10 @@ beforeEach(() => {
     // Set up temp directory for test state
     ctx.tempDir = mkdtempSync(join(tmpdir(), "logs-test-"));
 
-    // The LogReader expects <basePath>/.autonomous-dev/daemon.log
-    // So we need tempDir to be the basePath, and create .autonomous-dev inside it
-    mkdirSync(join(ctx.tempDir, ".autonomous-dev"), { recursive: true });
+    // The LogReader expects <basePath>/.autonomous-dev/logs/daemon.log
+    // (PR #320 corrected the path to include the logs/ subdir; the
+    // daemon itself has always written there).
+    mkdirSync(join(ctx.tempDir, ".autonomous-dev", "logs"), { recursive: true });
 
     // Set the state dir to tempDir/.autonomous-dev so stateDirRoot() returns that
     ctx.originalStateDir = process.env["AUTONOMOUS_DEV_STATE_DIR"];
@@ -75,8 +76,8 @@ afterEach(async () => {
 
 describe("BUG-14 logs live reader", () => {
     test("logs page reads live daemon log and excludes stub timestamps", async () => {
-        // Write synthetic daemon.log with 3 known lines
-        const daemonLogPath = join(ctx.tempDir, ".autonomous-dev", "daemon.log");
+        // Write synthetic daemon.log with 3 known lines (now in logs/ subdir).
+        const daemonLogPath = join(ctx.tempDir, ".autonomous-dev", "logs", "daemon.log");
         const testTimestamp1 = "2026-05-17T10:00:00Z";
         const testTimestamp2 = "2026-05-17T10:01:00Z";
         const testTimestamp3 = "2026-05-17T10:02:00Z";
@@ -152,7 +153,7 @@ describe("BUG-14 logs live reader", () => {
 
     test("logs page respects level filter query parameter", async () => {
         // Write daemon.log with mixed levels
-        const daemonLogPath = join(ctx.tempDir, ".autonomous-dev", "daemon.log");
+        const daemonLogPath = join(ctx.tempDir, ".autonomous-dev", "logs", "daemon.log");
         const logLines = [
             JSON.stringify({
                 ts: "2026-05-17T10:00:00Z",
@@ -189,7 +190,7 @@ describe("BUG-14 logs live reader", () => {
 
     test("logs page respects limit query parameter", async () => {
         // Write daemon.log with many lines
-        const daemonLogPath = join(ctx.tempDir, ".autonomous-dev", "daemon.log");
+        const daemonLogPath = join(ctx.tempDir, ".autonomous-dev", "logs", "daemon.log");
         const logLines = [];
         for (let i = 0; i < 10; i++) {
             logLines.push(JSON.stringify({

@@ -23,8 +23,10 @@ const ctx: Ctx = { dir: "", cache: null };
 
 function setupRepo(): { dir: string; logPath: string } {
     const dir = mkdtempSync(join(tmpdir(), "log-reader-"));
-    mkdirSync(join(dir, ".autonomous-dev"), { recursive: true });
-    return { dir, logPath: join(dir, ".autonomous-dev", "daemon.log") };
+    // The daemon writes to <basePath>/.autonomous-dev/logs/daemon.log.
+    // PR #320 corrected the LogReader path; the fixture follows suit.
+    mkdirSync(join(dir, ".autonomous-dev", "logs"), { recursive: true });
+    return { dir, logPath: join(dir, ".autonomous-dev", "logs", "daemon.log") };
 }
 
 beforeEach(() => {
