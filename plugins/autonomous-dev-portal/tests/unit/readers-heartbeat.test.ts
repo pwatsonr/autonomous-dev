@@ -82,12 +82,10 @@ describe("HeartbeatReader", () => {
         ctx.cache = new AggregationCache({ defaultTTLMs: 5000 });
         const now = Date.parse("2026-05-01T00:00:00Z");
         writeHb(hbPath, {
-            version: 1,
-            ts: new Date(now - 10_000).toISOString(), // 10s old
+            timestamp: new Date(now - 10_000).toISOString(), // 10s old
             pid: 4242,
-            uptime_s: 60,
-            daemon_version: "0.1.0",
-            active_requests: 1,
+            iteration_count: 60,
+            active_request_id: "req-1",
         });
         const reader = new HeartbeatReader({
             basePath: dir,
@@ -110,12 +108,10 @@ describe("HeartbeatReader", () => {
         ctx.cache = new AggregationCache({ defaultTTLMs: 5000 });
         const now = Date.parse("2026-05-01T00:00:00Z");
         writeHb(hbPath, {
-            version: 1,
-            ts: new Date(now - 120_000).toISOString(), // 120s old
+            timestamp: new Date(now - 120_000).toISOString(), // 120s old
             pid: 4242,
-            uptime_s: 60,
-            daemon_version: "0.1.0",
-            active_requests: 0,
+            iteration_count: 60,
+            active_request_id: null,
         });
         const reader = new HeartbeatReader({
             basePath: dir,
@@ -137,12 +133,10 @@ describe("HeartbeatReader", () => {
         ctx.cache = new AggregationCache({ defaultTTLMs: 5000 });
         const now = Date.parse("2026-05-01T00:00:00Z");
         writeHb(hbPath, {
-            version: 1,
-            ts: new Date(now - 600_000).toISOString(), // 10 minutes old
+            timestamp: new Date(now - 600_000).toISOString(), // 10 minutes old
             pid: 4242,
-            uptime_s: 1,
-            daemon_version: "0.1.0",
-            active_requests: 0,
+            iteration_count: 1,
+            active_request_id: null,
         });
         const reader = new HeartbeatReader({
             basePath: dir,
@@ -165,12 +159,10 @@ describe("HeartbeatReader", () => {
         ctx.cache = new AggregationCache({ defaultTTLMs: 5000 });
         const ts = "2026-05-01T00:00:00Z";
         writeHb(hbPath, {
-            version: 1,
-            ts,
+            timestamp: ts,
             pid: 99,
-            uptime_s: 5,
-            daemon_version: "1.0.0",
-            active_requests: 3,
+            iteration_count: 5,
+            active_request_id: "req-3",
         });
         const reader = new HeartbeatReader({
             basePath: dir,
@@ -180,8 +172,8 @@ describe("HeartbeatReader", () => {
         expect(r.ok).toBe(true);
         if (r.ok && r.value) {
             expect(r.value.pid).toBe(99);
-            expect(r.value.daemon_version).toBe("1.0.0");
-            expect(r.value.active_requests).toBe(3);
+            expect(r.value.iteration_count).toBe(5);
+            expect(r.value.active_request_id).toBe("req-3");
         }
     });
 });

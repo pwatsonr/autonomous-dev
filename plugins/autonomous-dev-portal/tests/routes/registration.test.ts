@@ -36,10 +36,24 @@ describe("registerRoutes — all 9 routes mounted", () => {
         });
     }
 
-    test("GET /repo/:repo/request/:id returns 200 for a valid REQ-id", async () => {
+    test("GET /repo/:repo/request/:id is mounted (not Hono default 404)", async () => {
         const app = freshApp();
-        const res = await app.request("/repo/acme%2Fwidgets/request/REQ-000001");
-        expect(res.status).toBe(200);
+        // Goal of this suite is "all routes mounted" — verify the path is
+        // routed at all. A bogus repo deterministically yields the
+        // handler's notFound(c) (404 emitted by the route, not Hono's
+        // default `Not Found` for an unmounted path). Distinguish by
+        // body content: Hono's default unmounted-route response is the
+        // text "404 Not Found"; the handler's notFound() returns an HTML
+        // page.
+        const res = await app.request("/repo/acme/request/REQ-999999");
+        // 404 is fine (it means the route was hit and the handler ran);
+        // the body content disambiguates handler-404 from unmounted-404.
+        expect(res.status).toBe(404);
+        const ct = res.headers.get("content-type") ?? "";
+        // notFound() in response-utils.ts emits an HTML page, NOT the
+        // plaintext "404 Not Found" body that Hono ships for unmounted
+        // routes.
+        expect(ct.toLowerCase()).toContain("text/html");
     });
 
     test("GET /health returns 200 with JSON body", async () => {

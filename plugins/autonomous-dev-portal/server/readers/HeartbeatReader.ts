@@ -142,7 +142,7 @@ export class HeartbeatReader {
                 threshold_seconds: this.threshold,
             };
         } else {
-            const hbMs = Date.parse(hb.value.ts);
+            const hbMs = Date.parse(hb.value.timestamp);
             const ageS = Math.max(0, Math.floor((this.now() - hbMs) / 1000));
             status = {
                 state: ageS <= this.threshold ? "up" : "down",

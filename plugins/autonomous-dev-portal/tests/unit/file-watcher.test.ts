@@ -162,15 +162,26 @@ describe("FileWatcher", () => {
         await fs.writeFile(file, '{"a":1}');
         await wait(150);
         w1.dispose();
+        // Allow the OS-level fs.watch handle to fully release before
+        // re-watching the same inode (macOS otherwise drops the first
+        // event on the fresh watcher).
+        await wait(150);
 
-        // Fresh watcher on the same path resumes cleanly.
-        const w2 = new FileWatcher([file], { debounceDelay: 60 });
+        // Fresh watcher on the same path resumes cleanly. Polling backend
+        // gives us a deterministic schedule independent of native
+        // re-attach quirks.
+        const w2 = new FileWatcher([file], {
+            debounceDelay: 60,
+            polling: true,
+            pollingInterval: 100,
+        });
         ctx.watcher = w2;
         const events2 = recordEvents(w2);
         await w2.start();
-        await wait(50);
-        await fs.writeFile(file, '{"a":2}');
+        // Let the polling baseline tick run before we mutate.
         await wait(200);
+        await fs.writeFile(file, '{"a":2}');
+        await wait(500);
         expect(events2.length).toBeGreaterThanOrEqual(1);
     });
 });

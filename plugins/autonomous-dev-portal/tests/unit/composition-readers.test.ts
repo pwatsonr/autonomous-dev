@@ -122,6 +122,9 @@ describe("Honesty contract — empty state dir produces zero KPIs", () => {
             actionsDir: join(emptyDir, "request-actions"),
             decisionsDir: join(emptyDir, "gate-decisions"),
             stateRoot: emptyDir,
+            // Isolate the settings reader from the real ~/.claude config so
+            // the empty-state honesty contract is genuinely empty.
+            configPath: join(emptyDir, "autonomous-dev.json"),
         });
         expect(data.repos.length).toBe(0);
         expect(data.requests?.length ?? 0).toBe(0);
@@ -146,6 +149,9 @@ describe("Honesty contract — empty state dir produces zero KPIs", () => {
             actionsDir: join(emptyDir, "request-actions"),
             decisionsDir: join(emptyDir, "gate-decisions"),
             stateRoot: emptyDir,
+            // Isolate the settings reader from the real ~/.claude config so
+            // the empty-state honesty contract is genuinely empty.
+            configPath: join(emptyDir, "autonomous-dev.json"),
         });
         expect(data.kpis.totalRepos).toBe(0);
         expect(data.kpis.activeRepos).toBe(0);
