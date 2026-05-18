@@ -48,7 +48,12 @@ export interface SanitizationResult {
 type DOMPurifyHookEvent = "uponSanitizeAttribute" | "uponSanitizeElement";
 type DOMPurifyHookCallback = (
     node: Element,
-    data: { attrName?: string; attrValue?: string; allowedAttributes?: Record<string, boolean> },
+    data: {
+        attrName?: string;
+        attrValue?: string;
+        allowedAttributes?: Record<string, boolean>;
+        tagName?: string;
+    },
 ) => void;
 interface DOMPurifyInstance {
     sanitize: (input: string, config?: Record<string, unknown>) => string;
@@ -200,9 +205,14 @@ function configurePurify(purify: DOMPurifyInstance, config: SanitizationConfig):
         FORCE_BODY: false,
         WHOLE_DOCUMENT: false,
         RETURN_DOM_FRAGMENT: false,
+        // DOMPurify treats `target` and `rel` as URI-bearing attributes and
+        // strips them when ALLOWED_URI_REGEXP is set. Explicitly mark them
+        // as URI-safe so the link-hardening renderer's `_blank` / `noopener
+        // noreferrer` survive the sanitization pass.
+        ADD_URI_SAFE_ATTR: ["target", "rel"],
     });
 
-    purify.addHook("uponSanitizeAttribute", (_node, data) => {
+    purify.addHook("uponSanitizeAttribute", (node, data) => {
         const name = data.attrName?.toLowerCase() ?? "";
         if (name.startsWith("on")) {
             // strip event handlers — defense against marked allowing them
@@ -217,6 +227,39 @@ function configurePurify(purify: DOMPurifyInstance, config: SanitizationConfig):
                 .filter((cls) => cls.length > 0 && ALLOWED_CLASS_PATTERN.test(cls))
                 .join(" ");
             data.attrValue = filtered;
+        }
+
+        // Force target="_blank" and rel="noopener noreferrer" on absolute
+        // http(s) anchors. Idempotent: if the renderer already added them
+        // (the marked custom renderer does), this enforces canonical values
+        // even when an attacker tries to override them via inline HTML.
+        // Relative URLs (e.g. `/foo`) and `mailto:` are left untouched.
+        if (
+            node.nodeName === "A" &&
+            (name === "href" || name === "target" || name === "rel")
+        ) {
+            const href = node.getAttribute("href");
+            if (href !== null && /^https?:\/\//i.test(href.trim())) {
+                if (name === "target") {
+                    data.attrValue = "_blank";
+                } else if (name === "rel") {
+                    data.attrValue = "noopener noreferrer";
+                }
+            }
+        }
+    });
+
+    // Post-attribute hook: for absolute http(s) anchors, ensure target/rel
+    // are present even if the input HTML lacked them. Without this, an
+    // attacker who supplies raw `<a href="https://...">` would bypass the
+    // marked renderer's defaults.
+    purify.addHook("uponSanitizeElement", (node) => {
+        if (node.nodeName === "A" && typeof node.getAttribute === "function") {
+            const href = node.getAttribute("href");
+            if (href !== null && /^https?:\/\//i.test(href.trim())) {
+                node.setAttribute("target", "_blank");
+                node.setAttribute("rel", "noopener noreferrer");
+            }
         }
     });
 }
