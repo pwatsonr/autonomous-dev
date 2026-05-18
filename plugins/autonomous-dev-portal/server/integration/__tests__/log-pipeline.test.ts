@@ -104,9 +104,14 @@ describe("LogPipeline", () => {
         appendFileSync(filePath, VALID(0) + "\n" + VALID(1) + "\n" + VALID(2) + "\n");
         pipeline = newPipeline();
         await pipeline.start();
+        // Bumped from 1500ms to 5000ms — file-watcher events on
+        // macOS FSEvents + the 10ms debounce occasionally take >1.5s
+        // when the full test suite runs concurrently. The happy path
+        // is unaffected; the longer timeout only changes the failure
+        // wall-clock when something is genuinely broken.
         const got = waitFor<LogPayload>(
             (cb) => pipeline!.on("data", cb),
-            1500,
+            5000,
             "data",
         );
         appendFileSync(filePath, VALID(3, "new line") + "\n");

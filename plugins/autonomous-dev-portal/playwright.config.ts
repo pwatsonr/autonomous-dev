@@ -14,6 +14,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
     testDir: "tests/visual-regression",
+    // *.visual.ts (not *.spec.ts) so bun's default test matcher skips
+    // these specs — they import `@playwright/test` which isn't a bun
+    // dependency. bun runs everything else; Playwright runs only these.
+    testMatch: "**/*.visual.ts",
     timeout: 60_000,
     fullyParallel: false,
     workers: 1,
