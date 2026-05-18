@@ -46,7 +46,7 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>{{EXTRA_PATH_DIRS}}/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <string>{{PATH_VALUE}}</string>
         <key>HOME</key>
         <string>{{USER_HOME}}</string>
     </dict>
