@@ -12,7 +12,11 @@
 //   - artifact pane renders the diff variant (stub `acme/REQ-000001` is
 //     `currentArtifact.format === "diff"`)
 
-import { describe, expect, test } from "bun:test";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 
 import { registerRoutes } from "../../server/routes";
@@ -159,5 +163,68 @@ describe("Request Detail — 404 path", () => {
         const res = await app.request("/repo/acme/request/REQ-999999");
         expect(res.status).toBe(404);
         expect(res.status).not.toBe(500);
+    });
+});
+
+// PLAN-041 T-041-A-05 — tier-2 record path: request-action JSON exists in
+// `${stateDir}/request-actions/REQ-NNNNNN.json` but the target repo's
+// `state.json` is absent. This exercises `loadRequestRecord`'s sparse-state
+// branch, which previously triggered the `null is not an object (evaluating
+// 'res.isEscaped')` 500 because the minimal record's empty `phases` array
+// fed `request-timeline.tsx` and the TimelineActions fragment's
+// `return null;` short-circuit. Asserts 200 or 404 — never 500.
+describe("Request Detail — tier-2 sparse-state path (PLAN-041)", () => {
+    const originalStateDir = process.env["AUTONOMOUS_DEV_STATE_DIR"];
+    const tier2Id = "REQ-041041";
+    let tmpRoot: string;
+
+    beforeAll(() => {
+        tmpRoot = mkdtempSync(join(tmpdir(), "plan-041-tier2-"));
+        const actionsDir = join(tmpRoot, "request-actions");
+        mkdirSync(actionsDir, { recursive: true });
+        // Tier-2 fixture: request-action present, no state.json in any repo
+        // (resolveRepoPath returns null for an unconfigured repo slug, so
+        // the reader takes the sparse-state branch).
+        writeFileSync(
+            join(actionsDir, `${tier2Id}.json`),
+            JSON.stringify({
+                id: tier2Id,
+                repo: "tier2-repo",
+                title: "Tier-2 sparse-state request",
+                phase: "code",
+                status: "running",
+                createdAt: "2026-05-18T00:00:00Z",
+            }),
+        );
+        process.env["AUTONOMOUS_DEV_STATE_DIR"] = tmpRoot;
+    });
+
+    afterAll(() => {
+        if (originalStateDir === undefined) {
+            delete process.env["AUTONOMOUS_DEV_STATE_DIR"];
+        } else {
+            process.env["AUTONOMOUS_DEV_STATE_DIR"] = originalStateDir;
+        }
+        try {
+            rmSync(tmpRoot, { recursive: true, force: true });
+        } catch {
+            /* best-effort cleanup */
+        }
+    });
+
+    test("tier-2 record (request-action present, state.json absent) does not 500", async () => {
+        const app = freshApp();
+        const res = await app.request(`/repo/tier2-repo/request/${tier2Id}`);
+        // The page must render (200) OR be a clean not-found (404). The
+        // forbidden outcome is 500 — that was the bug closed by replacing
+        // `return null;` in region templates with `return <></>;`.
+        expect(res.status).not.toBe(500);
+        expect([200, 404]).toContain(res.status);
+        // If the template rendered, sanity-check it produced a string body
+        // and not an empty/garbage response.
+        if (res.status === 200) {
+            const html = await res.text();
+            expect(html).toContain(tier2Id);
+        }
     });
 });
