@@ -3008,13 +3008,27 @@ _spawn_upgrade_helper_macos() {
     # itself uses bash 3.2-safe idioms.
     [[ -z "${bash_path}" ]] && bash_path="/bin/bash"
 
+    # Live-trial 2 (v0.3.2 → v0.3.3 on 2026-05-18) revealed that the
+    # upgrader job's PATH must include wherever the `claude` CLI lives,
+    # because install-daemon.sh calls `command -v claude` to compute
+    # EXTRA_PATH_DIRS for the daemon plist it renders. If `claude`
+    # isn't in PATH at that moment, the new daemon's plist gets a
+    # stripped PATH and FATAL-exits with "Missing required commands:
+    # claude".
+    #
+    # Fix: inject the SUPERVISOR's current PATH into the upgrader plist.
+    # The supervisor is running, has a working PATH (otherwise the
+    # daemon wouldn't have started). Bash escapes for sed: we use a
+    # delimiter that won't appear in PATH (#) and strip any & chars.
+    local path_value="${PATH//&/\&}"
+
     # Render the upgrader plist
     sed \
         -e "s|{{BASH_PATH}}|${bash_path}|g" \
         -e "s|{{INSTALLER_PATH}}|${installer}|g" \
         -e "s|{{DAEMON_HOME}}|${DAEMON_HOME}|g" \
         -e "s|{{USER_HOME}}|${HOME}|g" \
-        -e "s|{{EXTRA_PATH_DIRS}}||g" \
+        -e "s#{{PATH_VALUE}}#${path_value}#g" \
         "${template}" > "${upgrader_plist}"
 
     if ! plutil -lint "${upgrader_plist}" >/dev/null 2>&1; then
