@@ -48,7 +48,7 @@ describe("GateActionPanel — active mode", () => {
     test("each button has aria-label that includes the request id", async () => {
         const html = await render(baseActive);
         expect(html).toContain('aria-label="Approve request REQ-1"');
-        expect(html).toContain('aria-label="Request Changes request REQ-1"');
+        expect(html).toContain('aria-label="Request changes request REQ-1"');
         expect(html).toContain('aria-label="Reject request REQ-1"');
     });
 

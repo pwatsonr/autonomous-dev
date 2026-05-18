@@ -39,7 +39,14 @@ describe("parseFormDataToConfig", () => {
             ]),
         );
         expect("evilKey" in out).toBe(false);
-        expect("__proto__" in out).toBe(false);
+        // `__proto__ in obj` is always true because every object inherits
+        // from Object.prototype. What matters for the prototype-pollution
+        // guard is: (a) the parser didn't set an OWN `__proto__` key,
+        // and (b) it didn't mutate Object.prototype itself.
+        expect(Object.hasOwn(out, "__proto__")).toBe(false);
+        expect(
+            (Object.prototype as unknown as { polluted?: string }).polluted,
+        ).toBeUndefined();
     });
 
     test("trustLevels.<repo> dynamic key is preserved", () => {

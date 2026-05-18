@@ -118,21 +118,26 @@ describe("palette", () => {
         }
     });
 
-    test("contrastRatio with #FFFFFF: at least 4 colors meet 4.5:1", () => {
-        // Yellow (#F0E442) is too light for body text against white;
-        // it's reserved for fills, not text. We assert that the dark
-        // members (black, blue, green, red, brown, magenta) are >=4.5.
+    test("contrastRatio with #FFFFFF: black and dark blue meet 4.5:1", () => {
+        // The Wong 8-color palette optimizes for color-vision-deficient
+        // discriminability, NOT body-text contrast. Two members
+        // (#000000 black, #0072B2 dark blue) clear the 4.5:1 body-text
+        // bar against white; the rest are reserved for fills/chart
+        // strokes where 3:1 is the relevant target. We pin the two
+        // body-text-safe entries explicitly so a future palette swap
+        // that breaks both is caught.
         const minRatios: Record<string, number> = {};
         for (const c of COLOR_PALETTE) {
             minRatios[c] = contrastRatio(c, "#FFFFFF");
         }
-        // At least 4 palette colors satisfy the 4.5:1 body-text bar.
         const passing = COLOR_PALETTE.filter(
             (c) => (minRatios[c] ?? 0) >= 4.5,
         );
-        expect(passing.length).toBeGreaterThanOrEqual(4);
+        expect(passing.length).toBeGreaterThanOrEqual(2);
         // Black is always passing.
         expect(contrastRatio("#000000", "#FFFFFF")).toBeGreaterThanOrEqual(4.5);
+        // Dark blue (Wong #5) is the only chromatic body-text-safe choice.
+        expect(contrastRatio("#0072B2", "#FFFFFF")).toBeGreaterThanOrEqual(4.5);
     });
 });
 

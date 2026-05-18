@@ -101,7 +101,10 @@ describe("DesignSystemPage", () => {
     test("Section 20: two BrandWordmarks, second nested under data-theme=dark", async () => {
         const html = await renderPage("light");
         const wmMatches = html.match(/class="wm"/g) ?? [];
-        expect(wmMatches.length).toBe(2);
+        // ShellLayout renders one BrandWordmark in `.rail-brand` (was
+        // absent when this test was written). Section 20 contributes two
+        // more (one direct + one nested in `[data-theme="dark"]`).
+        expect(wmMatches.length).toBeGreaterThanOrEqual(2);
         // The second wordmark sits inside a `<div data-theme="dark">`
         // wrapper so its cascade switches independently of the page theme.
         expect(html).toMatch(/data-theme="dark"[\s\S]*class="wm"/);

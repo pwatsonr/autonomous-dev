@@ -60,10 +60,21 @@ export async function hmacSign(
  */
 export function timingSafeCompare(a: string, b: string): boolean {
     if (a.length !== b.length) return false;
+    // `Buffer.from(str, "hex")` silently truncates at the first invalid
+    // nybble — `"zz"` parses to an empty buffer, which would otherwise
+    // compare equal to itself. Reject any string whose parsed byte count
+    // doesn't match the expected `length/2` (hex strings are 2 chars per
+    // byte). Length must also be even.
+    if (a.length % 2 !== 0) return false;
     try {
-        return timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+        const aBuf = Buffer.from(a, "hex");
+        const bBuf = Buffer.from(b, "hex");
+        const expectedLen = a.length / 2;
+        if (aBuf.length !== expectedLen || bBuf.length !== expectedLen) {
+            return false;
+        }
+        return timingSafeEqual(aBuf, bBuf);
     } catch {
-        // Buffer.from with invalid hex chars returns shorter buffer; reject.
         return false;
     }
 }

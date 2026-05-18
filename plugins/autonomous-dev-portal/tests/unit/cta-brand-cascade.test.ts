@@ -55,12 +55,14 @@ describe("CTA `--brand` cascade (PLAN-038 TASK-003)", () => {
     test("no override of .btn.primary in portal.css", () => {
         const css = read("portal.css");
         // portal.css is for portal-only overrides (kill-switch, error page).
-        // It must not redeclare `.btn.primary` with anything other than
-        // var(--brand) — and ideally not at all.
-        const matches = css.match(/\.btn\.primary\b[^{]*\{[^}]*\}/g) ?? [];
+        // The pin guards against re-defining the BASE `.btn.primary` rule
+        // with hardcoded hex/undefined-token colors. Pseudo-class /
+        // attribute-state variants (`:disabled`, `[disabled]`, `:hover`,
+        // etc.) are out of scope — those legitimately use neutral palette
+        // tokens (e.g. var(--bg-2) for disabled).
+        const matches =
+            css.match(/\.btn\.primary(?![:[\w-])[^{,]*\{[^}]*\}/g) ?? [];
         for (const rule of matches) {
-            // If a rule exists, it must use var(--brand). No hardcoded hex.
-            // No reference to a missing token (e.g. --accent, --primary-color).
             expect(rule).toMatch(/var\(--brand[^)]*\)/);
             expect(rule).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
         }
@@ -68,7 +70,8 @@ describe("CTA `--brand` cascade (PLAN-038 TASK-003)", () => {
 
     test("no override of .btn.primary in shell.css", () => {
         const css = read("shell.css");
-        const matches = css.match(/\.btn\.primary\b[^{]*\{[^}]*\}/g) ?? [];
+        const matches =
+            css.match(/\.btn\.primary(?![:[\w-])[^{,]*\{[^}]*\}/g) ?? [];
         for (const rule of matches) {
             expect(rule).toMatch(/var\(--brand[^)]*\)/);
             expect(rule).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);

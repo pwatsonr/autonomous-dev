@@ -158,10 +158,18 @@ describe("enforceBinding", () => {
         expect((caught as SecurityError).code).toBe("LOCALHOST_REJECTS_PROXY");
     });
 
-    test("is a no-op for tailscale and oauth-pkce modes", () => {
-        // Other modes carry their own enforcers; this gate must not fire.
+    test("is a no-op for tailscale (auto bind) and oauth-pkce modes", () => {
+        // SPEC-014-1-03 tightened the tailscale branch: it now actively
+        // rejects wildcard `bind_host` values (127.0.0.1 / 0.0.0.0 / ::)
+        // in the SAME enforcer, so the no-op contract holds only for the
+        // canonical `auto` and an explicit Tailscale peer IP. The oauth
+        // branch remains a pure no-op (its own validateAuthConfig owns
+        // the binding rules).
         enforceBinding(
-            baseConfig({ auth_mode: "tailscale", bind_host: "0.0.0.0" }),
+            baseConfig({ auth_mode: "tailscale", bind_host: "auto" }),
+        );
+        enforceBinding(
+            baseConfig({ auth_mode: "tailscale", bind_host: "100.64.10.5" }),
         );
         enforceBinding(
             baseConfig({ auth_mode: "oauth-pkce", bind_host: "0.0.0.0" }),

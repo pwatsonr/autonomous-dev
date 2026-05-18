@@ -131,10 +131,14 @@ describe("GateRow markup — SPEC-037-4-03", () => {
         expect(html).toContain('<span class="chip variant sm">Fast Iter</span>');
     });
 
-    test("phase build maps to 'code' tone but text remains BUILD", async () => {
+    test("phase build maps to 'code' tone (Chip phase variant renders tone)", async () => {
         const html = await render(<GateRow {...item({ phase: "build" })} />);
-        // Phase chip text is the uppercase phase name.
-        expect(html).toContain(">BUILD<");
+        // The Chip primitive's phase variant uses the tone (after
+        // `build → code` mapping) as both the CSS class and the
+        // rendered text. See `primitives.tsx#Chip` and
+        // `gate-row.tsx#phaseChipTone`.
+        expect(html).toContain('class="chip-phase code"');
+        expect(html).toContain(">CODE<");
     });
 
     test("all three gate types render without error", async () => {

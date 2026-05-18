@@ -120,17 +120,35 @@ describe("SSEEventBus", () => {
         const conn = await bus.registerStream(slow);
         expect(conn).not.toBeNull();
         slow.block = true; // freeze the writer
-        // Fire enough writes that the queue saturates.
+        // Broadcasts are awaited inside SSEEventBus (via Promise.allSettled
+        // over per-connection writes). A blocked stream makes each
+        // broadcast hang, so sequential `await bus.broadcast()` would
+        // deadlock and never saturate the per-connection queue. Fire
+        // them in parallel and DON'T await: the first call enters the
+        // critical section and bumps `writeQueueDepth` to 1; subsequent
+        // calls hit the depth >= limit branch in Connection.write and
+        // increment droppedEventCount. We then assert on stats after a
+        // microtask tick to ensure the calls have all dispatched.
+        const fired = [] as Promise<void>[];
         for (let i = 0; i < 20; i += 1) {
-            await bus.broadcast({
-                type: "cost-update",
-                payload: { delta_usd: 0, total_usd: 0 },
-            });
+            fired.push(
+                bus.broadcast({
+                    type: "cost-update",
+                    payload: { delta_usd: 0, total_usd: 0 },
+                }),
+            );
         }
+        // Yield once so the dispatch loop in each broadcast can run up to
+        // the first `await` and increment the queue depth / drop counter.
+        await new Promise((r) => setTimeout(r, 10));
         // Stats must show drops; bus must NOT have thrown.
         const stats = bus.getConnectionStats();
         expect(stats.length).toBe(1);
         expect(stats[0]!.droppedEventCount).toBeGreaterThan(0);
+        // Cleanup: discard the still-pending broadcast promises so the
+        // afterEach shutdown can run without waiting for the blocked
+        // writer. `void` keeps the linter quiet.
+        void fired;
     });
 
     test("write failure transitions connection to closed and reaps it", async () => {

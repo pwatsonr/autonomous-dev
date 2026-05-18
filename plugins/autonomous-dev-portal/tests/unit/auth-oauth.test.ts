@@ -175,8 +175,9 @@ describe("pkce-utils", () => {
     });
 
     test("base64UrlEncode strips padding and remaps + and /", () => {
-        // Two zero bytes encode to "AA==" in standard base64 → "AA" url-safe.
-        expect(base64UrlEncode(Buffer.from([0, 0]))).toBe("AA");
+        // Two zero bytes encode to "AAA=" in standard base64 (ceil(2*4/3)
+        // = 3 base64 chars + 1 padding). URL-safe form strips the `=`.
+        expect(base64UrlEncode(Buffer.from([0, 0]))).toBe("AAA");
         // 0xfb 0xff encodes to "+/8=" standard → "-_8" url-safe.
         expect(base64UrlEncode(Buffer.from([0xfb, 0xff]))).toBe("-_8");
     });

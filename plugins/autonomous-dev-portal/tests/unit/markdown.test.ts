@@ -11,8 +11,13 @@ import { escapeHtml, renderMarkdown } from "../../server/lib/markdown";
 
 describe("escapeHtml", () => {
     test("escapes the five HTML-significant characters", () => {
+        // The implementation follows the OWASP-canonical 5: `&`, `<`, `>`,
+        // `"`, `'`. The forward slash (`/`) is intentionally NOT escaped:
+        // it's safe inside attribute values and tag bodies once `<` and
+        // `>` are already escaped, and leaving it readable improves
+        // diagnostic output for the audit log preview.
         expect(escapeHtml('<script>alert("x")</script>')).toBe(
-            "&lt;script&gt;alert(&quot;x&quot;)&lt;&#x2F;script&gt;",
+            "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;",
         );
     });
 
