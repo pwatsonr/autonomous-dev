@@ -75,8 +75,9 @@ export const RepoCard: FC<RepoSummary> = (r) => {
                     <span class="repo-trust meta-mono">{r.trust}</span>
                 )}
             </div>
-            {/* 2. Path row */}
-            <div class="repo-path meta-mono dim">~/projects/{r.repo}</div>
+            {/* 2. Path row — real allowlist path when threaded through,
+                 otherwise the legacy `~/projects/{repo}` placeholder. */}
+            <div class="repo-path meta-mono dim">{r.path ?? `~/projects/${r.repo}`}</div>
             {/* 3. Meta row 1 — phase + variant label */}
             <div class="repo-meta-row">
                 {r.phase && (

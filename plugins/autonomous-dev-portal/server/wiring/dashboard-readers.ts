@@ -31,6 +31,9 @@ export async function readDashboardData(
     //    grid (honesty contract — the operator's allowlist is not a lie).
     const settings = await readPortalSettings(opts);
     const allowlistRepos = settings.allowlist.map((e) => e.id);
+    // Build an id → absolute-path map so RepoCard can show the real path
+    // instead of the hardcoded `~/projects/{id}` placeholder.
+    const pathById = new Map(settings.allowlist.map((e) => [e.id, e.path]));
 
     // 2. Aggregate per-repo and pull the request ledger in one pass.
     const { byRepo, requests } = await readRepoAggregates({
@@ -42,7 +45,8 @@ export async function readDashboardData(
     //    allowlist order so the dashboard grid is deterministic).
     const repos: RepoSummary[] = allowlistRepos
         .map((id) => byRepo.get(id))
-        .filter((r): r is RepoSummary => r !== undefined);
+        .filter((r): r is RepoSummary => r !== undefined)
+        .map((r) => ({ ...r, path: pathById.get(r.repo) ?? r.path }));
 
     // 4. Append any repos that have requests but are NOT in the allowlist
     //    (defensive — should be rare, but means the dashboard never hides

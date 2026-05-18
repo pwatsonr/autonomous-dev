@@ -32,7 +32,7 @@ export interface ReadLogOptions {
 }
 
 export interface LogReaderDeps {
-    /** Repo root. The daemon writes <basePath>/.autonomous-dev/daemon.log. */
+    /** Repo root. The daemon writes <basePath>/.autonomous-dev/logs/daemon.log. */
     basePath: string;
     cache: AggregationCache;
     logger?: { warn?: (msg: string, ...args: unknown[]) => void };
@@ -50,7 +50,7 @@ export class LogReader {
     }
 
     private logPath(): string {
-        return join(this.deps.basePath, ".autonomous-dev", "daemon.log");
+        return join(this.deps.basePath, ".autonomous-dev", "logs", "daemon.log");
     }
 
     async readRecent(opts: ReadLogOptions = {}): Promise<Result<LogLine[]>> {
