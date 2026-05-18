@@ -145,6 +145,12 @@ class MockRegistry implements IAgentRegistry {
     if (!record) throw new Error(`Agent '${name}' not found`);
     record.state = state;
   }
+
+  transition(name: string, targetState: AgentState): void {
+    const record = this.agents.get(name);
+    if (!record) throw new Error(`Agent '${name}' not found`);
+    record.state = targetState;
+  }
 }
 
 // ---------------------------------------------------------------------------

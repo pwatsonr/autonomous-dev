@@ -63,9 +63,7 @@ function consumer(
 
 async function makeRegistry(opts: {
   hmacKey?: Buffer;
-  signer?: Parameters<typeof ArtifactRegistry.prototype.constructor>[0] extends infer _O
-    ? unknown
-    : never;
+  signer?: unknown;
 } = {}): Promise<ArtifactRegistry> {
   const reg = new ArtifactRegistry({
     hmacKey: opts.hmacKey ?? TEST_HMAC_KEY,

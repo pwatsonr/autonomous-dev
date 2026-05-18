@@ -184,7 +184,7 @@ describe('Slack Components (SPEC-008-4-03, Tasks 7 & 9)', () => {
     // Test 15: Modal structure
     test('modal has 3 input blocks', () => {
       const modal = buildSubmitModal('trigger-123');
-      const blocks = modal.view.blocks as InputBlock[];
+      const blocks = modal.view.blocks as unknown as InputBlock[];
 
       expect(blocks).toHaveLength(3);
       for (const block of blocks) {
@@ -222,7 +222,7 @@ describe('Slack Components (SPEC-008-4-03, Tasks 7 & 9)', () => {
     // Test 12/15: description block (required, multiline, max 10000)
     test('description block is required, multiline, max_length 10000', () => {
       const modal = buildSubmitModal('trigger-123');
-      const blocks = modal.view.blocks as InputBlock[];
+      const blocks = modal.view.blocks as unknown as InputBlock[];
       const descBlock = blocks.find((b) => b.block_id === 'description_block')!;
 
       expect(descBlock).toBeDefined();
@@ -236,7 +236,7 @@ describe('Slack Components (SPEC-008-4-03, Tasks 7 & 9)', () => {
     // Test 12/15: repo block (optional)
     test('repo block is optional', () => {
       const modal = buildSubmitModal('trigger-123');
-      const blocks = modal.view.blocks as InputBlock[];
+      const blocks = modal.view.blocks as unknown as InputBlock[];
       const repoBlock = blocks.find((b) => b.block_id === 'repo_block')!;
 
       expect(repoBlock).toBeDefined();
@@ -248,7 +248,7 @@ describe('Slack Components (SPEC-008-4-03, Tasks 7 & 9)', () => {
     // Test 12/15: acceptance criteria block (optional, multiline, max 2000)
     test('acceptance criteria block is optional, multiline, max_length 2000', () => {
       const modal = buildSubmitModal('trigger-123');
-      const blocks = modal.view.blocks as InputBlock[];
+      const blocks = modal.view.blocks as unknown as InputBlock[];
       const criteriaBlock = blocks.find((b) => b.block_id === 'criteria_block')!;
 
       expect(criteriaBlock).toBeDefined();
@@ -262,7 +262,7 @@ describe('Slack Components (SPEC-008-4-03, Tasks 7 & 9)', () => {
     // Placeholder text on all fields
     test('all input fields have placeholder text', () => {
       const modal = buildSubmitModal('trigger-123');
-      const blocks = modal.view.blocks as InputBlock[];
+      const blocks = modal.view.blocks as unknown as InputBlock[];
 
       for (const block of blocks) {
         expect(block.element.placeholder).toBeDefined();

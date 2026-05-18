@@ -135,7 +135,11 @@ export const IntelligenceConfigSchema = z.object({
   query_budgets: QueryBudgetConfigSchema,
   anomaly_detection: AnomalyDetectionConfigSchema,
   trend_analysis: TrendAnalysisConfigSchema,
-  false_positive_filters: FalsePositiveFiltersSchema.default({}),
+  false_positive_filters: FalsePositiveFiltersSchema.default({
+    maintenance_windows: [],
+    excluded_error_patterns: [],
+    load_test_markers: [],
+  }),
   governance: GovernanceConfigSchema,
   retention: RetentionConfigSchema,
   custom_pii_patterns: z.array(z.string()).default([]),

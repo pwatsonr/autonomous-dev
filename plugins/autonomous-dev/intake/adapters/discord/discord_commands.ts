@@ -355,3 +355,31 @@ export async function registerCommands(
     commandCount: DISCORD_COMMANDS[0].options!.length,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Builder helpers (compat shim)
+// ---------------------------------------------------------------------------
+
+/** JSON payload form of a Discord application command. */
+export interface RequestCommandJSON {
+  name: string;
+  description: string;
+  type?: number;
+  options?: unknown[];
+}
+
+/**
+ * Compatibility shim: returns objects with a `toJSON()` method that yields
+ * the existing DISCORD_COMMANDS payload. Used by `main.ts:registerSlashCommands`.
+ *
+ * NOTE: The real builder API was never landed; this shim adapts the legacy
+ * static array so the production code path still type-checks. The historical
+ * intent was per-request command synthesis (see PRD-018).
+ */
+export function buildAllRequestCommands(): Array<{ toJSON(): RequestCommandJSON }> {
+  return DISCORD_COMMANDS.map((cmd) => ({
+    toJSON(): RequestCommandJSON {
+      return cmd as unknown as RequestCommandJSON;
+    },
+  }));
+}

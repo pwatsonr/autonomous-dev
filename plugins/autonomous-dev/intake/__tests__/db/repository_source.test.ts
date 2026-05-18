@@ -83,6 +83,7 @@ function makeRequest(
     promotion_count: 0,
     last_promoted_at: null,
     paused_at_phase: null,
+    type: 'feature',
     source: 'cli',
     adapter_metadata: {},
     created_at: '2026-04-30T10:00:00.000Z',

@@ -64,7 +64,7 @@ export class ApprovalEvaluator {
         outcome: 'rejected',
         reasons,
         auto_generated_findings: [],
-        threshold_met: aggregationResult.aggregate_score >= (rubric as RubricWithThreshold).approval_threshold,
+        threshold_met: aggregationResult.aggregate_score >= ((rubric as RubricWithThreshold).approval_threshold ?? 0),
         has_critical_blocking: hasCriticalBlocking,
         has_critical_reject: true,
         floor_violations: [],

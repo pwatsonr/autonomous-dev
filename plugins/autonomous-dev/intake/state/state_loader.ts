@@ -322,7 +322,7 @@ export function loadState(filePath: string): RequestStateV1_1 {
   } else if (isPlainObject(raw) && raw.schema_version === 1.1) {
     upgraded = raw as unknown as RequestStateV1_1;
   } else {
-    const sv = isPlainObject(raw) ? raw.schema_version : undefined;
+    const sv = isPlainObject(raw as unknown) ? (raw as unknown as Record<string, unknown>).schema_version : undefined;
     throw new StateValidationError(
       [{
         instancePath: '/schema_version',

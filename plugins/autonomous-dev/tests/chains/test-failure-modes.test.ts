@@ -435,9 +435,9 @@ describe('SPEC-022-2-05: failure-mode × error-source matrix', () => {
         },
       ];
       // Build a registry with a tiny cap so the patches payload fails persist().
-      const tinyRegistry = new (registry.constructor as typeof registry.constructor)({
+      const tinyRegistry = new (registry.constructor as unknown as new (opts: { maxArtifactSizeMb: number }) => ArtifactRegistry)({
         maxArtifactSizeMb: 1 / 1024, // 1 KB cap
-      }) as ArtifactRegistry;
+      });
       // Re-load schemas so validate works.
       await (
         tinyRegistry as unknown as {

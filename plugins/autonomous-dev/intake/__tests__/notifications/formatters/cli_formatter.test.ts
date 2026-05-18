@@ -55,6 +55,9 @@ function makeRequest(overrides: Partial<RequestEntity> = {}): RequestEntity {
     promotion_count: 0,
     last_promoted_at: null,
     paused_at_phase: null,
+    source: 'cli',
+    adapter_metadata: {},
+    type: 'feature',
     created_at: new Date(Date.now() - 8_040_000).toISOString(), // ~2h 14m ago
     updated_at: new Date().toISOString(),
     ...overrides,

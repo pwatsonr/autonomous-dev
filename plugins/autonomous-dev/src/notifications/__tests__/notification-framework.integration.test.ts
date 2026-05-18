@@ -28,7 +28,6 @@ import type {
   DeliveryAdapter,
   DeliveryMethod,
   DeliveryResult,
-  NotificationConfig,
   NotificationPayload,
 } from '../types';
 import type { NotificationConfig as FullNotificationConfig } from '../notification-config';

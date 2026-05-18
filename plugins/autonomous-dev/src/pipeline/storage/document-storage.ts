@@ -7,7 +7,7 @@ import { TemplateEngine } from '../template-engine/template-engine';
 import { IdCounter } from '../frontmatter/id-generator';
 import { CreateDocumentRequest, DocumentHandle, createDocument } from './document-creator';
 import { DocumentContent, readDocument, readVersion } from './document-reader';
-import { DocumentFilter, listDocuments } from './document-lister';
+import { DocumentFilter, listDocuments, DocumentHandle as DocumentSummary } from './document-lister';
 import { WriteVersionRequest, VersionRecord, writeVersion } from './version-writer';
 import { listVersions } from './version-lister';
 import { deleteDocument } from './document-deleter';
@@ -87,7 +87,7 @@ export class DocumentStorage {
   }
 
   /** List documents in a pipeline with optional filter. */
-  async listDocuments(pipelineId: string, filter?: DocumentFilter): Promise<DocumentHandle[]> {
+  async listDocuments(pipelineId: string, filter?: DocumentFilter): Promise<DocumentSummary[]> {
     return listDocuments(pipelineId, this.directoryManager, filter);
   }
 

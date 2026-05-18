@@ -334,7 +334,7 @@ describe('TC-2-2-13: Redaction metadata no values', () => {
     expect(result.redactions[0].type).toBe('email');
     // Ensure original value is NEVER stored
     expect(
-      (result.redactions[0] as Record<string, unknown>).original_value,
+      (result.redactions[0] as unknown as Record<string, unknown>).original_value,
     ).toBeUndefined();
   });
 });

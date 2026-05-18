@@ -136,7 +136,9 @@ export class DuplicateDetector {
    */
   async initialize(): Promise<void> {
     // Dynamic import so the module is optional at compile time.
+    // The package is an optional runtime dep; types are not always installed.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // @ts-expect-error -- optional runtime dep without bundled @types
     const { pipeline } = await import('@xenova/transformers');
     this.embedder = (await pipeline(
       'feature-extraction',

@@ -254,6 +254,11 @@ class MockRegistry implements IAgentRegistry {
     const r = this.agents.get(name);
     if (r) r.state = state;
   }
+
+  transition(name: string, targetState: AgentState): void {
+    const r = this.agents.get(name);
+    if (r) r.state = targetState;
+  }
 }
 
 interface MockRuntimeOptions {

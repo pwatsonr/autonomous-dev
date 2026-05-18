@@ -12,6 +12,7 @@
 import * as path from "path";
 import { StateSnapshotCapture } from "../state-snapshot";
 import type { FileSystem, KillSnapshot } from "../state-snapshot";
+import type { StateSnapshot } from "../types";
 
 // ---------------------------------------------------------------------------
 // Mock filesystem
@@ -236,7 +237,7 @@ describe("StateSnapshotCapture", () => {
     const { mockFs, store } = createMockFs();
     const capture = new StateSnapshotCapture(STATE_DIR, mockFs);
 
-    const snapshots = [
+    const snapshots: StateSnapshot[] = [
       {
         requestId: "req-abc",
         pipelinePhase: "code_review",

@@ -153,7 +153,7 @@ describe('Corpus Generation (TC-2-4-01)', () => {
     const embeddedLineNums = new Set(corpus.manifest.embedded_items.map(i => i.line_number));
 
     // Sample 200 clean lines and check they don't contain any embedded values
-    const cleanLineIndices = [];
+    const cleanLineIndices: number[] = [];
     for (let i = 0; i < lines.length; i++) {
       if (!embeddedLineNums.has(i)) cleanLineIndices.push(i);
     }

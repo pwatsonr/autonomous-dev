@@ -134,7 +134,11 @@ export class StateSnapshotCapture {
     return {
       requestId,
       pipelinePhase: pipelineState.pipelinePhase ?? "unknown",
-      phaseStatus: pipelineState.phaseStatus ?? "unknown",
+      phaseStatus: (pipelineState.phaseStatus ?? "unknown") as
+        | "running"
+        | "completed"
+        | "pending"
+        | "unknown",
       artifacts,
       pendingEscalationIds,
       trustLevel: pipelineState.trustLevel ?? 0,

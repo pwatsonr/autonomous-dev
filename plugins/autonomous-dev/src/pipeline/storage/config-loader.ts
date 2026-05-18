@@ -18,11 +18,11 @@ export class ConfigValidationError extends Error {
  * Unknown keys are ignored (not passed through).
  */
 function deepMerge(defaults: PipelineConfig, partial: Record<string, unknown>): PipelineConfig {
-  const result = structuredClone(defaults) as Record<string, unknown>;
+  const result = structuredClone(defaults) as unknown as Record<string, unknown>;
 
   for (const key of Object.keys(defaults) as (keyof PipelineConfig)[]) {
     if (!(key in partial)) continue;
-    const defaultVal = (defaults as Record<string, unknown>)[key];
+    const defaultVal = (defaults as unknown as Record<string, unknown>)[key];
     const partialVal = partial[key];
 
     if (

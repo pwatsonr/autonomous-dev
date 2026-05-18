@@ -559,5 +559,5 @@ export async function runInteractivePrompts(
     io.close();
   }
 
-  return out as BugReport;
+  return out as unknown as BugReport;
 }

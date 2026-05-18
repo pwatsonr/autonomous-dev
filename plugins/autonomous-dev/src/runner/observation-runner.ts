@@ -500,7 +500,7 @@ export class ObservationRunner {
             ...rawData,
             prometheus: scrubResult.prometheus as unknown[],
             opensearch: scrubResult.opensearch as unknown[],
-            grafana: scrubResult.grafana as unknown[],
+            grafana: scrubResult.grafana as unknown as unknown[],
           };
           if (scrubResult.scrubAuditEntries.length > 0) {
             auditLog.info(
@@ -529,10 +529,10 @@ export class ObservationRunner {
         //       Enrich candidates with Sentry error issues, stack traces,
         //       and release health data when the adapter is available.
         if (this.sentryAdapter) {
-          const sentryConnectivity = connectivity.results.find(
-            (r: ConnectivityResult) => r.source === 'sentry',
-          );
-          const sentryStatus = sentryConnectivity?.status ?? 'not_configured';
+          // connectivity.results is keyed by source name in mcp-error-handler's
+          // ConnectivityResult shape ({ results: Record<string, status> }).
+          const sentryStatus: DataSourceStatus =
+            connectivity.results['sentry'] ?? 'not_configured';
 
           if (sentryStatus === 'available' || sentryStatus === 'degraded') {
             for (const candidate of candidates) {

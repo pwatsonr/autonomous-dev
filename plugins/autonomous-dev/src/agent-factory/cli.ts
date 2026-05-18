@@ -1143,10 +1143,11 @@ export async function commandAnalyze(
 
   const findingsCount = metaReviewResult.findings.length;
   const blockersCount = metaReviewResult.findings.filter(
-    (f) => f.severity === 'high',
+    (f) => f.severity === 'blocker',
   ).length;
   const warningsCount = findingsCount - blockersCount;
-  const verdict = metaReviewResult.approved ? 'approved' : 'rejected';
+  const verdict = metaReviewResult.verdict;
+  const approved = verdict === 'approved';
 
   // Set meta_review_id (use summary as a simple review identifier)
   const reviewId = `mr-${proposal.proposal_id.substring(0, 8)}`;
@@ -1167,7 +1168,7 @@ export async function commandAnalyze(
     },
   });
 
-  if (metaReviewResult.approved) {
+  if (approved) {
     proposalStore.updateStatus(proposal.proposal_id, 'meta_approved');
     output.push(`  Verdict: approved (${blockersCount} blockers, ${warningsCount} warnings)`);
     output.push(`  Status: meta_approved`);
@@ -1200,7 +1201,11 @@ export async function commandAnalyze(
     output.push(`  Verdict: rejected (${blockersCount} blockers, ${warningsCount} warnings)`);
     output.push(`  Status: meta_rejected`);
     output.push('');
-    output.push(`Proposal rejected by meta-review. ${metaReviewResult.summary}`);
+    const summaryParts = metaReviewResult.findings
+      .filter((f) => f.severity === 'blocker')
+      .map((f) => f.description);
+    const summary = summaryParts.length > 0 ? summaryParts.join('; ') : 'See findings.';
+    output.push(`Proposal rejected by meta-review. ${summary}`);
   }
 
   return output.join('\n');

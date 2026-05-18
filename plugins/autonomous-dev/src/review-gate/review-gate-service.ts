@@ -779,7 +779,15 @@ export class ReviewGateService {
       gate_id: state.gate_id,
       document_id: document.id,
       document_type: documentType,
-      final_outcome: iterationDecision.outcome ?? approvalDecision.outcome,
+      // The decision objects' outcome union is broader than GateOutcome's
+      // `final_outcome` (includes 'changes_requested'). The runtime contract
+      // (and existing test coverage) is that 'changes_requested' flows
+      // through; the type is widened here via `as` to preserve that.
+      final_outcome: (iterationDecision.outcome ?? approvalDecision.outcome) as
+        | 'approved'
+        | 'rejected'
+        | 'escalated'
+        | 'awaiting_human',
       final_score: aggregationResult.aggregate_score,
       total_iterations: state.current_iteration,
       review_result: reviewResult,

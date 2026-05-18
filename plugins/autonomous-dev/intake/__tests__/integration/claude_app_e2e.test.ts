@@ -101,7 +101,7 @@ function createTestFormatter(): CLIFormatter {
 function createTestIdentityResolver(userId: string): ClaudeIdentityResolver {
   return {
     resolve: async () => userId,
-  };
+  } as unknown as ClaudeIdentityResolver;
 }
 
 // ---------------------------------------------------------------------------

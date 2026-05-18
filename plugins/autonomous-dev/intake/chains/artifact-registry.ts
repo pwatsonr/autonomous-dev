@@ -207,7 +207,7 @@ export class ArtifactRegistry {
     // (per SPEC-022-1-05's idempotent-reload contract).
     this.validators.clear();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (this as { ajv: Ajv2020 }).ajv = new Ajv2020({
+    (this as unknown as { ajv: Ajv2020 }).ajv = new Ajv2020({
       allErrors: true,
       strict: true,
     });

@@ -529,11 +529,13 @@ describe('SPEC-022-2-05: trust × privileged-chain interactions', () => {
   let tempRoot: string;
   let registry: ArtifactRegistry;
   let securityExample: unknown;
+  let patchesExample: unknown;
 
   beforeEach(async () => {
     tempRoot = await createTempRequestDir();
     registry = await loadArtifactSchemas();
     securityExample = await loadSecurityFindingsExample();
+    patchesExample = await loadCodePatchesExample();
     ChainExecutor.__resetActiveChainsForTest();
   });
 

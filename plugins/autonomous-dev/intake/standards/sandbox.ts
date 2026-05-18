@@ -95,7 +95,7 @@ export async function runCustomEvaluator(
     stdout = result.stdout;
   } catch (err) {
     const elapsed = Date.now() - start;
-    const e = err as NodeJS.ErrnoException & {
+    const e = err as Omit<NodeJS.ErrnoException, 'code'> & {
       killed?: boolean;
       signal?: NodeJS.Signals;
       code?: number | string;
