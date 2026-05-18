@@ -108,14 +108,32 @@ export const ALLOWED_CLASS_PATTERN =
 /**
  * Patterns that, if present in the post-DOMPurify output, force a
  * refusal. Defense against hypothetical DOMPurify CVE bypass.
+ *
+ * Mirrors the contract enforced by the SPEC-014-2-05 XSS corpus tests
+ * (`tests/security/xss-payload-tests.spec.ts`). Any divergence between
+ * the two lists is a bug — the post-scan exists exactly to enforce the
+ * test corpus's "no executable substring survives" guarantee.
  */
 export const POST_SANITIZATION_BAD_PATTERNS: readonly RegExp[] = Object.freeze(
     [
-        /<script\b/i,
-        /javascript:/i,
-        /vbscript:/i,
-        /data:text\/html/i,
-        /data:application\/javascript/i,
+        // canonical script/iframe/object/embed open tags
+        /<\s*script\b/i,
+        /<\s*(iframe|object|embed)\b/i,
+        // any inline event-handler attribute (` onclick=`, ` onerror=`, ...)
+        /\son[a-z]+\s*=/i,
+        // dangerous URL schemes inside href/src/action/formaction
+        /(href|src|action|formaction)\s*=\s*["']?\s*javascript:/i,
+        /(href|src|action)\s*=\s*["']?\s*vbscript:/i,
+        /(href|src)\s*=\s*["']?\s*data:text\/html/i,
+        // CSS style-channel sinks (IE / Gecko legacy)
+        /expression\s*\(/i,
+        /behavior\s*:/i,
+        /-moz-binding/i,
+        // belt-and-suspenders bare scheme matches (no attribute context)
+        /\bjavascript:/i,
+        /\bvbscript:/i,
+        /\bdata:text\/html/i,
+        /\bdata:application\/javascript/i,
     ],
 );
 

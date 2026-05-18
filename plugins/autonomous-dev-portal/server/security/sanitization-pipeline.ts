@@ -100,7 +100,7 @@ function buildSecurityRenderer(config: SanitizationConfig): Renderer {
         // unchanged. Without a request-bound origin we treat every absolute
         // URL as external (defensive default).
         const titleAttr =
-            title !== null && title.length > 0
+            title !== null && title !== undefined && title.length > 0
                 ? ` title="${escapeAttr(title)}"`
                 : "";
         const isAbsolute = /^https?:\/\//i.test(safeUrl);
@@ -126,7 +126,7 @@ function buildSecurityRenderer(config: SanitizationConfig): Renderer {
                 return `<span class="blocked-image" title="Image exceeds size limit">${safeAlt}</span>`;
             }
             const titleAttr =
-                title !== null && title.length > 0
+                title !== null && title !== undefined && title.length > 0
                     ? ` title="${escapeAttr(title)}"`
                     : "";
             return `<img src="${escapeAttr(src)}" alt="${safeAlt}"${titleAttr} loading="lazy">`;
@@ -136,7 +136,7 @@ function buildSecurityRenderer(config: SanitizationConfig): Renderer {
             return `<span class="blocked-image" title="Blocked unsafe URL">${safeAlt}</span>`;
         }
         const titleAttr =
-            title !== null && title.length > 0
+            title !== null && title !== undefined && title.length > 0
                 ? ` title="${escapeAttr(title)}"`
                 : "";
         return `<img src="${escapeAttr(safeUrl)}" alt="${safeAlt}"${titleAttr} loading="lazy">`;
@@ -156,10 +156,18 @@ function buildSecurityRenderer(config: SanitizationConfig): Renderer {
     }) as Renderer["codespan"];
 
     renderer.html = ((html: string): string => {
-        // Reject ALL raw HTML in markdown — replace with an escaped placeholder.
-        // Even if marked is permissive in a future version, the user cannot
-        // smuggle HTML through.
-        return escapeHtml(html);
+        // Pass raw HTML *through* to DOMPurify rather than escaping it.
+        // DOMPurify will strip forbidden tags (<script>, <iframe>, ...),
+        // forbidden attributes (on*=, style=, ...), and unsafe URL schemes
+        // — and crucially, it will preserve legitimate inline tags like
+        // <span class="tok-keyword"> after the class allowlist hook runs.
+        //
+        // Escaping here would push the markup into a text-content channel
+        // where DOMPurify cannot inspect it as HTML, and where any later
+        // entity-decode (which DOMPurify does for non-required entities
+        // like `&#061;` and `&quot;`) would re-materialise the dangerous
+        // substrings. Trusting the sanitizer is the correct boundary.
+        return html;
     }) as Renderer["html"];
 
     return renderer;
@@ -201,7 +209,21 @@ function configurePurify(purify: DOMPurifyInstance, config: SanitizationConfig):
         SANITIZE_DOM: true,
         FORBID_TAGS: [...FORBIDDEN_TAGS],
         FORBID_ATTR: [...FORBIDDEN_ATTRIBUTES],
+        // KEEP_CONTENT must stay true so that DOMPurify preserves text
+        // inside non-allowlisted inline tags (e.g. <b>hello</b> → "hello").
+        // We use the per-tag FORBID_CONTENTS list below to drop content
+        // of executable / dangerous containers like <script> and <style>.
         KEEP_CONTENT: true,
+        FORBID_CONTENTS: [
+            "script",
+            "style",
+            "iframe",
+            "object",
+            "embed",
+            "svg",
+            "math",
+            "noscript",
+        ],
         FORCE_BODY: false,
         WHOLE_DOCUMENT: false,
         RETURN_DOM_FRAGMENT: false,
