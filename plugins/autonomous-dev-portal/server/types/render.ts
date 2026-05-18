@@ -53,6 +53,11 @@ export interface RepoSummary {
     /** When `true`, the repo card uses warn-line treatment instead of phase
      *  left bar. SPEC-036-1-03 AC #2. */
     attn?: boolean;
+    /** Absolute path to the repo on disk; populated from the operator's
+     *  allowlist when available. The card uses this for the path row so
+     *  the display matches the daemon's actual target instead of the
+     *  hardcoded `~/projects/{repo}` placeholder. */
+    path?: string;
 }
 
 // SPEC-036-1-06 §New types ---------------------------------------------------

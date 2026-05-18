@@ -8,7 +8,7 @@
 // for the Settings surface. This file is the read-side composition input.
 
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { userConfigPath } from "./state-paths";
 
@@ -91,14 +91,23 @@ function formatTrustLevel(level: number | string | undefined): string {
 }
 
 /**
- * Convert daemon allowlist (string[]) to portal format (AllowlistEntry[])
+ * Convert daemon allowlist (string[]) to portal format (AllowlistEntry[]).
+ *
+ * The repo `id` is derived from `basename(path)` so the dashboard renders
+ * real repo names (e.g. `autonomous-dev`) instead of synthetic `rep-NNN`
+ * placeholders. Collisions are disambiguated with a `-N` suffix; an empty
+ * basename falls back to the old synthetic pattern.
  */
 function formatAllowlist(paths: string[] | undefined): AllowlistEntry[] {
     if (!Array.isArray(paths)) return [];
-    return paths.map((path, index) => ({
-        id: `rep-${index.toString().padStart(3, '0')}`, // Generate stable IDs
-        path
-    }));
+    const seen = new Map<string, number>();
+    return paths.map((path, index) => {
+        const base = basename(path) || `rep-${index.toString().padStart(3, "0")}`;
+        const count = seen.get(base) ?? 0;
+        seen.set(base, count + 1);
+        const id = count === 0 ? base : `${base}-${count}`;
+        return { id, path };
+    });
 }
 
 export async function readPortalSettings(

@@ -50,7 +50,11 @@ export class FileLogsReader implements LogsReader {
     }
 
     private daemonLogPath(): string {
-        return join(stateDirRoot(), "daemon.log");
+        // The daemon writes to ~/.autonomous-dev/logs/daemon.log (note the
+        // `logs/` subdir). Without this, the reader falls through to the
+        // portal-audit fallback and surfaces stale portal-server lifecycle
+        // events instead of live daemon events.
+        return join(stateDirRoot(), "logs", "daemon.log");
     }
 
     private portalLogPath(): string {
