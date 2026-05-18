@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Marketplace auto-update: one-shot upgrade-helper launchd job.
+  Rendered by stage_upgrade() in supervisor-loop.sh just before the
+  supervisor exits. Because this is a SEPARATE launchd job from the
+  daemon (different Label), launchd does not reap it when the daemon
+  job's controlled process exits — it has its own lifecycle.
+
+  This is the fix for the 2026-05-18 v0.3.0 → v0.3.1 live-trial bug
+  where the previous `nohup ... &` + `disown` pattern was killed
+  along with the supervisor.
+
+  Lifecycle:
+    1. supervisor renders this template + bootstrap's the job
+    2. supervisor exits (KeepAlive.SuccessfulExit=false → no respawn)
+    3. launchd starts THIS job (RunAtLoad=true)
+    4. install-daemon.sh runs: bootouts old daemon job (already gone),
+       rewrites the daemon plist with the new version's PLUGIN_BIN_DIR,
+       bootstraps the new daemon job
+    5. THIS job exits 0; KeepAlive default is false → not respawned
+    6. New daemon takes over under the new version's code
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.autonomous-dev.daemon.upgrader</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{BASH_PATH}}</string>
+        <string>-c</string>
+        <string>'{{INSTALLER_PATH}}' --force</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>{{DAEMON_HOME}}/logs/upgrade-helper.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{DAEMON_HOME}}/logs/upgrade-helper.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{EXTRA_PATH_DIRS}}/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <key>HOME</key>
+        <string>{{USER_HOME}}</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

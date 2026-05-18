@@ -2941,39 +2941,133 @@ stage_upgrade() {
 
     log_info "daemon_upgrade_staging: from=${from_version} to=${to_version} installer=${installer} trial_deadline=${deadline}"
 
-    # KNOWN ISSUE (2026-05-18, first live trial of v0.3.0 → v0.3.1):
-    # The detached helper below does NOT survive on macOS — launchd
-    # appears to reap the entire job's process tree when the controlled
-    # process exits, regardless of nohup/disown. Evidence: the
-    # upgrade-helper.log file is created (the parent opens it for
-    # redirection) but stays 0 bytes; install-daemon.sh never emits
-    # any output.
+    # Spawn the upgrade helper as a SEPARATE OS-managed job (not a
+    # detached subshell). The 2026-05-18 v0.3.0 → v0.3.1 live trial
+    # established that `nohup ... &` + `disown` does NOT survive
+    # launchd's job reap on macOS — the subshell gets killed when the
+    # supervisor exits, before install-daemon.sh can run. A separate
+    # launchd job has its own lifecycle and survives our exit.
     #
-    # The detect-and-stage half of this mechanism still works — state
-    # files (.last-good-version, .upgrade-throttle, .upgrade-trial-
-    # pending) are correctly written, and check_upgrade_trial would
-    # correctly roll back if the new daemon failed to come up. But
-    # the new daemon never gets a chance to come up because the
-    # helper that's supposed to bootstrap it gets killed.
-    #
-    # Operator workaround until this is properly fixed: when you see
-    # `daemon_upgrade_staging` in the logs, manually run the installer:
-    #   $CACHE/<latest>/bin/install-daemon.sh --force
-    # That brings up the new daemon, which will read the still-present
-    # trial flag and enter probation as designed.
-    #
-    # Proper fix (deferred — TODO): bootstrap a separate ON-DEMAND
-    # launchd job that runs install-daemon, instead of trying to
-    # detach a subshell from the controlled job's process tree.
-    nohup bash -c "sleep 2 && '${installer}' --force" \
-        </dev/null \
-        >"${LOG_DIR}/upgrade-helper.log" 2>&1 &
-    disown $! 2>/dev/null || true
-    log_warn "daemon_upgrade_helper_unreliable: detached helper may be reaped by launchd. If new daemon doesn't come up within ~10s, run '${installer} --force' manually."
+    # Linux fallback uses systemd-run --user --no-block to register a
+    # transient unit; same idea, different supervisor.
+    if ! _spawn_upgrade_helper "${installer}"; then
+        log_error "daemon_upgrade_helper_spawn_failed: could not bootstrap upgrade helper. Aborting upgrade."
+        return 1
+    fi
 
     log_info "daemon_upgrade_exiting: exiting cleanly so launchd respawns under ${to_version}"
     # Mark shutdown so the main loop terminates after this iteration.
     SHUTDOWN_REQUESTED=true
+    return 0
+}
+
+# _spawn_upgrade_helper(installer_path) -> int
+#   Spawns the install-daemon.sh command as a SEPARATE OS-managed job
+#   so it survives the supervisor's exit. This is the fix for the
+#   2026-05-18 first-live-trial bug where nohup+disown didn't survive
+#   launchd's process-tree reap.
+#
+#   macOS: renders a one-shot launchd plist + bootstraps it
+#   Linux: uses systemd-run --user --no-block (transient unit)
+#   Other: falls back to the old nohup pattern (best-effort)
+_spawn_upgrade_helper() {
+    local installer="$1"
+    case "$(uname -s)" in
+        Darwin) _spawn_upgrade_helper_macos "${installer}" ;;
+        Linux)  _spawn_upgrade_helper_linux "${installer}" ;;
+        *)      _spawn_upgrade_helper_fallback "${installer}" ;;
+    esac
+}
+
+_spawn_upgrade_helper_macos() {
+    local installer="$1"
+    local upgrader_label="com.autonomous-dev.daemon.upgrader"
+    local upgrader_plist="${HOME}/Library/LaunchAgents/${upgrader_label}.plist"
+    local template="${PLUGIN_DIR}/templates/com.autonomous-dev.daemon.upgrader.plist.template"
+
+    if [[ ! -f "${template}" ]]; then
+        log_warn "_spawn_upgrade_helper_macos: template missing at ${template}; falling back to nohup"
+        _spawn_upgrade_helper_fallback "${installer}"
+        return $?
+    fi
+
+    # Find a usable bash 4+ — same logic as install-daemon.sh's resolve_paths
+    local bash_path=""
+    local candidate version
+    for candidate in /opt/homebrew/bin/bash /usr/local/bin/bash /usr/bin/bash /bin/bash; do
+        if [[ -x "${candidate}" ]]; then
+            version=$("${candidate}" -c 'echo ${BASH_VERSINFO[0]}' 2>/dev/null || echo "0")
+            if [[ ${version} -ge 4 ]]; then
+                bash_path="${candidate}"
+                break
+            fi
+        fi
+    done
+    # macOS system bash is 3.2; if no 4+ is on disk we still need a bash to
+    # run the installer. Use /bin/bash as a last resort — install-daemon.sh
+    # itself uses bash 3.2-safe idioms.
+    [[ -z "${bash_path}" ]] && bash_path="/bin/bash"
+
+    # Render the upgrader plist
+    sed \
+        -e "s|{{BASH_PATH}}|${bash_path}|g" \
+        -e "s|{{INSTALLER_PATH}}|${installer}|g" \
+        -e "s|{{DAEMON_HOME}}|${DAEMON_HOME}|g" \
+        -e "s|{{USER_HOME}}|${HOME}|g" \
+        -e "s|{{EXTRA_PATH_DIRS}}||g" \
+        "${template}" > "${upgrader_plist}"
+
+    if ! plutil -lint "${upgrader_plist}" >/dev/null 2>&1; then
+        log_warn "_spawn_upgrade_helper_macos: rendered plist failed plutil -lint; falling back to nohup"
+        rm -f "${upgrader_plist}"
+        _spawn_upgrade_helper_fallback "${installer}"
+        return $?
+    fi
+
+    # If a previous upgrader is still loaded (shouldn't be — they're
+    # one-shot — but defend), bootout first.
+    if launchctl print "gui/$(id -u)/${upgrader_label}" >/dev/null 2>&1; then
+        launchctl bootout "gui/$(id -u)/${upgrader_label}" 2>/dev/null || true
+    fi
+
+    # Bootstrap — RunAtLoad=true in the template means it starts immediately
+    if ! launchctl bootstrap "gui/$(id -u)" "${upgrader_plist}" 2>/dev/null; then
+        log_warn "_spawn_upgrade_helper_macos: launchctl bootstrap failed; falling back to nohup"
+        _spawn_upgrade_helper_fallback "${installer}"
+        return $?
+    fi
+
+    log_info "daemon_upgrade_helper_launched: macos/launchd label=${upgrader_label} installer=${installer}"
+    return 0
+}
+
+_spawn_upgrade_helper_linux() {
+    local installer="$1"
+    if ! command -v systemd-run >/dev/null 2>&1; then
+        _spawn_upgrade_helper_fallback "${installer}"
+        return $?
+    fi
+    if systemd-run --user --no-block \
+        --unit="autonomous-dev-upgrader-$(date +%s)" \
+        --description="autonomous-dev daemon self-upgrade helper" \
+        bash -c "'${installer}' --force" \
+        >/dev/null 2>&1
+    then
+        log_info "daemon_upgrade_helper_launched: linux/systemd-run installer=${installer}"
+        return 0
+    fi
+    _spawn_upgrade_helper_fallback "${installer}"
+}
+
+_spawn_upgrade_helper_fallback() {
+    local installer="$1"
+    # Best-effort detached spawn — known to be unreliable on macOS but
+    # the only option when launchctl/systemd-run aren't available.
+    nohup bash -c "sleep 2 && '${installer}' --force" \
+        </dev/null \
+        >"${LOG_DIR}/upgrade-helper.log" 2>&1 &
+    disown $! 2>/dev/null || true
+    log_warn "daemon_upgrade_helper_launched_fallback: using nohup detach (may be reaped by parent). If new daemon doesn't come up within ~10s, run '${installer} --force' manually."
     return 0
 }
 

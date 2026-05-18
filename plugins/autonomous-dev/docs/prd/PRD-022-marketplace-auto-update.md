@@ -108,13 +108,50 @@ The operator's direct words: *"I also think we should have a way to update the d
 
 ---
 
-## 8. Known issues (added 2026-05-18 after first live trial)
+## 8. First live trial (2026-05-18) + fix in PR #314
 
-The detect-and-stage half of the mechanism works as designed. The
-handoff from old daemon → install-daemon → new daemon **does not** —
-launchd appears to reap the supervisor's entire process tree when
-the controlled process exits, killing the detached helper before it
-can run.
+The 2026-05-18 v0.3.0 → v0.3.1 first live trial revealed that the
+original `nohup ... &` + `disown` handoff did NOT survive launchd's
+reap of the supervisor's process tree on macOS. Evidence:
+`upgrade-helper.log` was created (the parent opened it for redirection)
+but stayed 0 bytes; `install-daemon.sh` never emitted any output.
+
+All three logs (`daemon_upgrade_available` → `daemon_upgrade_staging`
+→ `daemon_upgrade_exiting`) appeared correctly. State files were
+written. The detect/stage/rollback machinery was all sound — only the
+final handoff step (spawning install-daemon) was broken.
+
+### Fix (PR #314)
+
+Replaced the detached subshell with an OS-aware spawn that uses the
+platform's service manager to register a SEPARATE one-shot job:
+
+| OS      | Mechanism                                                |
+|---------|----------------------------------------------------------|
+| macOS   | Render upgrader plist → `launchctl bootstrap` a separate |
+|         | `com.autonomous-dev.daemon.upgrader` job. The new job has |
+|         | its own Label and lifecycle — launchd doesn't reap it    |
+|         | when the daemon's controlled process exits.              |
+| Linux   | `systemd-run --user --no-block` registers a transient    |
+|         | unit — same idea, different supervisor.                  |
+| Other   | Falls back to the original nohup pattern (best-effort).  |
+
+Each path also falls back to nohup if its primary mechanism fails
+(template missing, plutil rejects, launchctl/systemd-run unavailable).
+The fallback logs `daemon_upgrade_helper_launched_fallback` so
+operators see the reliability degradation in `/logs`.
+
+### Verification
+
+Live trial of the fix will fire on the next release after v0.3.1.
+Bats coverage:
+
+- `tests/bats/spawn_upgrade_helper.bats` (9 tests) — macOS plist
+  rendering, leftover-bootout defense, launchctl-fails fallback,
+  plutil-fails fallback, Linux systemd-run invocation, no-systemd
+  fallback, dispatcher OS routing (Darwin/Linux/other).
+
+### Historical note (pre-fix behavior)
 
 - **What works:** check_upgrade_available, log de-dup, all three
   stage_upgrade gates, all state-file writes (`.last-good-version`,
