@@ -5,28 +5,5 @@
   "author": {
     "name": "pwatsonr",
     "url": "https://github.com/pwatsonr"
-  },
-  "extends": [
-    "autonomous-dev"
-  ],
-  "deployment_backend": {
-    "name": "azure",
-    "regions_supported": [
-      "eastus",
-      "eastus2",
-      "westus",
-      "westus2",
-      "westus3",
-      "northeurope",
-      "westeurope",
-      "japaneast",
-      "southeastasia"
-    ],
-    "services_supported": [
-      "container-apps",
-      "acr",
-      "front-door"
-    ],
-    "credential_provider": "credential-proxy"
   }
 }
