@@ -75,3 +75,58 @@ export function cspMiddleware(config: CSPConfig): MiddlewareHandler {
         await next();
     };
 }
+
+/**
+ * PLAN-041 §Follow-ups F-041-01 — strict CSP variant emitted as a SECOND
+ * `Content-Security-Policy-Report-Only` header alongside the primary
+ * {@link cspMiddleware} output. Purpose: surface (but do not block)
+ * inline-style violations the lenient baseline still permits, so the
+ * operator can iterate on the last known offenders (notably the
+ * `/design-system` route) without breaking the running app.
+ *
+ * Contract:
+ *   - Always emits to `Content-Security-Policy-Report-Only` (NEVER the
+ *     enforcing variant — flipping to enforce is an operator decision
+ *     made after the violation reports are clean).
+ *   - Reuses the per-request nonce set by {@link cspMiddleware} via
+ *     `c.get('cspNonce')`. Falls back to its own nonce if the primary
+ *     middleware did not run (defensive; the chain wires both).
+ *   - Must run AFTER {@link cspMiddleware} so the nonce is available.
+ *
+ * TODO(F-041-XX, follow-up to F-041-01): once the design-system route
+ * and any other inline-style call sites are migrated, retire
+ * {@link defaultCSPConfig}'s `allowUnsafeInlineStyles: true` default and
+ * fold this strict header into the primary CSP — delete this middleware
+ * factory at that point. Tracking issue belongs in the follow-up to
+ * F-041-01 (see PLAN-041 §Follow-ups).
+ */
+export function strictCspReportOnlyMiddleware(
+    config: CSPConfig,
+): MiddlewareHandler {
+    // Guard: this middleware exists specifically to surface violations
+    // without blocking. If a caller passes an enforcing config we
+    // deliberately downgrade rather than silently enforce.
+    const reportOnlyConfig: CSPConfig = config.reportOnly
+        ? config
+        : { ...config, reportOnly: true };
+    return async (c, next) => {
+        // Reuse the primary CSP middleware's nonce when available so the
+        // strict policy validates against the SAME inline scripts the
+        // browser is being asked to load.
+        let nonce = c.get("cspNonce") as string | undefined;
+        if (nonce === undefined || nonce.length === 0) {
+            nonce = reportOnlyConfig.enableNonce ? generateNonce() : "";
+            c.set("cspNonce", nonce);
+        }
+        const header = buildCSPHeader(reportOnlyConfig, nonce);
+        // append:true — when the primary CSP middleware is ALSO emitting
+        // a report-only header (development default), both policies are
+        // sent and the browser ANDs them per W3C CSP §3.2.2. In production
+        // the primary header is `Content-Security-Policy` (enforcing), so
+        // there is no collision and append is a no-op.
+        c.header("Content-Security-Policy-Report-Only", header, {
+            append: true,
+        });
+        await next();
+    };
+}

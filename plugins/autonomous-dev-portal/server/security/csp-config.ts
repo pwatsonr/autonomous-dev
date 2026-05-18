@@ -110,6 +110,33 @@ export function defaultCSPConfig(env: CSPEnvironment): CSPConfig {
 }
 
 /**
+ * PLAN-041 §Follow-ups F-041-01 — "tight" CSP variant used for
+ * report-only telemetry alongside the lenient (`defaultCSPConfig`)
+ * baseline. It drops `'unsafe-inline'` from `style-src` so violations
+ * surface in browser CSP reports; once the design-system route (the last
+ * known offender — uses many `style="..."` attributes) is migrated to
+ * external stylesheets or nonced `<style>` blocks, an operator can flip
+ * this config's `reportOnly` to `false` and retire the lenient baseline.
+ *
+ * Always returns `reportOnly: true`; the flip-to-enforce decision is
+ * deliberately out of code's reach.
+ *
+ * Threat-model note (PRD-023): the portal binds to loopback by default;
+ * the strict report-only header is defense-in-depth for the rare
+ * misconfigured non-loopback bind.
+ */
+export function strictReportOnlyCSPConfig(env: CSPEnvironment): CSPConfig {
+    return {
+        environment: env,
+        reportOnly: true,
+        enableNonce: true,
+        allowUnsafeInlineStyles: false,
+        reportUri: undefined,
+        customDirectives: undefined,
+    };
+}
+
+/**
  * Deep-clone a directives map. The base maps are frozen at module scope; we
  * MUST clone before mutating to avoid trampling other requests on the same
  * process.
@@ -164,6 +191,21 @@ export function buildDirectives(
         directives["style-src"] = directives["style-src"].filter(
             (s) => s !== "'unsafe-inline'",
         );
+        // PLAN-041 §Follow-ups F-041-01 — when `'unsafe-inline'` is
+        // dropped, attach the per-request nonce to `style-src` so
+        // nonce-bearing `<style nonce="...">` blocks (and inline `style`
+        // attributes via CSS-Hash-Source in a future migration) keep
+        // rendering under the tight policy. The lenient baseline does
+        // NOT take this branch — it keeps `'unsafe-inline'` and skips
+        // the nonce attachment, preserving CSP3 §6.6.3 semantics
+        // (browsers ignore `'unsafe-inline'` whenever a nonce-source is
+        // also present, which would otherwise tighten dev unexpectedly).
+        if (config.enableNonce && nonce !== null && nonce.length > 0) {
+            directives["style-src"] = [
+                ...directives["style-src"],
+                `'nonce-${nonce}'`,
+            ];
+        }
     }
 
     const overrides = config.customDirectives;
