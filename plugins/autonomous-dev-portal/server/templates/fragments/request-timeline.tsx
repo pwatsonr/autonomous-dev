@@ -43,7 +43,7 @@ const TimelineActions: FC<{ requestId: string; phase: Phase }> = ({
     // already complete (SPEC-037-7-04 AC-2). `failed` + `pending` qualify.
     const showSkip =
         phase.status !== "in-progress" && phase.status !== "complete";
-    if (!showCancel && !showRetry && !showSkip) return null;
+    if (!showCancel && !showRetry && !showSkip) return <></>;
     const endpoint = `/api/requests/${requestId}/action`;
     return (
         <div class="actions">

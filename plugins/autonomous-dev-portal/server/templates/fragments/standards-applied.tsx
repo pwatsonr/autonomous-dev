@@ -28,7 +28,7 @@ function normalizeSeverity(value: string): Severity {
 }
 
 export const StandardsApplied: FC<Props> = ({ rules }) => {
-    if (rules.length === 0) return null;
+    if (rules.length === 0) return <></>;
     return (
         <section class="sec standards-applied">
             <div class="sec-head">
