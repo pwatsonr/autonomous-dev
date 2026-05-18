@@ -27,6 +27,11 @@ import { connectionCounter } from "../lib/connection-tracker";
 import { getOAuthExtension } from "../lib/oauth-extension";
 import { cspMiddleware } from "../security/csp-middleware";
 import { defaultCSPConfig, type CSPEnvironment } from "../security/csp-config";
+import {
+    buildPortalCsrf,
+    portalCsrfEnforcer,
+    portalCsrfIssuer,
+} from "../security/csrf-wiring";
 import { securityHeaders } from "../security/security-headers";
 import { compression } from "./compression";
 import { errorHandler } from "./error-handler";
@@ -79,6 +84,19 @@ export function applyMiddlewareChain(app: Hono, config: PortalConfig): void {
     if (oauth !== null && config.oauth !== undefined) {
         oauth.attach(app, config.oauth);
     }
+
+    // CSRF wiring — see `security/csrf-wiring.ts`. The issuer runs on every
+    // request; it short-circuits on non-GET so only safe-method responses
+    // refresh the token cookie. The enforcer guards every state-mutating
+    // method (POST/PUT/DELETE/PATCH); GETs pass straight through. Both
+    // honor PORTAL_TEST_MODE + `X-Cypress-Test: 1` as a bypass.
+    //
+    // Mounted AFTER cors/oauth so the CORS preflight + OAuth callback
+    // routes (excluded via `/auth` prefix in the CSRF default config) are
+    // not double-processed.
+    const csrf = buildPortalCsrf(config);
+    app.use("*", portalCsrfIssuer(csrf));
+    app.use("*", portalCsrfEnforcer(csrf));
 
     // SPEC-013-4-01: compression wraps every response (incl. static
     // assets). Must come BEFORE the error boundary so error bodies are

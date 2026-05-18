@@ -156,7 +156,12 @@ describe('Error States (FR-021-09)', () => {
                 method: 'POST',
                 url: '/api/agents/nonexistent/promote',
                 failOnStatusCode: false,
-                body: {}
+                body: {},
+                // CSRF middleware is now wired (see fix/portal-csrf-middleware-wiring).
+                // This raw POST has no token, so request the documented test bypass.
+                headers: {
+                    'X-Cypress-Test': '1',
+                },
             }).then((response) => {
                 // The server might return 400 for malformed requests or 404 for missing routes
                 // Both are acceptable for non-existent endpoints
