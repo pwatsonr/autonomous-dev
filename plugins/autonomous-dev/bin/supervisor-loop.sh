@@ -2941,15 +2941,35 @@ stage_upgrade() {
 
     log_info "daemon_upgrade_staging: from=${from_version} to=${to_version} installer=${installer} trial_deadline=${deadline}"
 
-    # Spawn detached helper. The helper sleeps a couple of seconds so
-    # that the parent (us) has time to exit cleanly before launchctl
-    # bootouts the daemon job. nohup + disown means it survives our
-    # exit; >/dev/null silences output to the launchd stdout/stderr
-    # files which the new install will inherit.
+    # KNOWN ISSUE (2026-05-18, first live trial of v0.3.0 → v0.3.1):
+    # The detached helper below does NOT survive on macOS — launchd
+    # appears to reap the entire job's process tree when the controlled
+    # process exits, regardless of nohup/disown. Evidence: the
+    # upgrade-helper.log file is created (the parent opens it for
+    # redirection) but stays 0 bytes; install-daemon.sh never emits
+    # any output.
+    #
+    # The detect-and-stage half of this mechanism still works — state
+    # files (.last-good-version, .upgrade-throttle, .upgrade-trial-
+    # pending) are correctly written, and check_upgrade_trial would
+    # correctly roll back if the new daemon failed to come up. But
+    # the new daemon never gets a chance to come up because the
+    # helper that's supposed to bootstrap it gets killed.
+    #
+    # Operator workaround until this is properly fixed: when you see
+    # `daemon_upgrade_staging` in the logs, manually run the installer:
+    #   $CACHE/<latest>/bin/install-daemon.sh --force
+    # That brings up the new daemon, which will read the still-present
+    # trial flag and enter probation as designed.
+    #
+    # Proper fix (deferred — TODO): bootstrap a separate ON-DEMAND
+    # launchd job that runs install-daemon, instead of trying to
+    # detach a subshell from the controlled job's process tree.
     nohup bash -c "sleep 2 && '${installer}' --force" \
         </dev/null \
         >"${LOG_DIR}/upgrade-helper.log" 2>&1 &
     disown $! 2>/dev/null || true
+    log_warn "daemon_upgrade_helper_unreliable: detached helper may be reaped by launchd. If new daemon doesn't come up within ~10s, run '${installer} --force' manually."
 
     log_info "daemon_upgrade_exiting: exiting cleanly so launchd respawns under ${to_version}"
     # Mark shutdown so the main loop terminates after this iteration.
