@@ -304,6 +304,69 @@ function configurePurify(purify: DOMPurifyInstance, config: SanitizationConfig):
     });
 }
 
+/**
+ * Decode HTML numeric and named entities into their literal characters.
+ *
+ * Defense against encoding-bypass payloads like
+ *   `<a href="&#106;avascript:alert(1)">x</a>` — the encoded `j` becomes
+ *   `javascript:` after browser parsing.
+ *
+ * We run this BEFORE the post-sanitization forbidden-pattern scan so the
+ * scan sees the post-decode string and refuses smuggled payloads.
+ *
+ * Named-entity coverage is intentionally limited to the ones an attacker
+ * is likely to weaponise; the goal is to surface a forbidden substring,
+ * not to round-trip arbitrary content.
+ */
+const NAMED_ENTITIES: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'",
+    colon: ":",
+    sol: "/",
+    equals: "=",
+    lpar: "(",
+    rpar: ")",
+    grave: "`",
+    Tab: "\t",
+    NewLine: "\n",
+};
+
+function decodeEntities(s: string): string {
+    return s
+        // hex numeric: &#x3c; or &#X3C;
+        .replace(/&#x([0-9a-f]+);?/gi, (_m, hex: string) => {
+            const code = parseInt(hex, 16);
+            if (Number.isFinite(code) && code > 0 && code < 0x110000) {
+                try {
+                    return String.fromCodePoint(code);
+                } catch {
+                    return "";
+                }
+            }
+            return "";
+        })
+        // decimal numeric: &#60; or &#0000060;
+        .replace(/&#([0-9]+);?/g, (_m, dec: string) => {
+            const code = parseInt(dec, 10);
+            if (Number.isFinite(code) && code > 0 && code < 0x110000) {
+                try {
+                    return String.fromCodePoint(code);
+                } catch {
+                    return "";
+                }
+            }
+            return "";
+        })
+        // named entities (limited allowlist)
+        .replace(/&([a-zA-Z]+);/g, (m, name: string) => {
+            const decoded = NAMED_ENTITIES[name];
+            return decoded !== undefined ? decoded : m;
+        });
+}
+
 const TAG_RE = /<([a-z][a-z0-9-]*)\b/gi;
 function extractTags(html: string): string[] {
     const out: string[] = [];
@@ -404,13 +467,47 @@ export class MarkdownSanitizationPipeline {
         configurePurify(purify, this.config);
         const sanitized = purify.sanitize(rendered);
 
-        // Post-sanitization defensive scan.
+        // Post-sanitization defensive scan against the patterns mirrored
+        // from xss-payload-tests.spec.ts.
         for (const re of POST_SANITIZATION_BAD_PATTERNS) {
             if (re.test(sanitized)) {
                 const refusal: SanitizationResult = {
                     sanitized: "",
                     warnings: ["post-sanitization-unsafe-pattern"],
                     blocked: ["script-content"],
+                    safe: false,
+                };
+                if (this.config.enableCaching) this.cache.set(cacheKey, refusal);
+                return refusal;
+            }
+        }
+
+        // Additional defense-in-depth: check ATTRIBUTE-CONTEXT URL schemes
+        // against a once-and-twice-decoded view of the output. This catches
+        // encoding-bypass payloads like `<a href="&#106;avascript:..."` where
+        // a browser-side entity decode would re-materialise `javascript:`,
+        // while NOT refusing legitimate code blocks containing `&lt;script&gt;`
+        // (which decode to `<script>` but appear only in text-content channels
+        // that the browser will not re-parse as markup).
+        //
+        // We restrict the decoded-view scan to URL-scheme patterns because
+        // those are the only ones that remain dangerous after browser
+        // entity-decoding inside an attribute value. Tag/event-handler
+        // patterns are already caught by the main scan above on the raw
+        // sanitized output.
+        const URL_SCHEME_PATTERNS: RegExp[] = [
+            /(href|src|action|formaction)\s*=\s*["']?\s*javascript:/i,
+            /(href|src|action)\s*=\s*["']?\s*vbscript:/i,
+            /(href|src)\s*=\s*["']?\s*data:text\/html/i,
+        ];
+        const decodedOnce = decodeEntities(sanitized);
+        const decodedTwice = decodeEntities(decodedOnce);
+        for (const re of URL_SCHEME_PATTERNS) {
+            if (re.test(decodedOnce) || re.test(decodedTwice)) {
+                const refusal: SanitizationResult = {
+                    sanitized: "",
+                    warnings: ["post-sanitization-encoded-url-scheme"],
+                    blocked: ["unsafe-url-scheme"],
                     safe: false,
                 };
                 if (this.config.enableCaching) this.cache.set(cacheKey, refusal);
