@@ -17,6 +17,52 @@ import { PortalError } from "../middleware/error-handler";
 import { isOAuthExtensionRegistered } from "./oauth-extension";
 import type { PortalConfig } from "./config";
 
+// PLAN-041 §Follow-ups F-041-05 — Hostnames treated as loopback. Anything
+// outside this set requires an explicit acknowledgement (config flag or
+// PORTAL_PUBLIC_BIND=1) before the listening socket may open.
+const LOOPBACK_HOSTNAMES: ReadonlySet<string> = new Set([
+    "127.0.0.1",
+    "::1",
+    "localhost",
+]);
+
+function isLoopbackHostname(hostname: string): boolean {
+    return LOOPBACK_HOSTNAMES.has(hostname);
+}
+
+/**
+ * PLAN-041 §Follow-ups F-041-05 — Refuse-to-start guardrail.
+ *
+ * If the resolved bind hostname is NOT a loopback address and the operator
+ * has not explicitly acknowledged the public bind (via the
+ * `public_bind_acknowledged` config flag OR the `PORTAL_PUBLIC_BIND=1`
+ * environment variable), throw a PortalError so startup aborts BEFORE the
+ * listening socket opens. `0.0.0.0` and a specific public IP are gated
+ * identically — both require the ack.
+ *
+ * The throw is caught by `startServer().catch()` in server.ts and logged
+ * as a structured `startup_failed` line with this error's code/message,
+ * so operators see the override instructions in the message body.
+ */
+export function enforcePublicBindAcknowledgement(
+    hostname: string,
+    config: PortalConfig,
+    env: NodeJS.ProcessEnv = process.env,
+): void {
+    if (isLoopbackHostname(hostname)) return;
+    const envAck = env["PORTAL_PUBLIC_BIND"] === "1";
+    const configAck = config.public_bind_acknowledged === true;
+    if (envAck || configAck) return;
+    throw new PortalError(
+        "PUBLIC_BIND_NOT_ACKNOWLEDGED",
+        `Portal refused to start: bind hostname is "${hostname}" (non-loopback) but ` +
+            "public_bind_acknowledged is false. Set PORTAL_PUBLIC_BIND=1 (or " +
+            ".public_bind_acknowledged: true in config) to explicitly authorize " +
+            "exposing the portal to the network.",
+        500,
+    );
+}
+
 export function resolveBindHostname(config: PortalConfig): string {
     if (config.auth_mode === "localhost") return "127.0.0.1";
     if (config.auth_mode === "tailscale") {
@@ -97,8 +143,15 @@ export async function validateBindingConfig(
         );
     }
 
-    // 5. Port-availability probe.
-    await checkPortAvailability(config.port, resolveBindHostname(config));
+    // 5. PLAN-041 F-041-05 — public-bind guardrail. Resolve the hostname
+    //    once and refuse non-loopback binds unless the operator opted in.
+    //    Runs BEFORE checkPortAvailability so the probe socket never opens
+    //    on a public interface without acknowledgement.
+    const hostname = resolveBindHostname(config);
+    enforcePublicBindAcknowledgement(hostname, config);
+
+    // 6. Port-availability probe.
+    await checkPortAvailability(config.port, hostname);
 }
 
 function resolveTailscaleAddress(): string {

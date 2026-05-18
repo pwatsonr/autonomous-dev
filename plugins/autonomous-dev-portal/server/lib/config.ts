@@ -84,6 +84,15 @@ export interface PortalConfig {
     tls?: TlsConfig;
     /** SPEC-014-1-01 §Task 1.5 — gates X-Forwarded-For trust. Default: false. */
     trusted_reverse_proxy?: boolean;
+    /**
+     * PLAN-041 §Follow-ups F-041-05 — Explicit operator acknowledgement
+     * required when the resolved bind hostname is NOT a loopback address.
+     * The env var `PORTAL_PUBLIC_BIND=1` also satisfies this gate.
+     * Default: false. The guardrail lives in
+     * {@link validateBindingConfig} and fires BEFORE the listening socket
+     * opens.
+     */
+    public_bind_acknowledged?: boolean;
 }
 
 interface DefaultsShape {
