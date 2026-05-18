@@ -108,12 +108,49 @@ The operator's direct words: *"I also think we should have a way to update the d
 
 ---
 
-## 8. References
+## 8. Known issues (added 2026-05-18 after first live trial)
+
+The detect-and-stage half of the mechanism works as designed. The
+handoff from old daemon → install-daemon → new daemon **does not** —
+launchd appears to reap the supervisor's entire process tree when
+the controlled process exits, killing the detached helper before it
+can run.
+
+- **What works:** check_upgrade_available, log de-dup, all three
+  stage_upgrade gates, all state-file writes (`.last-good-version`,
+  `.upgrade-throttle`, `.upgrade-trial-pending`), check_upgrade_trial
+  startup logic, clear_upgrade_trial_if_probation_passed.
+- **What's broken:** the `nohup ... &` + `disown` pattern in
+  `stage_upgrade()`. The detached subshell gets killed when the
+  supervisor exits, so install-daemon.sh never runs. Plist is not
+  rewritten; new daemon does not come up.
+- **First live trial:** 2026-05-18, v0.3.0 → v0.3.1 (this release).
+  Symptom: `upgrade-helper.log` is created but stays 0 bytes. All
+  three log lines (`daemon_upgrade_available` → `daemon_upgrade_staging`
+  → `daemon_upgrade_exiting`) appeared correctly; the helper just
+  never ran.
+- **Operator workaround:** when you see `daemon_upgrade_staging` in
+  `/logs`, manually run:
+  ```
+  ~/.claude/plugins/cache/autonomous-dev/autonomous-dev/<latest>/bin/install-daemon.sh --force
+  ```
+  That brings up the new daemon, which reads the still-present trial
+  flag and enters probation as designed (clears flag after 5
+  healthy iterations).
+- **Proper fix (deferred):** instead of detaching a subshell from the
+  controlled job's process tree, register a SEPARATE one-shot launchd
+  job that runs install-daemon. That job is outside our daemon's
+  lifecycle and survives our exit. Tracked as a follow-up.
+
+---
+
+## 9. References
 
 - **Implementation PRs:**
   - PR #300 — Phase 1: detect & log (`bin/lib/version-helpers.sh`, `check_upgrade_available`)
   - PR #301 — Phase 2: stage_upgrade on idle (`stage_upgrade`, `upgrade_throttled`)
   - PR #302 — Phase 3: trial-flag rollback (`check_upgrade_trial`, `clear_upgrade_trial_if_probation_passed`)
+  - PR #313 — Known-issue note added after first live trial (this section)
 - **Companion docs:**
   - TDD-039 — design + module breakdown
   - PLAN-040 — task list (retroactive)
