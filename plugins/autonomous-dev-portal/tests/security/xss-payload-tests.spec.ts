@@ -119,8 +119,16 @@ describe("legitimate content survives sanitization", () => {
         const payload = legit[i] as string;
         test(`payload[${i}] preserves at least one visible word`, () => {
             const result = sanitizeMarkdown(payload);
-            const visibleSanitized = result.sanitized
-                .replace(/<[^>]*>/g, "")
+            // "Visible" includes attribute content too — image alt text,
+            // link titles, etc. live in attributes, not text nodes, so
+            // tag-stripping alone discards them. Pull attribute values
+            // out as well before checking survival.
+            const attrText = [...result.sanitized.matchAll(/\s(?:alt|title|aria-label)="([^"]+)"/g)]
+                .map((m) => m[1])
+                .join(" ");
+            const visibleSanitized = (
+                result.sanitized.replace(/<[^>]*>/g, "") + " " + attrText
+            )
                 .replace(/&amp;/g, "&")
                 .replace(/&lt;/g, "<")
                 .replace(/&gt;/g, ">")
@@ -129,7 +137,12 @@ describe("legitimate content survives sanitization", () => {
                 .replace(/\s+/g, " ")
                 .trim();
             const inputWords = payload
-                .replace(/[*_`#>[\]()!-]/g, "")
+                // Strip markdown syntactic chars AND quote/colon/slash
+                // characters so words like `"Company` and `Logo"`
+                // (from image-alt-text payloads) reduce to `Company`
+                // and `Logo` — otherwise they don't substring-match
+                // the visible attribute content.
+                .replace(/[*_`#>[\]()!\-"':\/]/g, " ")
                 .split(/\s+/)
                 .filter((w) => w.length > 2);
             const survived = inputWords.some((w) => visibleSanitized.includes(w));

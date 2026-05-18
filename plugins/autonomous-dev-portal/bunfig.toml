@@ -1,0 +1,11 @@
+# bun test configuration for the portal.
+#
+# The visual-regression specs (tests/visual-regression/*.spec.ts) target
+# Playwright, not bun. Without exclusion bun picks them up by `.spec.ts`
+# suffix and errors with `Cannot find module '@playwright/test'`. The
+# Playwright suite is run separately via the `test:visual` script.
+
+[test]
+testPathIgnorePatterns = [
+    "tests/visual-regression/",
+]
