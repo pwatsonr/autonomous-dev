@@ -25,8 +25,15 @@ import type { Hono } from "hono";
 import type { PortalConfig } from "../lib/config";
 import { connectionCounter } from "../lib/connection-tracker";
 import { getOAuthExtension } from "../lib/oauth-extension";
-import { cspMiddleware } from "../security/csp-middleware";
-import { defaultCSPConfig, type CSPEnvironment } from "../security/csp-config";
+import {
+    cspMiddleware,
+    strictCspReportOnlyMiddleware,
+} from "../security/csp-middleware";
+import {
+    defaultCSPConfig,
+    strictReportOnlyCSPConfig,
+    type CSPEnvironment,
+} from "../security/csp-config";
 import {
     buildPortalCsrf,
     portalCsrfEnforcer,
@@ -53,10 +60,20 @@ export function applyMiddlewareChain(app: Hono, config: PortalConfig): void {
     app.use("*", structuredLogger(config.logging.level)); // 2. access logs
     app.use("*", timingMiddleware()); // 3. Server-Timing
     app.use("*", securityHeaders()); // 4. HSTS / X-Frame-Options / etc. (SPEC-014-2-04)
+    const cspEnv = resolveCspEnvironment();
+    app.use("*", cspMiddleware(defaultCSPConfig(cspEnv))); // 5. CSP w/ per-request nonce (SPEC-014-2-04)
+    // 5b. PLAN-041 §Follow-ups F-041-01 — strict report-only CSP emitted
+    //     alongside the lenient baseline. Drops `'unsafe-inline'` from
+    //     `style-src` so the operator can iterate on the last remaining
+    //     inline-style call sites (notably `/design-system`) without
+    //     blocking traffic. MUST run AFTER `cspMiddleware` so the strict
+    //     header reuses the same per-request nonce templates already
+    //     stamped into `<script>` tags. Retire when style migration is
+    //     complete and fold into `defaultCSPConfig`.
     app.use(
         "*",
-        cspMiddleware(defaultCSPConfig(resolveCspEnvironment())),
-    ); // 5. CSP w/ per-request nonce (SPEC-014-2-04)
+        strictCspReportOnlyMiddleware(strictReportOnlyCSPConfig(cspEnv)),
+    );
     app.use(
         "*",
         cors({
