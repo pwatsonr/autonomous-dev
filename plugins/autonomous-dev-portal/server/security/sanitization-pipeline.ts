@@ -48,7 +48,12 @@ export interface SanitizationResult {
 type DOMPurifyHookEvent = "uponSanitizeAttribute" | "uponSanitizeElement";
 type DOMPurifyHookCallback = (
     node: Element,
-    data: { attrName?: string; attrValue?: string; allowedAttributes?: Record<string, boolean> },
+    data: {
+        attrName?: string;
+        attrValue?: string;
+        allowedAttributes?: Record<string, boolean>;
+        tagName?: string;
+    },
 ) => void;
 interface DOMPurifyInstance {
     sanitize: (input: string, config?: Record<string, unknown>) => string;
@@ -95,7 +100,7 @@ function buildSecurityRenderer(config: SanitizationConfig): Renderer {
         // unchanged. Without a request-bound origin we treat every absolute
         // URL as external (defensive default).
         const titleAttr =
-            title !== null && title.length > 0
+            title !== null && title !== undefined && title.length > 0
                 ? ` title="${escapeAttr(title)}"`
                 : "";
         const isAbsolute = /^https?:\/\//i.test(safeUrl);
@@ -121,7 +126,7 @@ function buildSecurityRenderer(config: SanitizationConfig): Renderer {
                 return `<span class="blocked-image" title="Image exceeds size limit">${safeAlt}</span>`;
             }
             const titleAttr =
-                title !== null && title.length > 0
+                title !== null && title !== undefined && title.length > 0
                     ? ` title="${escapeAttr(title)}"`
                     : "";
             return `<img src="${escapeAttr(src)}" alt="${safeAlt}"${titleAttr} loading="lazy">`;
@@ -131,7 +136,7 @@ function buildSecurityRenderer(config: SanitizationConfig): Renderer {
             return `<span class="blocked-image" title="Blocked unsafe URL">${safeAlt}</span>`;
         }
         const titleAttr =
-            title !== null && title.length > 0
+            title !== null && title !== undefined && title.length > 0
                 ? ` title="${escapeAttr(title)}"`
                 : "";
         return `<img src="${escapeAttr(safeUrl)}" alt="${safeAlt}"${titleAttr} loading="lazy">`;
@@ -151,10 +156,18 @@ function buildSecurityRenderer(config: SanitizationConfig): Renderer {
     }) as Renderer["codespan"];
 
     renderer.html = ((html: string): string => {
-        // Reject ALL raw HTML in markdown — replace with an escaped placeholder.
-        // Even if marked is permissive in a future version, the user cannot
-        // smuggle HTML through.
-        return escapeHtml(html);
+        // Pass raw HTML *through* to DOMPurify rather than escaping it.
+        // DOMPurify will strip forbidden tags (<script>, <iframe>, ...),
+        // forbidden attributes (on*=, style=, ...), and unsafe URL schemes
+        // — and crucially, it will preserve legitimate inline tags like
+        // <span class="tok-keyword"> after the class allowlist hook runs.
+        //
+        // Escaping here would push the markup into a text-content channel
+        // where DOMPurify cannot inspect it as HTML, and where any later
+        // entity-decode (which DOMPurify does for non-required entities
+        // like `&#061;` and `&quot;`) would re-materialise the dangerous
+        // substrings. Trusting the sanitizer is the correct boundary.
+        return html;
     }) as Renderer["html"];
 
     return renderer;
@@ -192,17 +205,54 @@ function configurePurify(purify: DOMPurifyInstance, config: SanitizationConfig):
             "i",
         ),
         ALLOW_DATA_ATTR: false,
+        // ARIA attributes are not in the threat model for read-only
+        // request-detail rendering; disabling them removes an evasion
+        // surface (e.g. `aria-label="javascript:..."` as a covert
+        // channel).
+        ALLOW_ARIA_ATTR: false,
         ALLOW_UNKNOWN_PROTOCOLS: false,
         SANITIZE_DOM: true,
+        // SAFE_FOR_TEMPLATES blocks mustache-style template-injection
+        // payloads from surviving the round-trip, defeating most
+        // mutation-XSS shapes that rely on a downstream template engine
+        // re-parsing the output.
+        SAFE_FOR_TEMPLATES: true,
+        // Restrict DOMPurify to the HTML profile — SVG, MathML, and
+        // XML profiles are explicitly NOT requested. Belt-and-suspenders
+        // with FORBID_TAGS which already contains `svg` / `math`.
+        USE_PROFILES: { html: true },
         FORBID_TAGS: [...FORBIDDEN_TAGS],
         FORBID_ATTR: [...FORBIDDEN_ATTRIBUTES],
+        // KEEP_CONTENT must stay true so that DOMPurify preserves text
+        // inside non-allowlisted inline tags (e.g. <b>hello</b> → "hello").
+        // We use the per-tag FORBID_CONTENTS list below to drop content
+        // of executable / dangerous containers like <script> and <style>.
         KEEP_CONTENT: true,
+        FORBID_CONTENTS: [
+            "script",
+            "style",
+            "iframe",
+            "object",
+            "embed",
+            "svg",
+            "math",
+            "noscript",
+        ],
         FORCE_BODY: false,
         WHOLE_DOCUMENT: false,
         RETURN_DOM_FRAGMENT: false,
+        // DOMPurify treats `target` and `rel` as URI-bearing attributes and
+        // strips them when ALLOWED_URI_REGEXP is set. Explicitly mark them
+        // as URI-safe so the link-hardening renderer's `_blank` / `noopener
+        // noreferrer` survive the sanitization pass.
+        ADD_URI_SAFE_ATTR: ["target", "rel"],
+        // USE_PROFILES.html enforces a built-in attribute allowlist that
+        // does not include `target`. Re-add it explicitly so external
+        // links keep their `target="_blank"` after the profile filter.
+        ADD_ATTR: ["target"],
     });
 
-    purify.addHook("uponSanitizeAttribute", (_node, data) => {
+    purify.addHook("uponSanitizeAttribute", (node, data) => {
         const name = data.attrName?.toLowerCase() ?? "";
         if (name.startsWith("on")) {
             // strip event handlers — defense against marked allowing them
@@ -218,7 +268,103 @@ function configurePurify(purify: DOMPurifyInstance, config: SanitizationConfig):
                 .join(" ");
             data.attrValue = filtered;
         }
+
+        // Force target="_blank" and rel="noopener noreferrer" on absolute
+        // http(s) anchors. Idempotent: if the renderer already added them
+        // (the marked custom renderer does), this enforces canonical values
+        // even when an attacker tries to override them via inline HTML.
+        // Relative URLs (e.g. `/foo`) and `mailto:` are left untouched.
+        if (
+            node.nodeName === "A" &&
+            (name === "href" || name === "target" || name === "rel")
+        ) {
+            const href = node.getAttribute("href");
+            if (href !== null && /^https?:\/\//i.test(href.trim())) {
+                if (name === "target") {
+                    data.attrValue = "_blank";
+                } else if (name === "rel") {
+                    data.attrValue = "noopener noreferrer";
+                }
+            }
+        }
     });
+
+    // Post-attribute hook: for absolute http(s) anchors, ensure target/rel
+    // are present even if the input HTML lacked them. Without this, an
+    // attacker who supplies raw `<a href="https://...">` would bypass the
+    // marked renderer's defaults.
+    purify.addHook("uponSanitizeElement", (node) => {
+        if (node.nodeName === "A" && typeof node.getAttribute === "function") {
+            const href = node.getAttribute("href");
+            if (href !== null && /^https?:\/\//i.test(href.trim())) {
+                node.setAttribute("target", "_blank");
+                node.setAttribute("rel", "noopener noreferrer");
+            }
+        }
+    });
+}
+
+/**
+ * Decode HTML numeric and named entities into their literal characters.
+ *
+ * Defense against encoding-bypass payloads like
+ *   `<a href="&#106;avascript:alert(1)">x</a>` — the encoded `j` becomes
+ *   `javascript:` after browser parsing.
+ *
+ * We run this BEFORE the post-sanitization forbidden-pattern scan so the
+ * scan sees the post-decode string and refuses smuggled payloads.
+ *
+ * Named-entity coverage is intentionally limited to the ones an attacker
+ * is likely to weaponise; the goal is to surface a forbidden substring,
+ * not to round-trip arbitrary content.
+ */
+const NAMED_ENTITIES: Record<string, string> = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'",
+    colon: ":",
+    sol: "/",
+    equals: "=",
+    lpar: "(",
+    rpar: ")",
+    grave: "`",
+    Tab: "\t",
+    NewLine: "\n",
+};
+
+function decodeEntities(s: string): string {
+    return s
+        // hex numeric: &#x3c; or &#X3C;
+        .replace(/&#x([0-9a-f]+);?/gi, (_m, hex: string) => {
+            const code = parseInt(hex, 16);
+            if (Number.isFinite(code) && code > 0 && code < 0x110000) {
+                try {
+                    return String.fromCodePoint(code);
+                } catch {
+                    return "";
+                }
+            }
+            return "";
+        })
+        // decimal numeric: &#60; or &#0000060;
+        .replace(/&#([0-9]+);?/g, (_m, dec: string) => {
+            const code = parseInt(dec, 10);
+            if (Number.isFinite(code) && code > 0 && code < 0x110000) {
+                try {
+                    return String.fromCodePoint(code);
+                } catch {
+                    return "";
+                }
+            }
+            return "";
+        })
+        // named entities (limited allowlist)
+        .replace(/&([a-zA-Z]+);/g, (m, name: string) => {
+            const decoded = NAMED_ENTITIES[name];
+            return decoded !== undefined ? decoded : m;
+        });
 }
 
 const TAG_RE = /<([a-z][a-z0-9-]*)\b/gi;
@@ -321,13 +467,47 @@ export class MarkdownSanitizationPipeline {
         configurePurify(purify, this.config);
         const sanitized = purify.sanitize(rendered);
 
-        // Post-sanitization defensive scan.
+        // Post-sanitization defensive scan against the patterns mirrored
+        // from xss-payload-tests.spec.ts.
         for (const re of POST_SANITIZATION_BAD_PATTERNS) {
             if (re.test(sanitized)) {
                 const refusal: SanitizationResult = {
                     sanitized: "",
                     warnings: ["post-sanitization-unsafe-pattern"],
                     blocked: ["script-content"],
+                    safe: false,
+                };
+                if (this.config.enableCaching) this.cache.set(cacheKey, refusal);
+                return refusal;
+            }
+        }
+
+        // Additional defense-in-depth: check ATTRIBUTE-CONTEXT URL schemes
+        // against a once-and-twice-decoded view of the output. This catches
+        // encoding-bypass payloads like `<a href="&#106;avascript:..."` where
+        // a browser-side entity decode would re-materialise `javascript:`,
+        // while NOT refusing legitimate code blocks containing `&lt;script&gt;`
+        // (which decode to `<script>` but appear only in text-content channels
+        // that the browser will not re-parse as markup).
+        //
+        // We restrict the decoded-view scan to URL-scheme patterns because
+        // those are the only ones that remain dangerous after browser
+        // entity-decoding inside an attribute value. Tag/event-handler
+        // patterns are already caught by the main scan above on the raw
+        // sanitized output.
+        const URL_SCHEME_PATTERNS: RegExp[] = [
+            /(href|src|action|formaction)\s*=\s*["']?\s*javascript:/i,
+            /(href|src|action)\s*=\s*["']?\s*vbscript:/i,
+            /(href|src)\s*=\s*["']?\s*data:text\/html/i,
+        ];
+        const decodedOnce = decodeEntities(sanitized);
+        const decodedTwice = decodeEntities(decodedOnce);
+        for (const re of URL_SCHEME_PATTERNS) {
+            if (re.test(decodedOnce) || re.test(decodedTwice)) {
+                const refusal: SanitizationResult = {
+                    sanitized: "",
+                    warnings: ["post-sanitization-encoded-url-scheme"],
+                    blocked: ["unsafe-url-scheme"],
                     safe: false,
                 };
                 if (this.config.enableCaching) this.cache.set(cacheKey, refusal);

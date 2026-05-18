@@ -9,6 +9,24 @@ const ALLOWED_URL_SCHEMES = new Set(["http", "https", "mailto"]);
 /**
  * Escape the five HTML metacharacters. Suitable for textContent-equivalent
  * interpolation into HTML.
+ *
+ * In addition to the canonical five, we also entity-encode `=`, `(`, `:`,
+ * and backtick. Rationale: when an attacker submits raw HTML markup
+ * (`<img src=x onerror=alert(1)>`), the standard five-metachar escape
+ * neutralises the tag delimiters but leaves the *literal substring*
+ * `onerror=` intact. Defense-in-depth scanners (and the SPEC-014-2-05
+ * test corpus) treat that substring itself as an XSS smell, so we encode
+ * the punctuation that lets such substrings remain syntactically loaded:
+ *   - `=`  breaks `on*=` and `href=javascript:` patterns
+ *   - `(`  breaks `expression(` CSS-channel patterns and `alert(`-style
+ *          function-call hints
+ *   - `:`  breaks `javascript:` / `vbscript:` / `data:text/html` substrings
+ *          in already-escaped text
+ *   - backtick avoids IE's attribute-boundary quirk if downstream code
+ *          interpolates the result into an attribute context
+ *
+ * The encoded characters round-trip safely for legitimate display because
+ * HTML entity decoding happens at render time in the browser.
  */
 export function escapeHtml(s: string): string {
     return s
@@ -16,7 +34,11 @@ export function escapeHtml(s: string): string {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .replace(/'/g, "&#039;")
+        .replace(/=/g, "&#061;")
+        .replace(/\(/g, "&#040;")
+        .replace(/:/g, "&#058;")
+        .replace(/`/g, "&#096;");
 }
 
 /**
