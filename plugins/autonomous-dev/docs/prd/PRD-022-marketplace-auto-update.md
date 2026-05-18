@@ -196,3 +196,61 @@ Bats coverage:
   - `plugins/autonomous-dev/bin/lib/version-helpers.sh` — primitives
   - `plugins/autonomous-dev/bin/install-daemon.sh` — invoked by stage_upgrade
   - `plugins/autonomous-dev/templates/com.autonomous-dev.daemon.plist.template` — KeepAlive contract
+
+---
+
+## 10. Upstream contract
+
+This PRD covers the **cache → running daemon** half of the upgrade pipeline.
+The **marketplace → cache** half is owned by claude-code itself. This section
+documents the surface we depend on, the surface we explicitly chose *not* to
+depend on, and the failure modes we can observe from our side.
+
+### What we depend on
+
+| ID | Dependency | Where it shows up |
+|----|------------|-------------------|
+| UP-01 | Cache layout: `~/.claude/plugins/cache/autonomous-dev/autonomous-dev/<X.Y.Z>/` with one directory per cached version | `version-helpers.sh::list_cached_versions`, `current_version` |
+| UP-02 | Each cached version directory contains a valid plugin tree, specifically `bin/install-daemon.sh` and `bin/supervisor-loop.sh` | `stage_upgrade` gate FR-022-04 / AC-04 |
+| UP-03 | Version directory names are valid semver triplets that sort correctly via numeric comparison | `compare_semver` (AC-09) |
+| UP-04 | `claude plugin update` pulls the marketplace manifest from GitHub and extracts new versions into the cache layout above | Operator-side prerequisite; we never invoke it ourselves |
+| UP-05 | claude-code does not delete the *currently-running* version's directory out from under us | `install-daemon.sh --force` paths and `.last-good-version` rollback both rely on the prior version's tree still being present on disk |
+
+### What we explicitly do not depend on
+
+| ID | Non-dependency | Why |
+|----|----------------|-----|
+| UP-N1 | No notification / hook / IPC from claude-code when it pulls a new cache version | We discover via filesystem poll (`UPGRADE_CHECK_EVERY_N_POLLS`, default ~30 min). Polling is dumb but observable and survives upgrades of claude-code itself. |
+| UP-N2 | No reliance on `plugin.json` `version` field matching the directory name | We treat the directory name as authoritative for semver comparison. Mismatches between `plugin.json` and the cache directory name are upstream's problem, not ours. |
+| UP-N3 | No reliance on marketplace.json schema beyond "claude-code accepted it" | If claude-code extracted it into the cache, we assume it parsed. We only inspect the extracted tree. |
+| UP-N4 | No coordination with `claude` CLI process | The daemon is a separate launchd / systemd job. Operator may never run `claude` interactively; the cache can still update via background mechanisms. |
+
+### Upstream failure modes
+
+| Mode | Symptom we'd see | Recovery |
+|------|------------------|----------|
+| Marketplace manifest is invalid JSON | New version never appears in cache | None on our side. Daemon stays on current version indefinitely. **No signal.** |
+| GitHub rate-limit / network failure during `claude plugin update` | New version never appears in cache | None on our side. **No signal.** |
+| Partial cache extraction (directory exists, `bin/install-daemon.sh` missing) | `stage_upgrade` gate AC-04 trips; we log nothing visible to operator and skip | Self-heals when upstream completes the extraction on a subsequent pull. Throttle does not engage (gate trips before throttle write), so we re-check every cadence. |
+| Directory name not valid semver (e.g., `0.3.x-dev/`) | `compare_semver` ignores it; `list_cached_versions` filter excludes non-numeric segments | Latest valid semver still wins. Non-semver directories are invisible to us. |
+| `plugin.json` version disagrees with directory name | We honor the directory name (UP-N2) | No action needed; mismatch is benign for our purposes. |
+| Currently-running version's directory deleted by upstream cleanup | `current_version` may return `unknown`; rollback target (`.last-good-version`) may not exist on disk | `stage_upgrade` skips when current path is non-cache (AC-08). Rollback installer would fail; daemon would crash-loop on next restart. **No automated recovery — operator must reinstall.** |
+| Stuck on old version because cache never advances | Daemon runs old code; no `daemon_upgrade_available` log line ever fires | **No signal.** Operator must notice externally (e.g., comparing release tags vs. running version in heartbeat). |
+
+### Observability gaps
+
+We have no positive signal that the marketplace → cache pipeline is healthy.
+The absence of `daemon_upgrade_available` log lines is ambiguous: either no
+new version exists, or upstream is broken. If a future PRD wants to close
+this gap, candidates are:
+
+- Periodic compare of `current_version` against the GitHub release tags
+  (introduces network dependency the daemon doesn't otherwise have).
+- A portal-side check that surfaces "running v0.3.5, marketplace claims
+  v0.4.0" as a banner.
+- Operator-side cron that runs `claude plugin update` on a schedule
+  (out-of-band; not this plugin's responsibility).
+
+None of these are in scope for PRD-022. The current contract is: we trust
+upstream to deliver versions into the cache, and we promise to promote them
+within ~30 min of arrival once delivered.
