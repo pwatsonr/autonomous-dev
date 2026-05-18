@@ -245,18 +245,26 @@ describe("approval flow — high-cost reject confirmation token", () => {
 });
 
 describe("approval flow — intake router failures bubble up", () => {
-    test("transient failure → 503 + NETWORK_TRANSIENT errorCode", async () => {
+    test("transient failure → upstream 503 surfaces as 422 + SERVICE_UNAVAILABLE", async () => {
+        // Note: when the upstream router is REACHABLE but returns 503,
+        // IntakeRouterClient retries 3 times then surfaces the upstream
+        // body's errorCode (SERVICE_UNAVAILABLE from the mock router).
+        // The portal-test-server only maps the truly-unreachable case
+        // (NETWORK_TRANSIENT errorCode, from a fetch exception) to 503;
+        // other errors become 422. This matches the production
+        // intake-router-client.ts:195-205 contract: HTTP errors from a
+        // reachable router carry the upstream errorCode verbatim.
         await createState(ctx.repoRoot, "REQ-000030", {
             status: "pending-approval",
             cost: 10,
         });
         ctx.router.setBehavior("fail-transient");
         const resp = await postGate("REQ-000030", "approve", {});
-        expect(resp.status).toBe(503);
+        expect(resp.status).toBe(422);
         // 3 retries on the client.
         expect(ctx.router.getReceivedCommands()).toHaveLength(3);
         const body = (await resp.json()) as { errorCode?: string };
-        expect(body.errorCode).toBe("NETWORK_TRANSIENT");
+        expect(body.errorCode).toBe("SERVICE_UNAVAILABLE");
     });
 
     test("permanent failure → 422 + INVALID_TRANSITION (no retry)", async () => {

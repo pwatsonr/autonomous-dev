@@ -45,14 +45,17 @@ describe("StaleDataHandler — banner severity truth table", () => {
     });
 
     test("stale: severity 'warning', status role, no retry", () => {
+        // 45_000ms is sub-minute so formatAge renders "45s" (boundary at
+        // 60_000ms switches to minute units). Earlier exact 60_000 value
+        // crossed the cliff and formatted as "1m".
         const h = new StaleDataHandler(
-            stubMonitor({ status: "stale", heartbeatAgeMs: 60_000 }),
+            stubMonitor({ status: "stale", heartbeatAgeMs: 45_000 }),
         );
         const banner = h.getBannerStatus();
         expect(banner.severity).toBe("warning");
         expect(banner.ariaRole).toBe("status");
         expect(banner.message).toMatch(/stale/i);
-        expect(banner.details).toContain("60s");
+        expect(banner.details).toContain("45s");
         expect(banner.showRetry).toBe(false);
     });
 

@@ -7,8 +7,11 @@
 //   - Rail-nav `Agents` link points at /agents (not /settings#agents)
 //   - Rendered empty-state copy is honest (no kit fixtures leak through)
 
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
 import { Hono } from "hono";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { NAV_ITEMS } from "../../server/components/rail-nav";
 import { registerRoutes } from "../../server/routes";
@@ -18,6 +21,38 @@ function freshApp(): Hono {
     registerRoutes(app);
     return app;
 }
+
+// Isolate the readers from the real ~/.claude/autonomous-dev.json so the
+// "empty state" assertions don't accidentally observe the dev's real
+// allowlist (3 repos in this developer's config). The settings reader
+// honors AUTONOMOUS_DEV_USER_CONFIG and AUTONOMOUS_DEV_STATE_DIR; pointing
+// both into an empty tmp dir gives us a genuinely empty fixture.
+let stateOverride: string;
+let priorUserConfig: string | undefined;
+let priorStateDir: string | undefined;
+beforeAll(() => {
+    stateOverride = mkdtempSync(join(tmpdir(), "PLAN-038-routes-"));
+    priorUserConfig = process.env["AUTONOMOUS_DEV_USER_CONFIG"];
+    priorStateDir = process.env["AUTONOMOUS_DEV_STATE_DIR"];
+    process.env["AUTONOMOUS_DEV_USER_CONFIG"] = join(
+        stateOverride,
+        "autonomous-dev.json",
+    );
+    process.env["AUTONOMOUS_DEV_STATE_DIR"] = stateOverride;
+});
+afterAll(() => {
+    if (priorUserConfig === undefined) {
+        delete process.env["AUTONOMOUS_DEV_USER_CONFIG"];
+    } else {
+        process.env["AUTONOMOUS_DEV_USER_CONFIG"] = priorUserConfig;
+    }
+    if (priorStateDir === undefined) {
+        delete process.env["AUTONOMOUS_DEV_STATE_DIR"];
+    } else {
+        process.env["AUTONOMOUS_DEV_STATE_DIR"] = priorStateDir;
+    }
+    rmSync(stateOverride, { recursive: true, force: true });
+});
 
 describe("PLAN-038 new routes — /agents, /repos, /api/agents", () => {
     test("GET /agents returns 200", async () => {
