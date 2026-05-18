@@ -59,7 +59,11 @@ function setup(activeTab = "general") {
     dom.window.eval(SCRIPT);
     fv = (dom.window as unknown as { __settingsTabs: SettingsTabsNs })
         .__settingsTabs;
-    // The script self-runs `init()` since readyState !== 'loading'.
+    // JSDOM keeps `document.readyState === 'loading'` for these
+    // synchronously-built fixtures, so the script's IIFE registers a
+    // `DOMContentLoaded` listener instead of running init(). Drive it
+    // through the explicit test-harness export.
+    fv.init();
     return dom.window.document;
 }
 
@@ -96,6 +100,9 @@ describe("settings-tabs.js — initial render", () => {
             { runScripts: "outside-only", url: "http://localhost/settings" },
         );
         dom.window.eval(SCRIPT);
+        // See setup(): JSDOM holds readyState='loading'; trigger init manually.
+        (dom.window as unknown as { __settingsTabs: SettingsTabsNs })
+            .__settingsTabs.init();
         const doc = dom.window.document;
         expect(panelHidden(doc, "general")).toBe(false);
         expect(panelHidden(doc, "agents")).toBe(true);

@@ -3,8 +3,10 @@
 // reader reads ~/.autonomous-dev/portal-settings.json with totally different
 // shape. UI says "SAVED" but reload reads from a file no one wrote.
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { Hono } from "hono";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { registerRoutes } from "../../server/routes";
@@ -13,13 +15,17 @@ import { FileSettingsStore } from "../../server/wiring/settings-store";
 import { buildFileWebhookDispatcher } from "../../server/wiring/notification-dispatcher";
 import type { AuditAppender } from "../../server/routes/_action-deps";
 
+// Each test gets a fresh ephemeral config file so writes from one test
+// can't leak into another, and the committed fixture is never mutated.
+let TEST_CONFIG_DIR: string;
+let TEST_CONFIG_PATH: string;
+
 function freshApp(): Hono {
     const app = new Hono();
 
-    // Wire up settings actions dependencies with test config path
-    const testConfigPath = join(kitParityFixtureRoot(), "autonomous-dev.json");
-    const settingsStore = new FileSettingsStore(testConfigPath);
-    const notificationDispatcher = buildFileWebhookDispatcher(fetch, testConfigPath);
+    // Wire up settings actions dependencies with the per-test temp config.
+    const settingsStore = new FileSettingsStore(TEST_CONFIG_PATH);
+    const notificationDispatcher = buildFileWebhookDispatcher(fetch, TEST_CONFIG_PATH);
 
     // Noop audit appender for testing
     const audit: AuditAppender = {
@@ -40,14 +46,37 @@ function freshApp(): Hono {
 }
 
 const ORIGINAL_STATE_DIR = process.env["AUTONOMOUS_DEV_STATE_DIR"];
+const ORIGINAL_USER_CONFIG = process.env["AUTONOMOUS_DEV_USER_CONFIG"];
 
 describe("BUG-1 regression test — settings persist properly", () => {
     beforeAll(() => {
         process.env["AUTONOMOUS_DEV_STATE_DIR"] = kitParityFixtureRoot();
     });
 
+    beforeEach(() => {
+        // Per-test temp directory so the GET /settings reader sees the
+        // same file the POST writer wrote.
+        TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), "bug1-settings-"));
+        TEST_CONFIG_PATH = join(TEST_CONFIG_DIR, "autonomous-dev.json");
+        writeFileSync(TEST_CONFIG_PATH, "{}", "utf-8");
+        // The route handler (server/routes/settings.ts) calls
+        // `readPortalSettings()` with no override; it resolves
+        // `userConfigPath()` which honors AUTONOMOUS_DEV_USER_CONFIG.
+        process.env["AUTONOMOUS_DEV_USER_CONFIG"] = TEST_CONFIG_PATH;
+    });
+
     afterAll(() => {
         process.env["AUTONOMOUS_DEV_STATE_DIR"] = ORIGINAL_STATE_DIR;
+        if (ORIGINAL_USER_CONFIG === undefined) {
+            delete process.env["AUTONOMOUS_DEV_USER_CONFIG"];
+        } else {
+            process.env["AUTONOMOUS_DEV_USER_CONFIG"] = ORIGINAL_USER_CONFIG;
+        }
+        try {
+            rmSync(TEST_CONFIG_DIR, { recursive: true, force: true });
+        } catch {
+            // best-effort cleanup
+        }
     });
 
     test("trust level changes persist after save and reload", async () => {

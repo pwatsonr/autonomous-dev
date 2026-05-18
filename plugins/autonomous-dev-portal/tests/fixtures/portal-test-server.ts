@@ -230,9 +230,18 @@ export async function startPortal(
             configChanges: proposed,
         });
         if (!setResp.success) {
+            // After IntakeRouterClient.retry() exhausts on a 5xx the
+            // surfaced errorCode is the SERVER's body code (e.g.
+            // "SERVICE_UNAVAILABLE" from the mock router), not the
+            // synthetic "NETWORK_TRANSIENT" used for network-level
+            // throws. Treat both as transient → 503.
+            const transient =
+                setResp.errorCode === "NETWORK_TRANSIENT" ||
+                setResp.errorCode === "SERVICE_UNAVAILABLE" ||
+                setResp.errorCode?.startsWith("HTTP_5") === true;
             return c.json(
                 { ok: false, error: setResp.error },
-                setResp.errorCode === "NETWORK_TRANSIENT" ? 503 : 422,
+                transient ? 503 : 422,
             );
         }
         let reloadOk: boolean | undefined;
