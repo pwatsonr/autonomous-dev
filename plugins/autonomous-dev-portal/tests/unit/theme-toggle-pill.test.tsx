@@ -112,8 +112,11 @@ describe("ShellLayout theme-toggle pill — SPEC-037-1-02", () => {
         );
         expect(themeToggleOpen).toBeGreaterThan(-1);
         expect(lastButtonOpen).toBe(themeToggleOpen);
-        // Also ensure the mtd-spend div appears BEFORE the toggle.
-        const mtdIdx = railOps.indexOf('class="rail-ops-mtd');
+        // SPEC-037-3-04 rewrote `.rail-ops` to a 3-line metrics block —
+        // the MTD row now renders via `RailOpsRow` (a `<div class="line">`
+        // with the literal "MTD spend" label) rather than the old
+        // `.rail-ops-mtd` div. Verify the row exists before the toggle.
+        const mtdIdx = railOps.indexOf("MTD spend");
         expect(mtdIdx).toBeGreaterThan(-1);
         expect(mtdIdx).toBeLessThan(themeToggleOpen);
     });
