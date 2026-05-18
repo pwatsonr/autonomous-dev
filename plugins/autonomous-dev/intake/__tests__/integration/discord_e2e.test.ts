@@ -607,6 +607,9 @@ describe.skip('Discord E2E (SPEC-008-3-05, Task 15)', () => {
         promotion_count: 0,
         last_promoted_at: null,
         paused_at_phase: null,
+        source: 'cli',
+        adapter_metadata: {},
+        type: 'feature',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });

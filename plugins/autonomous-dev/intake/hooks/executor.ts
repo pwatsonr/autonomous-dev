@@ -449,10 +449,13 @@ export class HookExecutor {
    * used by `HookResult.error.failure_mode`.
    */
   private resolveFailureMode(hook: RegisteredHook): FailureModeStr {
-    const mode = hook.hook.failure_mode as FailureMode | FailureModeStr | undefined;
-    if (mode === FailureMode.Block || mode === 'block') return 'block';
-    if (mode === FailureMode.Warn || mode === 'warn') return 'warn';
-    if (mode === FailureMode.Ignore || mode === 'ignore') return 'ignore';
+    // Both the FailureMode enum and the FailureModeStr literal union share the
+    // same underlying string values ('block' | 'warn' | 'ignore'), so a single
+    // string comparison covers both shapes.
+    const mode = hook.hook.failure_mode as unknown as string | undefined;
+    if (mode === 'block') return 'block';
+    if (mode === 'warn') return 'warn';
+    if (mode === 'ignore') return 'ignore';
     // PLAN-019-4 manifests are required to declare failure_mode; if missing
     // we default to 'warn' (the safest non-aborting choice) rather than
     // silently 'ignore' which would suppress operator-visible failures.

@@ -29,7 +29,8 @@
  */
 
 import { createHmac } from 'node:crypto';
-import { promises as fs, type FileHandle } from 'node:fs';
+import { promises as fs } from 'node:fs';
+import type { FileHandle } from 'node:fs/promises';
 
 import { canonicalize } from '../hooks/fingerprint';
 import {

@@ -63,8 +63,11 @@ function makeMockRegistry(states: Record<string, AgentState>): IAgentRegistry {
     getForTask: () => [],
     freeze: () => {},
     unfreeze: () => {},
+    shadow: () => {},
+    unshadow: () => {},
     getState: (name: string) => states[name],
     setState: (name: string, state: AgentState) => { states[name] = state; },
+    transition: (name: string, state: AgentState) => { states[name] = state; },
   };
 }
 

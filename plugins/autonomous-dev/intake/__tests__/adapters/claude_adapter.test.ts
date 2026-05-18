@@ -46,7 +46,7 @@ function createMockIdentityResolver(
 ): ClaudeIdentityResolver {
   return {
     resolve: async () => userId,
-  };
+  } as unknown as ClaudeIdentityResolver;
 }
 
 /** Create a mock CLIFormatter. */

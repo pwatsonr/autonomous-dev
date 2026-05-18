@@ -60,6 +60,42 @@ export interface WeaknessReport {
   metrics_summary: MetricsSummary;
 }
 
+/**
+ * Logger contract consumed by WeaknessReportStore. Kept separate from the
+ * broader runtime logger so the store can be exercised in isolation.
+ *
+ * NOTE: This interface and the WeaknessReportStore stub below are placeholders
+ * carried forward from PRD-016 (SKIP-WITH-NOTE). The full implementation is
+ * pending; the stub exists only so importers/typechecking succeed.
+ */
+export interface ReportStoreLogger {
+  info?(msg: string, ctx?: Record<string, unknown>): void;
+  warn?(msg: string, ctx?: Record<string, unknown>): void;
+  error?(msg: string, ctx?: Record<string, unknown>): void;
+}
+
+/**
+ * Stub for the persistence-layer class introduced in PRD-016. The real
+ * implementation reads/writes JSONL files; this stub exists so the rest of
+ * the type system compiles. Tests that exercise behavior are marked SKIP.
+ */
+export class WeaknessReportStore {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  constructor(private readonly _filePath: string, private readonly _logger?: ReportStoreLogger) {}
+
+  /** Append a new report. Stub — real impl pending PRD-016. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async append(_report: WeaknessReport): Promise<void> {
+    throw new Error('WeaknessReportStore.append: stub (PRD-016 SKIP)');
+  }
+
+  /** Return previously stored reports. Stub — real impl pending PRD-016. */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getReports(_agentName?: string): WeaknessReport[] {
+    return [];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Trigger types (SPEC-005-3-1)
 // ---------------------------------------------------------------------------

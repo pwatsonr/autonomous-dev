@@ -48,8 +48,9 @@ function captureMain(
 }> {
   const writes: string[] = [];
   const original = process.stdout.write.bind(process.stdout);
-  // @ts-expect-error -- jest mocking pattern
-  process.stdout.write = (chunk: string | Uint8Array): boolean => {
+  // Reassigning process.stdout.write — the standard signature is broader than
+  // (chunk) => boolean, but for tests we only invoke it with a single chunk.
+  (process.stdout as unknown as { write: (chunk: string | Uint8Array) => boolean }).write = (chunk: string | Uint8Array): boolean => {
     writes.push(typeof chunk === 'string' ? chunk : chunk.toString());
     return true;
   };

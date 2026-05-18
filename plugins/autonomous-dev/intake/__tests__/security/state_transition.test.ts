@@ -189,6 +189,9 @@ function createRequestInState(
     promotion_count: 0,
     last_promoted_at: null,
     paused_at_phase: status === 'paused' ? 'intake' : null,
+    type: 'feature',
+    source: 'cli',
+    adapter_metadata: {},
     created_at: now,
     updated_at: now,
   });

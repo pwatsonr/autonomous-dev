@@ -76,7 +76,7 @@ function getValidator() {
   const ajv = new Ajv2020({ allErrors: true, strict: false });
   addFormats(ajv);
   const validate = ajv.compile(fixRecipeSchema);
-  cachedValidator = validate as typeof cachedValidator;
+  cachedValidator = validate as unknown as NonNullable<typeof cachedValidator>;
   cachedAjv = ajv;
   return { validate: cachedValidator!, ajv };
 }

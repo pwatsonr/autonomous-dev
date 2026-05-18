@@ -35,6 +35,7 @@ describe("TrustResolver", () => {
     });
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       requestOverride: 3,
       repositoryId: "repo-a",
     };
@@ -54,6 +55,7 @@ describe("TrustResolver", () => {
     });
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       repositoryId: "repo-a",
     };
 
@@ -70,6 +72,7 @@ describe("TrustResolver", () => {
     });
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       repositoryId: "unknown-repo",
     };
 
@@ -93,6 +96,7 @@ describe("TrustResolver", () => {
     };
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       repositoryId: "x",
     };
 
@@ -101,6 +105,7 @@ describe("TrustResolver", () => {
 
   test("returns L1 with DEFAULT_TRUST_CONFIG (system_default_level is 1)", () => {
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       repositoryId: "x",
     };
 
@@ -113,6 +118,7 @@ describe("TrustResolver", () => {
   // -------------------------------------------------------------------------
   test("no caching -- changing config between calls reflects in second result", () => {
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       repositoryId: "repo-a",
     };
 
@@ -143,6 +149,7 @@ describe("TrustResolver", () => {
     });
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       requestOverride: 0,
       repositoryId: "repo-a",
     };
@@ -159,6 +166,7 @@ describe("TrustResolver", () => {
     });
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       repositoryId: "repo-a",
     };
 
@@ -171,6 +179,7 @@ describe("TrustResolver", () => {
     });
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       repositoryId: "unknown",
     };
 
@@ -186,6 +195,7 @@ describe("TrustResolver", () => {
     });
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       requestOverride: undefined,
       repositoryId: "my-repo",
     };
@@ -202,6 +212,7 @@ describe("TrustResolver", () => {
     });
 
     const context: TrustResolutionContext = {
+      requestId: "test-req",
       repositoryId: "not-in-config",
     };
 
@@ -213,6 +224,7 @@ describe("TrustResolver", () => {
 
     for (const level of [0, 1, 2, 3] as const) {
       const context: TrustResolutionContext = {
+      requestId: "test-req",
         requestOverride: level,
         repositoryId: "any",
       };

@@ -347,7 +347,7 @@ export class CanaryStateManager {
     // The canary config may live under a 'canary' section of the config.
     // Since AgentFactoryConfig does not yet have a 'canary' field, we
     // check if one has been added or fall back to the default.
-    const configAny = this.config as Record<string, unknown>;
+    const configAny = this.config as unknown as Record<string, unknown>;
     if (
       configAny['canary'] &&
       typeof configAny['canary'] === 'object' &&

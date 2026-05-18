@@ -34,6 +34,7 @@ function mkEntity(id: string): RequestEntity {
     promotion_count: 0,
     last_promoted_at: null,
     paused_at_phase: null,
+    type: 'feature',
     source: 'cli',
     adapter_metadata: { source: 'cli' },
     created_at: '2026-04-30T10:00:00.000Z',

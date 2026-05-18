@@ -306,7 +306,7 @@ export class CanaryExitEvaluator {
    */
   private resolveConfigCriteria(): Partial<CanaryExitCriteria> {
     const partial: Partial<CanaryExitCriteria> = {};
-    const configAny = this.config as Record<string, unknown>;
+    const configAny = this.config as unknown as Record<string, unknown>;
     const canaryConfig = configAny['canary'] as
       | Record<string, unknown>
       | undefined;

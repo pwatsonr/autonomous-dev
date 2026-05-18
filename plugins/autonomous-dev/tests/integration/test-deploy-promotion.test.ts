@@ -188,22 +188,23 @@ describe('SPEC-023-2-05 dev -> staging -> prod promotion', () => {
     __setApprovalClockForTest(null);
   });
 
-  function go(args: Partial<RunDeployArgs> & { deployId: string; envName: string }): Promise<ReturnType<typeof runDeploy>> {
+  function go(args: Partial<RunDeployArgs> & { deployId: string; envName: string }): ReturnType<typeof runDeploy> {
+    const { deployId, envName, buildContext, ...rest } = args;
     return runDeploy({
-      deployId: args.deployId,
-      envName: args.envName,
+      ...rest,
+      deployId,
+      envName,
       requestDir,
       actor: 'test-actor',
       selectorRegistry,
-      buildContext: args.buildContext ?? ({
+      buildContext: buildContext ?? ({
         repoPath: requestDir,
         commitSha: '0'.repeat(40),
         branch: 'main',
-        requestId: args.deployId,
+        requestId: deployId,
         cleanWorktree: true,
         params: {},
       } satisfies BuildContext),
-      ...args,
     });
   }
 
@@ -261,7 +262,7 @@ describe('SPEC-023-2-05 dev -> staging -> prod promotion', () => {
     // beyond the orchestrator's own registry/escalation pointers, which
     // are reset by setEscalationSink + makeStubRegistry calls below.
     resetEscalationSink();
-    setEscalationSink({ raise: (e) => escalations.push(e) });
+    setEscalationSink({ raise: (e) => { escalations.push(e); } });
 
     await expect(
       recordApproval({

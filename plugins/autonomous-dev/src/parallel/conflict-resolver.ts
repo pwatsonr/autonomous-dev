@@ -214,7 +214,7 @@ export function threeWayMerge(
 
         if (oursContent === theirsContent) {
           // Compatible: same change (including both deleted)
-          if (oursContent !== null) {
+          if (oursContent !== null && oursContent !== undefined) {
             result.push(oursContent);
           }
         } else {

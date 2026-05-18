@@ -115,6 +115,7 @@ function makeRequest(
     promotion_count: 0,
     last_promoted_at: null,
     paused_at_phase: null,
+    type: 'feature',
     source: 'cli',
     adapter_metadata: { source: 'cli', pid: process.pid },
     created_at: created,
@@ -695,7 +696,7 @@ describe('repair — concurrent invocation', () => {
       });
     }
 
-    const results = [];
+    const results: RepairResult[] = [];
     for (const report of reports) {
       results.push(await ctx.manager.repair(report, { force: true }));
     }

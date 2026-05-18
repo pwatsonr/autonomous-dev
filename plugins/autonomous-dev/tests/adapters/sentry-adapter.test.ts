@@ -105,7 +105,7 @@ function buildConnectivity(
 
 /** Builds a mock Sentry issues list response. */
 function buildMockIssuesResponse(count: number = 3): unknown[] {
-  const issues = [];
+  const issues: unknown[] = [];
   for (let i = 1; i <= count; i++) {
     issues.push({
       id: `issue-${i}`,

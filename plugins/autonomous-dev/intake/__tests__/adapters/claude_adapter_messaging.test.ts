@@ -45,7 +45,7 @@ function createMockRouter(): IntakeRouter {
 function createMockIdentityResolver(userId = 'test-user'): ClaudeIdentityResolver {
   return {
     resolve: async () => userId,
-  };
+  } as unknown as ClaudeIdentityResolver;
 }
 
 function createMockFormatter(): CLIFormatter {

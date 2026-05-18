@@ -122,6 +122,9 @@ function insertRequest(
     promotion_count: opts.promotionCount ?? 0,
     last_promoted_at: lastPromotedIso,
     paused_at_phase: null,
+    source: 'cli',
+    adapter_metadata: {},
+    type: 'feature',
     created_at: createdAtIso,
     updated_at: createdAtIso,
   });

@@ -98,6 +98,7 @@ function makeRequest(
     promotion_count: 0,
     last_promoted_at: null,
     paused_at_phase: null,
+    type: 'feature',
     source: 'cli',
     adapter_metadata: { source: 'cli', pid: process.pid },
     created_at: created,

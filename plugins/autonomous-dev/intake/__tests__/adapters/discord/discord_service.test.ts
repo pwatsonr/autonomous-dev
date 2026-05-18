@@ -46,7 +46,7 @@ function baseConfig(
 
 // Minimal stub adapter — DiscordService never calls into it during
 // construction-only tests.
-const stubAdapter = {} as unknown as Parameters<typeof DiscordService>[1];
+const stubAdapter = {} as unknown as ConstructorParameters<typeof DiscordService>[1];
 
 const stubLogger = {
   info: jest.fn(),

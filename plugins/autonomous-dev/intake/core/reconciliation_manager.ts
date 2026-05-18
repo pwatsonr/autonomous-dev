@@ -849,8 +849,8 @@ export class ReconciliationManager {
   ): Promise<TempCleanupReport> {
     const dryRun = options.dryRun === true;
     const force = options.force === true;
-    const confirm =
-      options.confirm ?? ((async () => false) as RepairOptions['confirm']);
+    const confirm: NonNullable<RepairOptions['confirm']> =
+      options.confirm ?? (async () => false);
 
     const report: TempCleanupReport = {
       scanned: 0,
@@ -1360,6 +1360,7 @@ export class ReconciliationManager {
       promotion_count: 0,
       last_promoted_at: null,
       paused_at_phase: null,
+      type: (state.type as string | undefined) ?? 'feature',
       source,
       adapter_metadata:
         (state.adapter_metadata as AdapterMetadata) ?? ({} as AdapterMetadata),

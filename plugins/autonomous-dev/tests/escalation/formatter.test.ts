@@ -47,7 +47,6 @@ function makeInput(overrides: Partial<FormatterInput> = {}): FormatterInput {
       { option_id: "opt-2", label: "Skip", action: "skip" },
     ],
     retryCount: 1,
-    pipelineBehavior: "pause_at_boundary",
     ...overrides,
   };
 }

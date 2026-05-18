@@ -241,6 +241,7 @@ function entityFromSubmit(
     promotion_count: 0,
     last_promoted_at: null,
     paused_at_phase: null,
+    type: 'feature',
     source: req.source,
     adapter_metadata: req.adapterMetadata,
     created_at: createdAt,

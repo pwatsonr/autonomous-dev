@@ -320,6 +320,9 @@ describe('Submit Flow Integration (SPEC-008-1-09)', () => {
           promotion_count: 0,
           last_promoted_at: null,
           paused_at_phase: null,
+          source: 'cli',
+          adapter_metadata: {},
+          type: 'feature',
           created_at: now,
           updated_at: now,
         });

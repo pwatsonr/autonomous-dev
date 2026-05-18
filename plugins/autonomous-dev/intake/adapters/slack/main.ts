@@ -1355,7 +1355,9 @@ export class SlackService {
 
     // dispatch.kind === 'route'
     if (dispatch.responseAction === 'clear') {
-      res.status(200).json({ response_action: 'clear' } satisfies SlackResponseBody);
+      // Slack 'clear' response_action does not include text; the SlackResponseBody
+      // interface keeps `text` required for the common case, so we cast here.
+      res.status(200).json({ response_action: 'clear' } as unknown as SlackResponseBody);
     } else {
       res.status(200).json({
         replace_original: true,

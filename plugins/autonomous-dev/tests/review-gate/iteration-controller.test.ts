@@ -375,7 +375,7 @@ describe('IterationController', () => {
     // Use decreasing finding count + improving scores so stagnation doesn't fire.
     for (let i = 1; i <= 4; i++) {
       state = controller.startIteration(state);
-      const findingsThisIter = [];
+      const findingsThisIter: MergedFinding[] = [];
       // 6 findings on iter1, 5 on iter2, 4 on iter3, 3 on iter4 (decreasing)
       const findingCount = 7 - i;
       for (let j = 1; j <= findingCount; j++) {

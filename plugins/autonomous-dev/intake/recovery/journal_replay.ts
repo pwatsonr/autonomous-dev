@@ -331,6 +331,7 @@ function entityFromState(
     promotion_count: 0,
     last_promoted_at: null,
     paused_at_phase: (parsed.paused_from as string | undefined) ?? null,
+    type: (parsed.type as RequestEntity['type'] | undefined) ?? 'feature',
     source,
     adapter_metadata: adapterMetadata,
     created_at: createdAt,

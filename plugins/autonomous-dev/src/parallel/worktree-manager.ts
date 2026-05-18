@@ -114,7 +114,7 @@ const logger = {
  */
 async function calculateDirectorySize(dirPath: string): Promise<number> {
   let totalSize = 0;
-  let entries: Awaited<ReturnType<typeof fs.readdir>>;
+  let entries: fsSync.Dirent[];
   try {
     entries = await fs.readdir(dirPath, { withFileTypes: true });
   } catch {

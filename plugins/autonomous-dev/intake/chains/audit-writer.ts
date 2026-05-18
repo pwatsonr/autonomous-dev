@@ -30,7 +30,8 @@
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { promises as fs, type FileHandle } from 'node:fs';
+import { promises as fs } from 'node:fs';
+import type { FileHandle } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 

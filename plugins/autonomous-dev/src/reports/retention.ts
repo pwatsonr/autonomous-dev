@@ -15,6 +15,7 @@
  */
 
 import * as fs from 'fs/promises';
+import type { Dirent } from 'fs';
 import * as path from 'path';
 
 // ---------------------------------------------------------------------------
@@ -84,7 +85,7 @@ async function findObservationFiles(
 ): Promise<string[]> {
   const results: string[] = [];
 
-  let entries: Awaited<ReturnType<typeof fs.readdir>>;
+  let entries: Dirent[];
   try {
     entries = await fs.readdir(currentDir, { withFileTypes: true });
   } catch {
@@ -117,7 +118,7 @@ async function findObservationFiles(
 async function findArchiveFiles(archiveDir: string): Promise<string[]> {
   const results: string[] = [];
 
-  let entries: Awaited<ReturnType<typeof fs.readdir>>;
+  let entries: Dirent[];
   try {
     entries = await fs.readdir(archiveDir, { withFileTypes: true });
   } catch {

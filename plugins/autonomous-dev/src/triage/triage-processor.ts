@@ -12,6 +12,7 @@
  */
 
 import * as fs from 'fs/promises';
+import type { Dirent } from 'fs';
 import * as path from 'path';
 import { validateOnRead, updateFrontmatter, appendToBody } from './frontmatter-io';
 import { executePromote } from './actions/promote';
@@ -43,7 +44,7 @@ async function findMarkdownFiles(
 ): Promise<string[]> {
   const results: string[] = [];
 
-  let entries: Awaited<ReturnType<typeof fs.readdir>>;
+  let entries: Dirent[];
   try {
     entries = await fs.readdir(currentDir, { withFileTypes: true });
   } catch {

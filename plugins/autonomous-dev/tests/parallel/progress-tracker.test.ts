@@ -717,7 +717,9 @@ describe('EventBus', () => {
 
   it('calls handler on matching event', () => {
     const received: ParallelEvent[] = [];
-    bus.on('track.state_changed', (e) => received.push(e));
+    bus.on('track.state_changed', (e) => {
+      received.push(e);
+    });
     bus.emit(makeMinimalStateChangedEvent());
     expect(received.length).toBe(1);
     expect(received[0].type).toBe('track.state_changed');
@@ -725,22 +727,30 @@ describe('EventBus', () => {
 
   it('supports multiple handlers per event type', () => {
     let count = 0;
-    bus.on('track.state_changed', () => count++);
-    bus.on('track.state_changed', () => count++);
+    bus.on('track.state_changed', () => {
+      count++;
+    });
+    bus.on('track.state_changed', () => {
+      count++;
+    });
     bus.emit(makeMinimalStateChangedEvent());
     expect(count).toBe(2);
   });
 
   it('does not call handler for other event types', () => {
     const received: ParallelEvent[] = [];
-    bus.on('merge.started', (e) => received.push(e));
+    bus.on('merge.started', (e) => {
+      received.push(e);
+    });
     bus.emit(makeMinimalStateChangedEvent());
     expect(received.length).toBe(0);
   });
 
   it('off removes handler', () => {
     let count = 0;
-    const handler = () => count++;
+    const handler = () => {
+      count++;
+    };
     bus.on('track.state_changed', handler);
     bus.off('track.state_changed', handler);
     bus.emit(makeMinimalStateChangedEvent());
@@ -793,8 +803,12 @@ describe('EventBus', () => {
 
   it('removeAllListeners clears all handlers', () => {
     let count = 0;
-    bus.on('track.state_changed', () => count++);
-    bus.on('merge.started', () => count++);
+    bus.on('track.state_changed', () => {
+      count++;
+    });
+    bus.on('merge.started', () => {
+      count++;
+    });
     bus.removeAllListeners();
     bus.emit(makeMinimalStateChangedEvent());
     expect(count).toBe(0);
@@ -916,7 +930,7 @@ describe('TrackStateMachine', () => {
 
   it('emits track.state_changed event on transition', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.state_changed', (e) => events.push(e));
+    bus.on('track.state_changed', (e) => { events.push(e); });
     await sm.transition('queued', 'scheduled');
     expect(events.length).toBe(1);
     const evt = events[0] as any;
@@ -929,7 +943,7 @@ describe('TrackStateMachine', () => {
 
   it('does not emit event on invalid transition', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.state_changed', (e) => events.push(e));
+    bus.on('track.state_changed', (e) => { events.push(e); });
     await expect(sm.transition('complete', 'shortcut')).rejects.toThrow();
     expect(events.length).toBe(0);
   });
@@ -1036,7 +1050,7 @@ describe('StallDetector', () => {
 
   it('emits warning at stall timeout', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => events.push(e));
+    bus.on('track.stalled', (e) => { events.push(e); });
 
     detector.registerTrack('track-a');
     // Simulate passage of time: set lastActivity to 16 minutes ago
@@ -1052,7 +1066,7 @@ describe('StallDetector', () => {
 
   it('terminates at 2x stall timeout', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => events.push(e));
+    bus.on('track.stalled', (e) => { events.push(e); });
 
     detector.registerTrack('track-a');
     // Simulate 31 minutes of inactivity (2x 15 = 30 min threshold)
@@ -1067,7 +1081,7 @@ describe('StallDetector', () => {
 
   it('does not alert for recently active tracks', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => events.push(e));
+    bus.on('track.stalled', (e) => { events.push(e); });
 
     detector.registerTrack('track-a');
     detector.updateActivity('track-a'); // just now
@@ -1079,7 +1093,7 @@ describe('StallDetector', () => {
 
   it('updateActivity prevents stall alert', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => events.push(e));
+    bus.on('track.stalled', (e) => { events.push(e); });
 
     detector.registerTrack('track-a');
     // Set old activity
@@ -1099,7 +1113,7 @@ describe('StallDetector', () => {
 
     // Even if we try to check, no events
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => events.push(e));
+    bus.on('track.stalled', (e) => { events.push(e); });
     await (detector as any).checkAll();
     expect(events.length).toBe(0);
   });
@@ -1115,7 +1129,7 @@ describe('StallDetector', () => {
 
   it('handles multiple tracks independently', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => events.push(e));
+    bus.on('track.stalled', (e) => { events.push(e); });
 
     detector.registerTrack('track-a');
     detector.registerTrack('track-b');
@@ -1141,7 +1155,7 @@ describe('StallDetector', () => {
 
   it('setRequestId populates requestId in emitted events', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => events.push(e));
+    bus.on('track.stalled', (e) => { events.push(e); });
 
     detector.setRequestId('req-42');
     detector.registerTrack('track-a');
