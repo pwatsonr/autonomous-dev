@@ -205,8 +205,22 @@ function configurePurify(purify: DOMPurifyInstance, config: SanitizationConfig):
             "i",
         ),
         ALLOW_DATA_ATTR: false,
+        // ARIA attributes are not in the threat model for read-only
+        // request-detail rendering; disabling them removes an evasion
+        // surface (e.g. `aria-label="javascript:..."` as a covert
+        // channel).
+        ALLOW_ARIA_ATTR: false,
         ALLOW_UNKNOWN_PROTOCOLS: false,
         SANITIZE_DOM: true,
+        // SAFE_FOR_TEMPLATES blocks mustache-style template-injection
+        // payloads from surviving the round-trip, defeating most
+        // mutation-XSS shapes that rely on a downstream template engine
+        // re-parsing the output.
+        SAFE_FOR_TEMPLATES: true,
+        // Restrict DOMPurify to the HTML profile — SVG, MathML, and
+        // XML profiles are explicitly NOT requested. Belt-and-suspenders
+        // with FORBID_TAGS which already contains `svg` / `math`.
+        USE_PROFILES: { html: true },
         FORBID_TAGS: [...FORBIDDEN_TAGS],
         FORBID_ATTR: [...FORBIDDEN_ATTRIBUTES],
         // KEEP_CONTENT must stay true so that DOMPurify preserves text
@@ -232,6 +246,10 @@ function configurePurify(purify: DOMPurifyInstance, config: SanitizationConfig):
         // as URI-safe so the link-hardening renderer's `_blank` / `noopener
         // noreferrer` survive the sanitization pass.
         ADD_URI_SAFE_ATTR: ["target", "rel"],
+        // USE_PROFILES.html enforces a built-in attribute allowlist that
+        // does not include `target`. Re-add it explicitly so external
+        // links keep their `target="_blank"` after the profile filter.
+        ADD_ATTR: ["target"],
     });
 
     purify.addHook("uponSanitizeAttribute", (node, data) => {
