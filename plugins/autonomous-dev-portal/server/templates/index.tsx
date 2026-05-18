@@ -34,6 +34,7 @@ import { AuditView } from "./views/audit";
 import { CostsView } from "./views/costs";
 import { DashboardView } from "./views/dashboard";
 import { LogsView } from "./views/logs";
+import { EnhancedLogsView } from "./views/enhanced-logs";
 import { NotFoundView } from "./views/404";
 import { OpsView } from "./views/ops";
 import { ReposView } from "./views/repos";
@@ -82,6 +83,8 @@ function renderViewBody<V extends ViewName>(
         }
         case "logs":
             return <LogsView {...(props as RenderProps["logs"])} />;
+        case "enhanced-logs":
+            return <EnhancedLogsView {...(props as RenderProps["enhanced-logs"])} />;
         case "ops":
             return <OpsView {...(props as RenderProps["ops"])} />;
         case "audit":
@@ -132,6 +135,7 @@ function activePathFor(view: ViewName): string {
         case "costs":
             return "/costs";
         case "logs":
+        case "enhanced-logs":
             return "/logs";
         case "ops":
             return "/ops";
