@@ -94,7 +94,11 @@ describe("CSRFProtection token lifecycle", () => {
     test("rejects modified signature without throwing", async () => {
         const csrf = build();
         const { token, signature } = await csrf.generateTokenForSession("s1");
-        const tampered = "0" + signature.slice(1);
+        // Flip the first hex digit to guarantee a difference; "0" → "1"
+        // if the original was "0" so the tampered != original
+        // regardless of what the HMAC outputs.
+        const firstChar = signature[0] === "0" ? "1" : "0";
+        const tampered = firstChar + signature.slice(1);
         expect(await csrf.validateToken(token, tampered, "s1")).toBe(false);
     });
 

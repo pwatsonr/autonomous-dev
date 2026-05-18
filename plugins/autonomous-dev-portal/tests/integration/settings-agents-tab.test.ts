@@ -47,6 +47,9 @@ test("settings Agents tab inspect modal links use real agent names", async () =>
     // Inspect modal links should point to real agent names
     expect(html).toMatch(/inspect-agent-modal-(accessibility-reviewer|code-executor|architecture-reviewer)/);
 
-    // Should NOT have modal links for stale names
-    expect(html).not.toMatch(/inspect-agent-modal-(architect|coder|gate-keeper)/);
+    // Should NOT have modal links for stale stub names. Use end-anchored
+    // matchers so we don't false-positive on real agents whose names start
+    // with these prefixes (e.g. `architect` would otherwise match
+    // `architecture-reviewer`).
+    expect(html).not.toMatch(/inspect-agent-modal-(?:architect|coder|gate-keeper)(?=["\-/\s>])/);
 });
