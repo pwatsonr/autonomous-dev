@@ -396,6 +396,35 @@ spawn_session_typed() {
             ;;
     esac
 
+    # ── PLAN-042 Phase B: evidence verifier (LOG MODE) ──
+    # After PR #339's empty-evidence guard, run the verifier over each
+    # claim in `evidence[]`. Phase B is observability-only: the verifier
+    # writes ${req_dir}/verification-report.jsonl + a one-line calibration
+    # summary to stderr, but does NOT modify the envelope or block phase
+    # advancement. Phase C will flip the mode to `refuse` and override
+    # passing envelopes when verification fails.
+    #
+    # PRD-024 / TDD-041 §2 / PLAN-042 task T-042-B-07.
+    # Default mode is `log` regardless of $VERIFICATION_MODE (Phase B's
+    # explicit constraint per PLAN-042). Phase C will read the env var.
+    case "${target_phase}" in
+        integration|deploy|test)
+            local verifier_path="${LIB_DIR}/../lib/verification/verifier.sh"
+            if [[ ! -f "${verifier_path}" ]]; then
+                verifier_path="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/verification/verifier.sh"
+            fi
+            if [[ -f "${verifier_path}" ]]; then
+                # Run in a subshell so any sourced state can't leak into
+                # our env, and so failures here can't poison set -e.
+                ( set +e
+                  # shellcheck source=/dev/null
+                  source "${verifier_path}"
+                  verify_envelope "${req_dir}" "${target_phase}" "log"
+                ) || true
+            fi
+            ;;
+    esac
+
     # Synthesize phase-result.json if agent didn't write one.
     #
     # 2026-05-19 fix (REQ-000011 post-mortem): review phases that exit
