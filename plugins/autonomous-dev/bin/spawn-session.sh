@@ -239,9 +239,92 @@ spawn_session_typed() {
     else
         agent_tools="${tools_full}"
     fi
+
+    # ── PLAN-042 Phase A: command-audit log shim (observability only) ──
+    # For the three executor phases (integration|deploy|test), set up a
+    # daemon-owned append-only audit log at ${req_dir}/command-audit.jsonl
+    # and inject a Claude SDK PreToolUse hook (audit-log-writer.sh) via
+    # --settings. Every Bash tool invocation by the agent appends one
+    # JSONL row to the log. The agent does NOT have the file path in its
+    # tool descriptions or prompt; the path is bound through env vars to
+    # the daemon-supplied hook process.
+    #
+    # PRD-024 / TDD-041 §D-05, ADR-041-05.
+    #
+    # Phase A is observability only: the log is written but never read
+    # by the synthesis chain below. Phase B will wire the verifier.
+    # If anything in this setup block fails, we fall through to the
+    # un-instrumented claude call — observability MUST NOT break the
+    # pipeline.
+    local audit_settings_file=""
+    local audit_log_file=""
+    case "${target_phase}" in
+        integration|deploy|test)
+            audit_log_file="${req_dir}/command-audit.jsonl"
+            # Create the file (or truncate if it already exists from a
+            # prior phase-attempt) and lock it down to operator-only.
+            # `: > file` is a portable, atomic-enough truncate-or-create.
+            : > "${audit_log_file}" 2>/dev/null || audit_log_file=""
+            if [[ -n "${audit_log_file}" ]]; then
+                chmod 0600 "${audit_log_file}" 2>/dev/null || true
+                # Resolve the hook script path. We compute it relative to
+                # this script so the daemon can move with the plugin.
+                local hook_script="${LIB_DIR}/../hooks/audit-log-writer.sh"
+                if [[ ! -x "${hook_script}" ]]; then
+                    hook_script="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/audit-log-writer.sh"
+                fi
+                if [[ -x "${hook_script}" ]]; then
+                    # Build a per-session settings JSON registering a
+                    # PreToolUse hook for the Bash tool that runs our
+                    # audit-log-writer. The hook receives the SDK event
+                    # on stdin and reads AUDIT_LOG_PATH / AUDIT_PHASE
+                    # from the environment we export below.
+                    audit_settings_file="$(mktemp -t advsetup.XXXXXX 2>/dev/null || echo "")"
+                    if [[ -n "${audit_settings_file}" ]]; then
+                        jq -n --arg cmd "${hook_script}" '{
+                            hooks: {
+                                PreToolUse: [
+                                    {
+                                        matcher: "Bash",
+                                        hooks: [
+                                            { type: "command", command: $cmd }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }' > "${audit_settings_file}" 2>/dev/null || audit_settings_file=""
+                    fi
+                fi
+            fi
+            ;;
+    esac
+
+    # Compose the audit-related claude flag array (empty unless we set
+    # up the shim above).
+    local -a audit_flags=()
+    if [[ -n "${audit_settings_file}" && -f "${audit_settings_file}" ]]; then
+        audit_flags+=(--settings "${audit_settings_file}")
+    fi
+
+    # Always-on cleanup of the temp settings file (audit log itself
+    # stays inside ${req_dir} and is the operator's to retain/rotate).
+    if [[ -n "${audit_settings_file}" ]]; then
+        # shellcheck disable=SC2064
+        trap "rm -f '${audit_settings_file}'" EXIT
+    fi
+
+    # Export audit env so the hook subprocess inherits them. Safe to
+    # export even when the shim is inactive — the hook is a no-op
+    # without AUDIT_LOG_PATH.
+    export AUDIT_LOG_PATH="${audit_log_file}"
+    export AUDIT_PHASE="${target_phase}"
+
     if [[ "${req_type}" == "infra" && "${target_phase}" != *"_review" ]]; then
         local gates="${ENHANCED_GATES_CSV:-${DEFAULT_ENHANCED_GATES}}"
-        env "ENHANCED_GATES=${gates}" claude \
+        env "ENHANCED_GATES=${gates}" \
+            "AUDIT_LOG_PATH=${AUDIT_LOG_PATH}" \
+            "AUDIT_PHASE=${AUDIT_PHASE}" \
+            claude \
             --print --output-format json \
             --agent "${agent}" \
             --add-dir "${req_dir}" \
@@ -249,6 +332,7 @@ spawn_session_typed() {
             --permission-mode bypassPermissions \
             --allowedTools "${agent_tools}" \
             --max-budget-usd "${phase_budget}" \
+            ${audit_flags[@]+"${audit_flags[@]}"} \
             ${args[@]+"${args[@]}"} \
             "${phase_prompt}" || exit_code=$?
     else
@@ -260,6 +344,7 @@ spawn_session_typed() {
             --permission-mode bypassPermissions \
             --allowedTools "${agent_tools}" \
             --max-budget-usd "${phase_budget}" \
+            ${audit_flags[@]+"${audit_flags[@]}"} \
             ${args[@]+"${args[@]}"} \
             "${phase_prompt}" || exit_code=$?
     fi
