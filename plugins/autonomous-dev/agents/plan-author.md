@@ -2,7 +2,7 @@
 name: plan-author
 version: "1.0.0"
 role: author
-model: "claude-sonnet-4-20250514"
+model: "claude-opus-4-7"
 temperature: 0.6
 turn_limit: 35
 tools:

@@ -2,7 +2,7 @@
 name: accessibility-reviewer
 version: "1.0.0"
 role: reviewer
-model: claude-sonnet-4-6
+model: "claude-opus-4-7"
 temperature: 0.1
 turn_limit: 15
 tools:

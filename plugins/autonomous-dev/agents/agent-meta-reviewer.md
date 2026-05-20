@@ -2,7 +2,7 @@
 name: agent-meta-reviewer
 version: "1.0.0"
 role: meta
-model: "claude-sonnet-4-20250514"
+model: "claude-opus-4-7"
 temperature: 0.1
 turn_limit: 15
 tools:
