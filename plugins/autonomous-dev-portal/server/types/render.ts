@@ -18,6 +18,7 @@ export type ViewName =
     | "settings"
     | "costs"
     | "logs"
+    | "enhanced-logs" // REQ-000011 — Enhanced logs observability surface
     | "ops"
     | "audit"
     | "agents" // PLAN-038 TASK-005 — net-new /agents surface
@@ -698,6 +699,7 @@ export interface RenderProps {
         projection?: import("../lib/costs-projection").ProjectionResult;
     };
     logs: { lines: LogLine[] };
+    "enhanced-logs": import("../templates/views/enhanced-logs").EnhancedLogsProps;
     ops: {
         health: OpsHealth;
         /** SPEC-014-2-04 — per-request CSRF token threaded through to KillSwitch. */

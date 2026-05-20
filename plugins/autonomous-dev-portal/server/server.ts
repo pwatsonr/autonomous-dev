@@ -52,7 +52,9 @@ import { buildFileWebhookDispatcher } from "./wiring/notification-dispatcher";
 import { FileSettingsStore } from "./wiring/settings-store";
 import { portalAuditPath } from "./wiring/state-paths";
 import { FileLogsReader } from "./wiring/logs-reader";
-import { setLogsReader } from "./routes/logs";
+import { setEnhancedLogsReader } from "./routes/logs";
+import { EnhancedLogReader } from "./readers/EnhancedLogReader";
+import { AggregationCache } from "./cache/AggregationCache";
 
 export interface ServerState {
     server?: Server<unknown>;
@@ -173,9 +175,14 @@ export async function startServer(): Promise<Server<unknown>> {
     const auditLogger = await buildPortalAuditLogger();
     const audit = auditAdapter(auditLogger, log);
 
-    // BUG-14 — Initialize LogsReader for live daemon logs
-    const logsReader = new FileLogsReader();
-    setLogsReader(logsReader);
+    // REQ-000011 — Initialize EnhancedLogReader for observability features
+    const cache = new AggregationCache({ defaultTTLMs: 2000 });
+    const enhancedLogsReader = new EnhancedLogReader({
+        basePath: process.cwd(),
+        cache: cache,
+        logger: log,
+    });
+    setEnhancedLogsReader(enhancedLogsReader);
 
     // BUG-13 — wire the audit reader so the audit page renders filter form and pagination
     try {
