@@ -2,7 +2,7 @@
 name: doc-reviewer
 version: "1.0.0"
 role: reviewer
-model: "claude-sonnet-4-20250514"
+model: "claude-opus-4-7"
 temperature: 0.2
 turn_limit: 20
 tools:

@@ -2,7 +2,7 @@
 name: rule-set-enforcement-reviewer
 version: "1.0.0"
 role: reviewer
-model: claude-sonnet-4-6
+model: "claude-opus-4-7"
 temperature: 0.0
 turn_limit: 25
 tools:

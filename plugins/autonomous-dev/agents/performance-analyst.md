@@ -2,7 +2,7 @@
 name: performance-analyst
 version: "1.0.0"
 role: meta
-model: "claude-sonnet-4-20250514"
+model: "claude-sonnet-4-6"
 temperature: 0.3
 turn_limit: 20
 tools:

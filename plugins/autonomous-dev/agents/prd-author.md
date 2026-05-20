@@ -2,7 +2,7 @@
 name: prd-author
 version: "1.0.0"
 role: author
-model: "claude-sonnet-4-20250514"
+model: "claude-opus-4-7"
 temperature: 0.7
 turn_limit: 30
 tools:

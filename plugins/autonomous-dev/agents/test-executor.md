@@ -2,7 +2,7 @@
 name: test-executor
 version: "1.0.0"
 role: executor
-model: "claude-sonnet-4-20250514"
+model: "claude-sonnet-4-6"
 temperature: 0.2
 turn_limit: 40
 tools:
