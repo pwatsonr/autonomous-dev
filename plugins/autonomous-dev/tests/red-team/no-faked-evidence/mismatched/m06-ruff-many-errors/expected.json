@@ -1,0 +1,10 @@
+{
+  "phase": "integration",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "Found 30 errors.\nsrc/a.py:1:1: E501 line too long",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

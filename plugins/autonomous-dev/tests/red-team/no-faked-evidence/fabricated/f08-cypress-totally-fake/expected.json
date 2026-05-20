@@ -1,0 +1,6 @@
+{
+  "phase": "test",
+  "should_detect": true,
+  "reexec": null,
+  "expected_reason_regex": "command_not_in_audit_log"
+}

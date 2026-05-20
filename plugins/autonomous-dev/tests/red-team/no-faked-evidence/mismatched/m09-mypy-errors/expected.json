@@ -1,0 +1,10 @@
+{
+  "phase": "test",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "src/x.py:9: error: Incompatible types\nFound 12 errors in 4 files",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

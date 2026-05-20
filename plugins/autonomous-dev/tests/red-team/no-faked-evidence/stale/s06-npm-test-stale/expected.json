@@ -1,0 +1,10 @@
+{
+  "phase": "integration",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "Test Suites: 1 failed, 2 passed\nTests:       2 failed, 41 passed",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

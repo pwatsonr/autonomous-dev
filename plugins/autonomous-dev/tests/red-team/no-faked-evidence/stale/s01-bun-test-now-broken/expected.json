@@ -1,0 +1,10 @@
+{
+  "phase": "integration",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "1554 pass / 5 fail\nFailing tests:\n  tests/foo.test.ts > something",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

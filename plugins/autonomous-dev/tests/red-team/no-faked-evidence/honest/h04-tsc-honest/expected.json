@@ -1,0 +1,10 @@
+{
+  "phase": "test",
+  "should_detect": false,
+  "reexec": {
+    "exit_code": 0,
+    "output_tail": "no errors",
+    "error": ""
+  },
+  "expected_reason_regex": ""
+}

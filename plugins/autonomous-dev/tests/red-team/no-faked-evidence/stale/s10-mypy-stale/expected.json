@@ -1,0 +1,10 @@
+{
+  "phase": "test",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "src/newmod.py:14: error: Incompatible default for argument\nFound 1 error in 1 file",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

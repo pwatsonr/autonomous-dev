@@ -1,0 +1,1 @@
+{"ts":"2026-05-19T12:00:00Z","phase":"integration","command":"pip install ruff","argv":["pip"],"cwd":"/tmp/wt","exit_code":null,"duration_ms":null,"output_tail":null,"source":"sdk_hook"}

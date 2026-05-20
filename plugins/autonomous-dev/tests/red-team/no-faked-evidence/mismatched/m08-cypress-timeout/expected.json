@@ -1,0 +1,10 @@
+{
+  "phase": "test",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 124,
+    "output_tail": "",
+    "error": "timeout"
+  },
+  "expected_reason_regex": "(exit_code_mismatch|reexec_timeout)"
+}

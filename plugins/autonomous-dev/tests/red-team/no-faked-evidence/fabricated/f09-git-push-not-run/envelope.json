@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "phase": "deploy",
+  "feedback": "all checks pass — agent claimed",
+  "evidence": [
+    {
+      "command": "git push origin feature/x",
+      "exit_code": 0,
+      "output_tail": "Everything up-to-date"
+    }
+  ]
+}
