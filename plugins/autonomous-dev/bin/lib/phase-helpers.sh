@@ -82,6 +82,15 @@ resolve_phase_prompt() {
         base_prompt="${base_prompt//\{\{PHASE\}\}/${phase}}"
     else
         local req_dir="${project}/.autonomous-dev/requests/${request_id}"
+        # Detect review phases to give them stronger envelope-mandatory
+        # framing. Review phases that don't write phase-result-<phase>.json
+        # are now treated as FAIL by the daemon (REQ-000011 post-mortem),
+        # so the prompt must make that obligation impossible to miss.
+        local is_review_phase=false
+        case "${phase}" in
+            *_review) is_review_phase=true ;;
+        esac
+
         base_prompt="You are an autonomous development agent working on request ${request_id}.
 
 Your current phase is: ${phase}
@@ -90,6 +99,43 @@ Read the request state file at: ${state_file}
 Read the project context at: ${project}
 
 Perform the work required for the '${phase}' phase as described in the state file."
+
+        # Reviewer-specific contract — placed early so it's load-bearing,
+        # not buried under the analysis instructions. Repeated again at
+        # the end for redundancy.
+        if [[ "${is_review_phase}" == "true" ]]; then
+            base_prompt="${base_prompt}
+
+═══════════════════════════════════════════════════════════════
+**MANDATORY OUTPUT CONTRACT FOR REVIEWERS — READ FIRST**
+
+You are a *_review phase. The daemon treats a clean exit WITHOUT a
+written phase-result-${phase}.json envelope as **FAIL** with code
+\`REVIEWER_DID_NOT_EMIT_VERDICT\`. Your analysis without the envelope
+is wasted work.
+
+Before you finish, write to \`${req_dir}/phase-result-${phase}.json\`:
+
+  {
+    \"status\": \"pass\" | \"fail\",
+    \"phase\": \"${phase}\",
+    \"feedback\": \"<verdict + any blocking findings, ≤500 chars>\",
+    \"findings\": [
+      { \"severity\": \"blocking|warn|info\", \"file\": \"<path>\",
+        \"line\": <number>, \"message\": \"<one sentence>\" }
+    ]
+  }
+
+  - \"pass\" = no blocking findings; pipeline advances.
+  - \"fail\" = at least one blocking finding; pipeline gates for the
+    operator. Use this honestly. False-pass is worse than verbose-fail.
+
+Even if your review found ZERO issues, you STILL must write the
+envelope with status: pass and a brief feedback message. The envelope
+is the contract; the analysis is just how you arrive at the verdict.
+═══════════════════════════════════════════════════════════════
+"
+        fi
 
         # Add artifact location instructions for authoring phases
         case "${phase}" in

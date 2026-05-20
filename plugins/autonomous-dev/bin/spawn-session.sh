@@ -65,6 +65,7 @@ write_synthesized_phase_result() {
             status: $s,
             phase: $p,
             feedback: $f,
+            error: $e,
             artifacts: [],
             synthesized: true,
             exit_code: $rc,
@@ -263,16 +264,36 @@ spawn_session_typed() {
             "${phase_prompt}" || exit_code=$?
     fi
 
-    # Synthesize phase-result.json if agent didn't write one
+    # Synthesize phase-result.json if agent didn't write one.
+    #
+    # 2026-05-19 fix (REQ-000011 post-mortem): review phases that exit
+    # cleanly without writing a phase-result envelope are NOT "pass" —
+    # they're "the reviewer never produced a verdict". Old behavior
+    # auto-passed them, which made the entire reviewer chain a no-op
+    # and let bad PRs through with no actual review. New behavior:
+    # missing-envelope on a `*_review` phase synthesizes FAIL with
+    # `REVIEWER_DID_NOT_EMIT_VERDICT`. The daemon's phase-transition
+    # logic treats that as a blocker, surfacing the gate to the
+    # operator instead of silently advancing.
+    #
+    # Non-review phases keep the original semantics: clean exit +
+    # missing envelope = pass (because the artifact-writing agents
+    # often produce the artifact correctly but forget the bookkeeping;
+    # we don't want to penalize them for that — the artifact is the
+    # contract). Review phases ARE the bookkeeping; missing envelope
+    # there means the contract was not met.
     local result_path="${req_dir}/phase-result-${target_phase}.json"
     if [[ ! -f "$result_path" ]]; then
         local status error_msg
-        if [[ $exit_code -eq 0 ]]; then
-            status="pass"
-            error_msg=""
-        else
+        if [[ $exit_code -ne 0 ]]; then
             status="fail"
             error_msg="AGENT_EXITED_NONZERO"
+        elif [[ "${target_phase}" == *"_review" ]]; then
+            status="fail"
+            error_msg="REVIEWER_DID_NOT_EMIT_VERDICT"
+        else
+            status="pass"
+            error_msg=""
         fi
         write_synthesized_phase_result "$result_path" "$status" "$error_msg" "$exit_code" "$target_phase"
     fi
