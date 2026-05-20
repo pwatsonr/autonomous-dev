@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "phase": "integration",
+  "feedback": "all checks pass — agent claimed",
+  "evidence": [
+    {
+      "command": "pytest -k integration",
+      "exit_code": 0,
+      "output_tail": "10 passed in 8.2s"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "phase": "integration",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "src/new.ts:3:5  error  unused-var  no-unused-vars\n2 problems (2 errors, 0 warnings)",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

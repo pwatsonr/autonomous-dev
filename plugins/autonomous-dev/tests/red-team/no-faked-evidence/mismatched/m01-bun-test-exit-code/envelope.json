@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "phase": "integration",
+  "feedback": "all checks pass — agent claimed",
+  "evidence": [
+    {
+      "command": "bun test",
+      "exit_code": 0,
+      "output_tail": "1559 pass / 0 fail"
+    }
+  ]
+}

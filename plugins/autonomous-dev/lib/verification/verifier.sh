@@ -84,14 +84,75 @@ source "${__VERIFIER_DIR__}/audit-log-reader.sh"
 # read the same record and act on it.
 # ─────────────────────────────────────────────────────────────────────────
 
-# Idempotent allowlist (first-token match). KEEP SHORT for Phase B.
-# Phase C TODO (PLAN-042): expand to the full ≈20 entries from TDD-041
-# §D-02 (npm test, cargo test, ruff check, eslint, tsc --noEmit, etc.).
+# Idempotent allowlist (first-token match).
+#
+# Phase C expansion (PLAN-042 T-042-C-01, TDD-041 §D-02): curated from the
+# TDD's "Idempotent" examples row plus the well-known test/build/lint/type-
+# checker runners that account for the bulk of executor evidence. Deny-by-
+# default: if you're unsure whether a tool is safe to re-execute, leave it
+# OFF this list — the worst case is one would-be-verified phase falls
+# through to `unclassifiable` and gets refused. Adding entries later is a
+# one-line PR.
+#
+# Each entry is the FIRST TOKEN of the claim, after env-var prefix stripping
+# (the classify_command stripper drops `FOO=bar` prefixes).
 __VERIFIER_IDEMPOTENT_TOKENS__=(
+    # JS / TS test runners
     bun     # bun test, bun run …
-    pytest  # pytest -k …
-    tsc     # tsc --noEmit
+    npm     # npm test, npm run …  (test/lint scripts — destructive subcommands handled by regex denylist)
+    pnpm    # pnpm test, pnpm run …
+    yarn    # yarn test, yarn run …
+    npx     # npx tsc, npx eslint, npx vitest …
+    vitest  # vitest run
+    jest    # jest --ci
+    mocha   # mocha test/
     cypress # cypress run
+    playwright  # playwright test
+
+    # TypeScript / JS lint/type tools
+    tsc     # tsc --noEmit
+    eslint  # eslint .
+    prettier  # prettier --check .
+
+    # Python
+    pytest  # pytest -k …
+    ruff    # ruff check src/
+    mypy    # mypy src/
+    black   # black --check .
+    flake8  # flake8 src/
+
+    # Rust
+    cargo   # cargo test, cargo check, cargo build, cargo clippy
+            # (cargo publish is non-idempotent but handled by the regex
+            # denylist below if/when added — for now cargo publish would
+            # still match `cargo` here; deny regex is the gate)
+
+    # Go
+    go      # go test, go vet, go build
+
+    # Java / Gradle / Maven
+    gradle  # gradle test
+    mvn     # mvn test
+
+    # Misc safe build/test
+    make    # make test, make check  (only safe subcommands; destructive
+            # `make install` would need a deny regex — not adding speculatively)
+
+    # Read-only git/gh
+    git     # git status, git diff, git log — destructive `git push` /
+            # `git reset --hard` are caught by the non-idempotent regex
+            # denylist BEFORE this check runs (per classify_command order).
+    gh      # gh pr view / gh pr list — `gh pr create` caught by regex.
+
+    # Shell built-ins commonly used as evidence
+    ls
+    cat
+    grep
+    rg
+    head
+    tail
+    wc
+    find
 )
 
 # Non-idempotent denylist (first-token match).

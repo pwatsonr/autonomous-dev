@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "phase": "test",
+  "feedback": "all checks pass — agent claimed",
+  "evidence": [
+    {
+      "command": "cargo test",
+      "exit_code": 0,
+      "output_tail": "test result: ok. 42 passed; 0 failed"
+    }
+  ]
+}

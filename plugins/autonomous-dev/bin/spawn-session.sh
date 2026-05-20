@@ -396,17 +396,26 @@ spawn_session_typed() {
             ;;
     esac
 
-    # ── PLAN-042 Phase B: evidence verifier (LOG MODE) ──
+    # ── PLAN-042 Phase C: evidence verifier (REFUSE MODE) ──
     # After PR #339's empty-evidence guard, run the verifier over each
-    # claim in `evidence[]`. Phase B is observability-only: the verifier
-    # writes ${req_dir}/verification-report.jsonl + a one-line calibration
-    # summary to stderr, but does NOT modify the envelope or block phase
-    # advancement. Phase C will flip the mode to `refuse` and override
-    # passing envelopes when verification fails.
+    # claim in `evidence[]`. Phase C flips Phase B's log-only verifier
+    # to refusal mode: if any claim's verdict is `would_have_failed`,
+    # the verifier returns rc=2 and we overwrite the envelope to
+    # `status="fail"` with `error="VERIFICATION_FAILED"`. The agent's
+    # claimed feedback is preserved inside the new feedback string so
+    # operators can still see what the agent asserted.
     #
-    # PRD-024 / TDD-041 §2 / PLAN-042 task T-042-B-07.
-    # Default mode is `log` regardless of $VERIFICATION_MODE (Phase B's
-    # explicit constraint per PLAN-042). Phase C will read the env var.
+    # PRD-024 / TDD-041 §2 / PLAN-042 task T-042-C-01.
+    #
+    # Mode resolution: production callers (this code path) default to
+    # `refuse`. Tests / direct callers of verify_envelope that don't set
+    # VERIFICATION_MODE keep `log` as the safe default — the third arg
+    # to verify_envelope is what wins here. Operators can fall back to
+    # log-mode for debugging via:
+    #   AUTONOMOUS_DEV_VERIFY_MODE=log
+    #
+    # Phase D will layer the per-request operator override on TOP of
+    # this. Phase C fires UNCONDITIONALLY.
     case "${target_phase}" in
         integration|deploy|test)
             local verifier_path="${LIB_DIR}/../lib/verification/verifier.sh"
@@ -414,13 +423,90 @@ spawn_session_typed() {
                 verifier_path="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/verification/verifier.sh"
             fi
             if [[ -f "${verifier_path}" ]]; then
-                # Run in a subshell so any sourced state can't leak into
-                # our env, and so failures here can't poison set -e.
-                ( set +e
-                  # shellcheck source=/dev/null
-                  source "${verifier_path}"
-                  verify_envelope "${req_dir}" "${target_phase}" "log"
-                ) || true
+                # Resolve mode. Default refuse; allow the operator env
+                # override to switch back to log for debugging. The case
+                # statement keeps unknown values from silently disabling
+                # verification.
+                local verify_mode="refuse"
+                case "${AUTONOMOUS_DEV_VERIFY_MODE:-}" in
+                    log)    verify_mode="log" ;;
+                    refuse) verify_mode="refuse" ;;
+                    "")     verify_mode="refuse" ;;
+                    *)      verify_mode="refuse" ;;  # unknown → safe default
+                esac
+
+                # Run the verifier in a subshell so sourced state cannot
+                # leak into our env. Capture the exit code: 0 = verified
+                # (or log mode), 2 = refuse-mode would_have_failed.
+                local verify_rc=0
+                (
+                    set +e
+                    # shellcheck source=/dev/null
+                    source "${verifier_path}"
+                    verify_envelope "${req_dir}" "${target_phase}" "${verify_mode}"
+                ) || verify_rc=$?
+
+                if [[ "${verify_mode}" == "refuse" && "${verify_rc}" -eq 2 ]]; then
+                    local result_path_refuse="${req_dir}/phase-result-${target_phase}.json"
+                    local report_path_refuse="${req_dir}/verification-report.jsonl"
+                    if [[ -f "${result_path_refuse}" ]]; then
+                        # Identify which checks failed across the report.
+                        # The report has one row per evidence entry; we
+                        # collect the unique failed-check names + the
+                        # first reason string so the feedback says WHY.
+                        local failed_checks=""
+                        local first_reason=""
+                        if [[ -f "${report_path_refuse}" ]]; then
+                            failed_checks=$(jq -r 'select(.verdict == "would_have_failed")
+                                | .checks
+                                | to_entries[]
+                                | select(.value == "fail")
+                                | .key' "${report_path_refuse}" 2>/dev/null \
+                                | sort -u | paste -sd, - 2>/dev/null || echo "")
+                            first_reason=$(jq -rs '
+                                map(select(.verdict == "would_have_failed"))
+                                | .[0].reason // ""
+                            ' "${report_path_refuse}" 2>/dev/null || echo "")
+                        fi
+                        # If no `checks` came back as "fail" but a reason
+                        # exists (e.g. unclassifiable_command — no
+                        # individual check fails, just the classification),
+                        # fall back to "classification".
+                        if [[ -z "${failed_checks}" && -n "${first_reason}" ]]; then
+                            failed_checks="classification"
+                        fi
+
+                        local original_feedback_refuse
+                        original_feedback_refuse=$(jq -r '.feedback // ""' \
+                            "${result_path_refuse}" 2>/dev/null || echo "")
+                        local fail_feedback_refuse
+                        fail_feedback_refuse="VERIFICATION_FAILED — failed_checks=${failed_checks:-unknown}; reason=${first_reason:-unspecified}; agent claimed: ${original_feedback_refuse}"
+
+                        local tmp_overwrite_refuse="${result_path_refuse}.tmp.$$"
+                        local ts_now_refuse
+                        ts_now_refuse=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                        jq -n \
+                            --arg p "${target_phase}" \
+                            --arg f "${fail_feedback_refuse}" \
+                            --arg ts "${ts_now_refuse}" \
+                            --arg fc "${failed_checks}" \
+                            --arg rs "${first_reason}" \
+                            '{
+                                status: "fail",
+                                phase: $p,
+                                feedback: $f,
+                                error: "VERIFICATION_FAILED",
+                                failed_checks: $fc,
+                                reason: $rs,
+                                artifacts: [],
+                                synthesized: true,
+                                exit_code: 0,
+                                completed_at: $ts
+                            }' > "${tmp_overwrite_refuse}" 2>/dev/null \
+                            && mv "${tmp_overwrite_refuse}" "${result_path_refuse}" \
+                            || rm -f "${tmp_overwrite_refuse}"
+                    fi
+                fi
             fi
             ;;
     esac

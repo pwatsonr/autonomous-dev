@@ -1,0 +1,10 @@
+{
+  "phase": "integration",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "3 failed, 117 passed in 4.7s\nFAILED tests/test_models.py::test_serialize",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "phase": "test",
+  "feedback": "all checks pass — agent claimed",
+  "evidence": [
+    {
+      "command": "cypress run",
+      "exit_code": 0,
+      "output_tail": "All specs passed!"
+    }
+  ]
+}

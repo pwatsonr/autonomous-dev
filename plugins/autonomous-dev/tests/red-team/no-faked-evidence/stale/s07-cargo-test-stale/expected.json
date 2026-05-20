@@ -1,0 +1,10 @@
+{
+  "phase": "test",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 101,
+    "output_tail": "failures:\n  tests::serializer\ntest result: FAILED. 41 passed; 1 failed",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "phase": "integration",
+  "feedback": "all checks pass — agent claimed",
+  "evidence": [
+    {
+      "command": "gh pr create --fill",
+      "exit_code": 0,
+      "output_tail": "https://github.com/o/r/pull/123"
+    }
+  ]
+}

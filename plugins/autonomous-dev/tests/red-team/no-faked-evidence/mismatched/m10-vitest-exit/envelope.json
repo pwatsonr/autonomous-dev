@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "phase": "integration",
+  "feedback": "all checks pass — agent claimed",
+  "evidence": [
+    {
+      "command": "vitest run",
+      "exit_code": 0,
+      "output_tail": "Test Files  5 passed (5)\nTests       55 passed (55)"
+    }
+  ]
+}

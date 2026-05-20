@@ -1,0 +1,10 @@
+{
+  "phase": "integration",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "Test Files  2 failed | 3 passed (5)\nTests       4 failed | 51 passed (55)",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

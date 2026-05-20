@@ -1,0 +1,10 @@
+{
+  "phase": "integration",
+  "should_detect": true,
+  "reexec": {
+    "exit_code": 1,
+    "output_tail": "src/new.py:9:1: F401 imported but unused\nFound 8 errors.",
+    "error": ""
+  },
+  "expected_reason_regex": "exit_code_mismatch"
+}

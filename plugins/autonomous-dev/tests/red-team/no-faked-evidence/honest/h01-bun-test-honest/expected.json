@@ -1,0 +1,10 @@
+{
+  "phase": "integration",
+  "should_detect": false,
+  "reexec": {
+    "exit_code": 0,
+    "output_tail": "1559 pass / 0 fail\nDone in 4.7s",
+    "error": ""
+  },
+  "expected_reason_regex": ""
+}

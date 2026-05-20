@@ -1,0 +1,12 @@
+{
+  "status": "pass",
+  "phase": "integration",
+  "feedback": "all checks pass — agent claimed",
+  "evidence": [
+    {
+      "command": "gh pr view 123",
+      "exit_code": 0,
+      "output_tail": "PR open"
+    }
+  ]
+}
