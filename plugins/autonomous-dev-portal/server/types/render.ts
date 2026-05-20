@@ -160,6 +160,15 @@ export interface RequestFlags {
     /** SPEC-037-7-02 — when true the Standards-applied section renders
      *  iff `standardsApplied.length > 0`. */
     hasStandards?: boolean;
+    /** PLAN-042 Phase D — when true the request is currently gated on a
+     *  `VERIFICATION_FAILED` envelope and the operator can authorize an
+     *  override. Drives the "Override verification" button. */
+    verificationFailed?: boolean;
+    /** PLAN-042 Phase D — when true an override has been recorded for
+     *  this request (set by either the CLI or the portal POST). The
+     *  request-detail page hides the override-button when this is true
+     *  and renders the audit line instead. */
+    verificationOverrideApplied?: boolean;
 }
 
 export interface RequestRecord {

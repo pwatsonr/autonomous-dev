@@ -446,10 +446,56 @@ spawn_session_typed() {
                     verify_envelope "${req_dir}" "${target_phase}" "${verify_mode}"
                 ) || verify_rc=$?
 
+                local override_applied=0
                 if [[ "${verify_mode}" == "refuse" && "${verify_rc}" -eq 2 ]]; then
+                    # ── PLAN-042 Phase D: operator override ──
+                    # An operator can authorize "trust the agent on this
+                    # run" by writing ${req_dir}/verification-override.json
+                    # via the `autonomous-dev override-verification` CLI or
+                    # the portal POST /repo/:repo/request/:id/override.
+                    #
+                    # The override is:
+                    #   • Per-request — gated on the file's `request_id`
+                    #     matching this REQ to prevent a stale override
+                    #     from a prior request authorizing the current one.
+                    #   • Audited — the file records {operator, reason, ts}.
+                    #   • Non-persistent — the file lives in ${req_dir} and
+                    #     is removed when the request hits terminal state
+                    #     (the daemon's existing per-request lifecycle).
+                    #
+                    # When the override is present and valid, we PRESERVE
+                    # the agent's original envelope (skip the overwrite to
+                    # status=fail) and log the override application to
+                    # daemon stderr for the audit trail. The verification
+                    # report itself was still written by the verifier, so
+                    # operators can see WHAT was overridden.
+                    local override_path_refuse="${req_dir}/verification-override.json"
+                    if [[ -f "${override_path_refuse}" ]]; then
+                        local override_req
+                        override_req=$(jq -r '.request_id // ""' \
+                            "${override_path_refuse}" 2>/dev/null || echo "")
+                        if [[ "${override_req}" == "${req_id}" ]]; then
+                            local override_reason override_operator
+                            override_reason=$(jq -r '.reason // ""' \
+                                "${override_path_refuse}" 2>/dev/null || echo "")
+                            override_operator=$(jq -r '.operator // "unknown"' \
+                                "${override_path_refuse}" 2>/dev/null || echo "unknown")
+                            printf 'verification_override_applied: request=%s phase=%s operator=%s reason="%s"\n' \
+                                "${req_id}" "${target_phase}" \
+                                "${override_operator}" "${override_reason}" >&2
+                            # Skip the envelope overwrite — operator
+                            # authorized this run.
+                            override_applied=1
+                        else
+                            # Stale override — file is for a different
+                            # request id. Log + ignore.
+                            printf 'verification_override_stale: request=%s file_request=%s — ignoring\n' \
+                                "${req_id}" "${override_req}" >&2
+                        fi
+                    fi
                     local result_path_refuse="${req_dir}/phase-result-${target_phase}.json"
                     local report_path_refuse="${req_dir}/verification-report.jsonl"
-                    if [[ -f "${result_path_refuse}" ]]; then
+                    if [[ "${override_applied}" -eq 0 && -f "${result_path_refuse}" ]]; then
                         # Identify which checks failed across the report.
                         # The report has one row per evidence entry; we
                         # collect the unique failed-check names + the
