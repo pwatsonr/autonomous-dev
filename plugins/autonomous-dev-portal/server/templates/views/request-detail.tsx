@@ -37,6 +37,7 @@ import { RequestTimeline } from "../fragments/request-timeline";
 import { ReviewerChain } from "../fragments/reviewer-chain";
 import { RunHistory } from "../fragments/run-history";
 import { StandardsApplied } from "../fragments/standards-applied";
+import { VerificationOverride } from "../fragments/verification-override";
 
 const DEFAULT_PIPELINE: string[] = [
     "prd",
@@ -72,6 +73,16 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
     const standardsRules = request.standardsApplied ?? [];
     const showStandards =
         request.flags?.hasStandards === true && standardsRules.length > 0;
+
+    // PLAN-042 Phase D — verification override surface. Render either:
+    //   • the form (when verificationFailed and not already overridden), or
+    //   • the audit confirmation (when an override has been applied).
+    // Both cases gate on a `verificationFailed` flag, so honest passes don't
+    // see the section at all.
+    const showVerificationOverride =
+        request.flags?.verificationFailed === true;
+    const verificationOverrideApplied =
+        request.flags?.verificationOverrideApplied === true;
 
     return (
         <main class="request-detail">
@@ -125,6 +136,18 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
             {/* Region 8: standards applied (flags.hasStandards). */}
             {showStandards ? (
                 <StandardsApplied rules={standardsRules} />
+            ) : null}
+
+            {/* PLAN-042 Phase D — verification override (per-request,
+                audited, non-persistent). Surfaces only when the request
+                is gated on VERIFICATION_FAILED. */}
+            {showVerificationOverride ? (
+                <VerificationOverride
+                    requestId={request.id}
+                    repo={request.repo}
+                    csrfToken={csrfToken}
+                    applied={verificationOverrideApplied}
+                />
             ) : null}
 
             {/* Phase timeline (legacy region preserved for OOB swaps). */}

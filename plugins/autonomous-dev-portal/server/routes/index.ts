@@ -66,6 +66,10 @@ import {
     buildGateAndRequestActionRoutes,
     type GateAndRequestActionDeps,
 } from "./gate-and-request-actions";
+import {
+    buildOverrideRoutes,
+    type OverrideRouteDeps,
+} from "./override";
 import { healthHandler } from "./health";
 import { buildKillSwitchRoutes } from "./kill-switch";
 import { logsHandler } from "./logs";
@@ -141,6 +145,12 @@ export interface RegisterRoutesOptions {
      * each returns 503 `standards-actions-disabled`.
      */
     standardsActions?: StandardsActionDeps;
+    /**
+     * PLAN-042 Phase D — when present, mounts the operator
+     * verification-override route (`POST /repo/:repo/request/:id/override`);
+     * when omitted, that path returns 503 `override-disabled`.
+     */
+    overrideAction?: OverrideRouteDeps;
 }
 
 function disabledHandler(error: string) {
@@ -293,6 +303,18 @@ export function registerRoutes(
         app.post(
             "/api/requests/:id/action",
             disabledHandler("gate-actions-disabled"),
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // PLAN-042 Phase D — operator verification-override route.
+    // -----------------------------------------------------------------
+    if (options.overrideAction !== undefined) {
+        app.route("/", buildOverrideRoutes(options.overrideAction));
+    } else {
+        app.post(
+            "/repo/:repo/request/:id/override",
+            disabledHandler("override-disabled"),
         );
     }
 

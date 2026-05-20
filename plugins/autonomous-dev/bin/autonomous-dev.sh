@@ -56,6 +56,10 @@ Commands:
   reconcile            Detect/repair drift (run 'reconcile --help' for options)
   agent <verb> <name>  Agent-factory action: inspect | freeze | unfreeze |
                        shadow | unshadow | promote
+  override-verification <REQ-id> --reason "<text>"
+                       PLAN-042 Phase D — authorize one request to advance
+                       past a VERIFICATION_FAILED gate. Per-request and
+                       audited; does not weaken the gate for other runs.
 
 Options:
   --help, -h           Show this help message
@@ -688,6 +692,187 @@ cmd_circuit_breaker_reset() {
 }
 
 # ---------------------------------------------------------------------------
+# cmd_override_verification() -> int
+#   PLAN-042 Phase D — operator override for VERIFICATION_FAILED.
+#
+#   Usage:
+#     autonomous-dev override-verification REQ-NNNNNN --reason "<text>"
+#
+#   Behavior:
+#     - Walks `${DAEMON_HOME}/requests/<REQ-id>` and any project worktree's
+#       `.autonomous-dev/requests/<REQ-id>` to locate the request directory.
+#     - Writes `${req_dir}/verification-override.json` with:
+#         { request_id, reason, operator, timestamp }
+#     - Appends an audit row to the portal request-action ledger so the
+#       override is visible in the portal (see write_request_action_audit).
+#     - Per PLAN-042 §"Phase D" the override is per-request and
+#       non-persistent — terminal-state cleanup is handled by the daemon's
+#       existing per-request lifecycle (the file lives in `${req_dir}` and
+#       is removed when the request hits `done/cancelled/failed`).
+#
+#   Exit codes:
+#     0 — override file written successfully
+#     1 — missing REQ-id, missing --reason, empty reason, or req_dir not
+#         found.
+# ---------------------------------------------------------------------------
+cmd_override_verification() {
+    local req_id="" reason=""
+    local positional=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --reason)
+                if [[ $# -lt 2 ]]; then
+                    echo "ERROR: --reason requires a non-empty value" >&2
+                    return 1
+                fi
+                reason="$2"
+                shift 2
+                ;;
+            --reason=*)
+                reason="${1#--reason=}"
+                shift
+                ;;
+            --help|-h)
+                cat <<EOF
+Usage: autonomous-dev override-verification <REQ-id> --reason "<text>"
+
+PLAN-042 Phase D — authorize one autonomous-dev request to advance past a
+VERIFICATION_FAILED gate. The override is per-request, audited, and
+non-persistent.
+
+Arguments:
+  <REQ-id>          A request identifier of the form REQ-NNNNNN.
+  --reason <text>   Required non-empty rationale for the override. Recorded
+                    in the request's audit trail.
+
+EOF
+                return 0
+                ;;
+            -*)
+                echo "ERROR: unknown flag: $1" >&2
+                return 1
+                ;;
+            *)
+                positional+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    if [[ ${#positional[@]} -lt 1 ]]; then
+        echo "ERROR: missing REQ-id. Usage: autonomous-dev override-verification REQ-NNNNNN --reason \"<text>\"" >&2
+        return 1
+    fi
+    req_id="${positional[0]}"
+
+    if [[ ! "${req_id}" =~ ^REQ-[0-9]{6}$ ]]; then
+        echo "ERROR: invalid REQ-id: ${req_id} (expected REQ-NNNNNN)" >&2
+        return 1
+    fi
+    if [[ -z "${reason// /}" ]]; then
+        echo "ERROR: --reason is required and must be non-empty" >&2
+        return 1
+    fi
+
+    # Resolve req_dir. Search order:
+    #   1. AUTONOMOUS_DEV_REQ_DIR (test/tooling explicit override)
+    #   2. ${AUTONOMOUS_DEV_STATE_DIR:-$DAEMON_HOME}/requests/<id>
+    #   3. <cwd>/.autonomous-dev/requests/<id>
+    #   4. find $PWD up to two levels deep for .autonomous-dev/requests/<id>
+    local req_dir=""
+    if [[ -n "${AUTONOMOUS_DEV_REQ_DIR:-}" && -d "${AUTONOMOUS_DEV_REQ_DIR}" ]]; then
+        req_dir="${AUTONOMOUS_DEV_REQ_DIR}"
+    fi
+    if [[ -z "${req_dir}" ]]; then
+        local state_root="${AUTONOMOUS_DEV_STATE_DIR:-${DAEMON_HOME}}"
+        local candidate="${state_root}/requests/${req_id}"
+        if [[ -d "${candidate}" ]]; then
+            req_dir="${candidate}"
+        fi
+    fi
+    if [[ -z "${req_dir}" ]]; then
+        local candidate="${PWD}/.autonomous-dev/requests/${req_id}"
+        if [[ -d "${candidate}" ]]; then
+            req_dir="${candidate}"
+        fi
+    fi
+    if [[ -z "${req_dir}" ]]; then
+        # Best-effort discovery across project worktrees.
+        local found
+        found=$(find "${PWD}" -maxdepth 4 -type d -path "*/.autonomous-dev/requests/${req_id}" 2>/dev/null | head -n1 || true)
+        if [[ -n "${found}" ]]; then
+            req_dir="${found}"
+        fi
+    fi
+    if [[ -z "${req_dir}" ]]; then
+        echo "ERROR: could not locate request directory for ${req_id}" >&2
+        echo "       set AUTONOMOUS_DEV_REQ_DIR or run from the project root" >&2
+        return 1
+    fi
+
+    local operator
+    operator="${USER:-${LOGNAME:-unknown}}"
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    local override_path="${req_dir}/verification-override.json"
+    local tmp_path="${override_path}.tmp.$$"
+
+    jq -n \
+        --arg req "${req_id}" \
+        --arg reason "${reason}" \
+        --arg op "${operator}" \
+        --arg ts "${ts}" \
+        '{
+            request_id: $req,
+            reason: $reason,
+            operator: $op,
+            timestamp: $ts
+        }' > "${tmp_path}"
+    chmod 0600 "${tmp_path}" 2>/dev/null || true
+    mv "${tmp_path}" "${override_path}"
+
+    # Append to the portal request-action ledger (audit trail). The portal
+    # already aggregates these files into the request-detail page's
+    # history region. We embed the override under a `verification_override`
+    # key so existing consumers (which look at `status` / `phase`) are
+    # untouched but new consumers can render the row.
+    local action_dir="${AUTONOMOUS_DEV_STATE_DIR:-${DAEMON_HOME}}/request-actions"
+    if mkdir -p "${action_dir}" 2>/dev/null; then
+        local action_path="${action_dir}/${req_id}.json"
+        local existing="{}"
+        if [[ -f "${action_path}" ]]; then
+            existing=$(cat "${action_path}" 2>/dev/null || echo "{}")
+        fi
+        local action_tmp="${action_path}.tmp.$$"
+        printf '%s' "${existing}" | jq \
+            --arg req "${req_id}" \
+            --arg reason "${reason}" \
+            --arg op "${operator}" \
+            --arg ts "${ts}" \
+            '. + {
+                id: $req,
+                last_action: "verification_override",
+                verification_override: {
+                    enabled: true,
+                    reason: $reason,
+                    set_by: $op,
+                    set_at: $ts
+                }
+            }' > "${action_tmp}" 2>/dev/null && mv "${action_tmp}" "${action_path}" \
+            || rm -f "${action_tmp}"
+        chmod 0600 "${action_path}" 2>/dev/null || true
+    fi
+
+    echo "Verification override recorded for ${req_id}."
+    echo "  reason:    ${reason}"
+    echo "  operator:  ${operator}"
+    echo "  timestamp: ${ts}"
+    echo "  path:      ${override_path}"
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # Command routing
 # ---------------------------------------------------------------------------
 if [[ $# -eq 0 ]]; then
@@ -766,6 +951,9 @@ case "${COMMAND}" in
             exit 127
         fi
         exec bun run "${PLUGIN_BIN_DIR}/agent-cli.ts" "$@"
+        ;;
+    override-verification)
+        cmd_override_verification "$@"
         ;;
     --help|-h)
         usage
