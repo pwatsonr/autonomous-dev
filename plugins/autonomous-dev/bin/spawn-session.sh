@@ -264,6 +264,53 @@ spawn_session_typed() {
             "${phase_prompt}" || exit_code=$?
     fi
 
+    # ── Confabulation guard (REQ-000011 post-mortem, 2026-05-19) ──
+    # The integration/deploy/test phases shipped envelopes claiming
+    # "all tests pass / 100% pass rate / Docker artifacts created"
+    # without actually verifying anything. They DID write envelopes
+    # (so the reviewer fail-closed check above doesn't catch them),
+    # but the envelopes confabulated success. The contract here:
+    # an executor claiming pass MUST include an `evidence` array with
+    # at least one `{command, exit_code, output_tail}` entry showing
+    # the verification they ran. No evidence + status=pass = override
+    # to fail with EXECUTOR_CLAIMED_PASS_WITHOUT_EVIDENCE.
+    case "${target_phase}" in
+        integration|deploy|test)
+            local result_path_pre_check="${req_dir}/phase-result-${target_phase}.json"
+            if [[ -f "${result_path_pre_check}" ]]; then
+                local claimed_status
+                claimed_status=$(jq -r '.status // "fail"' "${result_path_pre_check}" 2>/dev/null || echo "fail")
+                if [[ "${claimed_status}" == "pass" ]]; then
+                    local evidence_count
+                    evidence_count=$(jq '(.evidence // []) | length' "${result_path_pre_check}" 2>/dev/null || echo 0)
+                    if [[ "${evidence_count}" -lt 1 ]]; then
+                        # Overwrite the envelope with a synthesized fail.
+                        # Preserve the agent's feedback so operator sees
+                        # what was claimed alongside the failure reason.
+                        local original_feedback
+                        original_feedback=$(jq -r '.feedback // ""' "${result_path_pre_check}" 2>/dev/null || echo "")
+                        local fail_feedback
+                        fail_feedback="EXECUTOR_CLAIMED_PASS_WITHOUT_EVIDENCE — agent claimed: ${original_feedback}"
+                        local tmp_overwrite="${result_path_pre_check}.tmp.$$"
+                        local ts_now
+                        ts_now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                        jq -n --arg p "${target_phase}" --arg f "${fail_feedback}" --arg ts "${ts_now}" '{
+                            status: "fail",
+                            phase: $p,
+                            feedback: $f,
+                            error: "EXECUTOR_CLAIMED_PASS_WITHOUT_EVIDENCE",
+                            artifacts: [],
+                            synthesized: true,
+                            exit_code: 0,
+                            completed_at: $ts
+                        }' > "${tmp_overwrite}"
+                        mv "${tmp_overwrite}" "${result_path_pre_check}"
+                    fi
+                fi
+            fi
+            ;;
+    esac
+
     # Synthesize phase-result.json if agent didn't write one.
     #
     # 2026-05-19 fix (REQ-000011 post-mortem): review phases that exit

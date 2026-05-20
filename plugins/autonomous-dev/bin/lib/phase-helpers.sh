@@ -90,6 +90,15 @@ resolve_phase_prompt() {
         case "${phase}" in
             *_review) is_review_phase=true ;;
         esac
+        # Detect executor phases that historically confabulate "all tests
+        # pass / Docker built / deployment complete" without actually
+        # running anything (REQ-000011 post-mortem). The daemon now
+        # auto-fails their envelopes if status=pass but no `evidence`
+        # array is present.
+        local is_executor_phase=false
+        case "${phase}" in
+            integration|deploy|test) is_executor_phase=true ;;
+        esac
 
         base_prompt="You are an autonomous development agent working on request ${request_id}.
 
@@ -133,6 +142,57 @@ Before you finish, write to \`${req_dir}/phase-result-${phase}.json\`:
 Even if your review found ZERO issues, you STILL must write the
 envelope with status: pass and a brief feedback message. The envelope
 is the contract; the analysis is just how you arrive at the verdict.
+═══════════════════════════════════════════════════════════════
+"
+        fi
+
+        # Executor-specific contract — same hoisting + forcing language
+        # as reviewers, addressing the confabulation pattern observed in
+        # REQ-000011 (integration agent claimed \"100% pass\" without
+        # running tests; deploy agent claimed Docker built without
+        # writing any Dockerfile).
+        if [[ "${is_executor_phase}" == "true" ]]; then
+            base_prompt="${base_prompt}
+
+═══════════════════════════════════════════════════════════════
+**MANDATORY EVIDENCE-OF-WORK CONTRACT FOR EXECUTORS — READ FIRST**
+
+You are an executor phase (${phase}). The daemon now **auto-fails**
+any envelope where status=\"pass\" but the \`evidence\` array is empty
+or missing — code \`EXECUTOR_CLAIMED_PASS_WITHOUT_EVIDENCE\`.
+
+If you claim tests pass, you MUST run them and capture the output.
+If you claim a Docker image built, you MUST run docker build and
+capture the output. No exceptions. Summary claims like \"all tests
+passing\" without command output are now blocked.
+
+Required envelope shape (note the \`evidence\` array):
+
+  {
+    \"status\": \"pass\" | \"fail\",
+    \"phase\": \"${phase}\",
+    \"feedback\": \"<short summary, ≤500 chars>\",
+    \"evidence\": [
+      {
+        \"command\": \"<exact command you ran>\",
+        \"exit_code\": <0 = success, nonzero = failure>,
+        \"output_tail\": \"<last 20 lines of stdout/stderr, verbatim>\"
+      }
+    ],
+    \"artifacts\": [
+      { \"kind\": \"<test-output|dockerfile|deploy-script>\",
+        \"path\": \"<file path>\", \"title\": \"<one-liner>\" }
+    ]
+  }
+
+Rules:
+  - If you claim a command produced exit_code 0, the \`output_tail\`
+    must contain the actual tool's success markers (e.g. \"X pass / 0 fail\"
+    for bun test). DO NOT paraphrase. Paste the tail verbatim.
+  - If even one of your verification commands fails, set status=\"fail\"
+    and report HONESTLY. False-pass is worse than verbose-fail.
+  - You can include MULTIPLE evidence entries (one per command).
+  - Empty \`evidence\` array + status=\"pass\" = auto-failed by the daemon.
 ═══════════════════════════════════════════════════════════════
 "
         fi
