@@ -2289,6 +2289,108 @@ update_state_cost() {
 }
 
 ###############################################################################
+# Intake DB Ledger Mirror (REQ-000013)
+###############################################################################
+
+# map_state_status_to_intake(state_status) -> echoes mapped intake status; rc 0/1
+#   Pure function. No side effects. No I/O. No logging.
+#   Maps a state.json status vocabulary token to the intake.db CHECK-constrained
+#   vocabulary. Any unmapped value echoes "" and returns 1.
+#   queued        -> "queued"
+#   running|gate  -> "active"
+#   paused        -> "paused"
+#   done          -> "done"
+#   failed        -> "failed"
+#   <anything>    -> echo "" ; return 1
+map_state_status_to_intake() {
+    local s="$1"
+    case "$s" in
+        queued)        echo "queued" ;;
+        running|gate)  echo "active" ;;
+        paused)        echo "paused" ;;
+        done)          echo "done"   ;;
+        failed)        echo "failed" ;;
+        *)             echo ""; return 1 ;;
+    esac
+    return 0
+}
+
+# sync_intake_db_row(request_id, phase, state_status, ts) -> always returns 0
+#   Best-effort, non-fatal mirror of a state.json transition into intake.db.
+#   Logs exactly one terminal line on every path. Never aborts the caller.
+#   Parameters:
+#     $1 request_id   - Request ID (e.g. REQ-000013). Single-quote-escaped before binding.
+#     $2 phase        - Phase name written to current_phase verbatim (free-form TEXT).
+#     $3 state_status - A state.json status; mapped via map_state_status_to_intake.
+#     $4 ts           - ISO-8601 UTC timestamp (%Y-%m-%dT%H:%M:%SZ). Written to updated_at.
+sync_intake_db_row() {
+    local request_id="$1" phase="$2" state_status="$3" ts="$4"
+
+    # 1) sqlite3 must be available.
+    if ! command -v sqlite3 >/dev/null 2>&1; then
+        log_error "sync_intake_db_row: sqlite3 CLI not found; cannot mirror ${request_id} -> ${phase}"
+        return 0
+    fi
+
+    # 2) DB file must exist.
+    if [[ ! -f "$INTAKE_DB" ]]; then
+        log_warn "sync_intake_db_row: ${INTAKE_DB} not present; skipping ledger update for ${request_id}"
+        return 0
+    fi
+
+    # 3) Map status; skip on unmapped/empty.
+    local mapped
+    if ! mapped=$(map_state_status_to_intake "$state_status") || [[ -z "$mapped" ]]; then
+        log_error "sync_intake_db_row: unmapped state status '${state_status}' for ${request_id}; not writing ledger"
+        return 0
+    fi
+
+    # 4) Parameter-bound UPDATE + changes() in one connection.
+    #    Values are double-quote-escaped and bound via double-quoted SQL strings
+    #    in .parameter set. Double-quoting handles apostrophes in values (e.g.
+    #    REQ-O'BRIEN) that confuse the sqlite3 CLI when single-quoted. Real
+    #    request IDs and phase names are alphanumeric so neither ' nor " appear
+    #    in practice; the escaping is defense-in-depth.
+    #    Use "cmd && rc=0 || rc=$?" to capture the exit code safely under
+    #    set -euo pipefail: the &&/|| list context suppresses errexit so the
+    #    function does not abort when sqlite3 returns non-zero.
+    local rid="${request_id//\"/\"\"}"
+    local ph="${phase//\"/\"\"}"
+    local update_out rc=0
+    update_out=$(sqlite3 "$INTAKE_DB" <<SQL 2>&1
+.parameter set :rid "${rid}"
+.parameter set :phase "${ph}"
+.parameter set :status "${mapped}"
+.parameter set :ts "${ts}"
+UPDATE requests
+   SET current_phase = :phase,
+       status        = :status,
+       updated_at    = :ts
+ WHERE request_id = :rid;
+SELECT changes();
+SQL
+) && rc=0 || rc=$?
+
+    # 5) Non-zero exit -> ERROR, non-fatal.
+    if [[ $rc -ne 0 ]]; then
+        log_error "sync_intake_db_row: sqlite3 UPDATE failed for ${request_id} -> (${phase}, ${mapped}); rc=${rc}; out=${update_out}"
+        return 0
+    fi
+
+    # 6) Zero-row match -> WARN.
+    local changed
+    changed=$(printf '%s\n' "$update_out" | tail -n1)
+    if [[ "$changed" == "0" ]]; then
+        log_warn "sync_intake_db_row: 0 rows updated for ${request_id} (no ledger row?) -> (${phase}, ${mapped})"
+        return 0
+    fi
+
+    # 7) Success.
+    log_info "sync_intake_db_row: ledger updated ${request_id} -> (${phase}, ${mapped})"
+    return 0
+}
+
+###############################################################################
 # Phase Advancement (SPEC-039-2-05)
 ###############################################################################
 
@@ -2375,6 +2477,9 @@ advance_phase() {
                     }')
                 echo "$event" >> "$events_file"
 
+                # Mirror terminal completion to the intake ledger (REQ-000013 Call site C)
+                sync_intake_db_row "$request_id" "$current_phase" "done" "$ts"
+
                 # Clean up gate decision file for completed request
                 local repo_basename
                 repo_basename=$(basename "$project")
@@ -2429,6 +2534,9 @@ advance_phase() {
                         to: $to
                     }')
                 echo "$event" >> "$events_file"
+
+                # Mirror phase advance to the intake ledger (REQ-000013 Call site B)
+                sync_intake_db_row "$request_id" "$next_phase" "$next_status" "$ts"
 
                 log_info "Phase advanced: $request_id $current_phase -> $next_phase (status=$next_status)"
 
@@ -2485,7 +2593,18 @@ advance_phase() {
                    "$state_file" > "$tmp"
                 mv "$tmp" "$state_file"
 
+                # Mirror review-fail reset to the intake ledger (REQ-000013 Call site E)
+                sync_intake_db_row "$request_id" "$author_phase" "running" "$ts"
+
                 log_info "Review phase $current_phase failed, reset to author phase $author_phase"
+            fi
+
+            # Mirror a terminal failure (retry-exhausted) to the ledger (REQ-000013 Call site F).
+            # handle_phase_failure may have set state.json status=failed; re-read to confirm.
+            local post_status
+            post_status=$(jq -r '.status // ""' "$state_file" 2>/dev/null || echo "")
+            if [[ "$post_status" == "failed" ]]; then
+                sync_intake_db_row "$request_id" "$current_phase" "failed" "$ts"
             fi
 
             # Write portal request action after all failure handling
@@ -2549,6 +2668,9 @@ intake_to_prd_if_needed() {
                 to: "prd"
             }')
         echo "$event" >> "$events_file"
+
+        # Mirror intake->prd transition to the intake ledger (REQ-000013 Call site A)
+        sync_intake_db_row "$request_id" "prd" "running" "$ts"
 
         log_info "Auto-transitioned $request_id from intake to prd"
 
