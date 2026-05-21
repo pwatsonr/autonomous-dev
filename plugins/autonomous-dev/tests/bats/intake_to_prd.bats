@@ -1,17 +1,28 @@
 #!/usr/bin/env bats
 
 # Tests for intake_to_prd_if_needed() function (SPEC-039-2-06)
+# Integration tests I1, R1 for REQ-000013 (intake DB ledger sync) also live here.
+
+PLUGIN_DIR_PATH=""
 
 setup() {
-    PLUGIN_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
+    PLUGIN_DIR_PATH="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
 
-    # Source the supervisor-loop.sh to get intake_to_prd_if_needed function
+    # Create temp home dir and set HOME BEFORE sourcing so all readonly vars
+    # (DAEMON_HOME, INTAKE_DB, LOG_DIR, LOG_FILE) resolve under the temp tree.
+    # This is required by REQ-000013 spec IN-1.
+    TEST_WORK_DIR="$(mktemp -d)"
+    export HOME="$TEST_WORK_DIR"
+
+    # Pre-create the log directory so log_json can write to LOG_FILE
+    mkdir -p "$TEST_WORK_DIR/.autonomous-dev/logs"
+
+    # Source the script after HOME is set
     set +e  # Allow non-zero returns from sourced functions
-    source "$PLUGIN_DIR/bin/supervisor-loop.sh"
+    source "$PLUGIN_DIR_PATH/bin/supervisor-loop.sh"
     set -e
 
     # Create test project and request directory
-    TEST_WORK_DIR="$(mktemp -d)"
     TEST_PROJECT="$TEST_WORK_DIR/test-project"
     TEST_REQUEST_ID="REQ-260512"
     TEST_REQ_DIR="$TEST_PROJECT/.autonomous-dev/requests/$TEST_REQUEST_ID"
@@ -20,6 +31,24 @@ setup() {
 
 teardown() {
     rm -rf "$TEST_WORK_DIR"
+}
+
+# ---------------------------------------------------------------------------
+# Shared DB helpers for REQ-000013 integration / regression tests
+# ---------------------------------------------------------------------------
+
+# seed_db_intake() — seed the DB with request in (intake, queued) state
+seed_db_intake() {
+    mkdir -p "$DAEMON_HOME"
+    sqlite3 "$INTAKE_DB" < "$PLUGIN_DIR_PATH/intake/db/schema.sql"
+    sqlite3 "$INTAKE_DB" \
+        "INSERT INTO requests (request_id,title,description,raw_input,requester_id,source_channel,current_phase,status)
+         VALUES ('$TEST_REQUEST_ID','t','d','r','u','claude_app','intake','queued');"
+}
+
+# ledger <col> — read a column from the test request's row
+ledger() {
+    sqlite3 "$INTAKE_DB" "SELECT $1 FROM requests WHERE request_id='$TEST_REQUEST_ID';"
 }
 
 @test "intake_to_prd_if_needed: queued/intake transitions to running/prd" {
@@ -118,4 +147,91 @@ EOF
 
     # Verify no events written
     [[ ! -f "$TEST_REQ_DIR/events.jsonl" ]]
+}
+
+# ===========================================================================
+# Integration and Regression tests for REQ-000013: intake DB ledger mirroring
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# I1: intake→prd transition mirrors ('prd', 'active') in ledger
+# ---------------------------------------------------------------------------
+@test "I1: intake_to_prd_if_needed mirrors ledger to (prd, active)" {
+    # Seed: DB has (intake, queued); state.json has (intake, queued)
+    seed_db_intake
+
+    cat > "$TEST_REQ_DIR/state.json" << EOF
+{
+  "id": "$TEST_REQUEST_ID",
+  "status": "queued",
+  "current_phase": "intake",
+  "priority": 1,
+  "created_at": "2026-05-12T10:00:00Z",
+  "updated_at": "2026-05-12T10:00:00Z"
+}
+EOF
+
+    intake_to_prd_if_needed "$TEST_REQUEST_ID" "$TEST_PROJECT"
+    local result=$?
+
+    # Function must return 0 (transition happened)
+    [[ $result -eq 0 ]]
+
+    # state.json: transition to prd/running
+    local state_phase state_status
+    state_phase=$(jq -r '.current_phase' "$TEST_REQ_DIR/state.json")
+    state_status=$(jq -r '.status' "$TEST_REQ_DIR/state.json")
+    [[ "$state_phase" == "prd" ]]
+    [[ "$state_status" == "running" ]]
+
+    # intake.db: ledger row must reflect ('prd', 'active')
+    [[ "$(ledger current_phase)" == "prd" ]]
+    [[ "$(ledger status)" == "active" ]]
+}
+
+# ---------------------------------------------------------------------------
+# R1: Regression test — reproduce REQ-000011 drift scenario
+#   Before the fix: ledger stays at ('intake','queued') after the transition.
+#   After the fix:  ledger reflects ('prd','active').
+# ---------------------------------------------------------------------------
+@test "R1: regression — intake DB no longer drifts after intake_to_prd transition" {
+    # Seed: ledger starts at (intake, queued) — the drifted state from REQ-000011
+    seed_db_intake
+
+    local before_phase before_status
+    before_phase=$(ledger current_phase)
+    before_status=$(ledger status)
+    [[ "$before_phase" == "intake" ]]
+    [[ "$before_status" == "queued" ]]
+
+    # state.json also starts at (intake, queued)
+    cat > "$TEST_REQ_DIR/state.json" << EOF
+{
+  "id": "$TEST_REQUEST_ID",
+  "status": "queued",
+  "current_phase": "intake",
+  "priority": 1,
+  "created_at": "2026-05-12T10:00:00Z",
+  "updated_at": "2026-05-12T10:00:00Z"
+}
+EOF
+
+    # Execute the transition
+    intake_to_prd_if_needed "$TEST_REQUEST_ID" "$TEST_PROJECT"
+
+    # After the fix, the ledger must NOT remain ('intake', 'queued').
+    # It must reflect the updated ('prd', 'active').
+    local after_phase after_status
+    after_phase=$(ledger current_phase)
+    after_status=$(ledger status)
+
+    # This is the key regression assertion: ledger is no longer stuck at intake/queued
+    [[ "$after_phase" == "prd" ]]
+    [[ "$after_status" == "active" ]]
+
+    # Double-check: SELECT current_phase,status returns 'prd|active' not 'intake|queued'
+    local combined
+    combined=$(sqlite3 "$INTAKE_DB" \
+        "SELECT current_phase || '|' || status FROM requests WHERE request_id='$TEST_REQUEST_ID';")
+    [[ "$combined" == "prd|active" ]]
 }
