@@ -9,6 +9,7 @@ tools:
   - Read
   - Glob
   - Grep
+  - Write
 expertise:
   - wcag-2.2-aa
   - keyboard-accessibility
