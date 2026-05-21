@@ -9,6 +9,7 @@ tools:
   - Read
   - Glob
   - Grep
+  - Write
 expertise:
   - ux-heuristics
   - information-architecture
