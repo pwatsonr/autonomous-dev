@@ -490,6 +490,7 @@ restore_interrupted_session() {
     # Clear session_active flag
     local tmp="${state_file}.tmp"
     jq '.current_phase_metadata.session_active = false' "${state_file}" > "${tmp}" 2>/dev/null
+    # LEDGER-EXEMPT: status/current_phase not modified
     mv "${tmp}" "${state_file}"
 
     # Append recovery event
@@ -1171,6 +1172,7 @@ dispatch_phase_session() {
         .current_phase_metadata.dispatched_at = $timestamp |
         .current_phase_metadata.dispatched_phase = $phase' \
        "${state_file}" > "${tmp}"
+    # LEDGER-EXEMPT: status/current_phase not modified
     mv "${tmp}" "${state_file}"
 
     # Checkpoint
@@ -1291,6 +1293,7 @@ spawn_session() {
     # Mark session as active in state metadata
     local tmp="${state_file}.tmp"
     jq '.current_phase_metadata.session_active = true' "${state_file}" > "${tmp}"
+    # LEDGER-EXEMPT: status/current_phase not modified
     mv "${tmp}" "${state_file}"
 
     # Update heartbeat with active request
@@ -1329,6 +1332,7 @@ spawn_session() {
     if [[ -f "${state_file}" ]]; then
         local tmp="${state_file}.tmp"
         jq '.current_phase_metadata.session_active = false' "${state_file}" > "${tmp}"
+        # LEDGER-EXEMPT: status/current_phase not modified
         mv "${tmp}" "${state_file}"
     fi
 
@@ -1693,6 +1697,15 @@ escalate_to_paused() {
         ' "${state_file}" > "${tmp}"
     mv "${tmp}" "${state_file}"
 
+    # NEW (REQ-000014 FR-A1, ADR-3): read current_phase for ledger mirror.
+    # Use the authoritative state.json value post-mv; fall back to caller-supplied
+    # phase if state.json is malformed or current_phase is absent.
+    local current_phase
+    current_phase=$(jq -r '.current_phase // empty' "${state_file}" 2>/dev/null || echo "")
+    if [[ -z "${current_phase}" ]]; then
+        current_phase="${phase}"
+    fi
+
     # Append escalation event
     local event
     event=$(jq -n \
@@ -1711,6 +1724,11 @@ escalate_to_paused() {
             }
         }')
     echo "${event}" >> "${events_file}"
+
+    # NEW (REQ-000014 FR-A1, FR-A2, FR-A3): mirror state.json into intake.db.
+    # Non-fatal by contract; sync_intake_db_row always returns 0 and logs every
+    # failure mode (ERROR/WARN/INFO).
+    sync_intake_db_row "${request_id}" "${current_phase}" "paused" "${ts}"
 
     # Emit alert
     emit_alert "retry_exhaustion" "Request ${request_id} paused after ${retry_count} retries in phase '${phase}'"
@@ -1972,6 +1990,7 @@ update_request_state() {
             .cost_accrued_usd = ((.cost_accrued_usd // 0) + ($cost | tonumber)) |
             .updated_at = $ts
             ' > "${tmp}"
+        # LEDGER-EXEMPT: status/current_phase not modified
         mv "${tmp}" "${state_file}"
 
         # Append session_complete event
@@ -2009,6 +2028,7 @@ update_request_state() {
             .cost_accrued_usd = ((.cost_accrued_usd // 0) + ($cost | tonumber)) |
             .updated_at = $ts
             ' > "${tmp}"
+        # LEDGER-EXEMPT: status/current_phase not modified
         mv "${tmp}" "${state_file}"
 
         # Compute and write next_retry_after (SPEC-001-3-02 Task 4)
@@ -2021,6 +2041,7 @@ update_request_state() {
             local tmp2="${state_file}.tmp"
             jq --arg nra "${next_retry}" \
                 '.current_phase_metadata.next_retry_after = $nra' "${state_file}" > "${tmp2}"
+            # LEDGER-EXEMPT: status/current_phase not modified
             mv "${tmp2}" "${state_file}"
             log_info "Request ${request_id} backoff until ${next_retry} (retry ${new_retry_count})"
         fi
@@ -2279,6 +2300,7 @@ update_state_cost() {
         return 0
     fi
 
+    # LEDGER-EXEMPT: status/current_phase not modified
     if ! mv "$tmp" "$state_file" 2>/dev/null; then
         log_warn "Failed to move updated state file for request $request_id"
         rm -f "$tmp" 2>/dev/null || true
@@ -2315,6 +2337,13 @@ map_state_status_to_intake() {
     return 0
 }
 
+# ─── AUDIT REFERENCE ───────────────────────────────────────────────────────
+# Every state.json writer in this file that mutates `.status` or
+# `.current_phase` MUST call this helper. See docs/triage/state-json-writers.md
+# for the canonical writer audit (MIRROR / EXEMPT / OUT_OF_SCOPE).
+# Adding a new state.json writer? Update that audit and either call this
+# helper or document the exemption inline.
+# ───────────────────────────────────────────────────────────────────────────
 # sync_intake_db_row(request_id, phase, state_status, ts) -> always returns 0
 #   Best-effort, non-fatal mirror of a state.json transition into intake.db.
 #   Logs exactly one terminal line on every path. Never aborts the caller.
@@ -2562,6 +2591,7 @@ advance_phase() {
                --arg ts "$ts" \
                '.escalation_count = $count | .updated_at = $ts' \
                "$state_file" > "$tmp"
+            # LEDGER-EXEMPT: status/current_phase not modified
             mv "$tmp" "$state_file"
 
             # Append phase_failed event
