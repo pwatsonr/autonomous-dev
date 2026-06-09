@@ -32,6 +32,10 @@ readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
 readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
 readonly PORTAL_REQUEST_ACTIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/request-actions"
 readonly GATE_DECISIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/gate-decisions"
+# PRD-025 FR-025-05 / #353: portal-originated config-change markers. The portal
+# writes proposed config edits here instead of mutating CONFIG_FILE directly;
+# consume_config_changes() validates + applies them during reconcile.
+readonly CONFIG_CHANGES_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/config-changes"
 
 # --- Runtime State Variables -------------------------------------------------
 
@@ -2783,6 +2787,65 @@ handle_phase_failure() {
 # Orphan Reconciliation
 ###############################################################################
 
+# consume_config_changes() -> void
+#   PRD-025 FR-025-05 / #353. Applies portal-originated config-change markers.
+#   The portal writes a marker {id, source:"portal", actor, ts, summary,
+#   proposed:<full user config>} into CONFIG_CHANGES_DIR rather than mutating
+#   CONFIG_FILE directly (FR-925). This validates each marker, atomically
+#   applies `.proposed` to CONFIG_FILE, logs an audit line, and archives the
+#   marker. Invalid markers are moved to a `rejected/` subdir (never applied,
+#   never retried forever). Runs during reconcile. Safe under `set -e`.
+consume_config_changes() {
+    [[ -d "${CONFIG_CHANGES_DIR}" ]] || return 0
+
+    local applied_dir="${CONFIG_CHANGES_DIR}/applied"
+    local rejected_dir="${CONFIG_CHANGES_DIR}/rejected"
+    local applied_count=0
+    local marker
+    for marker in "${CONFIG_CHANGES_DIR}"/*.json; do
+        [[ -f "${marker}" ]] || continue   # literal glob when no markers present
+
+        # 1. Validate: parseable JSON, source=="portal", .proposed is an object.
+        if ! jq empty "${marker}" 2>/dev/null; then
+            log_warn "Config-change marker is corrupt JSON; rejecting: ${marker}"
+            mkdir -p "${rejected_dir}"; mv "${marker}" "${rejected_dir}/" 2>/dev/null || rm -f "${marker}"
+            continue
+        fi
+        local src proposed_type
+        src=$(jq -r '.source // ""' "${marker}" 2>/dev/null || echo "")
+        proposed_type=$(jq -r '.proposed | type' "${marker}" 2>/dev/null || echo "null")
+        if [[ "${src}" != "portal" || "${proposed_type}" != "object" ]]; then
+            log_warn "Config-change marker failed validation (source='${src}', proposed=${proposed_type}); rejecting: ${marker}"
+            mkdir -p "${rejected_dir}"; mv "${marker}" "${rejected_dir}/" 2>/dev/null || rm -f "${marker}"
+            continue
+        fi
+
+        local id actor summary
+        id=$(jq -r '.id // "unknown"' "${marker}" 2>/dev/null || echo "unknown")
+        actor=$(jq -r '.actor // "unknown"' "${marker}" 2>/dev/null || echo "unknown")
+        summary=$(jq -r '.summary // ""' "${marker}" 2>/dev/null || echo "")
+
+        # 2. Apply: atomically write `.proposed` to CONFIG_FILE.
+        local cfg_tmp="${CONFIG_FILE}.tmp.$$"
+        mkdir -p "$(dirname "${CONFIG_FILE}")" 2>/dev/null || true
+        if jq '.proposed' "${marker}" > "${cfg_tmp}" 2>/dev/null && mv "${cfg_tmp}" "${CONFIG_FILE}"; then
+            # 3. Audit (structured log line is the daemon's audit trail) + archive.
+            log_info "Applied portal config change ${id} by '${actor}': ${summary}"
+            mkdir -p "${applied_dir}"; mv "${marker}" "${applied_dir}/" 2>/dev/null || rm -f "${marker}"
+            applied_count=$(( applied_count + 1 ))
+        else
+            rm -f "${cfg_tmp}" 2>/dev/null || true
+            log_warn "Failed to apply config-change marker ${id}; leaving for retry: ${marker}"
+        fi
+    done
+
+    # Reload so applied changes take effect this run (poll interval, caps, etc.).
+    if [[ ${applied_count} -gt 0 ]]; then
+        load_config || log_warn "Config reload after applying ${applied_count} change(s) failed"
+    fi
+    return 0
+}
+
 # reconcile_orphans() -> void
 #   Reconcile orphan SQLite rows and state.json files per SPEC-039-1-04.
 #   Runs at startup and every RECONCILE_EVERY_N_POLLS iterations.
@@ -3259,6 +3322,9 @@ main_loop() {
         if [[ $(( POLL_COUNT % RECONCILE_EVERY_N_POLLS )) -eq 1 ]]; then
             reconcile_orphans || log_error "Orphan reconciliation failed"
         fi
+
+        # Apply any portal-originated config-change markers (PRD-025 FR-025-05).
+        consume_config_changes || log_error "Config-change consumption failed"
 
         # Marketplace auto-update.
         if [[ $(( POLL_COUNT % UPGRADE_CHECK_EVERY_N_POLLS )) -eq 1 ]]; then

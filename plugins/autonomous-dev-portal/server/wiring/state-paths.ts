@@ -53,6 +53,21 @@ export function requestActionPath(id: string): string {
 }
 
 /**
+ * Per-change marker files for portal-originated configuration edits
+ * (PRD-025 FR-025-05 / #353). The portal writes a marker here instead of
+ * mutating the user config directly; the daemon's reconcile step validates
+ * and applies it (mirrors the gate-decision / request-action poll model), so
+ * every config change is daemon-mediated, validated, and audited.
+ */
+export function configChangesDir(): string {
+    return join(stateDirRoot(), "config-changes");
+}
+
+export function configChangePath(id: string): string {
+    return join(configChangesDir(), `${id}.json`);
+}
+
+/**
  * The portal's audit-log file (HMAC-chained NDJSON). Distinct from the
  * daemon's audit log so a portal compromise cannot rewrite daemon history.
  */

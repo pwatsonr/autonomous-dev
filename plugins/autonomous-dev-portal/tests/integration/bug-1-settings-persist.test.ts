@@ -5,7 +5,7 @@
 
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { Hono } from "hono";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -63,7 +63,37 @@ describe("BUG-1 regression test — settings persist properly", () => {
         // `readPortalSettings()` with no override; it resolves
         // `userConfigPath()` which honors AUTONOMOUS_DEV_USER_CONFIG.
         process.env["AUTONOMOUS_DEV_USER_CONFIG"] = TEST_CONFIG_PATH;
+        // #353: the writer now emits a config-change MARKER under
+        // ${AUTONOMOUS_DEV_STATE_DIR}/config-changes instead of writing the
+        // config directly. Point the state dir at this test's temp dir so
+        // markers don't land in the committed kit-parity fixture.
+        process.env["AUTONOMOUS_DEV_STATE_DIR"] = TEST_CONFIG_DIR;
     });
+
+    // Simulate the daemon's consume_config_changes(): apply any pending
+    // portal config-change markers to the config file the reader reads. This
+    // lets the regression tests still assert end-to-end persistence through
+    // the new marker indirection (the daemon's real apply is covered by
+    // consume_config_changes.bats).
+    function applyPendingMarkers(): void {
+        const ccDir = join(TEST_CONFIG_DIR, "config-changes");
+        let files: string[];
+        try {
+            files = readdirSync(ccDir).filter((f) => f.endsWith(".json"));
+        } catch {
+            return;
+        }
+        for (const f of files.sort()) {
+            const marker = JSON.parse(readFileSync(join(ccDir, f), "utf-8"));
+            if (
+                marker.source === "portal" &&
+                marker.proposed &&
+                typeof marker.proposed === "object"
+            ) {
+                writeFileSync(TEST_CONFIG_PATH, JSON.stringify(marker.proposed), "utf-8");
+            }
+        }
+    }
 
     afterAll(() => {
         process.env["AUTONOMOUS_DEV_STATE_DIR"] = ORIGINAL_STATE_DIR;
@@ -98,6 +128,7 @@ describe("BUG-1 regression test — settings persist properly", () => {
         expect(saveHtml).toContain("SAVED");
 
         // Then reload the settings page and check if the trust level persists
+        applyPendingMarkers();
         const loadRes = await app.request("/settings");
         expect(loadRes.status).toBe(200);
         const loadHtml = await loadRes.text();
@@ -121,6 +152,7 @@ describe("BUG-1 regression test — settings persist properly", () => {
         expect(saveHtml).toContain("SAVED");
 
         // Reload and check if the cost cap persists
+        applyPendingMarkers();
         const loadRes = await app.request("/settings");
         expect(loadRes.status).toBe(200);
         const loadHtml = await loadRes.text();
@@ -149,6 +181,7 @@ describe("BUG-1 regression test — settings persist properly", () => {
         expect(saveHtml).toContain("SAVED");
 
         // Reload and check if notification settings persist
+        applyPendingMarkers();
         const loadRes = await app.request("/settings");
         expect(loadRes.status).toBe(200);
         const loadHtml = await loadRes.text();
