@@ -21,38 +21,42 @@ if [[ -z "${PLUGIN_ROOT:-}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Logging helpers (write to stderr so stdout stays clean for data output)
-# Only define if not already defined (e.g., when sourced by supervisor-loop.sh)
+# Logging + escalation (private to this module).
+#
+# Historically this file defined 2-arg `log_error/log_warning/log_info` and
+# `emit_escalation` only when the host hadn't — but supervisor-loop.sh defines
+# 1-arg `log_error/log_info`, so those calls logged the tag and dropped the
+# message. Use a private `_rl_log`/`_rl_escalate` that DELEGATES to the host's
+# structured loggers when present (correct message), else writes to stderr.
+# Private names avoid any signature collision with the host.
 # ---------------------------------------------------------------------------
-if ! declare -F log_error >/dev/null 2>&1; then
-  log_error() {
-    local tag="$1"; shift
-    echo "[${tag}] ERROR: $*" >&2
+if ! declare -F _rl_log >/dev/null 2>&1; then
+  _rl_log() {
+    # $1 = level (info|warn|error); remaining args = message
+    local level="$1"; shift
+    local msg="$*"
+    case "$level" in
+      warn)
+        if declare -F log_warn >/dev/null 2>&1; then log_warn "rate_limit: ${msg}"
+        else echo "[rate_limit_handler] WARNING: ${msg}" >&2; fi ;;
+      error)
+        if declare -F log_error >/dev/null 2>&1; then log_error "rate_limit: ${msg}"
+        else echo "[rate_limit_handler] ERROR: ${msg}" >&2; fi ;;
+      *)
+        if declare -F log_info >/dev/null 2>&1; then log_info "rate_limit: ${msg}"
+        else echo "[rate_limit_handler] INFO: ${msg}" >&2; fi ;;
+    esac
   }
 fi
 
-if ! declare -F log_warning >/dev/null 2>&1; then
-  log_warning() {
-    local tag="$1"; shift
-    echo "[${tag}] WARNING: $*" >&2
-  }
-fi
-
-if ! declare -F log_info >/dev/null 2>&1; then
-  log_info() {
-    local tag="$1"; shift
-    echo "[${tag}] INFO: $*" >&2
-  }
-fi
-
-# ---------------------------------------------------------------------------
-# emit_escalation fallback
-# Only define if not already defined (e.g., when sourced by supervisor-loop.sh)
-# ---------------------------------------------------------------------------
-if ! declare -F emit_escalation >/dev/null 2>&1; then
-  emit_escalation() {
+if ! declare -F _rl_escalate >/dev/null 2>&1; then
+  _rl_escalate() {
     local payload="$1"
-    # Last resort: write to stderr and alerts directory
+    # Prefer the host's structured alert channel; else write to the alerts dir.
+    if declare -F emit_alert >/dev/null 2>&1; then
+      emit_alert "rate_limit_escalation" "$payload"
+      return 0
+    fi
     echo "[rate_limit_handler] ESCALATION: $payload" >&2
     local alerts_dir="${HOME}/.autonomous-dev/alerts"
     mkdir -p "$alerts_dir"
@@ -198,7 +202,7 @@ handle_rate_limit() {
 
   # Backoff sequence with defaults (base=30): 30, 60, 120, 240, 480, then pause
   if (( backoff > max_seconds )); then
-    log_error "rate_limit_handler" "Rate limit persists after $consecutive consecutive retries. Activating kill switch."
+    _rl_log error "Rate limit persists after $consecutive consecutive retries. Activating kill switch."
 
     # Emit escalation
     local payload
@@ -213,7 +217,7 @@ handle_rate_limit() {
         max_backoff_seconds: $max,
         recommendation: "Check Anthropic API status. Verify API key quota. Wait for rate limits to clear, then manually restart."
       }')
-    emit_escalation "$payload"
+    _rl_escalate "$payload"
 
     # Write kill switch state
     write_rate_limit_state "$state_file" true "$consecutive" "$max_seconds" true
@@ -228,7 +232,7 @@ handle_rate_limit() {
     retry_at=$(date -u -d "+${backoff} seconds" +"%Y-%m-%dT%H:%M:%SZ")
   fi
 
-  log_warning "rate_limit_handler" "Rate limit detected (consecutive: $consecutive). Backing off for ${backoff}s until $retry_at"
+  _rl_log warn "Rate limit detected (consecutive: $consecutive). Backing off for ${backoff}s until $retry_at"
 
   write_rate_limit_state "$state_file" true "$consecutive" "$backoff" false "$retry_at"
   return 0
@@ -264,7 +268,7 @@ check_rate_limit_state() {
   # Parse state file
   local state
   if ! state=$(jq '.' "$state_file" 2>/dev/null); then
-    log_warning "rate_limit_handler" "Corrupted rate-limit state file. Deleting and recreating."
+    _rl_log warn "Corrupted rate-limit state file. Deleting and recreating."
     rm -f "$state_file"
     return 0
   fi
@@ -276,7 +280,7 @@ check_rate_limit_state() {
 
   # Kill switch: do not proceed
   if [[ "$kill_switch" == "true" ]]; then
-    log_error "rate_limit_handler" "Kill switch active. Manual restart required."
+    _rl_log error "Kill switch active. Manual restart required."
     return 1
   fi
 
@@ -297,7 +301,7 @@ check_rate_limit_state() {
 
     if (( now_epoch < retry_epoch )); then
       local remaining=$((retry_epoch - now_epoch))
-      log_info "rate_limit_handler" "Rate limit backoff active. ${remaining}s remaining until $retry_at"
+      _rl_log info "Rate limit backoff active. ${remaining}s remaining until $retry_at"
       return 1  # Still in backoff period
     fi
   fi
@@ -329,7 +333,7 @@ clear_rate_limit_state() {
   active=$(jq -r '.active // false' "$state_file" 2>/dev/null) || active="false"
 
   if [[ "$active" == "true" ]]; then
-    log_info "rate_limit_handler" "Clearing rate limit state after successful session."
+    _rl_log info "Clearing rate limit state after successful session."
     write_rate_limit_state "$state_file" false 0 0 false
   fi
 }

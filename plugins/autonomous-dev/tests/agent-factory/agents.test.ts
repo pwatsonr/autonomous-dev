@@ -176,6 +176,29 @@ function test_all_system_prompts_are_substantive(): void {
   console.log('PASS: test_all_system_prompts_are_substantive');
 }
 
+// Comprehensive guard: EVERY agents/*.md must parse and pass validation so a
+// registry.load() admits the whole catalog. The per-agent tests above and the
+// older "all agents" helpers only cover a fixed foundation list — which is how
+// the specialist reviewers regressed (#364). This one scans the directory.
+function test_every_agent_file_validates(): void {
+  const files = fs.readdirSync(AGENTS_DIR).filter((f) => f.endsWith('.md'));
+  assert(files.length >= 6, `expected agent files, found ${files.length}`);
+  const failures: string[] = [];
+  for (const file of files) {
+    const parseResult = parseAgentString(readAgentFile(file));
+    if (!parseResult.success || !parseResult.agent) {
+      failures.push(`${file}: parse failed — ${parseResult.errors.map((e) => e.message).join('; ')}`);
+      continue;
+    }
+    const result = validateAgent(parseResult.agent, new Set<string>());
+    if (!result.valid) {
+      failures.push(`${file}: ${result.errors.map((e) => `${e.rule}: ${e.message}`).join('; ')}`);
+    }
+  }
+  assert(failures.length === 0, `agent definitions failed validation:\n  ${failures.join('\n  ')}`);
+  console.log(`PASS: test_every_agent_file_validates (${files.length} agents)`);
+}
+
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
@@ -190,4 +213,5 @@ describe("AgentFactory: agent definitions", () => {
   it("all agents have minimum 2 rubric dimensions", () => { test_all_agents_have_minimum_2_rubric_dimensions(); });
   it("all agents respect tool allowlist", () => { test_all_agents_respect_tool_allowlist(); });
   it("all system prompts are substantive", () => { test_all_system_prompts_are_substantive(); });
+  it("every agent file in the directory validates", () => { test_every_agent_file_validates(); });
 });

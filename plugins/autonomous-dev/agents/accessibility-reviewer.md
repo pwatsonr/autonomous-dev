@@ -15,6 +15,16 @@ expertise:
   - keyboard-accessibility
   - aria
   - color-contrast
+evaluation_rubric:
+  - name: wcag-coverage
+    weight: 0.4
+    description: Checks contrast (4.5:1 / 3:1), keyboard operability, focus order, ARIA name/role/value, and alt text
+  - name: false-positive-rate
+    weight: 0.3
+    description: Flags only genuine WCAG 2.2 AA failures, not stylistic preferences
+  - name: actionability
+    weight: 0.3
+    description: Cites the failing element and the specific success criterion plus a remedy
 output_schema: schemas/reviewer-finding-v1.json
 description: "Specialist reviewer for WCAG 2.2 AA conformance: contrast (4.5:1 / 3:1), keyboard accessibility, focus order, ARIA, alt text."
 ---
