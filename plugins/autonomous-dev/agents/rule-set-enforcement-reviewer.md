@@ -15,6 +15,16 @@ expertise:
   - standards-enforcement
   - dsl-evaluation
   - policy-as-code
+evaluation_rubric:
+  - name: rule-fidelity
+    weight: 0.5
+    description: Correctly evaluates each standards.yaml rule against the change with no missed or misapplied rules
+  - name: false-positive-rate
+    weight: 0.3
+    description: Reports a violation only when the rule predicate genuinely matches
+  - name: rule-id-tagging
+    weight: 0.2
+    description: Every finding is tagged with its originating rule_id for traceability
 output_schema: schemas/reviewer-finding-v1.json
 description: "Specialist reviewer that enforces project-defined standards from .autonomous-dev/standards.yaml; one finding per rule violation, each tagged with rule_id."
 ---

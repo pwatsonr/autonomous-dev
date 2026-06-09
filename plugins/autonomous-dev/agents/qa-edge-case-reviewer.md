@@ -15,6 +15,16 @@ expertise:
   - boundary-analysis
   - error-handling
   - concurrency
+evaluation_rubric:
+  - name: edge-case-discovery
+    weight: 0.45
+    description: Surfaces real boundary conditions, race conditions, error paths, null handling, and resource leaks
+  - name: reproducibility
+    weight: 0.3
+    description: Each finding describes concrete inputs/sequence that trigger the failure
+  - name: false-positive-rate
+    weight: 0.25
+    description: Avoids speculative findings with no plausible trigger
 output_schema: schemas/reviewer-finding-v1.json
 description: "Specialist reviewer that hunts edge cases, boundary conditions, race conditions, error paths, null handling, and resource leaks."
 ---

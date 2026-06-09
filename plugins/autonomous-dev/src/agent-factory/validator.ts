@@ -37,10 +37,18 @@ export type { ValidationResult };
 // of `Edit` and `Bash` — they can persist a verdict but cannot modify code.
 // (Scoped-write hardening — restricting Write to the envelope path — is a
 // separate follow-up; see PRD-025.)
+//
+// `Bash(node *)` is a SCOPED execution permission allowed for reviewers
+// solely for `rule-set-enforcement-reviewer`, which runs a local Node
+// script to evaluate `.autonomous-dev/standards.yaml` rules. It is listed
+// as a distinct, exact token (not bare `Bash`) so the privilege is explicit
+// and auditable. NOTE: `node` can execute arbitrary code, so this reviewer
+// is a trusted-execution role despite being read-only w.r.t. the repo;
+// adding further scoped-bash reviewers should be a deliberate decision.
 export const TOOL_ALLOWLIST: Record<AgentRole, string[]> = {
   author:   ['Read', 'Glob', 'Grep', 'Write', 'WebSearch', 'WebFetch'],
   executor: ['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write', 'WebSearch', 'WebFetch'],
-  reviewer: ['Read', 'Glob', 'Grep', 'Write'],
+  reviewer: ['Read', 'Glob', 'Grep', 'Write', 'Bash(node *)'],
   meta:     ['Read', 'Glob', 'Grep', 'Write'],
 };
 
