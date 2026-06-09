@@ -3,59 +3,15 @@
 /* Tokens loaded separately via /static/design-tokens.css */
 
 /* ============================================================
-   Dark mode override — inlined here to guarantee load order.
-   Default theme for the autonomous-dev portal.
+   Dark-mode tokens live in design-tokens.css, which loads BEFORE this
+   file (shell.tsx) under the identical :root[data-theme="dark"] selector.
+   Do NOT re-declare color tokens here. A stale duplicate of the
+   --phase-* palette previously shadowed the canonical PRD-018 M-02
+   values (e.g. --phase-prd #a48bd9 vs the correct #d6c4ee) and broke
+   phase-chip contrast in dark mode. Removed per PRD-025 FR-025-02 /
+   PRD-026 FR-026-04. design-tokens.css is the single source of truth
+   for every color token; this stylesheet only adds layout/components.
    ============================================================ */
-:root[data-theme="dark"] {
-  --bg-0: #14130f;
-  --bg-1: #1c1b16;
-  --bg-2: #24221c;
-  --bg-3: #2e2c24;
-  --line-1: #3a3830;
-  --line-2: #4d4a3f;
-  --fg-0: #ede9d8;
-  --fg-1: #c9c5b3;
-  --fg-2: #95917f;
-  --fg-3: #6a6857;
-
-  --brand: #e89255;
-  --brand-hover: #f1a572;
-  --brand-press: #c8631a;
-  --brand-tint: #3a2a18;
-  --brand-line: #6b4220;
-
-  --ok: #98c39a;
-  --ok-tint: #1d2a1f;
-  --ok-line: #335036;
-
-  --warn: #dfba6b;
-  --warn-tint: #2c2616;
-  --warn-line: #574a25;
-
-  --err: #d99891;
-  --err-tint: #2e1c1a;
-  --err-line: #5a302c;
-
-  --info: #88adcb;
-  --info-tint: #1a2530;
-  --info-line: #2f4659;
-
-  --muted: #95917f;
-  --muted-tint: #2a281f;
-
-  --phase-prd:    #a48bd9;
-  --phase-tdd:    #6fa8c7;
-  --phase-plan:   #66b896;
-  --phase-spec:   #b5b250;
-  --phase-code:   #e89255;
-  --phase-review: #c98a55;
-  --phase-deploy: #98c39a;
-  --phase-observe:#9a978a;
-
-  --shadow-1: 0 1px 0 rgba(0,0,0,0.4), 0 0 0 1px var(--line-1);
-  --shadow-2: 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px var(--line-1);
-  --shadow-pop: 0 8px 24px rgba(0,0,0,0.6), 0 0 0 1px var(--line-2);
-}
 
 html, body, #root { height: 100%; }
 body { background: var(--bg-0); color: var(--fg-0); }

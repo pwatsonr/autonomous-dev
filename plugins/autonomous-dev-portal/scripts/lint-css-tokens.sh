@@ -3,8 +3,10 @@
 # Reject hex color literals, hardcoded font-family declarations, and
 # hardcoded px sizes in non-token CSS files.
 #
-# Scans:
-#   plugins/autonomous-dev-portal/server/static/*.css
+# Scans (PRD-025 FR-025-01 — these are the directories the portal CSS
+# actually lives in; the prior globs pointed at server/static/ which has
+# never existed, so this gate was a silent no-op):
+#   plugins/autonomous-dev-portal/static/*.css
 #   plugins/autonomous-dev-portal/src/styles/**/*.css
 # Excludes:
 #   design-tokens.css (the canonical source of truth for tokens).
@@ -12,11 +14,20 @@
 # Exit codes:
 #   0 — no violations
 #   1 — one or more violations found (file/line printed for each)
+#   2 — zero files scanned (fail-closed against future path drift)
 set -euo pipefail
 
 PORTAL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-CSS_FILES=$(find "$PORTAL_DIR/server/static" "$PORTAL_DIR/src/styles" \
+CSS_FILES=$(find "$PORTAL_DIR/static" "$PORTAL_DIR/src/styles" \
     -name '*.css' ! -name 'design-tokens.css' 2>/dev/null)
+
+# Fail-closed: a token-discipline gate that scans nothing is worse than no
+# gate at all because it reads as green. If the directories move again,
+# surface it loudly instead of silently passing.
+if [ -z "$(printf '%s' "$CSS_FILES" | tr -d '[:space:]')" ]; then
+    echo "ERROR: lint-css-tokens scanned 0 CSS files — check scan paths ($PORTAL_DIR/static, $PORTAL_DIR/src/styles)." >&2
+    exit 2
+fi
 
 EXIT=0
 

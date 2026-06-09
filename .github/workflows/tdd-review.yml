@@ -80,4 +80,6 @@ jobs:
           agent-name: tdd-reviewer
           path-glob: "plugins/*/docs/tdd/TDD-*.md"
           threshold: "85"
-          prompt-template-path: plugins/autonomous-dev/agents/tdd-reviewer.md
+          # PRD-025 FR-025-03: tdd-reviewer.md never existed; doc-reviewer is
+          # the agent that reviews TDDs against the template.
+          prompt-template-path: plugins/autonomous-dev/agents/doc-reviewer.md

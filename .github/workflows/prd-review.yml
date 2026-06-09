@@ -78,4 +78,7 @@ jobs:
           agent-name: prd-reviewer
           path-glob: "plugins/*/docs/prd/PRD-*.md"
           threshold: "85"
-          prompt-template-path: plugins/autonomous-dev/agents/prd-reviewer.md
+          # PRD-025 FR-025-03: doc-reviewer scores PRDs/TDDs/plans against
+          # the template. prd-reviewer.md never existed, so this step errored
+          # on every doc PR and failed the required check.
+          prompt-template-path: plugins/autonomous-dev/agents/doc-reviewer.md

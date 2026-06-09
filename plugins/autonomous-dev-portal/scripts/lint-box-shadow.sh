@@ -57,11 +57,13 @@ if [[ -n "${SCAN_FILE}" ]]; then
   fi
   files=("${SCAN_FILE}")
 else
-  # server/static/*.css (top-level only, excluding design-tokens.css)
-  if [[ -d "${PORTAL_ROOT}/server/static" ]]; then
+  # static/*.css (top-level only, excluding design-tokens.css). PRD-025
+  # FR-025-01: the portal stylesheets live in static/, not server/static/
+  # (which never existed) — the old path made this gate a silent no-op.
+  if [[ -d "${PORTAL_ROOT}/static" ]]; then
     while IFS= read -r -d '' f; do
       files+=("$f")
-    done < <(find "${PORTAL_ROOT}/server/static" -maxdepth 1 -type f -name '*.css' \
+    done < <(find "${PORTAL_ROOT}/static" -maxdepth 1 -type f -name '*.css' \
               ! -name 'design-tokens.css' -print0)
   fi
   # src/styles/**/*.css (recursive, excluding design-tokens.css)
@@ -70,6 +72,12 @@ else
       files+=("$f")
     done < <(find "${PORTAL_ROOT}/src/styles" -type f -name '*.css' \
               ! -name 'design-tokens.css' -print0)
+  fi
+  # Fail-closed against future path drift: a scan of 0 files reads as green
+  # but guarantees nothing (PRD-025 FR-025-01).
+  if [[ ${#files[@]} -eq 0 ]]; then
+    echo "lint-box-shadow: scanned 0 CSS files — check scan paths (${PORTAL_ROOT}/static, ${PORTAL_ROOT}/src/styles)." >&2
+    exit 2
   fi
 fi
 
