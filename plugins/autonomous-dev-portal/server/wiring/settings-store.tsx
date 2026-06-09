@@ -249,11 +249,21 @@ export class FileSettingsStore implements SettingsStore {
 
             try {
                 // FR-925: route the change through the daemon (config-change
-                // marker), don't mutate the user config directly.
+                // marker), don't mutate the user config directly. Summarize
+                // which section(s) the form actually touched for the audit log.
+                const sections: string[] = [];
+                if (dailyField in form || perRequestField in form || monthlyField in form) {
+                    sections.push("cost caps");
+                }
+                if ("trust-level" in form) sections.push("trust level");
+                if ("defaultVariant" in form || "defaultBackend" in form) {
+                    sections.push("general");
+                }
+                if (this.hasNotificationFields(form)) sections.push("notifications");
                 await writeConfigChangeMarker({
                     proposed: next,
                     actor,
-                    summary: "settings: notification preferences update",
+                    summary: `settings: ${sections.length > 0 ? sections.join(", ") : "update"}`,
                 });
             } catch (err) {
                 return {
