@@ -36,12 +36,13 @@ import { requireConfirmation } from "./confirmation-routes";
 const REPO_RE = /^[A-Za-z0-9._-]{1,128}$/;
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
-export type GateVerb = "approve" | "request-changes" | "reject";
+export type GateVerb = "approve" | "request-changes" | "reject" | "defer";
 
 const GATE_VERBS: readonly GateVerb[] = [
     "approve",
     "request-changes",
     "reject",
+    "defer",
 ] as const;
 
 const REQUEST_ACTIONS: ReadonlySet<string> = new Set([

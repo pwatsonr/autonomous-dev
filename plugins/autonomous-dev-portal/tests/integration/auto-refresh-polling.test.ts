@@ -24,6 +24,19 @@ interface PolledPage {
     path: string;
     bodyId: string;
     intervalSeconds: number;
+    /**
+     * The element id that `hx-select` and `hx-target` point to. Defaults to
+     * `bodyId`. `/logs` uses a narrower swap target (`log-tail`) so the
+     * persistent `role="log"` live-region node survives polls (finding 6 —
+     * WCAG 4.1.3: replacing the live-region node silences AT announcements).
+     */
+    swapTargetId?: string;
+    /**
+     * The swap mode for this page's polling. Defaults to `"outerHTML"`.
+     * `/logs` uses `"innerHTML"` on the inner `#log-tail` node so the AT
+     * live-region container is never destroyed mid-session.
+     */
+    swapMode?: "outerHTML" | "innerHTML";
 }
 
 const POLLED_PAGES: PolledPage[] = [
@@ -32,7 +45,17 @@ const POLLED_PAGES: PolledPage[] = [
     { path: "/requests", bodyId: "requests-body", intervalSeconds: 10 },
     { path: "/costs", bodyId: "costs-body", intervalSeconds: 10 },
     { path: "/ops", bodyId: "ops-body", intervalSeconds: 10 },
-    { path: "/logs", bodyId: "logs-body", intervalSeconds: 5 },
+    {
+        path: "/logs",
+        bodyId: "logs-body",
+        intervalSeconds: 5,
+        // Narrower swap: targets the inner `#log-tail` live-region with
+        // innerHTML instead of replacing `#logs-body` with outerHTML.
+        // This preserves the `role="log" aria-live="polite"` container across
+        // polls so NVDA/JAWS/VoiceOver receive live-region announcements.
+        swapTargetId: "log-tail",
+        swapMode: "innerHTML",
+    },
     { path: "/repos", bodyId: "repos-body", intervalSeconds: 10 },
     { path: "/agents", bodyId: "agents-body", intervalSeconds: 30 },
 ];
@@ -64,24 +87,32 @@ describe("PORTAL-AUDIT-2026-05-16 — auto-refresh polling contract", () => {
             expect(res.status).toBe(200);
             const html = await res.text();
 
-            // Body wrapper id is the polling target — must match the
-            // hx-select selector for the swap to land on itself.
+            // Body wrapper id must always be present so the poll trigger
+            // element is findable in the DOM.
             expect(html).toContain(`id="${page.bodyId}"`);
-            expect(html).toContain(`hx-select="#${page.bodyId}"`);
+
+            // The swap target may be the body wrapper itself (standard pages)
+            // or a narrower inner node (e.g. /logs targets #log-tail to keep
+            // the role=log live-region alive across polls — WCAG 4.1.3).
+            const swapId = page.swapTargetId ?? page.bodyId;
+            expect(html).toContain(`hx-select="#${swapId}"`);
 
             // Polling interval with visibility guard — pinned so changes are explicit.
             // Using double quotes inside the JS expression to avoid entity encoding issues.
+            // We check for the opening of the trigger (the visibility guard is always first)
+            // which matches both the baseline form and any view that extends it with &&.
             expect(html).toContain(
-                `hx-trigger="every ${page.intervalSeconds}s [document.visibilityState === &quot;visible&quot;]"`,
+                `hx-trigger="every ${page.intervalSeconds}s [document.visibilityState === &quot;visible&quot;`,
             );
 
             // Same path the user is on — full-page fetch + hx-select extracts
-            // the body wrapper. (`hx-get="/"` is fine for the dashboard.)
+            // the swap target. (`hx-get="/"` is fine for the dashboard.)
             expect(html).toContain(`hx-get="${page.path}"`);
 
-            // Swap target + mode — outerHTML on `this` keeps the wrapper id stable.
-            expect(html).toContain('hx-target="this"');
-            expect(html).toContain('hx-swap="outerHTML"');
+            // Swap mode — outerHTML replaces the whole wrapper (stable id contract);
+            // innerHTML updates only the inner content (required for /logs live-region).
+            const expectedSwapMode = page.swapMode ?? "outerHTML";
+            expect(html).toContain(`hx-swap="${expectedSwapMode}"`);
 
             // Cypress-style smoke test (comment only - not implemented):
             // A real browser test would:

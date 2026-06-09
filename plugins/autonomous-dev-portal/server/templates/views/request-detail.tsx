@@ -1,45 +1,43 @@
-// SPEC-036-3-01..06 — Request Detail composition root.
-// SPEC-037-7-01..04 — Adds page-head, .rd-stat block, standards-applied
-// section, replaces <dialog> with .modal-bg overlay (consumes the shared
-// `static/modal.js` helper), and verifies gate/timeline action wiring.
+// FR-026-20..22 — Request Detail v3 composition root.
 //
-// Pure composition: imports each fragment from `fragments/*` and emits the
-// 11-region order specified in TDD-036 §6.2 verbatim:
+// Implements the v3 redesign layout for the request-detail surface:
 //
-//   0. Page head (← Back · REQ id · Pause/Kill)       — RequestPageHead (037-7-01)
-//   1. Request header / SSE meta region (.rd-head)     — RequestHeader (037-7-01)
-//   2. Pipeline visualization                          — PipelineVis
-//   3. Artifact pane (v1.1, persistent reading)        — ArtifactPane
-//   4. Reviewer chain (review/code phases)             — ReviewerChain
-//   5. Deploy pipeline (deploy phase)                  — DeployPipeline
-//   6. Gate detail card (status === gate)              — GateDetail
-//   7. Standards applied (flags.hasStandards)          — StandardsApplied (037-7-02)
-//   8. Request timeline (always rendered)              — RequestTimeline
-//   9. Run history (v1.1, always rendered)             — RunHistory
-//  10. Confirm modal (mounted by gate-actions.js)       — modal-slot
-//  11. Phase artifact modal (one per phase artifact)    — PhaseArtifactModal (037-7-03)
+//   [Topbar] title=req-id, subTitle=summary, rightSlot=priority+repo+Back
+//   [.main-inner]
+//     [.phase-timeline.sec]         — numbered 8-step phase track
+//     [.rdetail]                    — two-column grid (minmax(0,1fr) / 360px)
+//       [.rdetail-main]             — artifact pane (HTMX swap target)
+//       [.gate-panel sticky]        — gate panel (sticky, 360px)
 //
-// Conditional rendering uses straight ternaries on the request shape — no
-// fragment-level logic is duplicated here. All fragments self-handle their
-// empty cases.
+// The artifact pane is the hx-target (#rd-artifact-pane); clicking a phase
+// step fires hx-get → /repo/:repo/request/:id/artifact/:phase which returns
+// the RdV3ArtifactPane fragment with outerHTML swap (no modal, no redirect).
+//
+// The gate panel shows reviewer verdict rows, a note textarea, and
+// Approve / Reject / Defer buttons (or a post-decision banner when the
+// server has already recorded a decision). Gate action POSTs target the
+// existing /repo/:repo/request/:id/gate/approve|reject endpoints.
+//
+// Design source of truth:
+//   /tmp/design_extract/autonomous-dev-v3/project/request-detail.jsx
+//   /tmp/design_extract/autonomous-dev-v3/project/static/app.css
+//
+// CSS for this view: static/v3/request-detail.css
 
 import type { FC } from "hono/jsx";
 
 import type { RenderProps } from "../../types/render";
-import { ArtifactPane } from "../fragments/artifact-pane";
-import { DeployPipeline } from "../fragments/deploy-pipeline";
-import { GateDetail } from "../fragments/gate-detail";
-import { PhaseArtifactModal } from "../fragments/phase-artifact-modal";
-import { PipelineVis } from "../fragments/pipeline-vis";
-import { RequestHeader } from "../fragments/request-header";
-import { RequestPageHead } from "../fragments/request-page-head";
-import { RequestTimeline } from "../fragments/request-timeline";
-import { ReviewerChain } from "../fragments/reviewer-chain";
-import { RunHistory } from "../fragments/run-history";
-import { StandardsApplied } from "../fragments/standards-applied";
-import { VerificationOverride } from "../fragments/verification-override";
+import type { RequestRecord } from "../../types/render";
+import { Topbar } from "../../components/topbar";
+import { RdV3PhaseTrack } from "../fragments/rd-v3-phase-track";
+import type { PhaseStepV3 } from "../fragments/rd-v3-phase-track";
+import { RdV3ArtifactPane } from "../fragments/rd-v3-artifact-pane";
+import { RdV3GatePanel } from "../fragments/rd-v3-gate-panel";
+import type { GateReviewer } from "../fragments/rd-v3-gate-panel";
+import { RdV3TopbarRight } from "../fragments/rd-v3-request-header";
 
-const DEFAULT_PIPELINE: string[] = [
+/** Default 8-phase pipeline order. */
+const DEFAULT_PIPELINE = [
     "prd",
     "tdd",
     "plan",
@@ -48,130 +46,196 @@ const DEFAULT_PIPELINE: string[] = [
     "review",
     "deploy",
     "observe",
-];
+] as const;
 
+/** Display labels for each pipeline phase key. */
+const PHASE_LABELS: Record<string, string> = {
+    prd: "PRD",
+    tdd: "TDD",
+    plan: "Plan",
+    spec: "Spec",
+    code: "Code",
+    review: "Review",
+    deploy: "Deploy",
+    observe: "Observe",
+};
+
+/**
+ * Derive the PhaseStepV3 list from the request record.
+ *
+ * State mapping:
+ *   - phases before currentPhase → "done"
+ *   - currentPhase               → "now"
+ *   - phases after currentPhase  → "pending"
+ *
+ * Duration is left empty because the stub RequestRecord does not carry
+ * per-phase durations in the v1 shape; a future iteration can thread
+ * `phases[].duration` through when the daemon exposes it.
+ *
+ * @param request - current RequestRecord
+ * @returns ordered PhaseStepV3 array
+ */
+function derivePhaseSteps(request: RequestRecord): PhaseStepV3[] {
+    const pipeline = request.pipelinePhases ?? [...DEFAULT_PIPELINE];
+    const currentPhase = request.currentPhase ?? pipeline[0] ?? "prd";
+    const currentIndex = pipeline.indexOf(currentPhase);
+
+    return pipeline.map((key, i) => {
+        let state: PhaseStepV3["state"];
+        if (i < currentIndex) {
+            state = "done";
+        } else if (i === currentIndex) {
+            state = "now";
+        } else {
+            state = "pending";
+        }
+        return {
+            key,
+            label: PHASE_LABELS[key] ?? key.toUpperCase(),
+            state,
+            dur: "",
+        };
+    });
+}
+
+/**
+ * Build the gate-panel reviewer list from the request record.
+ *
+ * Maps `RequestReviewer` (full shape) → `GateReviewer` (verdict-only shape
+ * for the gate panel). Falls back to an empty array so the panel renders
+ * with no reviewer rows when the request has none.
+ *
+ * @param request - current RequestRecord
+ * @returns GateReviewer array
+ */
+function deriveGateReviewers(request: RequestRecord): GateReviewer[] {
+    if (request.reviewers === undefined || request.reviewers.length === 0) {
+        return [];
+    }
+    return request.reviewers.map((r) => ({
+        id: r.name,
+        verdict: r.blocking ? "fail" : "pass",
+    }));
+}
+
+/**
+ * Format a cost number as "$X.XX" or "$—" when undefined.
+ *
+ * @param n - cost in USD or undefined
+ * @returns formatted string
+ */
+function fmt(n: number | undefined): string {
+    if (n === undefined) return "$—";
+    return `$${n.toFixed(2)}`;
+}
+
+/**
+ * Derive a short "opened" date string from the startedAt ISO timestamp.
+ * Returns "—" when not available.
+ *
+ * @param iso - ISO-8601 timestamp or undefined
+ * @returns formatted date string
+ */
+function fmtOpened(iso: string | undefined): string {
+    if (iso === undefined || iso === "") return "—";
+    const ts = Date.parse(iso);
+    if (Number.isNaN(ts)) return iso;
+    return new Date(ts).toISOString().slice(0, 10);
+}
+
+/**
+ * FR-026-20..22 — Request Detail v3 view.
+ *
+ * Composes the Topbar + phase track strip + two-column rdetail grid from
+ * the v3 fragment library. All fragments are server-rendered; no client-
+ * side state is used in the initial render. HTMX provides the phase-swap
+ * interactivity.
+ *
+ * @param props - request-detail render props
+ */
 export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
     request,
-    csrfToken,
+    csrfToken = "",
 }) => {
-    const phases = request.pipelinePhases ?? DEFAULT_PIPELINE;
-    const currentPhase = request.currentPhase ?? phases[0] ?? "prd";
+    const pipeline = request.pipelinePhases ?? [...DEFAULT_PIPELINE];
+    const currentPhase = request.currentPhase ?? pipeline[0] ?? "prd";
     const status = request.status ?? "running";
-    const reviewers = request.reviewers ?? [];
-    const showReviewerChain =
-        currentPhase === "review" || currentPhase === "code";
-    const showDeploy = currentPhase === "deploy";
-    const showGate = status === "gate";
-    // Only artifacts attached to the request show up in the modal stack;
-    // future iteration will surface a per-phase map. For now the current
-    // artifact is always also reachable as a modal.
-    const phaseArtifacts =
-        request.currentArtifact !== undefined ? [request.currentArtifact] : [];
 
-    // SPEC-037-7-02 — Standards-applied section gates on the explicit
-    // `flags.hasStandards` AND a non-empty rule list.
-    const standardsRules = request.standardsApplied ?? [];
-    const showStandards =
-        request.flags?.hasStandards === true && standardsRules.length > 0;
+    const steps = derivePhaseSteps(request);
+    const gateReviewers = deriveGateReviewers(request);
 
-    // PLAN-042 Phase D — verification override surface. Render either:
-    //   • the form (when verificationFailed and not already overridden), or
-    //   • the audit confirmation (when an override has been applied).
-    // Both cases gate on a `verificationFailed` flag, so honest passes don't
-    // see the section at all.
-    const showVerificationOverride =
-        request.flags?.verificationFailed === true;
-    const verificationOverrideApplied =
-        request.flags?.verificationOverrideApplied === true;
+    // Gate label: e.g. "Spec gate · review"
+    const gateLabel = `${currentPhase.charAt(0).toUpperCase()}${currentPhase.slice(1)} gate · review`;
+
+    // Derive the branch name: fall back to a synthetic branch slug based on
+    // the request id (the daemon creates branches as "auto/<req-id>").
+    const branch = `auto/${request.id.toLowerCase()}`;
+
+    // Artifact pane props: derive from the current phase step
+    const currentStep = steps.find((s) => s.key === currentPhase);
+    const artifactState = currentStep?.state ?? "pending";
+
+    // Topbar subTitle: request summary or id
+    const subTitle =
+        request.summary !== undefined && request.summary !== ""
+            ? request.summary
+            : undefined;
+
+    // Priority: derive from the gate type or fall back to "MED"
+    const priority = status === "gate" ? "HIGH" : "MED";
 
     return (
-        <main class="request-detail">
-            {/* Region 0: page-head — ← Back, request id, Pause/Kill. */}
-            <RequestPageHead requestId={request.id} />
-
-            {/* Region 1+2: request header + meta region. */}
-            <RequestHeader request={request} />
-
-            {/* Region 3: pipeline visualization (always rendered) */}
-            <div id={`request-${request.id}-phase`}>
-                <PipelineVis phases={phases} currentPhase={currentPhase} />
-            </div>
-
-            {/* Region 4: artifact pane (v1.1, always rendered) */}
-            <div id={`request-${request.id}-artifact`}>
-                <ArtifactPane
-                    phase={currentPhase}
-                    targetId={`request-${request.id}-artifact-pane`}
-                    artifact={request.currentArtifact}
-                />
-            </div>
-
-            {/* Region 5: reviewer chain (review/code phases) */}
-            {showReviewerChain ? (
-                <ReviewerChain reviewers={reviewers} />
-            ) : null}
-
-            {/* Region 6: deploy pipeline (deploy phase) */}
-            {showDeploy ? (
-                <div id={`request-${request.id}-deploy`}>
-                    <DeployPipeline
-                        deployStage={request.deployStage ?? "preflight"}
-                        deployTarget={request.deployTarget}
+        <>
+            <Topbar
+                title={request.id}
+                subTitle={subTitle}
+                rightSlot={
+                    <RdV3TopbarRight
+                        priority={priority}
+                        repo={request.repo}
                     />
+                }
+            />
+            <div class="main-inner">
+                {/* Phase pipeline strip */}
+                <RdV3PhaseTrack
+                    repo={request.repo}
+                    requestId={request.id}
+                    opened={fmtOpened(request.startedAt)}
+                    branch={branch}
+                    cost={fmt(request.cost)}
+                    budget={fmt(undefined)}
+                    steps={steps}
+                    selectedPhase={currentPhase}
+                />
+
+                {/* Two-column layout: artifact pane + gate panel */}
+                <div class="rdetail">
+                    <div class="rdetail-main">
+                        <RdV3ArtifactPane
+                            phase={currentPhase}
+                            state={artifactState}
+                            artifact={request.currentArtifact}
+                            branch={branch}
+                            agent={request.currentArtifact?.phase ?? ""}
+                            dur=""
+                            cost={fmt(request.cost)}
+                        />
+                    </div>
+
+                    {/* Gate panel — sticky 360px right column */}
+                    <div class="rd-gate-col">
+                        <RdV3GatePanel
+                            requestId={request.id}
+                            repo={request.repo}
+                            gateLabel={gateLabel}
+                            reviewers={gateReviewers}
+                            csrfToken={csrfToken}
+                            decision={request.gateDecision ?? null}
+                        />
+                    </div>
                 </div>
-            ) : null}
-
-            {/* Region 7: gate detail card (status === gate) */}
-            {showGate ? (
-                <GateDetail
-                    requestId={request.id}
-                    repo={request.repo}
-                    gateType={request.gateType ?? "reviewer-chain"}
-                    gateDetail={request.gateDetail ?? ""}
-                    waitedMin={request.waitedMin ?? 0}
-                    csrfToken={csrfToken}
-                />
-            ) : null}
-
-            {/* Region 8: standards applied (flags.hasStandards). */}
-            {showStandards ? (
-                <StandardsApplied rules={standardsRules} />
-            ) : null}
-
-            {/* PLAN-042 Phase D — verification override (per-request,
-                audited, non-persistent). Surfaces only when the request
-                is gated on VERIFICATION_FAILED. */}
-            {showVerificationOverride ? (
-                <VerificationOverride
-                    requestId={request.id}
-                    repo={request.repo}
-                    csrfToken={csrfToken}
-                    applied={verificationOverrideApplied}
-                />
-            ) : null}
-
-            {/* Phase timeline (legacy region preserved for OOB swaps). */}
-            <RequestTimeline
-                requestId={request.id}
-                phases={request.phases}
-            />
-
-            {/* Region 9: run history (v1.1, always rendered) */}
-            <RunHistory runs={request.runs} />
-
-            {/* Region 11: phase artifact modal (one per phase) */}
-            <PhaseArtifactModal
-                artifacts={phaseArtifacts}
-                requestId={request.id}
-                allPhases={phases}
-            />
-
-            {/* Page-level scripts — SPEC-037-7-03 shared modal helper +
-                SPEC-036-3-06 gate-actions confirm-modal interceptor. The
-                shell template loads /static/htmx.min.js + theme-toggle.js;
-                this view adds the surface-specific scripts. */}
-            <script src="/static/modal.js" defer></script>
-            <script src="/static/gate-actions.js" defer></script>
-        </main>
+            </div>
+        </>
     );
 };

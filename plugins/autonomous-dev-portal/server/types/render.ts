@@ -217,6 +217,15 @@ export interface RequestRecord {
     /** ISO-8601 start timestamp. Rendered as the final `.rd-meta` segment. */
     startedAt?: string;
 
+    /**
+     * PRD-026 §4-state gate coverage — recorded gate decision when an
+     * operator has already acted on this gate.  `null` or absent means the
+     * gate is still awaiting a decision (action buttons render).
+     * "approved" | "rejected" | "deferred" map to the banner variants in
+     * RdV3GatePanel.
+     */
+    gateDecision?: "approved" | "rejected" | "deferred" | null;
+
     // SPEC-037-7-02 §Standards-applied section.
     /** Per-request feature flag bag; drives conditional sections. */
     flags?: RequestFlags;
@@ -699,14 +708,28 @@ export interface RenderProps {
         items: DashboardRequest[];
         aggregates: RequestsAggregatesProp;
     };
-    approvals: { items: ApprovalItem[]; costCapDailyUsd: number };
+    approvals: {
+        items: ApprovalItem[];
+        costCapDailyUsd: number;
+        /** When set, overrides the default first-row selection. Threaded
+         *  from `?selected=` query param so HTMX row clicks survive polls. */
+        selectedId?: string;
+    };
     settings: { config: SettingsView; data?: SettingsData };
     costs: {
         series: CostSeries;
         /** SPEC-036-2-03 — pre-computed by the route handler. */
         projection?: import("../lib/costs-projection").ProjectionResult;
     };
-    logs: { lines: LogLine[] };
+    logs: {
+        lines: LogLine[];
+        /**
+         * When true, the log read failed server-side and `lines` is empty or
+         * stale. `LiveLog` renders a dedicated `.l-err` system row so the user
+         * sees an honest signal rather than a blank terminal or fabricated data.
+         */
+        readError?: boolean;
+    };
     ops: {
         health: OpsHealth;
         /** SPEC-014-2-04 — per-request CSRF token threaded through to KillSwitch. */

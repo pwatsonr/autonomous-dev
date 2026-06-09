@@ -1,1 +1,313 @@
-/* v3/approvals.css — Approvals view overrides. Built on top of shared foundation (app.css, design-tokens.css). */
+/* v3/approvals.css — Approvals view.
+   FR-026-30: 6-column approval-row grid, cdot reviewer checks,
+   filter-strip, preview card, gate-stats-7d bars.
+   All values use design tokens; no raw hex; no hardcoded px for
+   font-size/padding/margin/gap/border-radius (0/1px excepted). */
+
+/* ============================================================
+   Filter strip
+   ============================================================ */
+.filter-strip {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-2h) 0;
+    margin-bottom: var(--s-4);
+}
+
+.filter-strip .search {
+    flex: 1;
+    max-width: 360px;
+    height: 30px;
+    background: var(--bg-1);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-2);
+    padding: 0 var(--s-2h);
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    color: var(--fg-0);
+}
+
+.filter-strip .search:focus {
+    outline: 2px solid var(--brand);
+    outline-offset: 1px;
+    border-color: var(--brand);
+}
+
+.filter-strip .search::placeholder {
+    color: var(--fg-3);
+}
+
+/* ============================================================
+   Approvals table card
+   ============================================================ */
+.approvals-card {
+    overflow: hidden;
+}
+
+/* 6-column grid shared by header and row. */
+.approvals-table-head,
+.approval-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 110px 180px 80px 200px;
+    gap: var(--s-3h);
+    padding: var(--s-2h) var(--s-4);
+    align-items: center;
+}
+
+/* ---- Table header ---- */
+.approvals-table-head {
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--line-2);
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-2);
+}
+
+.approvals-th-right {
+    text-align: right;
+}
+
+/* ---- Approval row ---- */
+/* Finding 2 fix: .approval-row is now a <button>; reset browser button
+   chrome so the grid layout and visual styling are unaffected. */
+.approval-row {
+    /* button reset */
+    appearance: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    width: 100%;
+    /* end button reset */
+    border-bottom: 1px solid var(--line-1);
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    background: var(--bg-1);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-std);
+}
+
+.approval-row:hover {
+    background: var(--bg-2);
+}
+
+.approval-row:focus {
+    outline: 2px solid var(--brand);
+    outline-offset: -2px;
+}
+
+.approval-row.selected {
+    background: var(--bg-2);
+    box-shadow: inset 2px 0 0 var(--brand);
+}
+
+.approval-row:last-child {
+    border-bottom: 0;
+}
+
+/* ---- Row cells ---- */
+.approval-row-id {
+    font-family: var(--font-mono);
+    font-size: var(--t-tiny);
+    color: var(--fg-2);
+}
+
+.approval-row-title {
+    display: block;
+    font-weight: 500;
+    color: var(--fg-0);
+    font-size: var(--t-h3);
+}
+
+.approval-row-sub {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--t-tiny);
+    color: var(--fg-3);
+    margin-top: var(--s-1);
+}
+
+.approval-row-age {
+    font-family: var(--font-mono);
+    font-size: var(--t-tiny);
+    color: var(--fg-2);
+    text-align: right;
+}
+
+.approval-row-actions {
+    display: flex;
+    gap: var(--s-1h);
+    justify-content: flex-end;
+}
+
+/* ---- Reviewer check dots ---- */
+.approval-row-checks {
+    display: flex;
+    gap: var(--s-1);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.cdot {
+    width: 10px;
+    height: 10px;
+    border-radius: var(--r-1);
+    background: var(--bg-3);
+    border: 1px solid var(--line-1);
+    flex-shrink: 0;
+}
+
+.cdot--pass {
+    background: var(--ok);
+    border-color: var(--ok);
+}
+
+.cdot--warn {
+    background: var(--warn);
+    border-color: var(--warn);
+}
+
+.cdot--fail {
+    background: var(--err);
+    border-color: var(--err);
+}
+
+.cdot--pending {
+    /* Finding 4 fix: previous bg-2/dashed-line-1 combination produced
+       ~1.14:1 contrast ratio, failing WCAG 2.2 AA 1.4.11 (3:1 minimum for
+       UI components). Fix: transparent fill with a 2px fg-2 solid border
+       renders a clear hollow ring at ≥3:1 contrast against both bg-1 and
+       the selected-row bg-2 surface. */
+    background: transparent;
+    border: 2px solid var(--fg-2);
+}
+
+/* ---- Empty state ---- */
+.approvals-empty {
+    padding: var(--s-9) var(--s-4);
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    color: var(--fg-3);
+}
+
+/* ============================================================
+   Lower grid: preview + gate-stats side by side
+   ============================================================ */
+.approvals-lower-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: var(--s-3h);
+    margin-top: var(--s-6);
+}
+
+/* ---- Preview card body ---- */
+.approvals-preview-label {
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    color: var(--fg-2);
+    margin-bottom: var(--s-3);
+}
+
+.approvals-preview-artifact {
+    font-size: var(--t-h3);
+}
+
+.approvals-preview-empty {
+    font-size: var(--t-h3);
+}
+
+/* ---- Gate stats card body ---- */
+.approvals-stats-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2h);
+}
+
+/* StatRow */
+.stat-row {
+    /* intentionally no extra margin; gap on parent handles spacing */
+}
+
+.stat-row-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    margin-bottom: var(--s-1);
+    font-size: var(--t-meta);
+}
+
+.stat-row-label {
+    color: var(--fg-1);
+}
+
+.stat-row-value {
+    font-family: var(--font-mono);
+    color: var(--fg-0);
+    font-weight: 600;
+}
+
+.stat-row-pct {
+    font-family: var(--font-mono);
+    color: var(--fg-3);
+    min-width: 32px;
+    text-align: right;
+}
+
+.stat-row-track {
+    height: 4px;
+    background: var(--bg-2);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+}
+
+.stat-row-bar {
+    height: 100%;
+    border-radius: var(--r-pill);
+    /* Width is supplied by the server via --bar-w on the parent .stat-row-track.
+       This is the CSP-safe alternative to an inline style="width:N%" on the bar
+       element itself — the custom property is set on the track, consumed here. */
+    width: var(--bar-w, 0%);
+}
+
+.stat-row-bar--ok   { background: var(--ok); }
+.stat-row-bar--info { background: var(--info); }
+.stat-row-bar--err  { background: var(--err); }
+.stat-row-bar--warn { background: var(--warn); }
+
+/* Median time-to-approve footer row */
+.approvals-stats-median {
+    margin-top: var(--s-2);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--line-1);
+    font-family: var(--font-mono);
+    font-size: var(--t-tiny);
+    color: var(--fg-2);
+    display: flex;
+    justify-content: space-between;
+}
+
+.approvals-stats-median-val {
+    color: var(--fg-0);
+    font-weight: 600;
+}
+
+/* ============================================================
+   Spacer utility (used in StatRow head and preview card header)
+   ============================================================ */
+.spacer {
+    flex: 1 1 auto;
+}
+
+/* ============================================================
+   Gate-stats placeholder label (honesty rule: data not yet live)
+   ============================================================ */
+.approvals-stats-placeholder-label {
+    color: var(--warn);
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+}

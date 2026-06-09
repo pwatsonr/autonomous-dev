@@ -74,7 +74,7 @@ import { healthHandler } from "./health";
 import { buildKillSwitchRoutes } from "./kill-switch";
 import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
-import { requestDetailHandler } from "./request-detail";
+import { requestDetailHandler, artifactFragmentHandler } from "./request-detail";
 import { reposHandler } from "./repos";
 import { requestsHandler } from "./requests";
 import { settingsHandler } from "./settings";
@@ -360,6 +360,8 @@ export function registerRoutes(
     // -----------------------------------------------------------------
     app.get("/", dashboardHandler);
     app.get("/repo/:repo/request/:id", requestDetailHandler);
+    // FR-026-20 — HTMX artifact pane fragment endpoint.
+    app.get("/repo/:repo/request/:id/artifact/:phase", artifactFragmentHandler);
     app.get("/approvals", approvalsHandler);
     app.get("/requests", requestsHandler);
     app.get("/settings", settingsHandler);

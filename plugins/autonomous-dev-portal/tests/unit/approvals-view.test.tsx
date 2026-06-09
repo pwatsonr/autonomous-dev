@@ -1,10 +1,12 @@
-// SPEC-037-4-01 / -03 / -05 — Approvals view unit tests.
+// FR-026-30 — Approvals v3 view unit tests.
 //
-// Asserts: page-head shape (title + Settings link + Bulk approve button),
-// KPI strip (3 cards, correct order, count derivation, sub-line copy),
-// gate-list rendering (per-row markup, gate-{type} classes, data attrs),
-// empty state, and that no legacy `riskLevel` / `approval-item` markup
-// survives the rebuild.
+// Validates the rebuilt Approvals surface: Topbar shape (title + pending
+// subTitle + seg + Bulk approve), filter strip, 6-column approval-row grid
+// with cdot reviewer checks, selected-row preview card, and gate-stats-7d
+// card with StatRow bars.
+//
+// Preserves existing hx-post endpoint coverage so the HTMX approve/reject
+// wiring stays tested through the redesign.
 
 import { describe, expect, test } from "bun:test";
 
@@ -35,283 +37,335 @@ const baseItem = (
     ...overrides,
 });
 
-describe("ApprovalsView — SPEC-037-4-01 page-head", () => {
-    test("renders <div class=\"page-head\"> with <h1>Approvals</h1>", async () => {
+// ---- Topbar -----------------------------------------------------------------
+
+describe("ApprovalsView — FR-026-30 Topbar", () => {
+    test("renders <header class=\"topbar\"> with title Approvals", async () => {
         const html = await render(
             <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain('<div class="page-head">');
-        expect(html).toContain("<h1>Approvals</h1>");
+        expect(html).toContain('<header class="topbar">');
+        expect(html).toContain(">Approvals<");
     });
 
-    test("head-actions contains Settings link to /settings#approvals", async () => {
+    test("subTitle shows N pending count", async () => {
+        const html = await render(
+            <ApprovalsView items={[baseItem(), baseItem({ id: "REQ-2" })]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain("2 pending");
+    });
+
+    test("topbar rightSlot contains Pending/Approved/Rejected seg buttons", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain('href="/settings#approvals"');
+        expect(html).toContain("Pending");
+        expect(html).toContain("Approved");
+        expect(html).toContain("Rejected");
     });
 
-    test("head-actions contains primary Bulk approve button posting to bulk-approve", async () => {
+    test("Bulk approve button is present in topbar rightSlot", async () => {
         const html = await render(
-            <ApprovalsView items={[]} costCapDailyUsd={25} />,
+            <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain('hx-post="/api/approvals/bulk-approve"');
         expect(html).toContain("Bulk approve");
-        // The bulk approve button has the bulk-approve class and hx-post attribute
-        expect(html).toMatch(/class="bulk-approve"[^>]*hx-post/);
-    });
-});
-
-describe("ApprovalsView — SPEC-037-4-01 KPI strip", () => {
-    test("renders exactly 3 .kpi cards in the kpi-strip", async () => {
-        const html = await render(
-            <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
-        );
-        const matches = html.match(/<div class="kpi">/g) ?? [];
-        expect(matches.length).toBe(3);
+        expect(html).toContain('hx-post="/api/approvals/bulk-approve"');
     });
 
-    test("KPI labels are Reviewer chain / Standards violation / Cost cap, in order", async () => {
+    test("Bulk approve button has bulk-approve class", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        const labels = [...html.matchAll(/<div class="kpi-label">([^<]+)</g)].map(
-            (m) => m[1],
-        );
-        expect(labels).toEqual([
-            "Reviewer chain",
-            "Standards violation",
-            "Cost cap",
-        ]);
+        expect(html).toContain('class="btn primary sm bulk-approve"');
     });
 
-    test("KPI counts partition items by gateType", async () => {
-        const items = [
-            baseItem({ id: "R1", gateType: "reviewer-chain", repo: "a" }),
-            baseItem({ id: "R2", gateType: "reviewer-chain", repo: "b" }),
-            baseItem({ id: "S1", gateType: "standards-violation", repo: "a" }),
-            baseItem({ id: "C1", gateType: "cost-cap", repo: "c" }),
-        ];
+    test("Bulk approve button is disabled when items is empty", async () => {
         const html = await render(
-            <ApprovalsView items={items} costCapDailyUsd={42} />,
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        const nums = [...html.matchAll(/<div class="kpi-num">([^<]+)</g)].map(
-            (m) => m[1],
-        );
-        expect(nums).toEqual(["2", "1", "1"]);
-    });
-
-    test("Reviewer sub-line counts unique repos", async () => {
-        const items = [
-            baseItem({ id: "R1", gateType: "reviewer-chain", repo: "a" }),
-            baseItem({ id: "R2", gateType: "reviewer-chain", repo: "a" }),
-            baseItem({ id: "R3", gateType: "reviewer-chain", repo: "b" }),
-        ];
-        const html = await render(
-            <ApprovalsView items={items} costCapDailyUsd={10} />,
-        );
-        expect(html).toContain("across 2 repos");
-    });
-
-    test("Cost cap sub-line describes gates blocking consistently", async () => {
-        const html = await render(
-            <ApprovalsView items={[]} costCapDailyUsd={42} />,
-        );
-        expect(html).toContain("cost-cap gates blocking");
-    });
-
-    test("Standards sub-line uses blocking field when present", async () => {
-        const items = [
-            baseItem({
-                id: "S1",
-                gateType: "standards-violation",
-                blocking: true,
-            }),
-            baseItem({
-                id: "S2",
-                gateType: "standards-violation",
-                blocking: false,
-            }),
-        ];
-        const html = await render(
-            <ApprovalsView items={items} costCapDailyUsd={10} />,
-        );
-        expect(html).toContain("of which 1 are blocking");
+        // disabled attribute on an empty items render
+        expect(html).toContain("disabled");
     });
 });
 
-describe("ApprovalsView — SPEC-037-4-02 segmented filter", () => {
-    test("renders 4 .seg-btn buttons; first carries class 'on'", async () => {
+// ---- Filter strip -----------------------------------------------------------
+
+describe("ApprovalsView — FR-026-30 filter strip", () => {
+    test("renders .filter-strip with search input", async () => {
         const html = await render(
-            <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        const btnMatches = html.match(/class="seg-btn[^"]*"/g) ?? [];
-        expect(btnMatches.length).toBe(4);
-        expect(btnMatches[0]).toContain("on");
-        // Subsequent buttons do NOT have the "on" class.
-        expect(btnMatches.slice(1).every((c) => !c.includes("on"))).toBe(true);
+        expect(html).toContain('class="filter-strip"');
+        expect(html).toContain('class="search"');
+        expect(html).toContain('placeholder="Filter by id, title, repo…"');
     });
 
-    test("segmented filter group carries data-segmented-filter=\"approvals\"", async () => {
+    test("gate-type seg carries data-segmented-filter=\"approvals\"", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
         expect(html).toContain('data-segmented-filter="approvals"');
     });
 
-    test("each filter button has the correct data-filter value", async () => {
+    test("gate-type seg has 4 buttons: All gates / Review / Deploy / Spec", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        for (const filter of [
-            "all",
-            "reviewer-chain",
-            "standards-violation",
-            "cost-cap",
-        ]) {
-            expect(html).toContain(`data-filter="${filter}"`);
-        }
+        expect(html).toContain("All gates");
+        expect(html).toContain("Review");
+        expect(html).toContain("Deploy");
+        expect(html).toContain("Spec");
     });
 
-    test("aria-pressed reflects the initial active state", async () => {
+    test("first seg-btn in gate filter is active with data-filter=\"all\"", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        const allBtn = html.match(
-            /<button[^>]*data-filter="all"[^>]*>/,
+        expect(html).toContain('data-filter="all"');
+        // The first seg-btn should be active
+        const firstBtn = html.match(/class="seg-btn[^"]*"[^>]*data-filter="all"/);
+        expect(firstBtn?.[0] ?? "").toContain("active");
+    });
+
+    test("SLA meta line is present", async () => {
+        const html = await render(
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        expect(allBtn?.[0]).toContain('aria-pressed="true"');
+        expect(html).toContain("SLA");
     });
 });
 
-describe("ApprovalsView — SPEC-037-4-03 gate-list + rows", () => {
-    test("renders <section class=\"sec\"> with <h2>Open gates · N</h2>", async () => {
+// ---- Approvals table --------------------------------------------------------
+
+describe("ApprovalsView — FR-026-30 6-column approval-row grid", () => {
+    test("renders .card.approvals-card with table header", async () => {
         const html = await render(
-            <ApprovalsView
-                items={[baseItem(), baseItem({ id: "REQ-2" })]}
-                costCapDailyUsd={25}
-            />,
+            <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain('<section class="sec">');
-        expect(html).toContain("Open gates ");
-        expect(html).toContain("2</h2>");
+        expect(html).toContain("approvals-card");
+        expect(html).toContain("approvals-table-head");
     });
 
-    test("renders one .gate-row per item", async () => {
+    test("table header contains all 6 column labels", async () => {
+        const html = await render(
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain("Request");
+        expect(html).toContain("Title");
+        expect(html).toContain("Gate");
+        expect(html).toContain("Reviewer checks");
+        expect(html).toContain("Waiting");
+        expect(html).toContain("Actions");
+    });
+
+    test("renders one .approval-row per item", async () => {
         const items = [
             baseItem({ id: "R1" }),
-            baseItem({ id: "R2", gateType: "standards-violation" }),
-            baseItem({ id: "R3", gateType: "cost-cap" }),
+            baseItem({ id: "R2" }),
+            baseItem({ id: "R3" }),
         ];
         const html = await render(
             <ApprovalsView items={items} costCapDailyUsd={10} />,
         );
-        const rowMatches = html.match(/class="gate-row gate-/g) ?? [];
+        // Match only the row container divs (class starts with "approval-row"
+        // followed by either " selected", space-terminated, or end-of-attr).
+        const rowMatches =
+            html.match(/class="approval-row(?:\s+selected)?"/g) ?? [];
         expect(rowMatches.length).toBe(3);
     });
 
-    test("each row carries data-gate-type matching gateType", async () => {
-        const items = [
-            baseItem({ id: "R1", gateType: "reviewer-chain" }),
-            baseItem({ id: "S1", gateType: "standards-violation" }),
-        ];
+    test("first row is selected by default when items exist", async () => {
         const html = await render(
-            <ApprovalsView items={items} costCapDailyUsd={10} />,
+            <ApprovalsView items={[baseItem({ id: "REQ-X" })]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain('data-gate-type="reviewer-chain"');
-        expect(html).toContain('data-gate-type="standards-violation"');
+        expect(html).toContain('class="approval-row selected"');
     });
 
-    test("each row carries the gate-{type} modifier class", async () => {
-        const items = [
-            baseItem({ gateType: "reviewer-chain" }),
-            baseItem({ id: "S", gateType: "standards-violation" }),
-            baseItem({ id: "C", gateType: "cost-cap" }),
-        ];
+    test("row carries data-approval-id matching item id", async () => {
         const html = await render(
-            <ApprovalsView items={items} costCapDailyUsd={10} />,
+            <ApprovalsView items={[baseItem({ id: "REQ-42" })]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain("gate-reviewer-chain");
-        expect(html).toContain("gate-standards-violation");
-        expect(html).toContain("gate-cost-cap");
+        expect(html).toContain('data-approval-id="REQ-42"');
     });
 
-    test("row has gate-left / gate-mid / gate-right in that order", async () => {
+    test("row shows request id in .approval-row-id span", async () => {
         const html = await render(
-            <ApprovalsView items={[baseItem()]} costCapDailyUsd={10} />,
+            <ApprovalsView items={[baseItem({ id: "REQ-99" })]} costCapDailyUsd={25} />,
         );
-        const leftIdx = html.indexOf('class="gate-left"');
-        const midIdx = html.indexOf('class="gate-mid"');
-        const rightIdx = html.indexOf('class="gate-right"');
-        expect(leftIdx).toBeGreaterThan(0);
-        expect(midIdx).toBeGreaterThan(leftIdx);
-        expect(rightIdx).toBeGreaterThan(midIdx);
+        expect(html).toContain(
+            '<span class="approval-row-id">REQ-99</span>',
+        );
     });
 
-    test("cost renders as $D.DD via toFixed(2)", async () => {
+    test("row shows phase chip with phase name", async () => {
+        const html = await render(
+            <ApprovalsView items={[baseItem({ phase: "review" })]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain('chip-phase review');
+        expect(html).toContain("review");
+    });
+
+    test("waiting column shows waitedMin as N + m", async () => {
         const html = await render(
             <ApprovalsView
-                items={[baseItem({ cost: 3.1 })]}
-                costCapDailyUsd={10}
+                items={[baseItem({ waitedMin: 22 })]}
+                costCapDailyUsd={25}
             />,
         );
-        expect(html).toContain('<div class="gate-cost meta-mono">$3.10</div>');
+        expect(html).toContain(">22m<");
     });
 
-    test("row has Open anchor, Approve and Reject buttons with correct hx-post targets", async () => {
+    test("cdot elements render for items with checks", async () => {
+        const itemWithChecks = {
+            ...baseItem({ id: "R-checks" }),
+            checks: ["pass", "pass", "warn", "pending"] as ("pass" | "warn" | "fail" | "pending")[],
+        } as ApprovalItem & { checks: ("pass" | "warn" | "fail" | "pending")[] };
         const html = await render(
-            <ApprovalsView
-                items={[baseItem({ id: "REQ-X", repo: "acme" })]}
-                costCapDailyUsd={10}
-            />,
+            <ApprovalsView items={[itemWithChecks]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain('href="/repo/acme/request/REQ-X"');
-        expect(html).toContain('hx-post="/api/approvals/REQ-X/approve"');
-        expect(html).toContain('hx-post="/api/approvals/REQ-X/reject"');
+        expect(html).toContain("cdot--pass");
+        expect(html).toContain("cdot--warn");
+        expect(html).toContain("cdot--pending");
     });
 
-    test("phase chip text is uppercase", async () => {
-        const html = await render(
-            <ApprovalsView
-                items={[baseItem({ phase: "review" })]}
-                costCapDailyUsd={10}
-            />,
-        );
-        expect(html).toContain(">REVIEW<");
-    });
-
-    test("empty items renders <div class=\"empty\">No open gates</div> and no .gate-list", async () => {
+    test("empty state renders .approvals-empty when items is empty", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain('<div class="empty">No open gates</div>');
-        expect(html).not.toContain('<div class="gate-list">');
+        expect(html).toContain("approvals-empty");
+        expect(html).toContain("No pending approvals");
+    });
+
+    test("Approve button posts to correct endpoint with double-confirm", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[baseItem({ id: "REQ-A", repo: "my-repo" })]}
+                costCapDailyUsd={10}
+            />,
+        );
+        expect(html).toContain('hx-post="/api/approvals/REQ-A/approve"');
+        expect(html).toContain('hx-confirm=');
+    });
+
+    test("Reject button posts to correct endpoint with double-confirm", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[baseItem({ id: "REQ-B", repo: "my-repo" })]}
+                costCapDailyUsd={10}
+            />,
+        );
+        expect(html).toContain('hx-post="/api/approvals/REQ-B/reject"');
+        expect(html).toContain('hx-confirm=');
+    });
+
+    test("Inspect link href points to /repo/{repo}/request/{id}", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[baseItem({ id: "REQ-C", repo: "acme-repo" })]}
+                costCapDailyUsd={10}
+            />,
+        );
+        expect(html).toContain('href="/repo/acme-repo/request/REQ-C"');
     });
 });
 
-describe("ApprovalsView — schema cleanup", () => {
-    test("no legacy .approval-item / risk-* markup survives", async () => {
-        const items = [
-            baseItem(),
-            baseItem({ id: "R2", gateType: "standards-violation" }),
-        ];
+// ---- Preview card -----------------------------------------------------------
+
+describe("ApprovalsView — FR-026-30 preview card", () => {
+    test("renders .approvals-lower-grid with two .card elements", async () => {
         const html = await render(
-            <ApprovalsView items={items} costCapDailyUsd={25} />,
+            <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain("approvals-lower-grid");
+        const cardMatches = html.match(/<div class="card[^"]*">/g) ?? [];
+        expect(cardMatches.length).toBeGreaterThanOrEqual(2);
+    });
+
+    test("preview card shows Selected · {id} when items exist", async () => {
+        const html = await render(
+            <ApprovalsView items={[baseItem({ id: "REQ-P" })]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain("Selected · REQ-P");
+    });
+
+    test("preview card shows 'No selection' when items is empty", async () => {
+        const html = await render(
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain("No selection");
+    });
+
+    test("preview card has Open full link to the selected request", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[baseItem({ id: "REQ-Q", repo: "qrepo" })]}
+                costCapDailyUsd={25}
+            />,
+        );
+        expect(html).toContain('href="/repo/qrepo/request/REQ-Q"');
+    });
+});
+
+// ---- Gate stats card --------------------------------------------------------
+
+describe("ApprovalsView — FR-026-30 gate-stats-7d card", () => {
+    test("renders 'Gate stats · 7d' heading", async () => {
+        const html = await render(
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain("Gate stats · 7d");
+    });
+
+    test("renders Auto-approved / Operator approved / Rejected / Re-spec'd rows", async () => {
+        const html = await render(
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain("Auto-approved");
+        expect(html).toContain("Operator approved");
+        expect(html).toContain("Rejected");
+        expect(html).toContain("Re-spec&#39;d");
+    });
+
+    test("renders median time-to-approve label", async () => {
+        const html = await render(
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain("Median time-to-approve");
+    });
+
+    test("stat-row-track elements have ARIA progressbar role", async () => {
+        const html = await render(
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
+        );
+        expect(html).toContain('role="progressbar"');
+    });
+});
+
+// ---- Schema / token cleanliness --------------------------------------------
+
+describe("ApprovalsView — schema / token cleanliness", () => {
+    test("no raw hex color in rendered output", async () => {
+        const html = await render(
+            <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
+        );
+        expect(html).not.toMatch(/#[0-9a-fA-F]{6}/);
+        expect(html).not.toMatch(/#[0-9a-fA-F]{3}\b/);
+    });
+
+    test("no legacy .approval-item or risk-* markup", async () => {
+        const html = await render(
+            <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
         );
         expect(html).not.toContain("approval-item");
         expect(html).not.toContain("risk-high");
         expect(html).not.toContain("risk-med");
         expect(html).not.toContain("risk-low");
-        expect(html).not.toContain("risk-badge");
     });
 
-    test("no raw hex color sneaks into the rendered template", async () => {
+    test("polling wrapper id is #approvals-body", async () => {
         const html = await render(
-            <ApprovalsView items={[baseItem()]} costCapDailyUsd={25} />,
+            <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        // Tolerate hex inside `<svg>` (none here) and class names; only
-        // catch literal #abc/#abcdef tokens.
-        expect(html).not.toMatch(/#[0-9a-fA-F]{6}/);
-        expect(html).not.toMatch(/#[0-9a-fA-F]{3}\b/);
+        expect(html).toContain('id="approvals-body"');
     });
 });
