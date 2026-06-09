@@ -643,6 +643,29 @@ cmd_kill_switch() {
     chmod 600 "${KILL_SWITCH_FILE}"
 
     echo "Kill switch ENGAGED at ${timestamp}."
+
+    # PRD-025 FR-025-10: the flag file alone only stops the NEXT iteration —
+    # an in-flight session keeps running until it finishes. Also send SIGTERM
+    # to the live daemon so it shuts the current session down within the
+    # graceful-shutdown window. The daemon traps SIGTERM (handle_shutdown ->
+    # graceful_shutdown_child), so this is a clean stop, not a kill -9.
+    local lock_file="${DAEMON_HOME}/daemon.lock"
+    if [[ -f "${lock_file}" ]]; then
+        local lock_pid
+        lock_pid=$(cat "${lock_file}" 2>/dev/null || echo "")
+        if [[ "${lock_pid}" =~ ^[0-9]+$ ]] && kill -0 "${lock_pid}" 2>/dev/null; then
+            if kill -TERM "${lock_pid}" 2>/dev/null; then
+                echo "Sent SIGTERM to running daemon (PID ${lock_pid}); in-flight work will stop gracefully."
+            else
+                echo "WARNING: could not signal daemon PID ${lock_pid}; it will stop at the next iteration."
+            fi
+        else
+            echo "Daemon not currently running; flag will take effect on next start."
+        fi
+    else
+        echo "No daemon lock found; flag will take effect on next start."
+    fi
+
     echo "All daemon processing will halt."
     echo "To resume, run: autonomous-dev kill-switch reset"
 }
