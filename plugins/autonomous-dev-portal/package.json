@@ -25,6 +25,7 @@
     "marked": "~5.1.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/bun": "latest",
     "@types/dompurify": "~3.0.0",
     "@types/jsdom": "~21.1.0",

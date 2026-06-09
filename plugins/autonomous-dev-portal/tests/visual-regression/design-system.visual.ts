@@ -61,10 +61,10 @@ test.beforeAll(async () => {
     // Spawn the portal in test mode. PORTAL_WORDMARK_BRACKETS=1 freezes
     // the wordmark variant so the brand-section golden doesn't depend on
     // any local env override.
-    server = spawn("bun", ["run", "server/index.ts"], {
+    server = spawn("bun", ["run", "server/server.ts"], {
         env: {
             ...process.env,
-            PORT: String(PORT),
+            PORTAL_PORT: String(PORT),
             NODE_ENV: "test",
             PORTAL_WORDMARK_BRACKETS: "1",
         },

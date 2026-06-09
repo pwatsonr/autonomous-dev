@@ -16,3 +16,7 @@ bun.lock
 cypress/videos/
 cypress/screenshots/
 cypress/downloads/
+
+# Playwright visual-regression run artifacts
+test-results/
+playwright-report/
