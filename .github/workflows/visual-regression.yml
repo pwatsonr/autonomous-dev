@@ -46,10 +46,11 @@ jobs:
       CI: 'true'
 
     steps:
-      - name: Checkout (with LFS)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          lfs: true
+        # NOTE: golden PNGs are committed as regular files (not Git LFS), and
+        # the Playwright runner image has no git-lfs binary — requesting
+        # `lfs: true` made checkout fail outright. Plain checkout is correct.
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1

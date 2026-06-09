@@ -39,7 +39,11 @@ jobs:
           GITLEAKS_ENABLE_SUMMARY: "true"
 
       - name: Upload gitleaks SARIF to Code Scanning
-        if: always()
+        # gitleaks-action only writes gitleaks.sarif when it has findings; on a
+        # clean scan the file is absent and an unconditional upload would fail
+        # the whole job (and cascade to the security-baseline gate). Only upload
+        # when the SARIF actually exists.
+        if: always() && hashFiles('gitleaks.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3.27.0
         with:
           sarif_file: gitleaks.sarif

@@ -43,6 +43,12 @@ paths = [
   '''(?i)\.md$''',
   '''plugins/autonomous-dev/tests/fixtures/.*''',
   '''tests/fixtures/security/.*''',
+  # Secret-handling test suites: these deliberately embed fake tokens to
+  # exercise the detector/scrubber. Allowlisted by directory so the real
+  # detection rules above still apply everywhere else.
+  '''.*/tests/safety/.*''',
+  '''.*/tests/adapters/.*''',
+  '''.*/__tests__/adapters/.*''',
   '''docs/.*''',
   '''.*\.example$''',
   '''.*\.sample$''',
