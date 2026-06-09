@@ -47,6 +47,10 @@ LOG_MAX_SIZE_MB=50
 LOG_RETENTION_DAYS=7
 DAILY_COST_CAP=50.00
 MONTHLY_COST_CAP=500.00
+PER_REQUEST_COST_CAP=50.00
+MAX_CONCURRENT_REQUESTS=3
+RATE_LIMIT_BACKOFF_BASE=30
+RATE_LIMIT_BACKOFF_MAX=900
 IDLE_BACKOFF_CURRENT=30
 IDLE_BACKOFF_BASE=30
 ONCE_MODE=false
@@ -731,8 +735,16 @@ load_config() {
     MAX_RETRIES_PER_PHASE=$(jq -r '.daemon.max_retries_per_phase // 3' "${EFFECTIVE_CONFIG}")
     LOG_MAX_SIZE_MB=$(jq -r '.daemon.log_max_size_mb // 50' "${EFFECTIVE_CONFIG}")
     LOG_RETENTION_DAYS=$(jq -r '.daemon.log_retention_days // 7' "${EFFECTIVE_CONFIG}")
-    DAILY_COST_CAP=$(jq -r '.daemon.daily_cost_cap_usd // 50.00' "${EFFECTIVE_CONFIG}")
-    MONTHLY_COST_CAP=$(jq -r '.daemon.monthly_cost_cap_usd // 500.00' "${EFFECTIVE_CONFIG}")
+    # Cost caps and concurrency live under `.governance` in config_defaults.json.
+    # The previous `.daemon.*` paths never matched, so these silently fell back
+    # to the hardcoded defaults and ignored operator config (PRD-025 FR-025-11).
+    # Read `.governance.*` first, keeping `.daemon.*` as a back-compat fallback.
+    DAILY_COST_CAP=$(jq -r '.governance.daily_cost_cap_usd // .daemon.daily_cost_cap_usd // 50.00' "${EFFECTIVE_CONFIG}")
+    MONTHLY_COST_CAP=$(jq -r '.governance.monthly_cost_cap_usd // .daemon.monthly_cost_cap_usd // 500.00' "${EFFECTIVE_CONFIG}")
+    PER_REQUEST_COST_CAP=$(jq -r '.governance.per_request_cost_cap_usd // 50.00' "${EFFECTIVE_CONFIG}")
+    MAX_CONCURRENT_REQUESTS=$(jq -r '.governance.max_concurrent_requests // 3' "${EFFECTIVE_CONFIG}")
+    RATE_LIMIT_BACKOFF_BASE=$(jq -r '.governance.rate_limit_backoff_base_seconds // 30' "${EFFECTIVE_CONFIG}")
+    RATE_LIMIT_BACKOFF_MAX=$(jq -r '.governance.rate_limit_backoff_max_seconds // 900' "${EFFECTIVE_CONFIG}")
 
     # 5. Update idle backoff variables
     IDLE_BACKOFF_CURRENT=${POLL_INTERVAL}
@@ -1700,6 +1712,58 @@ escalate_to_paused() {
     emit_alert "retry_exhaustion" "Request ${request_id} paused after ${retry_count} retries in phase '${phase}'"
 
     log_error "Request ${request_id} escalated to PAUSED (retry exhaustion in ${phase})"
+}
+
+# check_per_request_cost_cap(request_id: string, project: string) -> void
+#   PRD-025 FR-025-11 (PRD-001 FR-503). Called after a session's cost has been
+#   recorded. If the request's accumulated `cost_accrued_usd` has reached the
+#   configured per-request cap, pause the request and escalate so a single
+#   runaway request can't consume the whole daily/monthly budget. No-op for
+#   requests already in a terminal/paused state.
+check_per_request_cost_cap() {
+    local request_id="$1"
+    local project="$2"
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+    [[ -f "${state_file}" ]] || return 0
+
+    local accrued status
+    accrued=$(jq -r '.cost_accrued_usd // 0' "${state_file}" 2>/dev/null || echo "0")
+    status=$(jq -r '.status // ""' "${state_file}" 2>/dev/null || echo "")
+    case "${status}" in done|cancelled|failed|paused) return 0 ;; esac
+
+    # Numeric, cap-aware comparison (awk handles floats; bash [[ ]] does not).
+    if ! awk "BEGIN {exit !(${accrued} >= ${PER_REQUEST_COST_CAP})}" 2>/dev/null; then
+        return 0
+    fi
+
+    local phase ts tmp events_file
+    phase=$(jq -r '.current_phase // "unknown"' "${state_file}" 2>/dev/null || echo "unknown")
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    tmp="${state_file}.tmp.$$"
+    if jq --arg ts "${ts}" \
+          --arg reason "Per-request cost cap reached (\$${accrued} >= \$${PER_REQUEST_COST_CAP})" \
+          '.status = "paused"
+           | .current_phase_metadata.paused_reason = $reason
+           | .current_phase_metadata.paused_at = $ts
+           | .updated_at = $ts' \
+          "${state_file}" > "${tmp}" 2>/dev/null; then
+        mv "${tmp}" "${state_file}"
+    else
+        rm -f "${tmp}" 2>/dev/null || true
+        log_warn "Failed to pause ${request_id} after per-request cost cap"
+        return 0
+    fi
+
+    events_file="${project}/.autonomous-dev/requests/${request_id}/events.jsonl"
+    jq -nc --arg ts "${ts}" --arg req "${request_id}" --arg phase "${phase}" \
+           --argjson accrued "${accrued}" --argjson cap "${PER_REQUEST_COST_CAP}" \
+           '{timestamp:$ts, type:"cost_cap_exceeded", request_id:$req,
+             details:{phase:$phase, scope:"per_request",
+                      cost_accrued_usd:$accrued, per_request_cap_usd:$cap,
+                      escalated_to:"paused"}}' >> "${events_file}" 2>/dev/null || true
+
+    emit_alert "per_request_cost_cap" "Request ${request_id} paused: cost \$${accrued} reached per-request cap \$${PER_REQUEST_COST_CAP}"
+    log_warn "Per-request cost cap reached for ${request_id}: \$${accrued} >= \$${PER_REQUEST_COST_CAP}. Request paused."
 }
 
 ###############################################################################
@@ -3268,6 +3332,11 @@ main_loop() {
             check_retry_exhaustion "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
         fi
+
+        # PRD-025 FR-025-11: after the session's cost is recorded, pause the
+        # request if it has reached the per-request cost cap (guards against a
+        # single request burning the whole budget).
+        check_per_request_cost_cap "${request_id}" "${project}"
 
         # Log rotation and cleanup (SPEC-001-3-04 Task 11)
         rotate_logs_if_needed
