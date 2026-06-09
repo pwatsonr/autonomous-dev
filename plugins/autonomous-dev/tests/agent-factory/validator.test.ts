@@ -213,15 +213,18 @@ function test_rule_005_tool_allowlist_reviewer_fail(): void {
 }
 
 function test_rule_005_tool_allowlist_meta_fail(): void {
+  // `Write` is now permitted for meta (mandatory verdict-envelope
+  // persistence); the read-only boundary is preserved by forbidding
+  // Edit/Bash. Assert on Bash, which a meta agent must never carry.
   const agent = validAgent({
     role: 'meta',
-    tools: ['Read', 'Glob', 'Grep', 'Write'],
+    tools: ['Read', 'Glob', 'Grep', 'Bash'],
   });
   const result = validateAgent(agent);
 
   const err = result.errors.find((e) => e.rule.startsWith('RULE_005'));
-  assert(err !== undefined, 'expected RULE_005 error for Write');
-  assert(err!.message.includes('Write'), `error message should mention Write: ${err!.message}`);
+  assert(err !== undefined, 'expected RULE_005 error for Bash');
+  assert(err!.message.includes('Bash'), `error message should mention Bash: ${err!.message}`);
   console.log('PASS: test_rule_005_tool_allowlist_meta_fail');
 }
 

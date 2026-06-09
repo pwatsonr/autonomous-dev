@@ -32,6 +32,10 @@ readonly DEFAULTS_FILE="${PLUGIN_DIR}/config/defaults.json"
 readonly ALERTS_DIR="${DAEMON_HOME}/alerts"
 readonly PORTAL_REQUEST_ACTIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/request-actions"
 readonly GATE_DECISIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/gate-decisions"
+# PRD-025 FR-025-05 / #353: portal-originated config-change markers. The portal
+# writes proposed config edits here instead of mutating CONFIG_FILE directly;
+# consume_config_changes() validates + applies them during reconcile.
+readonly CONFIG_CHANGES_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/config-changes"
 
 # --- Runtime State Variables -------------------------------------------------
 
@@ -47,6 +51,10 @@ LOG_MAX_SIZE_MB=50
 LOG_RETENTION_DAYS=7
 DAILY_COST_CAP=50.00
 MONTHLY_COST_CAP=500.00
+PER_REQUEST_COST_CAP=50.00
+MAX_CONCURRENT_REQUESTS=3
+RATE_LIMIT_BACKOFF_BASE=30
+RATE_LIMIT_BACKOFF_MAX=900
 IDLE_BACKOFF_CURRENT=30
 IDLE_BACKOFF_BASE=30
 ONCE_MODE=false
@@ -731,8 +739,16 @@ load_config() {
     MAX_RETRIES_PER_PHASE=$(jq -r '.daemon.max_retries_per_phase // 3' "${EFFECTIVE_CONFIG}")
     LOG_MAX_SIZE_MB=$(jq -r '.daemon.log_max_size_mb // 50' "${EFFECTIVE_CONFIG}")
     LOG_RETENTION_DAYS=$(jq -r '.daemon.log_retention_days // 7' "${EFFECTIVE_CONFIG}")
-    DAILY_COST_CAP=$(jq -r '.daemon.daily_cost_cap_usd // 50.00' "${EFFECTIVE_CONFIG}")
-    MONTHLY_COST_CAP=$(jq -r '.daemon.monthly_cost_cap_usd // 500.00' "${EFFECTIVE_CONFIG}")
+    # Cost caps and concurrency live under `.governance` in config_defaults.json.
+    # The previous `.daemon.*` paths never matched, so these silently fell back
+    # to the hardcoded defaults and ignored operator config (PRD-025 FR-025-11).
+    # Read `.governance.*` first, keeping `.daemon.*` as a back-compat fallback.
+    DAILY_COST_CAP=$(jq -r '.governance.daily_cost_cap_usd // .daemon.daily_cost_cap_usd // 50.00' "${EFFECTIVE_CONFIG}")
+    MONTHLY_COST_CAP=$(jq -r '.governance.monthly_cost_cap_usd // .daemon.monthly_cost_cap_usd // 500.00' "${EFFECTIVE_CONFIG}")
+    PER_REQUEST_COST_CAP=$(jq -r '.governance.per_request_cost_cap_usd // 50.00' "${EFFECTIVE_CONFIG}")
+    MAX_CONCURRENT_REQUESTS=$(jq -r '.governance.max_concurrent_requests // 3' "${EFFECTIVE_CONFIG}")
+    RATE_LIMIT_BACKOFF_BASE=$(jq -r '.governance.rate_limit_backoff_base_seconds // 30' "${EFFECTIVE_CONFIG}")
+    RATE_LIMIT_BACKOFF_MAX=$(jq -r '.governance.rate_limit_backoff_max_seconds // 900' "${EFFECTIVE_CONFIG}")
 
     # 5. Update idle backoff variables
     IDLE_BACKOFF_CURRENT=${POLL_INTERVAL}
@@ -1702,6 +1718,58 @@ escalate_to_paused() {
     log_error "Request ${request_id} escalated to PAUSED (retry exhaustion in ${phase})"
 }
 
+# check_per_request_cost_cap(request_id: string, project: string) -> void
+#   PRD-025 FR-025-11 (PRD-001 FR-503). Called after a session's cost has been
+#   recorded. If the request's accumulated `cost_accrued_usd` has reached the
+#   configured per-request cap, pause the request and escalate so a single
+#   runaway request can't consume the whole daily/monthly budget. No-op for
+#   requests already in a terminal/paused state.
+check_per_request_cost_cap() {
+    local request_id="$1"
+    local project="$2"
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+    [[ -f "${state_file}" ]] || return 0
+
+    local accrued status
+    accrued=$(jq -r '.cost_accrued_usd // 0' "${state_file}" 2>/dev/null || echo "0")
+    status=$(jq -r '.status // ""' "${state_file}" 2>/dev/null || echo "")
+    case "${status}" in done|cancelled|failed|paused) return 0 ;; esac
+
+    # Numeric, cap-aware comparison (awk handles floats; bash [[ ]] does not).
+    if ! awk "BEGIN {exit !(${accrued} >= ${PER_REQUEST_COST_CAP})}" 2>/dev/null; then
+        return 0
+    fi
+
+    local phase ts tmp events_file
+    phase=$(jq -r '.current_phase // "unknown"' "${state_file}" 2>/dev/null || echo "unknown")
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    tmp="${state_file}.tmp.$$"
+    if jq --arg ts "${ts}" \
+          --arg reason "Per-request cost cap reached (\$${accrued} >= \$${PER_REQUEST_COST_CAP})" \
+          '.status = "paused"
+           | .current_phase_metadata.paused_reason = $reason
+           | .current_phase_metadata.paused_at = $ts
+           | .updated_at = $ts' \
+          "${state_file}" > "${tmp}" 2>/dev/null; then
+        mv "${tmp}" "${state_file}"
+    else
+        rm -f "${tmp}" 2>/dev/null || true
+        log_warn "Failed to pause ${request_id} after per-request cost cap"
+        return 0
+    fi
+
+    events_file="${project}/.autonomous-dev/requests/${request_id}/events.jsonl"
+    jq -nc --arg ts "${ts}" --arg req "${request_id}" --arg phase "${phase}" \
+           --argjson accrued "${accrued}" --argjson cap "${PER_REQUEST_COST_CAP}" \
+           '{timestamp:$ts, type:"cost_cap_exceeded", request_id:$req,
+             details:{phase:$phase, scope:"per_request",
+                      cost_accrued_usd:$accrued, per_request_cap_usd:$cap,
+                      escalated_to:"paused"}}' >> "${events_file}" 2>/dev/null || true
+
+    emit_alert "per_request_cost_cap" "Request ${request_id} paused: cost \$${accrued} reached per-request cap \$${PER_REQUEST_COST_CAP}"
+    log_warn "Per-request cost cap reached for ${request_id}: \$${accrued} >= \$${PER_REQUEST_COST_CAP}. Request paused."
+}
+
 ###############################################################################
 # Turn Budget Exhaustion Detection (SPEC-001-3-02 Task 6)
 ###############################################################################
@@ -2654,6 +2722,14 @@ check_gates() {
         return 1
     fi
 
+    # Rate-limit backoff gate (PRD-025 FR-025-12): if a recent session hit an
+    # API rate limit, honor the exponential-backoff window (or the persistent
+    # kill-switch state after the ladder maxes out) before doing more work.
+    if declare -F check_rate_limit_state >/dev/null 2>&1 && ! check_rate_limit_state; then
+        log_warn "Rate-limit backoff active. Skipping iteration."
+        return 1
+    fi
+
     return 0
 }
 
@@ -2710,6 +2786,65 @@ handle_phase_failure() {
 ###############################################################################
 # Orphan Reconciliation
 ###############################################################################
+
+# consume_config_changes() -> void
+#   PRD-025 FR-025-05 / #353. Applies portal-originated config-change markers.
+#   The portal writes a marker {id, source:"portal", actor, ts, summary,
+#   proposed:<full user config>} into CONFIG_CHANGES_DIR rather than mutating
+#   CONFIG_FILE directly (FR-925). This validates each marker, atomically
+#   applies `.proposed` to CONFIG_FILE, logs an audit line, and archives the
+#   marker. Invalid markers are moved to a `rejected/` subdir (never applied,
+#   never retried forever). Runs during reconcile. Safe under `set -e`.
+consume_config_changes() {
+    [[ -d "${CONFIG_CHANGES_DIR}" ]] || return 0
+
+    local applied_dir="${CONFIG_CHANGES_DIR}/applied"
+    local rejected_dir="${CONFIG_CHANGES_DIR}/rejected"
+    local applied_count=0
+    local marker
+    for marker in "${CONFIG_CHANGES_DIR}"/*.json; do
+        [[ -f "${marker}" ]] || continue   # literal glob when no markers present
+
+        # 1. Validate: parseable JSON, source=="portal", .proposed is an object.
+        if ! jq empty "${marker}" 2>/dev/null; then
+            log_warn "Config-change marker is corrupt JSON; rejecting: ${marker}"
+            mkdir -p "${rejected_dir}"; mv "${marker}" "${rejected_dir}/" 2>/dev/null || rm -f "${marker}"
+            continue
+        fi
+        local src proposed_type
+        src=$(jq -r '.source // ""' "${marker}" 2>/dev/null || echo "")
+        proposed_type=$(jq -r '.proposed | type' "${marker}" 2>/dev/null || echo "null")
+        if [[ "${src}" != "portal" || "${proposed_type}" != "object" ]]; then
+            log_warn "Config-change marker failed validation (source='${src}', proposed=${proposed_type}); rejecting: ${marker}"
+            mkdir -p "${rejected_dir}"; mv "${marker}" "${rejected_dir}/" 2>/dev/null || rm -f "${marker}"
+            continue
+        fi
+
+        local id actor summary
+        id=$(jq -r '.id // "unknown"' "${marker}" 2>/dev/null || echo "unknown")
+        actor=$(jq -r '.actor // "unknown"' "${marker}" 2>/dev/null || echo "unknown")
+        summary=$(jq -r '.summary // ""' "${marker}" 2>/dev/null || echo "")
+
+        # 2. Apply: atomically write `.proposed` to CONFIG_FILE.
+        local cfg_tmp="${CONFIG_FILE}.tmp.$$"
+        mkdir -p "$(dirname "${CONFIG_FILE}")" 2>/dev/null || true
+        if jq '.proposed' "${marker}" > "${cfg_tmp}" 2>/dev/null && mv "${cfg_tmp}" "${CONFIG_FILE}"; then
+            # 3. Audit (structured log line is the daemon's audit trail) + archive.
+            log_info "Applied portal config change ${id} by '${actor}': ${summary}"
+            mkdir -p "${applied_dir}"; mv "${marker}" "${applied_dir}/" 2>/dev/null || rm -f "${marker}"
+            applied_count=$(( applied_count + 1 ))
+        else
+            rm -f "${cfg_tmp}" 2>/dev/null || true
+            log_warn "Failed to apply config-change marker ${id}; leaving for retry: ${marker}"
+        fi
+    done
+
+    # Reload so applied changes take effect this run (poll interval, caps, etc.).
+    if [[ ${applied_count} -gt 0 ]]; then
+        load_config || log_warn "Config reload after applying ${applied_count} change(s) failed"
+    fi
+    return 0
+}
 
 # reconcile_orphans() -> void
 #   Reconcile orphan SQLite rows and state.json files per SPEC-039-1-04.
@@ -3188,6 +3323,9 @@ main_loop() {
             reconcile_orphans || log_error "Orphan reconciliation failed"
         fi
 
+        # Apply any portal-originated config-change markers (PRD-025 FR-025-05).
+        consume_config_changes || log_error "Config-change consumption failed"
+
         # Marketplace auto-update.
         if [[ $(( POLL_COUNT % UPGRADE_CHECK_EVERY_N_POLLS )) -eq 1 ]]; then
             check_upgrade_available || true
@@ -3241,6 +3379,23 @@ main_loop() {
         local exit_code session_cost output_file
         IFS='|' read -r exit_code session_cost output_file <<< "${session_result}"
 
+        # PRD-025 FR-025-12: an API rate limit is a transient infra condition,
+        # not a code failure. Detect it in the session output BEFORE the normal
+        # branching: record the cost already incurred, advance the backoff state
+        # machine, and re-poll (the phase is left in place to retry once the
+        # backoff window — enforced by check_gates -> check_rate_limit_state —
+        # elapses). Do NOT record_crash or advance the phase.
+        if declare -F detect_rate_limit >/dev/null 2>&1 \
+           && [[ -f "${output_file}" ]] \
+           && detect_rate_limit "$(cat "${output_file}" 2>/dev/null || echo "")"; then
+            log_warn "API rate limit detected for ${request_id}; engaging exponential backoff (phase retained for retry)."
+            update_state_cost "${request_id}" "${project}" "${session_cost}" || true
+            update_cost_ledger "${session_cost}" "${request_id}" || true
+            handle_rate_limit "$(cat "${EFFECTIVE_CONFIG}" 2>/dev/null || echo '{}')" || true
+            [[ "${ONCE_MODE}" == "true" ]] && break
+            continue
+        fi
+
         # Post-session state update, crash tracking, and cost ledger
         # Three-way branching: turn exhaustion / success / hard failure (SPEC-001-3-02)
         if [[ ${exit_code} -ne 0 ]] && detect_turn_exhaustion "${exit_code}" "${output_file}"; then
@@ -3258,6 +3413,11 @@ main_loop() {
             update_cost_ledger "${session_cost}" "${request_id}"
         elif [[ ${exit_code} -eq 0 ]]; then
             record_success
+            # A clean session clears any rate-limit backoff so the consecutive
+            # counter resets (PRD-025 FR-025-12).
+            if declare -F clear_rate_limit_state >/dev/null 2>&1; then
+                clear_rate_limit_state || true
+            fi
             update_state_cost "${request_id}" "${project}" "${session_cost}"
             advance_phase "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
@@ -3268,6 +3428,11 @@ main_loop() {
             check_retry_exhaustion "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
         fi
+
+        # PRD-025 FR-025-11: after the session's cost is recorded, pause the
+        # request if it has reached the per-request cost cap (guards against a
+        # single request burning the whole budget).
+        check_per_request_cost_cap "${request_id}" "${project}"
 
         # Log rotation and cleanup (SPEC-001-3-04 Task 11)
         rotate_logs_if_needed
@@ -3297,6 +3462,16 @@ fi
 # shellcheck source=bin/lib/phase-helpers.sh
 if [[ -f "${LIB_DIR}/phase-helpers.sh" ]]; then
     source "${LIB_DIR}/phase-helpers.sh"
+fi
+
+# Rate-limit detection + exponential-backoff state machine (PRD-025 FR-025-12).
+# Provides detect_rate_limit / handle_rate_limit / check_rate_limit_state /
+# clear_rate_limit_state. Its logging is self-contained and delegates to this
+# daemon's loggers when present. Both files run `set -euo pipefail`, so sourcing
+# introduces no shell-option change.
+# shellcheck source=lib/rate_limit_handler.sh
+if [[ -f "${PLUGIN_DIR}/lib/rate_limit_handler.sh" ]]; then
+    source "${PLUGIN_DIR}/lib/rate_limit_handler.sh"
 fi
 
 # Guard: allow the script to be sourced for unit testing without executing main.

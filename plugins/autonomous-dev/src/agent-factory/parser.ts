@@ -256,6 +256,32 @@ function parseYaml(yamlStr: string): Record<string, unknown> {
       }
     }
 
+    // Block scalar: `key: |` (literal, newlines kept) or `key: >` (folded,
+    // newlines -> spaces), with optional chomping indicator (|-, >-, |+).
+    // Content is the run of lines indented deeper than the key. Used by
+    // agents with multi-line `description:` blocks (e.g. standards-meta-reviewer).
+    if (/^[|>][+-]?$/.test(rawValue)) {
+      const folded = rawValue[0] === '>';
+      const body: string[] = [];
+      let j = i + 1;
+      while (j < lines.length) {
+        const raw = lines[j].replace(/\r$/, '');
+        if (raw.trim() === '') { body.push(''); j++; continue; }
+        if (!/^\s/.test(raw)) break; // dedent to column 0 ends the block
+        body.push(raw);
+        j++;
+      }
+      // Strip the common leading indentation of the block.
+      const indents = body.filter((l) => l !== '').map((l) => l.match(/^\s*/)![0].length);
+      const minIndent = indents.length ? Math.min(...indents) : 0;
+      const dedented = body.map((l) => l.slice(minIndent));
+      // Drop trailing blank lines, then join.
+      while (dedented.length && dedented[dedented.length - 1] === '') dedented.pop();
+      result[key] = (folded ? dedented.join(' ') : dedented.join('\n')).trim();
+      i = j;
+      continue;
+    }
+
     result[key] = parseScalarValue(rawValue);
     i++;
   }
