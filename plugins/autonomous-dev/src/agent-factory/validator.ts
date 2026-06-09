@@ -27,21 +27,37 @@ export type { ValidationResult };
 // Tool allowlist per role (TDD 3.1.3)
 // ---------------------------------------------------------------------------
 
+// `Write` is permitted for author/reviewer/meta because every gated phase
+// MUST persist its output: authors write their artifact (PRD/TDD/Plan/Spec)
+// and reviewers/meta write the mandatory `phase-result-<phase>.json` verdict
+// envelope (a missing envelope on a *_review phase is treated as FAIL —
+// REVIEWER_DID_NOT_EMIT_VERDICT). This matches spawn-session.sh's review
+// allowlist (`Read Write Glob Grep`) and the fix in commit 5725b5c. The
+// read-only security property of reviewer/meta is preserved by the ABSENCE
+// of `Edit` and `Bash` — they can persist a verdict but cannot modify code.
+// (Scoped-write hardening — restricting Write to the envelope path — is a
+// separate follow-up; see PRD-025.)
 export const TOOL_ALLOWLIST: Record<AgentRole, string[]> = {
-  author:   ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch'],
+  author:   ['Read', 'Glob', 'Grep', 'Write', 'WebSearch', 'WebFetch'],
   executor: ['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write', 'WebSearch', 'WebFetch'],
-  reviewer: ['Read', 'Glob', 'Grep'],
-  meta:     ['Read', 'Glob', 'Grep'],
+  reviewer: ['Read', 'Glob', 'Grep', 'Write'],
+  meta:     ['Read', 'Glob', 'Grep', 'Write'],
 };
 
 // ---------------------------------------------------------------------------
 // Default model registry
 // ---------------------------------------------------------------------------
 
+// Approved model IDs. Includes the dated foundation IDs and the current
+// short-form family in use across agents/*.md (opus 4.7 for author/reviewer/
+// meta, sonnet 4.6 for executors). Keeping both forms avoids rejecting the
+// shipped agents at registry.load() time (PRD-025 FR-025-04 / #352).
 const DEFAULT_MODEL_REGISTRY: Set<string> = new Set([
   'claude-sonnet-4-20250514',
   'claude-opus-4-20250514',
   'claude-haiku-3-20250414',
+  'claude-opus-4-7',
+  'claude-sonnet-4-6',
 ]);
 
 // ---------------------------------------------------------------------------
