@@ -1,0 +1,830 @@
+[
+  {
+    "prd": "PRD-001-system-core.md",
+    "severity": "high",
+    "requirement": "FR-200 — Request ID format REQ-{YYYYMMDD}-{4-char-hex}",
+    "status": "contradicts",
+    "description": "The PRD specifies the format REQ-{YYYYMMDD}-{4-char-hex} (e.g., REQ-20260408-a3f1). The actual implementation uses REQ-NNNNNN (6 sequential digits), validated with ^REQ-[0-9]{6}$. This is a deliberate deviation in the runtime system that contradicts the PRD format everywhere the ID is validated or displayed.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/autonomous-dev.sh:110 — `if [[ ! \"$id\" =~ ^REQ-[0-9]{6}$ ]]`; supervisor-loop.sh:182 — `[[ \"$id\" =~ ^REQ-[0-9]{6}$ ]]`",
+    "recommendation": "Either update the PRD to reflect the 6-digit sequential format that ships, or document the divergence as a deliberate simplification and ensure all tooling (tests, docs) consistently uses one format."
+  },
+  {
+    "prd": "PRD-001-system-core.md",
+    "severity": "high",
+    "requirement": "FR-508 — Track total turn count per request and per phase; fail phase on turn budget exhaustion",
+    "status": "partial",
+    "description": "turn_count is initialized to 0 in the state file and is read for the portal action view, but is never incremented during runtime. The supervisor loop detects turn exhaustion (exit code 2) and treats it as a soft error, but does not write the actual turns used back into state.json. Per-phase turn budget tracking for the 'fail the phase if turns exceeded' contract exists only at the session-spawning level (resolve_max_turns), not at the accounting level.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/supervisor-loop.sh:2082 — only reads turn_count; no write-back of actual turns_used anywhere in update_request_state() or advance_phase()",
+    "recommendation": "After each session, extract the turn count from the claude JSON output and accumulate it into state.json.turn_count. Track per-phase turn counts in phase_history entries."
+  },
+  {
+    "prd": "PRD-001-system-core.md",
+    "severity": "high",
+    "requirement": "FR-305 — Cancel command SHALL delete git worktrees, delete remote branches (with confirmation), archive state directory",
+    "status": "partial",
+    "description": "The cancel_handler in intake/handlers/cancel_handler.ts only sets status='cancelled' in the database and emits an event. It does not delete git worktrees, does not delete remote branches, and does not archive the state directory. The cleanup_engine.sh supports those operations but is not called from the cancel path.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/intake/handlers/cancel_handler.ts:87 — `this.db.updateRequest(requestId, { status: 'cancelled' });` — no git worktree or branch operations follow",
+    "recommendation": "Wire cleanup_engine.sh cleanup_worktree() and cleanup_remote_branch() calls into the cancel handler, or add a post-cancellation hook in the supervisor loop that triggers cleanup when it encounters a newly-cancelled request."
+  },
+  {
+    "prd": "PRD-001-system-core.md",
+    "severity": "high",
+    "requirement": "FR-404 — daemon status SHALL report: running/stopped, PID, uptime, iteration count, crash count, circuit-breaker state, active request count, cost burn for current billing period",
+    "status": "partial",
+    "description": "cmd_daemon_status() reports running/stopped, lock PID (alive/stale), circuit breaker tripped/ok with crash count, kill switch state, and last heartbeat timestamp. It does NOT report uptime, iteration count, active request count, or cost burn for the current billing period.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/autonomous-dev.sh:549-625 — the full cmd_daemon_status() function",
+    "recommendation": "Read iteration_count from heartbeat.json, compute uptime from heartbeat timestamp vs. now, count active requests from the allowlist repos, and read today's spend from the cost ledger."
+  },
+  {
+    "prd": "PRD-001-system-core.md",
+    "severity": "high",
+    "requirement": "FR-405 — kill-switch SHALL: (a) write flag file, (b) send SIGTERM to running daemon, (c) future iterations exit until flag cleared",
+    "status": "partial",
+    "description": "cmd_kill_switch() writes the flag file (FR-405a) and the supervisor loop checks for the flag on every iteration (FR-405c). However, it does NOT send SIGTERM to the running daemon process (FR-405b). If the daemon is mid-session when the kill switch is set, it will only stop at the next iteration boundary.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/autonomous-dev.sh:631-648 — cmd_kill_switch writes flag file only, no SIGTERM",
+    "recommendation": "Read the PID from daemon.lock and send SIGTERM after writing the flag file, similar to how a graceful shutdown is initiated."
+  },
+  {
+    "prd": "PRD-001-system-core.md",
+    "severity": "high",
+    "requirement": "FR-505 — Detect API rate-limit responses and implement exponential backoff (30s, 60s, 120s, 240s, 480s, then pause and escalate)",
+    "status": "partial",
+    "description": "A rate_limit_handler.sh library exists with detect_rate_limit(), handle_rate_limit() functions, and tests in tests/unit/test_rate_limit_handler.sh. However, this library is never sourced or called from supervisor-loop.sh. The main loop has no rate-limit detection after session exit.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/lib/rate_limit_handler.sh exists; supervisor-loop.sh sources phase-legacy.sh, phase-helpers.sh, gate-check.sh, typed-limits.sh — never rate_limit_handler.sh",
+    "recommendation": "Source lib/rate_limit_handler.sh in supervisor-loop.sh and call detect_rate_limit() on the session output file after each session exit to enable the backoff logic."
+  },
+  {
+    "prd": "PRD-001-system-core.md",
+    "severity": "high",
+    "requirement": "FR-503 — Per-request cost cap enforcement (default $50, pause and escalate on breach)",
+    "status": "missing",
+    "description": "The per_request_cost_cap_usd is defined in config_defaults.json (governance section) and referenced in tests and docs, but check_gates() in supervisor-loop.sh only checks daily and monthly caps. There is no per-request cap check in the main loop or in update_cost_ledger()/update_state_cost().",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/supervisor-loop.sh:2713-2756 — check_cost_caps() reads only daily and monthly caps, no per-request check; config/defaults.json has no per_request_cost_cap_usd (only config_defaults.json does)",
+    "recommendation": "In check_gates() or after each cost update, compare the request's cost_accrued_usd against the configured per_request_cost_cap_usd and call escalate_to_paused() if exceeded."
+  },
+  {
+    "prd": "PRD-001-system-core.md",
+    "severity": "high",
+    "requirement": "FR-504 — Enforce maximum concurrent requests cap (default 3)",
+    "status": "missing",
+    "description": "The max_concurrent_requests setting is documented in config_init.sh comments but is not present in config/defaults.json (the file actually loaded by the daemon), and there is no enforcement of a concurrent request cap anywhere in the supervisor loop or request selection logic. The daemon processes one request at a time per iteration, but does not queue requests in intake beyond the cap.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/config/defaults.json — no max_concurrent_requests field; supervisor-loop.sh select_request() does not count active requests",
+    "recommendation": "Add max_concurrent_requests to config/defaults.json and enforce it in select_request() or check_gates() by counting requests in running/gate status across the allowlist."
+  },
+  {
+    "prd": "PRD-002-document-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-002 / §5.1.1 PRD Template required sections",
+    "status": "partial",
+    "description": "The code PRD template (prd-template.ts) diverges from the §5.1.1 specification. The spec requires: Problem Statement, Goals, Non-Goals, User Stories, Functional Requirements, Non-Functional Requirements, Success Metrics, Risks & Mitigations, Open Questions. The code adds 'Executive Summary' and 'Scope and Constraints' (not in spec) but omits 'Non-Goals', 'Success Metrics', and 'Open Questions'.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/pipeline/templates/prd-template.ts:22-112",
+    "recommendation": "Add Non-Goals, Success Metrics sections as required. Make Open Questions optional (matches PRD spec). Remove or fold 'Executive Summary' into Problem Statement or rename to match spec language. Rename 'Scope and Constraints' to 'Non-Goals' or add both."
+  },
+  {
+    "prd": "PRD-002-document-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-002 / §5.1.2 TDD Template required sections",
+    "status": "partial",
+    "description": "The TDD template omits 'Trade-off Analysis' (required) and 'Integration Points' (required) that §5.1.2 mandates. The template adds 'Error Handling', 'Deployment', 'Performance', 'Monitoring', 'Dependencies', 'Migration' which have no equivalent in the spec's TDD section list.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/pipeline/templates/tdd-template.ts:22-152",
+    "recommendation": "Add 'Trade-off Analysis' and 'Integration Points' as required sections. The extra sections are not disqualifying additions, but the two missing required sections need to be present."
+  },
+  {
+    "prd": "PRD-002-document-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-002 / §5.1.3 Plan Template required sections",
+    "status": "partial",
+    "description": "The Plan template uses 'Tasks' (instead of the spec's 'Work Units'), omits 'Dependency Graph', omits 'Agent Assignments', and omits 'Parallel Execution Strategy' (optional). The existing template has 'Objective', 'Scope', 'Tasks', 'Dependencies', 'Testing Strategy', 'Risks', 'Definition of Done' — these merge or rename several required sections but miss mandatory PRD-002 section IDs.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/pipeline/templates/plan-template.ts:22-92",
+    "recommendation": "Add 'Work Units' (or rename 'Tasks' to match), 'Dependency Graph', and 'Agent Assignments' as required sections."
+  },
+  {
+    "prd": "PRD-002-document-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-005 — Operator-configurable templates without code changes",
+    "status": "missing",
+    "description": "FR-005 requires operators to add optional sections, modify section descriptions, and adjust rubric weights via configuration without changing plugin code. All five templates hardcode customSectionsAllowed=false (except CODE which allows custom sections). No config file path exists in config-loader.ts for template section customization. The PipelineConfig type has no template overrides field.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/pipeline/templates/prd-template.ts:7 (customSectionsAllowed: false), /Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/pipeline/storage/config-loader.ts (no template section in loadConfig)",
+    "recommendation": "Add a 'templates' section to PipelineConfig and config.yaml that allows per-type section additions, description overrides, and rubric weight adjustments loaded at startup via config-loader.ts."
+  },
+  {
+    "prd": "PRD-002-document-pipeline.md",
+    "severity": "critical",
+    "requirement": "FR-062 / FR-063 — Gap detection blocks review gate approval",
+    "status": "partial",
+    "description": "Gap detection code exists and correctly assigns 'critical' severity to gaps (gap-detector.ts:54). The config flag gapDetectionAtGates=true exists. However, the ReviewGateService never reads gapDetectionAtGates and never invokes detectGaps or injects gap findings as blocking critical findings into the review pipeline. The config flag is defined in PipelineConfig but is a dead reference — no caller reads it in the review-gate path.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/pipeline/types/config.ts:48-49 (flag defined), /Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/review-gate/review-gate-service.ts (no detectGaps call in submitForReview), /Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/pipeline/traceability/gap-detector.ts:54",
+    "recommendation": "Wire gapDetectionAtGates into ReviewGateService.submitForReview: after pre-review validation (Step 1), if the config flag is enabled, regenerate the traceability matrix and inject any gaps as critical:blocking findings before score aggregation."
+  },
+  {
+    "prd": "PRD-003-agent-factory.md",
+    "severity": "critical",
+    "requirement": "FR-01, FR-03, FR-35 — Agent registry loads only valid, schema-conformant agents with role-correct tools",
+    "status": "regressed",
+    "description": "Every reviewer- and meta-role agent in agents/ carries a 'Write' tool in its frontmatter (added by commit 5725b5c 'fix(agents): add Write tool to author + reviewer frontmatter'). The validator's TOOL_ALLOWLIST explicitly forbids Write for reviewer and meta roles (validator.ts:33-34). Additionally, all 18 agents use models 'claude-opus-4-7' or 'claude-sonnet-4-6', which are absent from the DEFAULT_MODEL_REGISTRY (validator.ts:41-45 lists only the 20250514/20250414 model IDs). registry.load() does not pass a custom modelRegistry to the ValidationContext (registry.ts:166-168). Consequently, every agent fails RULE_005 or RULE_009 and would be rejected when registry.load() is called in production. tests/agent-factory/agents.test.ts confirms: 7 of 9 tests fail with 'RULE_005_TOOL_ALLOWLIST: Tool Write is not allowed' and 'RULE_009_MODEL_REGISTRY: Model claude-opus-4-7 is not in the approved model registry'.",
+    "evidence": "plugins/autonomous-dev/src/agent-factory/validator.ts:30-35 (TOOL_ALLOWLIST), plugins/autonomous-dev/src/agent-factory/validator.ts:41-45 (DEFAULT_MODEL_REGISTRY), plugins/autonomous-dev/src/agent-factory/registry.ts:166-168 (no modelRegistry in ctx), plugins/autonomous-dev/agents/quality-reviewer.md:tools includes Write, tests/agent-factory/agents.test.ts:7 failures",
+    "recommendation": "Either add Write to the reviewer/meta/author allowlists in TOOL_ALLOWLIST (and update the PRD's tool policy table), or remove Write from the reviewer/meta agent files. Update DEFAULT_MODEL_REGISTRY to include claude-opus-4-7 and claude-sonnet-4-6."
+  },
+  {
+    "prd": "PRD-003-agent-factory.md",
+    "severity": "high",
+    "requirement": "FR-04 — Tool access enforced at runtime; FR-33 — No agent can modify agents/ directory",
+    "status": "partial",
+    "description": "ToolAccessEnforcer and PathFilter are fully implemented in runtime.ts (lines 49-147). The agents/ directory is listed as a PROTECTED_PATTERN (runtime.ts:34). However, AgentRuntime is never imported or instantiated in the daemon's execution pipeline (src/engine/, src/runner/ contain zero references to AgentRuntime or checkToolCall). Actual agent sessions are spawned via spawn-session.sh / Claude CLI directly, bypassing all runtime hooks. The enforcement code exists but has no effect on production invocations.",
+    "evidence": "plugins/autonomous-dev/src/agent-factory/runtime.ts:49,93,173, grep of src/engine/ and src/runner/ returns no hits for AgentRuntime or checkToolCall",
+    "recommendation": "Wire AgentRuntime.checkToolCall() as a pre-tool hook in the agent session spawner (spawn-session.sh or the Claude subprocess wrapper) so the enforcement is exercised in production."
+  },
+  {
+    "prd": "PRD-003-agent-factory.md",
+    "severity": "high",
+    "requirement": "FR-11, FR-12, FR-19 — CLI commands: agent metrics, agent dashboard, agent rollback",
+    "status": "partial",
+    "description": "commandMetrics, commandDashboard, and commandRollback are fully implemented in src/agent-factory/cli.ts (lines 339, 425, 594). The public CLI entry point bin/agent-cli.ts only exposes: inspect, freeze, unfreeze, shadow, unshadow, promote, list (lines 186-302). The autonomous-dev.sh dispatcher routes 'agent' to agent-cli.ts exclusively (line 953). Consequently, 'autonomous-dev agent metrics', 'autonomous-dev agent dashboard', and 'autonomous-dev agent rollback' are unreachable from the command line despite being implemented. FR-20 (agent rollback) command is similarly absent.",
+    "evidence": "plugins/autonomous-dev/bin/agent-cli.ts:188-190 (verb list), plugins/autonomous-dev/bin/autonomous-dev.sh:953 (routes to agent-cli.ts), plugins/autonomous-dev/src/agent-factory/cli.ts:339,425,594 (command implementations)",
+    "recommendation": "Add metrics, dashboard, rollback, analyze, compare, reject, and gaps verbs to bin/agent-cli.ts's switch statement and inject the required dependencies (metricsEngine, rollbackManager, etc.)."
+  },
+  {
+    "prd": "PRD-003-agent-factory.md",
+    "severity": "high",
+    "requirement": "FR-22 — Dynamic agent creation: generate new agent definition using WebSearch and structural patterns",
+    "status": "missing",
+    "description": "FR-22 requires that when a domain gap is detected, the system SHALL 'generate a proposed new agent definition based on: the detected domain, best practices research (via WebSearch), and structural patterns from existing agents in the same archetype.' The DomainGapDetector (gaps/detector.ts) only logs gap records to domain-gaps.jsonl; it has no code to generate a new agent definition. The 'agent accept' command in cli.ts (line 1564) reads from data/proposed-agents/ but only as a placeholder: 'Note: Agent acceptance is a placeholder for PLAN-005-5 dynamic creation.' No LLM-based agent-definition generator exists in src/agent-factory/.",
+    "evidence": "plugins/autonomous-dev/src/agent-factory/gaps/detector.ts:123-204 (only logs gap records), plugins/autonomous-dev/src/agent-factory/cli.ts:1608 ('placeholder for PLAN-005-5 dynamic creation'), grep for generateNewAgent/createSpecialist in src/ returns no results",
+    "recommendation": "Implement an AgentCreator class that, given a GapRecord, uses WebSearch to research best practices, selects the appropriate archetype template, and generates a new agent .md file for human review."
+  },
+  {
+    "prd": "PRD-004-parallel-execution.md",
+    "severity": "critical",
+    "requirement": "Engine not wired into pipeline",
+    "status": "missing",
+    "description": "No production code outside src/parallel/ imports WorktreeManager, Scheduler, AgentSpawner, or MergeEngine. The parallel execution engine is a standalone library with no integration point into the daemon, pipeline orchestrator, or agent dispatch. A grep for these classes across all non-parallel src/ files returns zero results. The code-executor agent (agents/code-executor.md) runs sequentially with no parallel worktree coordination.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/parallel/ (isolated from all other src/ modules)",
+    "recommendation": "Create a top-level ParallelExecutionEngine orchestrator that ties WorktreeManager + Scheduler + AgentSpawner + MergeEngine together, and wire it into the pipeline's execution phase when execution_mode='parallel'."
+  },
+  {
+    "prd": "PRD-004-parallel-execution.md",
+    "severity": "critical",
+    "requirement": "FR-018/FR-020 — Agent spawning is a no-op stub",
+    "status": "partial",
+    "description": "AgentSpawner.spawnAgent() delegates to defaultCreateSubagentSession, which is explicitly a stub returning a fake session ID with a no-op terminate(). No Claude Code SDK integration exists. The engine cannot actually spawn subagents. Similarly, MergeEngine.resolveConflicts() is a protected method that unconditionally throws 'Conflict resolution not implemented. SPEC-006-4-2 provides the resolution pipeline.' Any merge encountering a conflict will fail immediately.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/parallel/agent-spawner.ts:315-322 (defaultCreateSubagentSession stub); /Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/parallel/merge-engine.ts:324-331 (resolveConflicts throws)",
+    "recommendation": "Connect defaultCreateSubagentSession to the Claude Code SDK subagent API. Wire ConflictResolver into MergeEngine via subclass or constructor injection."
+  },
+  {
+    "prd": "PRD-004-parallel-execution.md",
+    "severity": "high",
+    "requirement": "FR-007/FR-006/NFR-006 — Disk threshold defaults inverted from PRD",
+    "status": "contradicts",
+    "description": "PRD Appendix D specifies disk_warning_threshold=2 GB and disk_hard_limit=5 GB (warn first, then hard stop at higher value). The code has the opposite: disk_warning_threshold_gb=5, disk_hard_limit_gb=2. The config validator enforces disk_hard_limit_gb < disk_warning_threshold_gb, which is semantically backwards and makes the 'warning' DiskPressureLevel unreachable at runtime: critical fires at 2 GB before the warning threshold at 5 GB is ever crossed. The checkAndEmitDiskEvents logic (critical first, then warning) requires warning < critical to be reachable.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/parallel/config.ts:40-53 (DEFAULT_PARALLEL_CONFIG); /Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/parallel/config.ts:93-98 (validation enforces hard < warning); /Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/parallel/worktree-manager.ts:629-635 (critical fires before warning in logic)",
+    "recommendation": "Swap the defaults: disk_warning_threshold_gb=2, disk_hard_limit_gb=5. Invert the validation constraint to require disk_warning_threshold_gb < disk_hard_limit_gb."
+  },
+  {
+    "prd": "PRD-004-parallel-execution.md",
+    "severity": "high",
+    "requirement": "FR-004/NFR-008 — Filesystem isolation not enforced at runtime",
+    "status": "partial",
+    "description": "FilesystemIsolationHook is fully implemented with path validation, symlink resolution, and null-byte protection. However, it is never imported or instantiated by AgentSpawner. No code connects the hook to agent tool calls. The isolation exists as an untriggered class tested in isolation only.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/parallel/isolation-hook.ts (full implementation); no import of FilesystemIsolationHook in agent-spawner.ts (confirmed by grep returning no results)",
+    "recommendation": "Instantiate FilesystemIsolationHook in AgentSpawner.spawnAgent() and register it as a PostToolUse callback on the subagent session."
+  },
+  {
+    "prd": "PRD-004-parallel-execution.md",
+    "severity": "high",
+    "requirement": "FR-014 — max_tracks default wrong",
+    "status": "contradicts",
+    "description": "PRD FR-014 and Appendix D specify default max_tracks=3. The code sets DEFAULT_PARALLEL_CONFIG.max_tracks=5. This is a direct contradiction of the PRD's stated default.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/parallel/config.ts:42",
+    "recommendation": "Change DEFAULT_PARALLEL_CONFIG.max_tracks to 3 to match PRD Appendix D."
+  },
+  {
+    "prd": "PRD-005-production-intelligence.md",
+    "severity": "high",
+    "requirement": "FR-004 — Application health endpoint HTTP GET",
+    "status": "missing",
+    "description": "FR-004 (P1) requires connecting to application health endpoints via HTTP GET to determine basic service availability. No implementation exists: the ServiceConfigSchema has no health_endpoint field, no HTTP client probes any health URL, and the connectivity.ts probe set only covers Prometheus, Grafana, OpenSearch, Sentry. The PRD config schema example includes health_endpoint per service but the code schema does not.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/config/intelligence-config.schema.ts:18–26 (ServiceConfigSchema — no health_endpoint field); /Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/adapters/connectivity.ts:107–113 (buildProbeDescriptors — only four MCP sources)",
+    "recommendation": "Add health_endpoint?: string to ServiceConfigSchema, implement an HTTP GET probe in connectivity.ts, and surface the result as a DataSourceStatus in ConnectivityReport."
+  },
+  {
+    "prd": "PRD-005-production-intelligence.md",
+    "severity": "high",
+    "requirement": "FR-032 / FR-033 cooldown and oscillation governance — store lookups stubbed",
+    "status": "partial",
+    "description": "The governance integration wires cooldown (FR-032) and oscillation (FR-033) correctly at a type level, but both store-lookup functions — findRecentFixDeploymentFromStore (for cooldown) and findObservationsByServiceAndErrorFromStore (for oscillation) — are stubs that always return null/[] with a comment 'Stub: in production this scans the deployment store / observations store. The actual scanning logic is provided by SPEC-007-5-1'. As a result, cooldown_active will never be true and oscillation will never fire in production.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/runner/governance-integration.ts:203–244",
+    "recommendation": "Replace the stubs with real file-scanning logic. observation-store.ts already has findObservationsByServiceAndError and findRecentFixDeployment that could be used directly."
+  },
+  {
+    "prd": "PRD-005-production-intelligence.md",
+    "severity": "high",
+    "requirement": "FR-009 — PagerDuty/OpsGenie read-only cross-reference",
+    "status": "missing",
+    "description": "FR-009 (P2) requires read-only integration with PagerDuty/OpsGenie to cross-reference active incidents and suppress duplicate observations. No such adapter, config field, or logic exists anywhere in the codebase.",
+    "evidence": "grep across src/ for 'pagerduty|opsgenie' returns only test fixtures for an unrelated escalation feature, not the production intelligence module",
+    "recommendation": "This is P2 (Phase 3 scope) so skipping it is acceptable for Phase 1–2. However, the PRD's status claims should be updated to note it is not yet implemented."
+  },
+  {
+    "prd": "PRD-006-intake-communication.md",
+    "severity": "high",
+    "requirement": "FR-38",
+    "status": "partial",
+    "description": "The cancel handler marks the request as cancelled and logs the event, but performs no cleanup of associated git worktrees, branches, or draft PRs. FR-38 requires deleting worktrees, closing draft PRs, and deleting feature branches (with confirmation before destructive ops).",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/intake/handlers/cancel_handler.ts:87-108",
+    "recommendation": "Inject a git/GitHub cleanup service into CancelHandler and call it after the CONFIRM step. At minimum, emit a structured event (e.g. request_cancelled with cleanupRequested: true) so the pipeline core can handle it; currently IntakeEvent already has cleanupRequested on request_cancelled but CancelHandler hardcodes cleanupRequested: false — check event_types.ts."
+  },
+  {
+    "prd": "PRD-007-escalation-trust.md",
+    "severity": "high",
+    "requirement": "FR-10 / Section 7 Gate Matrix — L2 Deployment Approval",
+    "status": "contradicts",
+    "description": "PRD Section 7 specifies that Deployment Approval at trust level L2 is handled by 'System' (autonomous). The code implements `deployment_approval: \"human\"` at L2, requiring human approval. This means L2 operators do not get the autonomous deployment behaviour the PRD promises.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/trust/gate-matrix.ts:37",
+    "recommendation": "Determine the intended behaviour from the TDD (the code references SPEC-009-1-4). If the TDD overrides the PRD for L2 deployment, update the PRD table. If the PRD is authoritative, change the matrix cell to `\"system\"` and update the test expected matrix at gate-matrix.test.ts:44."
+  },
+  {
+    "prd": "PRD-007-escalation-trust.md",
+    "severity": "high",
+    "requirement": "FR-06 — Per-repository delivery history tracking and trust scoring",
+    "status": "missing",
+    "description": "FR-06 (P1) requires the system to track per-repository success/failure counts, gate-pass rates, and escalation frequency, and use this data to compute a trust score. The TrustScore interface at types.ts:61 is explicitly annotated as a Phase 3 forward-compatible stub with a comment 'no scoring logic implemented yet'. No code computes or persists per-repo delivery history anywhere in the trust subsystem.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/trust/types.ts:61-66",
+    "recommendation": "Acceptable deferral if Phase 3 scope is documented and understood. If Phase 1/2 is considered 'done', this P1 requirement needs a Phase 2 ticket. The config structures and type scaffolding are ready."
+  },
+  {
+    "prd": "PRD-007-escalation-trust.md",
+    "severity": "high",
+    "requirement": "FR-07 — Trust promotion suggestions with evidence",
+    "status": "missing",
+    "description": "FR-07 (P1) requires the system to emit a trust-level promotion suggestion to the PM Lead when a repository's trust score crosses the promotion threshold. No promotion suggestion emission or routing code exists; the promotion config (min_successful_runs, cooldown_hours) is parsed but never consumed by any engine.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/src/trust/trust-config.ts:31-36 (config parsed but unused by engine)",
+    "recommendation": "Defer to Phase 3 if agreed. Add a promotion-suggestion engine that reads per-repo delivery history (FR-06) and emits a notification when the threshold is met. Wire to the notification framework as event type trust_promotion_suggested."
+  },
+  {
+    "prd": "PRD-008-unified-request-submission.md",
+    "severity": "critical",
+    "requirement": "FR-824a — Two-phase commit ordering",
+    "status": "partial",
+    "description": "The full handoff_manager.submitRequest() two-phase commit (temp write → SQLite transaction → atomic rename) exists at intake/core/handoff_manager.ts:496 and is wired through intake/router/request_submitter.ts, but the actual SubmitHandler (intake/handlers/submit_handler.ts) DOES NOT call it. Instead it imports from intake/lib/state_json_writer.ts and performs: db.insertRequest() at line 243 (SQLite first), then writeStateJson() at line 248 (filesystem second). This reverses the FR-824a ordering (temp write → SQLite commit → atomic rename). The handoff_manager code path is a dead letter in normal execution.",
+    "evidence": "plugins/autonomous-dev/intake/handlers/submit_handler.ts:243-268 (SQLite-first, then state_json_writer); plugins/autonomous-dev/intake/core/handoff_manager.ts:496 (correct path, unused); plugins/autonomous-dev/intake/router/request_submitter.ts:83 (correct path, zero callers outside tests)",
+    "recommendation": "Replace the SQLite-first pattern in SubmitHandler.execute() with a call to submitFromRouter()/submitRequest() from handoff_manager, or wire the correct two-phase commit so the temp file is written before the SQLite INSERT is committed."
+  },
+  {
+    "prd": "PRD-008-unified-request-submission.md",
+    "severity": "high",
+    "requirement": "FR-820 — Router gate-action commands",
+    "status": "missing",
+    "description": "FR-820 requires the IntakeRouter to support gate-action commands 'approve', 'request-changes', and 'reject' (for use by PRD-009's portal and future approval clients). The router's registerHandlers() at intake/core/intake_router.ts:181 registers exactly 10 handlers (submit/status/list/cancel/pause/resume/priority/logs/feedback/kill) and has no trace of approve, request-changes, or reject. These do exist in intake/cli/deploy_approve_command.ts and intake/cli/deploy_reject_command.ts but are not registered on IntakeRouter.",
+    "evidence": "plugins/autonomous-dev/intake/core/intake_router.ts:181-202 (handler registration, no gate-action commands); plugins/autonomous-dev/intake/cli/deploy_approve_command.ts:167 (exists but separate CLI path, not via router)",
+    "recommendation": "Add ApproveHandler, RequestChangesHandler, and RejectHandler to IntakeRouter.registerHandlers() or expose them on a gate-action-specific router interface that satisfies FR-820."
+  },
+  {
+    "prd": "PRD-008-unified-request-submission.md",
+    "severity": "high",
+    "requirement": "FR-829 — Source metadata populated per channel",
+    "status": "partial",
+    "description": "The SQLite 'source' column in RequestEntity is hardcoded to 'cli' at intake/handlers/submit_handler.ts:237, regardless of the actual channel (discord, slack, claude-app). The state.json file (state_json_writer.ts:160) correctly maps source_channel from the command, so the on-disk file gets the right channel. But the SQLite row always records 'cli'. This breaks FR-829's requirement for audit trails and channel-specific debugging in the canonical index.",
+    "evidence": "plugins/autonomous-dev/intake/handlers/submit_handler.ts:237 (hardcoded 'source: cli'); plugins/autonomous-dev/intake/lib/state_json_writer.ts:160 (correct: uses request.source_channel)",
+    "recommendation": null
+  },
+  {
+    "prd": "PRD-008-unified-request-submission.md",
+    "severity": "high",
+    "requirement": "FR-823a — Server-side source assertion",
+    "status": "missing",
+    "description": "FR-823a requires the router to reject any IncomingCommand whose declared source does not match the adapter's registered channel identity. No such check exists in IntakeRouter.route(). The router accepts any IncomingCommand.source.channelType without asserting it matches a registered adapter boundary.",
+    "evidence": "plugins/autonomous-dev/intake/core/intake_router.ts:105-172 (route() method, no source-channel assertion anywhere)",
+    "recommendation": null
+  },
+  {
+    "prd": "PRD-008-unified-request-submission.md",
+    "severity": "high",
+    "requirement": "FR-838 / FR-839 — Per-channel rate limits (guild/workspace)",
+    "status": "partial",
+    "description": "Discord has a per-guild rate limit of 30/minute (consumeGuildBudget, BUCKET_CAPACITY=30) at discord_rate_limiter.ts:200, but FR-838 specifies 20 requests/hour per guild — a fundamentally different window. Slack has a per-workspace rate limiter in main.ts:97 (60-second window) but FR-839 specifies 50/hour per workspace. Neither matches the PRD specification. FR-837 (per-session rate limiting for Claude App, 5/hour) is not implemented at all; no session-level rate limiter exists.",
+    "evidence": "plugins/autonomous-dev/intake/adapters/discord/discord_rate_limiter.ts:200 (BUCKET_CAPACITY=30, window=60s, not 20/hour); plugins/autonomous-dev/intake/adapters/slack/main.ts:182 (perWorkspacePerMinute=60, not 50/hour); no claude_app session rate limiter found",
+    "recommendation": null
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "critical",
+    "requirement": "FR-925",
+    "status": "contradicts",
+    "description": "FR-925 requires all configuration mutations to go through the intake router (a config-set command) and explicitly states the portal SHALL NOT write configuration files directly. However, the portal writes config files directly via atomicWriteJson in settings-store.tsx.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/wiring/settings-store.tsx:250 — `await atomicWriteJson(this.path, next)`. The IntakeRouterClient exists with a config-set command type but is never called from settings-store. IntakeCommand.command has 'config-set' defined at intake-router-client.ts:27 but the store bypasses it.",
+    "recommendation": "Replace the direct atomicWriteJson calls in FileSettingsStore.saveFromForm() and addAllowlist() with IntakeRouterClient.submitCommand({command: 'config-set', ...}) calls. Validate server-side on the intake router side."
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "critical",
+    "requirement": "FR-915",
+    "status": "contradicts",
+    "description": "FR-915 requires gate action submissions to issue intake router commands (approve/request-changes/reject per PRD-008 FR-820) and carry source: 'portal'. Instead, gate-store.tsx writes marker files directly to the daemon state directory, bypassing the intake router entirely.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/wiring/gate-store.tsx:1-13 — 'No daemon-RPC channel exists. The portal writes a per-id marker file'. The applyGateDecision function calls atomicWriteJson(path, marker) at line ~98, never calling IntakeRouterClient.submitCommand. IntakeRouterClient.submitCommand() is only used by operations-handlers.ts for kill-switch/circuit-breaker ops.",
+    "recommendation": "Wire gate-store.tsx to call IntakeRouterClient.submitCommand with command:'approve'/'request-changes'/'reject' and targetRequestId set, carrying source:'portal' and the operator identity. The marker-file fallback may be kept as a secondary mechanism if the daemon is unreachable, but the intake router must be the primary path."
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "high",
+    "requirement": "FR-903",
+    "status": "contradicts",
+    "description": "FR-903 requires the homepage to auto-update via SSE (or polling) every 5 seconds. The dashboard template hard-codes a 10-second polling interval via HTMX.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/templates/views/dashboard.tsx:39 — `const DASHBOARD_POLLING_TRIGGER = 'every 10s [document.visibilityState === \"visible\"]'`. The SSE infrastructure exists at /portal/events but the dashboard comment at line 185-186 acknowledges 'SSE infrastructure exists at /portal/events but no template subscribes yet'.",
+    "recommendation": "Either subscribe the dashboard to SSE events and trigger fragment swaps on SSE messages, or reduce the polling interval to 5 seconds to match FR-903. The configurable sse_update_interval_seconds userConfig key (default 5) should drive this value."
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "high",
+    "requirement": "FR-S33",
+    "status": "contradicts",
+    "description": "FR-S33 mandates Referrer-Policy: same-origin on all responses. The implementation uses strict-origin-when-cross-origin as the default.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/security/security-headers.ts:58 — `referrerPolicy: 'strict-origin-when-cross-origin'`. FR-S33 explicitly states `Referrer-Policy: same-origin`.",
+    "recommendation": "Change the DEFAULT_SECURITY_HEADERS_CONFIG.referrerPolicy to 'same-origin' to match FR-S33."
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "high",
+    "requirement": "FR-929",
+    "status": "missing",
+    "description": "FR-929 requires a monthly spend time series for the last 12 months rendered as an SVG bar chart. The costs page only renders a daily spend SVG line chart for the last 30 days (CostChart). No monthly bar chart exists.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/templates/views/costs.tsx:133-143 — only a '30-day daily spend' line chart (CostChart component). No monthly bar chart component is imported or rendered. The server/charts/ directory has stacked_bar_chart.ts but it is not wired to the costs page.",
+    "recommendation": "Add a MonthlySpendChart component using the existing stacked_bar_chart.ts, wire it to a 12-month cost series from readCostsData(), and add it to the costs view between the daily chart and the projection section."
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "high",
+    "requirement": "FR-932",
+    "status": "missing",
+    "description": "FR-932 requires the cost analysis page to display the top-10 most expensive requests of all time with request ID, title, total cost, completion date, and repository. No such table exists in the costs view.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/templates/views/costs.tsx — no top-10 requests table. Searching for 'top.*10', 'most.*expensive', 'top_10' returns no results in cost-related server files.",
+    "recommendation": "Add a top-10 expensive requests table to the costs view, deriving data from the request ledger reader, sorted by total cost descending."
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "high",
+    "requirement": "FR-904",
+    "status": "missing",
+    "description": "FR-904 requires three dashboard sort modes: alphabetical (default), last activity descending, and needs-attention-first. The dashboard route does not read a sort query parameter, and no sort controls exist in the dashboard view.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/routes/dashboard.ts:78-86 — dashboardHandler reads no sort query param; readDashboardData() returns repos in a fixed order. No sort UI or HTMX trigger is present in dashboard.tsx.",
+    "recommendation": "Add a ?sort= query parameter to the dashboard route, implement sort logic in readDashboardData() or computeDashboardAggregates(), and add sort control buttons to the dashboard view."
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "high",
+    "requirement": "FR-938",
+    "status": "missing",
+    "description": "FR-938 requires the operations page to show production intelligence cycle status: last observation run timestamp, next scheduled run, and observation count from the last cycle. The readOpsHealth() function does not include this data.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/wiring/ops-readers.ts:111-143 — readOpsHealth() returns no production intelligence fields. The OpsHealth type at render.ts:642 has circuitBreaker?: CircuitBreakerState but no intelligence cycle fields. The ops view at ops.tsx also shows no intelligence section.",
+    "recommendation": "Add production intelligence state reading to readOpsHealth() from the daemon's state files, expose it on OpsHealth type, and render it in the ops view."
+  },
+  {
+    "prd": "PRD-009-web-control-plane.md",
+    "severity": "high",
+    "requirement": "FR-935",
+    "status": "partial",
+    "description": "FR-935 requires the ops page to show circuit breaker state and provide a reset button. The reset route exists (POST /ops/circuit-breaker/reset via operations-routes.ts), but the ops reader does not populate circuitBreaker state — readOpsHealth() returns no circuitBreaker field, so the UI renders an EmptyState.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-portal/server/wiring/ops-readers.ts:128-143 — the returned object has no circuitBreaker field. ops.tsx:93 checks `const cb = health.circuitBreaker` and falls back to EmptyState. The reset POST route exists at operations-routes.ts:122.",
+    "recommendation": "Read circuit breaker state from the daemon state files in readOpsHealth() and populate the circuitBreaker field on OpsHealth."
+  },
+  {
+    "prd": "PRD-010-github-actions-pipeline.md",
+    "severity": "critical",
+    "requirement": "FR-4003/FR-4004/FR-4005 — prd-review.yml and tdd-review.yml reference nonexistent agent files",
+    "status": "missing",
+    "description": "prd-review.yml references prompt-template-path: plugins/autonomous-dev/agents/prd-reviewer.md and tdd-review.yml references plugins/autonomous-dev/agents/tdd-reviewer.md. Neither file exists in the agents/ directory (only doc-reviewer.md, quality-reviewer.md, agent-meta-reviewer.md, etc. are present). The document-review composite action will fail the 'Load reviewer prompt' step with '::error::prompt-template-path ... does not exist', causing both required status checks (docs/prd-review and docs/tdd-review) to fail on every PR touching those documents.",
+    "evidence": ".github/workflows/prd-review.yml:81, .github/workflows/tdd-review.yml:83 — referenced paths plugins/autonomous-dev/agents/prd-reviewer.md and plugins/autonomous-dev/agents/tdd-reviewer.md verified absent via find",
+    "recommendation": "Create prd-reviewer.md and tdd-reviewer.md in plugins/autonomous-dev/agents/ with appropriate reviewer prompts, or change the prompt-template-path to an existing agent such as doc-reviewer.md (as plan-review.yml and spec-review.yml already do)."
+  },
+  {
+    "prd": "PRD-010-github-actions-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-9001 — observe.yml.example SHALL be shipped",
+    "status": "missing",
+    "description": "The PRD requires .github/workflows/observe.yml.example (shipped inactive, operators rename to activate). No such file exists anywhere under .github/. The entire §5.9 scheduled observation workflow (FR-9001 through FR-9006) is unimplemented.",
+    "evidence": "find /Users/pwatson/codebase/autonomous-dev/.github -name 'observe.yml*' returned no output",
+    "recommendation": "Create .github/workflows/observe.yml.example with the schedule/workflow_dispatch triggers, run command, webhook post, 15-minute timeout, and non-cancellable concurrency per FR-9002–FR-9006."
+  },
+  {
+    "prd": "PRD-010-github-actions-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-3004 — claude_args SHALL be '--max-turns 10 --model claude-opus-4-7'",
+    "status": "contradicts",
+    "description": "claude-assistant.yml sets claude_args: '--max-turns 5' and omits the model entirely. The PRD explicitly requires --max-turns 10 --model claude-opus-4-7 as a cost/latency cap. Both the turn limit (5 vs 10) and the model specification contradict the PRD.",
+    "evidence": ".github/workflows/claude-assistant.yml:101",
+    "recommendation": "Change claude_args to '--max-turns 10 --model claude-opus-4-7' to match FR-3004."
+  },
+  {
+    "prd": "PRD-010-github-actions-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-3007 — claude-assistant.yml job SHALL have timeout-minutes: 10",
+    "status": "missing",
+    "description": "Neither the respond job nor any job in claude-assistant.yml sets timeout-minutes. Without this, a runaway Claude invocation has no workflow-level time cap, contradicting the cost-control intent of FR-3007 and NFR-1009.",
+    "evidence": ".github/workflows/claude-assistant.yml — grep for timeout-minutes returned no output",
+    "recommendation": "Add timeout-minutes: 10 to the respond job."
+  },
+  {
+    "prd": "PRD-010-github-actions-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-2001 — assist-evals SHALL trigger on push of v* tags and workflow_dispatch",
+    "status": "partial",
+    "description": "assist-evals.yml only triggers on pull_request (paths filter on assist files) and a nightly schedule cron. It does not trigger on push of tags matching v* (release mode) and does not include workflow_dispatch. This means the release workflow (release.yml) cannot invoke assist-evals to enforce release-mode thresholds.",
+    "evidence": ".github/workflows/assist-evals.yml:18-27 — on: block has only pull_request and schedule triggers",
+    "recommendation": "Add on.push.tags: ['v*'] and on.workflow_dispatch to assist-evals.yml, and implement release-mode vs PR-mode threshold differentiation."
+  },
+  {
+    "prd": "PRD-010-github-actions-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-2003 — release mode SHALL fail on threshold breach; PR mode SHALL warn only",
+    "status": "partial",
+    "description": "check-eval-threshold.sh applies the same hard-fail logic regardless of event context (PR vs tag push). There is no conditional logic distinguishing release mode (hard fail) from PR advisory mode (warn but pass). FR-2003 requires PR-triggered runs to post a warning without blocking merge.",
+    "evidence": "scripts/ci/check-eval-threshold.sh — exits 1 on any breach with no event_name conditional",
+    "recommendation": "Add a github.event_name check: for pull_request, emit ::warning:: and exit 0; for push to tags, exit 1 on breach."
+  },
+  {
+    "prd": "PRD-010-github-actions-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-8002 — release.yml SHALL call ci.yml via workflow_call",
+    "status": "missing",
+    "description": "release.yml does not call ci.yml as a reusable workflow. The PRD requires that all baseline CI checks (typecheck, lint, test, shell, plugin-validate) pass before any release step runs. The current release.yml only runs budget-gate, verify-version, verify-evals, generate-changelog, and create-release.",
+    "evidence": ".github/workflows/release.yml — no uses: ./.github/workflows/ci.yml reference present; ci.yml has no workflow_call trigger",
+    "recommendation": "Add workflow_call to ci.yml's on: block, and add a job in release.yml that calls ci.yml and gates the rest of the pipeline on its success."
+  },
+  {
+    "prd": "PRD-011-pipeline-variants-extension-hooks.md",
+    "severity": "critical",
+    "requirement": "FR-1115 Timeout Enforcement",
+    "status": "missing",
+    "description": "Hook executor (intake/hooks/executor.ts) has no timeout enforcement. The invokeOne method calls require(hook.resolvedEntryPoint) and awaits the result with no timeout race. The hook manifest schema defines timeout_seconds and ExtensionsConfig.global_resource_limits.max_execution_time_seconds (intake/hooks/types.ts:303) exist in config, but neither is wired into the executor. A runaway hook will block indefinitely.",
+    "evidence": "intake/hooks/executor.ts:241-259 — invoke block has no setTimeout/AbortController/Promise.race",
+    "recommendation": "Wrap the hook invocation promise in a Promise.race with a timer derived from Math.min(hook.timeout_seconds ?? Infinity, config.global_resource_limits.max_execution_time_seconds) * 1000. On timeout, terminate and record invocation-error with failure_mode semantics."
+  },
+  {
+    "prd": "PRD-011-pipeline-variants-extension-hooks.md",
+    "severity": "critical",
+    "requirement": "§19.1 Node.js Worker Thread Sandbox",
+    "status": "missing",
+    "description": "Post-review §19.1 mandated that each hook run in a Node.js Worker Thread with a fresh V8 isolate, 256MB RSS cap, CPU-time budget, secret env-var stripping, and terminate() on timeout/crash. The hook executor uses a bare require() in the daemon process — no Worker is created, no isolation is applied, no memory limit is enforced. The only Worker-thread sandbox in the codebase (intake/standards/redos-sandbox.ts) is for ReDoS regex evaluation, not for hooks.",
+    "evidence": "intake/hooks/executor.ts:243-249 — uses require(hook.resolvedEntryPoint) with no worker_threads import anywhere in the hooks module",
+    "recommendation": "Implement a WorkerPool for hooks per §19.1: each invocation spawns (or reuses pooled) Worker thread with resourceLimits, strips secret env vars, enforces timeout via worker.terminate(), and maps worker stdout/stderr to the audit log."
+  },
+  {
+    "prd": "PRD-011-pipeline-variants-extension-hooks.md",
+    "severity": "high",
+    "requirement": "FR-1102 Phase Override Matrix / Pipeline Routing Enforcement",
+    "status": "partial",
+    "description": "The PHASE_OVERRIDE_MATRIX is correctly defined (intake/types/phase-override.ts) and phase_overrides is written into state.json (intake/lib/state_json_writer.ts:147). However, no orchestrator or daemon code was found that reads phase_overrides from state to actually skip phases at runtime. The phase_overrides field is validated on load (intake/state/state_loader.ts:172) but not consumed to control execution. Additionally, the HOTFIX type only skips ['prd', 'prd_review', 'plan_review'], while FR-1102 specifies hotfix skips PRD and TDD — tdd/tdd_review are not skipped.",
+    "evidence": "intake/types/phase-override.ts:104-111 — HOTFIX skippedPhases: ['prd', 'prd_review', 'plan_review'] — missing tdd/tdd_review. No runtime consumer of phase_overrides found in non-test, non-type code.",
+    "recommendation": "Wire the orchestrator/daemon to read state.phase_overrides and skip phases not listed. Also add 'tdd' and 'tdd_review' to HOTFIX.skippedPhases to match FR-1102."
+  },
+  {
+    "prd": "PRD-011-pipeline-variants-extension-hooks.md",
+    "severity": "high",
+    "requirement": "FR-1108 Hook Point Definition (plan-pre-author, spec-pre-author missing)",
+    "status": "partial",
+    "description": "FR-1108 specifies 11 hook points including plan-pre-author and spec-pre-author. The implemented HookPoint enum has 10 points: intake-pre-validate, prd-pre-author, tdd-pre-author, code-pre-write, code-post-write, review-pre-score, review-post-score, deploy-pre, deploy-post, rule-evaluation. The plan-pre-author and spec-pre-author hook points are absent from both intake/hooks/types.ts and schemas/hook-manifest-v1.json.",
+    "evidence": "intake/hooks/types.ts:28-39 — HookPoint enum lists 10 values, no PlanPreAuthor or SpecPreAuthor. schemas/hook-manifest-v1.json hookEntry.hook_point enum: same 10 values.",
+    "recommendation": "Add PlanPreAuthor = 'plan-pre-author' and SpecPreAuthor = 'spec-pre-author' to the HookPoint enum, HOOK_POINTS array, and hook-manifest-v1.json schema."
+  },
+  {
+    "prd": "PRD-011-pipeline-variants-extension-hooks.md",
+    "severity": "high",
+    "requirement": "FR-1101 / US-1101 Operator Enable/Disable of Request Types",
+    "status": "missing",
+    "description": "FR-1101 and US-1101 require operators to be able to enable/disable specific request types via configuration. The PRD's config section 8.1 specifies a request_types.enabled array in autonomous-dev.json. The autonomous-dev-config.schema.json only has an extensions block — there is no request_types.enabled/disabled field. All five types are always enabled with no operator gate.",
+    "evidence": "schemas/autonomous-dev-config.schema.json — only 'extensions' property exists at top level, no 'request_types' key",
+    "recommendation": "Add a request_types block to the config schema with an enabled array defaulting to all five types. Enforce in the intake path so disabled types are rejected at submission."
+  },
+  {
+    "prd": "PRD-012-quality-reviewer-suite.md",
+    "severity": "critical",
+    "requirement": "FR-1271 / FR-1272 — per-invocation resource limits and usage tracking",
+    "status": "missing",
+    "description": "The ReviewerEntry type (intake/reviewers/types.ts) and reviewer-chains-v1.json schema have no timeout, cost_cap, or token_limit fields. The runner (intake/reviewers/runner.ts) imposes no timeout on invoke() calls and records only duration_ms — not cost or token count. Per-reviewer daily/monthly spending caps (FR-1274) are also absent. Cost controls exist for the deploy subsystem but are completely absent from the reviewer chain subsystem.",
+    "evidence": "intake/reviewers/types.ts:50-57 (ReviewerEntry interface — no timeout/cost fields); intake/reviewers/runner.ts:111-143 (runOne — no timeout wrapping); schemas/reviewer-chains-v1.json (no timeout/cost_cap properties); intake/deploy/cost-cap.ts exists for deploy, nothing equivalent for reviewers",
+    "recommendation": "Add timeout_ms, cost_cap_usd, and token_limit to ReviewerEntry and the reviewer-chains schema. Implement Promise.race timeout in runner.runOne. Add a cost ledger per reviewer type mirroring deploy/cost-ledger.ts."
+  },
+  {
+    "prd": "PRD-012-quality-reviewer-suite.md",
+    "severity": "high",
+    "requirement": "FR-1261 / FR-1262 — extension hook registration with PRD-011",
+    "status": "missing",
+    "description": "All four specialist reviewers (qa-edge-case, ux-ui, accessibility, rule-set-enforcement) are wired directly into the reviewer chain config (config_defaults/reviewer-chains.json) and the REVIEWER_REGISTRY in invoke-reviewer.ts. None of them register via the HookRegistry reviewer-slot mechanism (intake/hooks/registry.ts). The hook registry's ReviewGate index (getReviewersForGate) is never populated with these agents. This means the extension hook discovery path documented in FR-1261/FR-1262 and the PRD-011 integration does not exist for the specialist reviewers.",
+    "evidence": "intake/reviewers/invoke-reviewer.ts:80-87 (REVIEWER_REGISTRY — hardcoded stubs); intake/hooks/registry.ts:47-76 (reviewerIndex — no specialist entries); grep for 'qa-edge-case|ux-ui-reviewer|accessibility-reviewer|rule-set-enforcement' in intake/hooks/ returns no results",
+    "recommendation": "Register the four specialist reviewers via HookManifest entries with ReviewerSlot objects pointing at 'code-review' (and 'document-review-spec' for ux-ui). This satisfies FR-1261/FR-1262 and makes them discoverable to plugin authors per FR-1263."
+  },
+  {
+    "prd": "PRD-012-quality-reviewer-suite.md",
+    "severity": "high",
+    "requirement": "FR-1244 / §9.2 — per-repository reviewer chain override",
+    "status": "contradicts",
+    "description": "The PRD §9.2 specifies the per-repo override file as .autonomous-dev/review-chains.yaml (YAML). The chain-resolver reads .autonomous-dev/reviewer-chains.json (JSON). The setup-wizard Phase 15 writes .autonomous-dev/reviewer-chains.yaml (YAML). This is a three-way inconsistency: PRD says review-chains.yaml, resolver reads reviewer-chains.json, wizard writes reviewer-chains.yaml. An operator following the wizard's output will never have their override picked up by the runtime.",
+    "evidence": "intake/reviewers/chain-resolver.ts:50 (REPO_OVERRIDE_REL_PATH = '.autonomous-dev/reviewer-chains.json'); plugins/autonomous-dev-assist/skills/setup-wizard/phases/phase-15-reviewer-chains.md:23 (files_created: '<repo>/.autonomous-dev/reviewer-chains.yaml'); PRD-012 §9.2 ('review-chains.yaml')",
+    "recommendation": "Standardize on one format. Either (a) update chain-resolver to read reviewer-chains.yaml and parse YAML, or (b) update the wizard to write reviewer-chains.json, or (c) add YAML support and accept both extensions. Document the canonical path in one place."
+  },
+  {
+    "prd": "PRD-012-quality-reviewer-suite.md",
+    "severity": "high",
+    "requirement": "FR-1242 — default chains for Spec requests include ux-ui-reviewer",
+    "status": "missing",
+    "description": "FR-1242 requires that Spec requests run [spec-reviewer] + frontend-conditional [ux-ui-reviewer]. The config_defaults/reviewer-chains.json only contains code_review gates per request type; there is no spec_review gate defined anywhere in the default config. This means the ux-ui-reviewer never fires for Spec-phase documents, missing the requirement.",
+    "evidence": "config_defaults/reviewer-chains.json (entire file — only 'code_review' gate per request type, no 'spec_review' gate); PRD-012 §5.5 FR-1242: 'Spec requests run [spec-reviewer] + frontend-conditional [ux-ui-reviewer]'",
+    "recommendation": "Add a spec_review gate to the default chain for 'feature' (at minimum) containing spec-reviewer as built-in and ux-ui-reviewer with trigger: 'frontend'."
+  },
+  {
+    "prd": "PRD-012-quality-reviewer-suite.md",
+    "severity": "high",
+    "requirement": "invoke-reviewer.ts — real agent SDK wiring (all P0 reviewers)",
+    "status": "partial",
+    "description": "The production InvokeReviewerFn in intake/reviewers/invoke-reviewer.ts returns a hardcoded stub (score: 85, verdict: APPROVE, stub: true) for all six reviewers including the four specialist agents. The agent .md definitions exist under plugins/autonomous-dev/agents/ but are never invoked. This means the specialist reviewer suite as a whole is structurally present but not actually executing in production — every code review will always 'pass' the specialist reviewers.",
+    "evidence": "intake/reviewers/invoke-reviewer.ts:58-68 (stubDispatcher always returns score:85/APPROVE); intake/reviewers/invoke-reviewer.ts:80-87 (REVIEWER_REGISTRY maps all 6 reviewers to stubDispatcher); comments: 'TODO(SPEC-020-2-04 production wiring): replace per-reviewer entries with real SDK invocations'",
+    "recommendation": "Implement SPEC-020-2-04 production wiring: resolve each reviewer name to its agents/*.md definition, invoke the Claude Agent SDK, parse the reviewer-finding-v1.json response, and return the actual score/verdict. This is the highest-priority gap for the suite to provide real value."
+  },
+  {
+    "prd": "PRD-013-engineering-standards-plugin-chaining.md",
+    "severity": "high",
+    "requirement": "FR-1320 — standards-aware agents",
+    "status": "partial",
+    "description": "Only agents/prd-author.md contains the {{STANDARDS_SECTION}} placeholder (line 40). agents/tdd-author.md and agents/code-executor.md have no such placeholder. PLAN-021-3 explicitly required all three agents. Furthermore, bin/spawn-session.sh (the actual agent launcher) does not perform {{STANDARDS_SECTION}} substitution anywhere — no call to renderStandardsSection is wired into the session spawn path.",
+    "evidence": "agents/prd-author.md:40 (has placeholder); agents/tdd-author.md (no placeholder); agents/code-executor.md (no placeholder); bin/spawn-session.sh (no standards substitution); intake/standards/prompt-renderer.ts:151 (function defined but called only from tests)",
+    "recommendation": null
+  },
+  {
+    "prd": "PRD-013-engineering-standards-plugin-chaining.md",
+    "severity": "high",
+    "requirement": "FR-1317 — chain length limit of 5",
+    "status": "contradicts",
+    "description": "FR-1317 specifies 'Maximum chain length: 5 plugins'. The DEFAULT_CHAIN_LIMITS constant sets max_length to 10, doubling the PRD limit. The TDD-022 spec itself references 'default: 5' (docs/tdd/TDD-022-plugin-chaining-engine.md:1096) making this a deliberate drift between the executor defaults and both the PRD and TDD.",
+    "evidence": "intake/chains/executor.ts:92 (max_length: 10); docs/prd/PRD-013:200 ('Maximum chain length: 5 plugins')",
+    "recommendation": "Change DEFAULT_CHAIN_LIMITS.max_length from 10 to 5, or document the intentional relaxation in the PRD as a post-review update."
+  },
+  {
+    "prd": "PRD-013-engineering-standards-plugin-chaining.md",
+    "severity": "high",
+    "requirement": "FR-1332/FR-1333 — two-person approval governance enforcement",
+    "status": "partial",
+    "description": "The standards-meta-reviewer agent (agents/standards-meta-reviewer.md:115) correctly sets requires_two_person_approval: true in its output JSON. However, no aggregator in src/review-gate/score-aggregator.ts or intake/reviewers/aggregator.ts reads or enforces this flag — neither file contains 'two_person' or 'requires_two_person' logic. The SPEC-021-3-02 spec (line 137) explicitly requires 'src/reviewers/aggregator.ts' to gate on this field, but that code does not exist.",
+    "evidence": "agents/standards-meta-reviewer.md:115 (emits flag); src/review-gate/score-aggregator.ts (no two-person logic); intake/reviewers/aggregator.ts (no two-person logic); docs/specs/SPEC-021-3-02-standards-meta-reviewer-and-two-person-approval.md:137",
+    "recommendation": null
+  },
+  {
+    "prd": "PRD-014-deployment-backends-framework.md",
+    "severity": "high",
+    "requirement": "FR-1454 — Manual rollback CLI command",
+    "status": "missing",
+    "description": "FR-1454 and US-19 require autonomous-dev deploy rollback REQ-NNNNNN [environment] to be exposed as a CLI command for operators to trigger rollback within the retention period. No such CLI file exists. Only auto-rollback via HealthMonitor is implemented.",
+    "evidence": "intake/cli/ directory contains deploy_approve_command.ts, deploy_reject_command.ts, deploy_backends_command.ts, deploy_cost_command.ts, deploy_estimate_command.ts, deploy_logs_command.ts, deploy_plan_command.ts — no deploy_rollback_command.ts",
+    "recommendation": "Implement intake/cli/deploy_rollback_command.ts that calls backend.rollback() on the given deployment record and registers it under 'deploy rollback <deployId> [env]'."
+  },
+  {
+    "prd": "PRD-014-deployment-backends-framework.md",
+    "severity": "high",
+    "requirement": "FR-1440 — Multi-environment sequential deployment (dev→staging→prod)",
+    "status": "missing",
+    "description": "FR-1440 requires multi-environment deployments to execute in sequence (dev→staging→prod), with each environment requiring success of the previous. runDeploy() handles a single envName per call. The types-config has auto_promote_from but no orchestration logic acts on it.",
+    "evidence": "intake/deploy/orchestrator.ts:237 runDeploy() — takes single envName; intake/deploy/types-config.ts:28 auto_promote_from exists as field but intake/deploy/environment.ts:175 only resolves it without acting on it; no multi-env loop exists",
+    "recommendation": "Implement a runMultiEnvDeploy() orchestrator that reads the environment order from config, calls runDeploy() sequentially, and gates each stage on the prior success."
+  },
+  {
+    "prd": "PRD-015: Extend autonomous-dev-assist for Plugin Chains, Deploy Framework, Cloud Backends, Credential Proxy, Egress Firewall, and Cost Estimation",
+    "severity": "high",
+    "requirement": "FR-1506",
+    "status": "missing",
+    "description": "skills/help/SKILL.md is missing the 'Egress Firewall' top-level section. The file ends at line 622 after the Credential Proxy section. There is no section explaining nftables/pfctl backends, DNS-refresh loop, per-plugin allowlist, or firewall test command.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-assist/skills/help/SKILL.md:622 (EOF after Credential Proxy; grep for 'nftables|pfctl|DNS.refresh|firewall test' returns 0 matches)",
+    "recommendation": "Add a '## Egress Firewall' section after Credential Proxy explaining nftables (Linux) and pfctl (macOS) backends, DNS-refresh interval, per-plugin allowlist path, and the firewall test command."
+  },
+  {
+    "prd": "PRD-015: Extend autonomous-dev-assist for Plugin Chains, Deploy Framework, Cloud Backends, Credential Proxy, Egress Firewall, and Cost Estimation",
+    "severity": "high",
+    "requirement": "FR-1511",
+    "status": "missing",
+    "description": "skills/config-guide/SKILL.md has only 23 sections. The 'firewall' section (nftables|pfctl backend selection, DNS-refresh interval, per-plugin allowlist file path) is absent. The file goes directly from cred_proxy (Section 23) to Full Example Configuration.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-assist/skills/config-guide/SKILL.md: grep for 'firewall|nftables|pfctl' returns 0 config-section matches",
+    "recommendation": "Add a 'Section 24: firewall' to config-guide/SKILL.md documenting backend selection (nftables|pfctl|disabled), DNS-refresh interval, and per-plugin allowlist file path."
+  },
+  {
+    "prd": "PRD-015: Extend autonomous-dev-assist for Plugin Chains, Deploy Framework, Cloud Backends, Credential Proxy, Egress Firewall, and Cost Estimation",
+    "severity": "high",
+    "requirement": "FR-1513",
+    "status": "partial",
+    "description": "skills/troubleshoot/SKILL.md has 15 scenarios but only 2 of the 5 PRD-mandated new scenarios are present. Scenario 14 covers cred-proxy socket permission denied and Scenario 15 covers cred-proxy TTL expiry mid-deploy. Missing: chain cycle detected, deploy approval stuck (awaiting-approval), cost-cap-tripped (deploy-level), and firewall denial with DNS-refresh lag.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-assist/skills/troubleshoot/SKILL.md: grep 'chain cycle|cycle detected|awaiting-approval|cost-cap-tripped|firewall.denial|DNS.refresh' returns 0 matches",
+    "recommendation": "Add 3 new scenarios to troubleshoot/SKILL.md: (a) chain cycle detected with chains graph recovery, (b) deploy awaiting-approval with deploy approve REQ-NNNNNN command, (c) firewall EHOSTUNREACH from DNS-refresh lag with firewall refresh-dns workaround. These are separate from the existing cost-cap scenario (Scenario 4) which covers the pipeline governance cap, not the deploy-level per-environment cap."
+  },
+  {
+    "prd": "PRD-015: Extend autonomous-dev-assist for Plugin Chains, Deploy Framework, Cloud Backends, Credential Proxy, Egress Firewall, and Cost Estimation",
+    "severity": "high",
+    "requirement": "FR-1514",
+    "status": "missing",
+    "description": "skills/troubleshoot/SKILL.md has no scenario for HMAC mismatch in 'chains audit verify' with the explicit 'do not delete the audit log' warning. The warning appears elsewhere (agents/troubleshooter.md, help/SKILL.md) but the standalone troubleshoot scenario is absent.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-assist/skills/troubleshoot/SKILL.md: grep 'HMAC mismatch|do not delete the audit log|chains audit verify' returns 0 matches in troubleshoot SKILL.md",
+    "recommendation": "Add a scenario titled 'chains audit verify reports HMAC mismatch' with explicit warning: do NOT delete the audit log. Recovery path references chains-runbook.md §3."
+  },
+  {
+    "prd": "PRD-015: Extend autonomous-dev-assist for Plugin Chains, Deploy Framework, Cloud Backends, Credential Proxy, Egress Firewall, and Cost Estimation",
+    "severity": "high",
+    "requirement": "FR-1530",
+    "status": "missing",
+    "description": "instructions/firewall-runbook.md does not exist. The PRD mandates a new file covering backend selection (Linux vs macOS), DNS-refresh tuning, allowlist authoring, simulating a deny, reading denied.log, and fail-open disabled mode. The README.md and runbook.md both reference this file but annotate it as pending TDD-025.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-assist/instructions/: ls shows chains-runbook.md, deploy-runbook.md, cred-proxy-runbook.md, runbook.md, cloud-prompt-tree.md — firewall-runbook.md absent. README.md line 93: 'firewall-runbook.md <!-- pending: TDD-025 -->'",
+    "recommendation": "Create instructions/firewall-runbook.md covering: backend selection, DNS-refresh tuning, allowlist authoring, deny simulation, denied.log reading, and the fail-open development-only mode warning."
+  },
+  {
+    "prd": "PRD-015: Extend autonomous-dev-assist for Plugin Chains, Deploy Framework, Cloud Backends, Credential Proxy, Egress Firewall, and Cost Estimation",
+    "severity": "high",
+    "requirement": "FR-1534",
+    "status": "partial",
+    "description": "evals/test-cases/cred-proxy-eval.yaml contains only 9 cases (8 negative/warning seed cases + 1 worked-example command-syntax case). The PRD requires at least 15 cases. The file itself declares case_minimum: 15 and includes authoring guidance comments for TDD-025 to complete it, indicating the suite is intentionally incomplete.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-assist/evals/test-cases/cred-proxy-eval.yaml: grep -c '^    question:' returns 9; file contains comment 'Target: 15 cases total'",
+    "recommendation": "Complete cred-proxy-eval.yaml to at least 15 cases. Add the 4 missing command-syntax cases and 2 troubleshoot-scenario cases following the id-reservation scheme documented in the file (cred-proxy-command-syntax-002 through -005, cred-proxy-troubleshoot-scenario-001 through -002)."
+  },
+  {
+    "prd": "PRD-015: Extend autonomous-dev-assist for Plugin Chains, Deploy Framework, Cloud Backends, Credential Proxy, Egress Firewall, and Cost Estimation",
+    "severity": "high",
+    "requirement": "FR-1535",
+    "status": "partial",
+    "description": "evals/test-cases/firewall-eval.yaml contains only 9 cases (8 negative/warning seed cases + 1 worked-example command-syntax case). The PRD requires at least 15 cases. The file declares case_minimum: 15 and contains authoring guidance for TDD-025.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev-assist/evals/test-cases/firewall-eval.yaml: grep -c '^    question:' returns 9; file contains comment 'Target: 15 cases total'",
+    "recommendation": "Complete firewall-eval.yaml to at least 15 cases. Add 4 command-syntax cases and 2 troubleshoot-scenario cases per the id-reservation scheme in the file."
+  },
+  {
+    "prd": "PRD-016-test-suite-stabilization.md",
+    "severity": "high",
+    "requirement": "FR-1610/1611/1613/1614",
+    "status": "missing",
+    "description": "The required triage matrix `docs/triage/PRD-016-test-failures.md` does not exist. FR-1610 requires this document listing every FAIL suite from the post-migration run with disposition, owner, and linked SPEC/issue. Without it, FR-1611 (FIX ETA buckets), FR-1613 (DELETE approvals), and FR-1614 (minimum suite coverage) are also unsatisfied.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/triage/ — directory listing shows no PRD-016-test-failures.md",
+    "recommendation": "Produce the triage matrix at `docs/triage/PRD-016-test-failures.md` covering every FAIL suite per FR-1614 requirements."
+  },
+  {
+    "prd": "PRD-016-test-suite-stabilization.md",
+    "severity": "high",
+    "requirement": "FR-1612",
+    "status": "partial",
+    "description": "Numerous `describe.skip` and `it.skip` blocks exist across test files but none carry the required annotation `// SKIP per PRD-016 triage row N: <reason>`. The acceptance criterion for FR-1612 explicitly requires this inline comment format so rationale travels with the code.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/tests/parallel/conflict-classifier.test.ts:382, tests/parallel/retry-handler.test.ts:379, plugins/autonomous-dev-portal/server/integration/__tests__/cost-pipeline.test.ts:180 (uses 'PRD-016 triage: SKIP-WITH-NOTE' but omits required row number)",
+    "recommendation": "Annotate every skip introduced by this PRD with `// SKIP per PRD-016 triage row N: <reason>`, linking to the triage matrix row."
+  },
+  {
+    "prd": "PRD-016-test-suite-stabilization.md",
+    "severity": "high",
+    "requirement": "FR-1660",
+    "status": "missing",
+    "description": "The ESLint config `.eslintrc.cjs` has no rule banning `process.exit(` in test files. The `overrides` block for `tests/**/*.ts` and `**/*.test.ts` relaxes existing rules but adds no `no-process-exit` rule with severity `error`. The CI lint step runs ESLint but will not catch test files that reintroduce `process.exit`.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/.eslintrc.cjs:40-49 — overrides block for test files has no process.exit constraint",
+    "recommendation": "Add `'no-restricted-syntax': ['error', { selector: \"CallExpression[callee.object.name='process'][callee.property.name='exit']\", message: 'process.exit() is forbidden in test files (PRD-016 FR-1660)' }]` to the test-file overrides block."
+  },
+  {
+    "prd": "PRD-017-cleanup-and-operational-closeout.md",
+    "severity": "high",
+    "requirement": "FR-1702 / FR-1701 Path-A: delete cost-cap.ts and migrate orchestrator",
+    "status": "partial",
+    "description": "PRD-017 and TDD-032 both select Path-A: migrate orchestrator to cost-cap-enforcer.ts and delete cost-cap.ts. The file cost-cap.ts still exists and orchestrator.ts line 24 still imports checkCostCap and recordCost directly from './cost-cap'. A deprecation shim (cost-cap-shim.ts) was introduced but the orchestrator was never migrated to use the enforcer exclusively, and cost-cap.ts was never deleted.",
+    "evidence": "plugins/autonomous-dev/intake/deploy/orchestrator.ts:24 — `import { checkCostCap, recordCost } from './cost-cap';`; plugins/autonomous-dev/intake/deploy/cost-cap.ts still present (5592 bytes, modified 2026-05-02); plugins/autonomous-dev/intake/deploy/cost-cap-shim.ts:17 — 'Bridging strategy: rather than reimplement the engine on top of CostCapEnforcer... this shim re-exports the existing cost-cap.ts engine.'",
+    "recommendation": "Complete the Path-A migration: migrate orchestrator.ts to use CostCapEnforcer exclusively, port all cost-cap.ts tests to exercise cost-cap-enforcer.ts, then delete cost-cap.ts. The shim re-exports from cost-cap.ts so it cannot be deleted until the orchestrator is cut over."
+  },
+  {
+    "prd": "PRD-017-cleanup-and-operational-closeout.md",
+    "severity": "high",
+    "requirement": "FR-1704: Path-B documentation if dual-path retained (AC-03)",
+    "status": "missing",
+    "description": "Neither Path-A nor Path-B is cleanly completed. If the intent is now Path-B (retain both files), the required JSDoc headers documenting distinct responsibilities are absent from both cost-cap.ts and cost-cap-enforcer.ts, and docs/architecture/cost-governance.md does not exist.",
+    "evidence": "grep -r 'cost-governance' plugins/autonomous-dev/intake/deploy/ returns no matches; ls plugins/autonomous-dev/docs/ shows no 'architecture' directory; cost-cap-enforcer.ts module JSDoc at line 1-18 does not reference distinct responsibilities or when operators should use each module.",
+    "recommendation": "Decide definitively between Path-A and Path-B. If Path-B: add JSDoc headers per FR-1704 and create docs/architecture/cost-governance.md. If Path-A: complete the migration and deletion."
+  },
+  {
+    "prd": "PRD-017-cleanup-and-operational-closeout.md",
+    "severity": "high",
+    "requirement": "FR-1711 / FR-1712: observe.yml.example at plugins/autonomous-dev/.github/workflows/observe.yml.example (AC-04)",
+    "status": "partial",
+    "description": "The observe.yml.example file exists and is well-formed (correct name, schedule trigger, workflow_dispatch, if:false default, SHA-pinned actions with version comments), but it is at the wrong path. PRD FR-1711 and SPEC-032-2-03 FR-1 both require plugins/autonomous-dev/.github/workflows/observe.yml.example. The actual file lives at plugins/autonomous-dev/templates/workflows/observe.yml.example. The plugins/autonomous-dev/.github/ directory does not exist.",
+    "evidence": "find result: plugins/autonomous-dev/templates/workflows/observe.yml.example (found); find result: plugins/autonomous-dev/.github/workflows/observe.yml.example (not found); ls plugins/autonomous-dev/.github/ exits with error code 1",
+    "recommendation": "Move observe.yml.example from templates/workflows/ to .github/workflows/ inside the plugin directory, creating the directory if needed. Update any references that use the templates/workflows/ path."
+  },
+  {
+    "prd": "PRD-017-cleanup-and-operational-closeout.md",
+    "severity": "high",
+    "requirement": "FR-1713: observe.yml.example cross-referenced from commands/observe.md (AC-04)",
+    "status": "missing",
+    "description": "commands/observe.md contains 71 lines with no mention of observe.yml, workflow template, or .github/workflows. SPEC-032-2-03 FR-7 requires appending a '## Workflow template' section (≤120 words) to commands/observe.md.",
+    "evidence": "plugins/autonomous-dev/commands/observe.md: grep for 'observe.yml', 'Workflow template', 'templates/workflows', 'github/workflows' all return zero matches",
+    "recommendation": "Append a '## Workflow template' section to commands/observe.md referencing the observe.yml.example file path and explaining how to activate it."
+  },
+  {
+    "prd": "PRD-017-cleanup-and-operational-closeout.md",
+    "severity": "high",
+    "requirement": "FR-1718: _path-drift-amendments.md summary table at plugins/autonomous-dev/docs/specs/_path-drift-amendments.md (AC-05)",
+    "status": "missing",
+    "description": "The path-drift sweep deposited moved-from HTML comments in six spec files (SPEC-014-2-01, SPEC-014-2-02, SPEC-014-2-03, SPEC-014-2-04, SPEC-015-1-01, SPEC-015-1-02), totalling 26 <!-- moved-from: --> annotations. However the required summary table _path-drift-amendments.md was never created. AC-05 requires this file as a gate for merge.",
+    "evidence": "find plugins/autonomous-dev -name '_path-drift-amendments.md' returns nothing; grep -r '<!-- moved-from:' plugins/autonomous-dev/docs/specs/ finds 26 matches across 6 spec files (excluding SPEC-032-3 and planning docs)",
+    "recommendation": "Author plugins/autonomous-dev/docs/specs/_path-drift-amendments.md with the production-side amendments table and deferred-to-PRD-016 section as specified in SPEC-032-3-02."
+  },
+  {
+    "prd": "PRD-017-cleanup-and-operational-closeout.md",
+    "severity": "high",
+    "requirement": "FR-1721 through FR-1725: stub-assertion-staleness.md at plugins/autonomous-dev/docs/lessons-learned/stub-assertion-staleness.md (AC-06)",
+    "status": "missing",
+    "description": "Neither the lessons-learned/ directory nor the stub-assertion-staleness.md file exists anywhere in the repository (outside .claude/worktrees/). The SPEC-032-3-03 spec describing what to write was created, but the actual output artifact was never produced.",
+    "evidence": "find plugins/autonomous-dev/docs -name 'lessons-learned' -type d returns nothing; find -name 'stub-assertion-staleness.md' excluding worktrees returns nothing; ls plugins/autonomous-dev/docs/ shows: bridge_contract.md, INTEGRATION.md, manual_verification, plans, prd, research, runbooks, security, SECURITY.md, specs, tdd, testing, triage — no lessons-learned directory",
+    "recommendation": "Create plugins/autonomous-dev/docs/lessons-learned/ directory and author stub-assertion-staleness.md with the Pattern Description, Cited Examples (>=3), Proposed Convention, Worked Example, and Deferred Adoption sections per SPEC-032-3-03."
+  },
+  {
+    "prd": "PRD-018-portal-visual-redesign.md",
+    "severity": "critical",
+    "requirement": "R-02 / M-01 CI enforcement",
+    "status": "partial",
+    "description": "CI lint scripts lint-css-tokens.sh and lint-box-shadow.sh both scan plugins/autonomous-dev-portal/server/static/ and plugins/autonomous-dev-portal/src/styles/ — but neither directory exists. The actual CSS files live in plugins/autonomous-dev-portal/static/. As a result, both scripts exit 0 on every PR without scanning any file, making the M-01 enforcement gate a no-op.",
+    "evidence": "scripts/lint-css-tokens.sh:18 — PORTAL_DIR/server/static; scripts/lint-box-shadow.sh:61-64 — PORTAL_ROOT/server/static; static/ directory confirmed present, server/static/ confirmed absent",
+    "recommendation": "Change the scan paths in both scripts from server/static/ to static/ (and update the matching comment headers). Re-run locally to validate zero false positives before merging."
+  },
+  {
+    "prd": "PRD-018-portal-visual-redesign.md",
+    "severity": "high",
+    "requirement": "R-02 / M-01 — no hard-coded hex in non-token CSS",
+    "status": "partial",
+    "description": "app.css contains hard-coded hex color literals in regular CSS rules, not inside the :root/:root[data-theme] token-definition blocks. Phase chip text colors (lines 208-211) use literals like #6b4ea8, #2f6f8f, etc. instead of var(--phase-prd), var(--phase-tdd), etc. The .log block (lines 326-335) hardcodes #14130f, #ede9d8, #95917f, #88adcb, #d99891, #98c39a instead of referencing bg/fg/semantic tokens. The chip-phase hex values do not even match the --phase-* values defined in design-tokens.css for either theme.",
+    "evidence": "static/app.css:208-211 — .chip-phase.prd { color:#6b4ea8; }; static/app.css:326,331-335 — .log { background: #14130f; } .log .l-time { color: #95917f; }; design-tokens.css:121 — --phase-prd: #3d2470 (light)",
+    "recommendation": "Replace chip-phase color literals with var(--phase-prd) etc. Replace .log block literals with var(--bg-0), var(--fg-0), var(--fg-2), var(--info), var(--err), var(--ok) tokens. Then fix the lint script paths so CI will catch regressions."
+  },
+  {
+    "prd": "PRD-018-portal-visual-redesign.md",
+    "severity": "high",
+    "requirement": "R-03 — default theme is light",
+    "status": "contradicts",
+    "description": "PRD-018 R-03 states 'Default is light' and OQ-04 is marked RESOLVED with 'Theme default = light. R-03 binds.' However, SPEC-037-1-01 deliberately flipped the default to dark. All three entry points now default to dark: ShellLayout (theme='dark'), getThemeFromCookie (returns 'dark' for missing/unknown cookies), and the FOUC IIFE (falls back to 'dark' if localStorage has no key). This directly contradicts the PRD's binding requirement.",
+    "evidence": "server/components/shell.tsx:205 — theme = 'dark'; server/lib/theme.ts:18 — return raw === 'light' ? 'light' : 'dark'; static/theme-toggle.js:63 — t==='light'?'light':'dark'",
+    "recommendation": "If the deliberate dark-default is intentional, update PRD-018 R-03 and close OQ-04 with the revised decision. If the PRD is authoritative, revert SPEC-037-1-01 to restore 'light' as the cold-load default."
+  },
+  {
+    "prd": "PRD-019-intake-to-deploy-e2e-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-019-12",
+    "status": "missing",
+    "description": "resolve_phase_prompt() in phase-helpers.sh does not inject (a) prior-phase artifact paths or (b) review feedback into prompts. The tdd phase prompt does not include the PRD file path. The prd retry prompt after prd_review failure does not include the review feedback. The phase-prompts/ directory only contains README.md — no phase-specific templates exist that could supply this context.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/lib/phase-helpers.sh:61-270 (no artifact or feedback injection); /Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/phase-prompts/README.md (only file in directory)",
+    "recommendation": "Extend resolve_phase_prompt() to (1) read phase_history from state.json and find artifact paths from prior phases' phase-result files, and (2) read current_phase_metadata.review_feedback from state.json and prepend it to retry prompts."
+  },
+  {
+    "prd": "PRD-019-intake-to-deploy-e2e-pipeline.md",
+    "severity": "high",
+    "requirement": "FR-019-14",
+    "status": "partial",
+    "description": "phase-result.json is written by agents/wrapper and read by advance_phase(). On review-phase failure the daemon resets current_phase to the author phase. BUT the daemon does NOT read the 'feedback' field from phase-result-<review_phase>.json and does NOT set current_phase_metadata.review_feedback in state.json. The acceptance criterion ('state.json shows current_phase_metadata.review_feedback contains Missing success metrics') is not satisfied.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/supervisor-loop.sh:2518-2531 (review fail resets phase but no feedback copy); no reference to review_feedback in advance_phase() or write path",
+    "recommendation": "In the review-fail branch of advance_phase(), read the feedback field from phase-result-<current_phase>.json and write it to current_phase_metadata.review_feedback in state.json before transitioning back to the author phase."
+  },
+  {
+    "prd": "PRD-020-intake-to-deploy-pipeline-hardening.md",
+    "severity": "high",
+    "requirement": "FR-020-04",
+    "status": "partial",
+    "description": "The request-detail route no longer 404s (core fix is present), but the state.json enrichment path is silently broken in production. request-record-reader.ts defines the daemon config allowlist as Array<{id?: string; path?: string}> (object array), while the real config at ~/.claude/autonomous-dev.json uses a string array [\"/path/to/repo\", ...]. resolveRepoPath always returns null in production, so the detail page renders with only request-action data — no phase history, no real cost_accrued_usd, no runs/reviewers from state.json. The test fixture uses the object format so tests pass.",
+    "evidence": "plugins/autonomous-dev-portal/server/wiring/request-record-reader.ts:65-80 (object-array type + path check); ~/.claude/autonomous-dev.json (string array in production); tests/unit/request-record-reader.test.ts:50 (test uses object format); plugins/autonomous-dev-portal/server/wiring/settings-reader.ts:53 (correctly documents 'daemon uses string[] not AllowlistEntry[]')",
+    "recommendation": "Fix resolveRepoPath to handle both string entries and object entries. Mirror the logic in settings-reader.ts formatAllowlist(), which already knows the config is string[]. Change the loop to: if (typeof entry === 'string' && basename(entry) === repoSlug) return entry; if (typeof (entry as any).path === 'string' && basename((entry as any).path) === repoSlug) return (entry as any).path;"
+  },
+  {
+    "prd": "PRD-022-marketplace-auto-update.md",
+    "severity": "high",
+    "requirement": "FR-022-08 / AC-07 — rollback spawns detached installer",
+    "status": "partial",
+    "description": "The rollback path in check_upgrade_trial (lines 3268-3271) uses the pre-PR-#314 nohup+disown pattern, not the _spawn_upgrade_helper dispatcher that was introduced in PR #314 specifically because nohup+disown does not survive launchd's process-tree reap on macOS. The forward-upgrade path (stage_upgrade, line 3075) correctly calls _spawn_upgrade_helper. The rollback path was not updated. On macOS, a crash-loop rollback will behave identically to the v0.3.0→v0.3.1 failure: upgrade-helper.log is created but stays 0 bytes; install-daemon.sh never runs; the daemon re-starts as the same bad version instead of rolling back.",
+    "evidence": "/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/supervisor-loop.sh:3268-3271 (nohup rollback) vs. 3075 (_spawn_upgrade_helper forward upgrade)",
+    "recommendation": "Replace the nohup block in check_upgrade_trial with a call to _spawn_upgrade_helper \"${installer}\" to get the same macOS/Linux/fallback dispatch the forward-upgrade path has."
+  },
+  {
+    "prd": "PRD-023-portal-security-hardening.md",
+    "severity": "high",
+    "requirement": "FR-023-08",
+    "status": "partial",
+    "description": "`data:image/svg+xml;base64,...` payloads containing executable SVG (e.g. `<svg onload=alert(1)/>`) pass through the full pipeline and are emitted as `<img src=\"data:image/svg+xml;base64,...\">` in the final HTML. The `renderer.image` only blocks `data:text/html` and `data:application/javascript` (sanitization-pipeline.ts:121-123), passing all other data: image/* through to DOMPurify. DOMPurify's `ALLOWED_URI_REGEXP: /^(?:http|https|mailto):/i` does not strip `data:` on `img` src when `USE_PROFILES: { html: true }` is active (confirmed by isolated test). The test corpus payload[4] in `dataUriAttacks` (`![x](data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSkvPg==)`) tests for this exact vector and 'passes' only because `xss-payload-tests.spec.ts`'s FORBIDDEN_PATTERNS do not decode the base64 content to inspect it.",
+    "evidence": "plugins/autonomous-dev-portal/server/security/sanitization-pipeline.ts:118-132 (renderer.image only blocks data:text/html and data:application/javascript); tests/security/xss-payloads.json:dataUriAttacks[4] (the svg+xml;base64 payload); tests/security/xss-payload-tests.spec.ts:35-56 (FORBIDDEN_PATTERNS do not include a base64-decode check)",
+    "recommendation": "Add `data:image/svg+xml` to the blocked MIME types in the `renderer.image` handler alongside `data:text/html` and `data:application/javascript`. SVG is a script-capable format and should not be permitted as a data: URI. The fix is a one-line addition: `|| lower.startsWith('data:image/svg+xml')` at sanitization-pipeline.ts:121. Also add a corpus test that asserts `.blocked` is non-empty (or `.sanitized` does not contain `data:image/svg+xml`) for such payloads."
+  },
+  {
+    "prd": "PRD-024-no-faked-evidence.md",
+    "severity": "high",
+    "requirement": "FR-024-06/07/08 — specific error codes",
+    "status": "partial",
+    "description": "The PRD mandates three distinct error codes: EVIDENCE_EXIT_CODE_MISMATCH (FR-024-06), EVIDENCE_OUTPUT_MISMATCH (FR-024-07), and EVIDENCE_FABRICATED (FR-024-08). The code emits a single VERIFICATION_FAILED for all three failure modes, making it impossible for operators or automated tooling to distinguish why a phase failed.",
+    "evidence": "plugins/autonomous-dev/bin/spawn-session.sh:544 — `error: \"VERIFICATION_FAILED\"` is always the envelope error key. The verifier's internal reason strings (command_not_in_audit_log, exit_code_mismatch, output_tail_mismatch) exist only in the JSONL report, not in the envelope error field.",
+    "recommendation": "Map verifier reason strings to the PRD-mandated error codes when overwriting the envelope in the Phase C block (spawn-session.sh:529-554). E.g. command_not_in_audit_log → EVIDENCE_FABRICATED, exit_code_mismatch → EVIDENCE_EXIT_CODE_MISMATCH, output_tail_mismatch → EVIDENCE_OUTPUT_MISMATCH."
+  },
+  {
+    "prd": "PRD-024-no-faked-evidence.md",
+    "severity": "high",
+    "requirement": "FR-024-10 — verification-<phase>.json record",
+    "status": "partial",
+    "description": "The PRD specifies a `verification-<phase>.json` file per phase containing: claimed evidence, actual evidence, classification per entry, verdict per entry, overall verdict, and total verification cost (wall-clock + dollar). The code writes a single `verification-report.jsonl` (JSONL, not JSON, shared across all phases). Per-row records omit the claimed and actual evidence values (only verdict strings are written), there is no overall-verdict summary entry, and there is no cost field.",
+    "evidence": "plugins/autonomous-dev/lib/verification/verifier.sh:323 — `local report=\"${req_dir}/verification-report.jsonl\"`. Per-row jq at lines 452-476 writes ts, phase, command, classification, checks, verdict, reason — but not claim_exit, claim_tail, actual_exit, actual_tail. No summary row or cost field is written.",
+    "recommendation": "Rename the output to verification-<phase>.json (one file per phase). Add claimed_exit_code, claimed_output_tail, actual_exit_code, actual_output_tail fields per row. Add a trailing summary entry with overall_verdict and verification_wall_time_ms. Even $0 as a placeholder for verification_cost_usd satisfies shape consistency."
+  },
+  {
+    "prd": "PRD-024-no-faked-evidence.md",
+    "severity": "high",
+    "requirement": "FR-024-05 — unclassifiable commands respect trust_level",
+    "status": "missing",
+    "description": "FR-024-05 requires that unclassifiable commands fail the phase UNLESS the request's trust_level is at or above the AC-04 threshold. AC-10 (low trust → fail) and AC-11 (high trust → UNCLASSIFIABLE_TRUSTED verdict, phase passes) are also unimplemented. The verifier unconditionally marks unclassifiable commands as would_have_failed regardless of trust level.",
+    "evidence": "plugins/autonomous-dev/lib/verification/verifier.sh:433-441 — the `unclassifiable` branch sets verdict=would_have_failed with no trust_level check. No trust_level lookup exists anywhere in lib/verification/. No UNCLASSIFIABLE_TRUSTED verdict exists in the codebase.",
+    "recommendation": "Pass the request's trust_level (from the request metadata JSON) to verify_envelope. In the unclassifiable branch, check if trust_level >= threshold; if so, set verdict=UNCLASSIFIABLE_TRUSTED (pass); otherwise keep would_have_failed with reason=unclassifiable_command."
+  }
+]
