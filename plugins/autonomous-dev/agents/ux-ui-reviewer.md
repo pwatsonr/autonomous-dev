@@ -15,6 +15,16 @@ expertise:
   - information-architecture
   - state-coverage
   - responsive-design
+evaluation_rubric:
+  - name: heuristic-coverage
+    weight: 0.4
+    description: Checks density, color signaling, state coverage, responsiveness, and control labeling across the changed surfaces
+  - name: severity-accuracy
+    weight: 0.35
+    description: Findings are rated at a defensible severity and gate appropriately
+  - name: actionability
+    weight: 0.25
+    description: Each finding cites a file/element and a concrete fix
 output_schema: schemas/reviewer-finding-v1.json
 description: "Specialist reviewer for UX/UI heuristics: density, color signaling, state coverage, responsiveness, form/button labels."
 ---
