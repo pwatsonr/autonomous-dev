@@ -49,8 +49,13 @@ while IFS= read -r file; do
     fi
 
     # 2. Hardcoded font-family (must use var(--font-*)).
+    #    Allowlist: font-family: inherit (CSS reset / component isolation)
+    #              font-family: none    (rare reset value)
+    #    These do not hard-code a specific typeface and do not bypass the
+    #    token system; they explicitly inherit or clear the font stack.
     FONT=$(grep -nE 'font-family\s*:' "$file" \
         | grep -v 'var(--font-' \
+        | grep -vE 'font-family\s*:\s*(inherit|none)\s*[;,)]' \
         | grep -vE '^\s*/\*|^\s*\*' || true)
     if [ -n "$FONT" ]; then
         echo "ERROR: Hardcoded font-family in $file:"

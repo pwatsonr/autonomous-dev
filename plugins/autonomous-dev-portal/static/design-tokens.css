@@ -147,7 +147,8 @@
   --lh-normal: 1.45;
   --lh-loose: 1.6;
 
-  /* ----- Spacing (4-step) ----- */
+  /* ----- Spacing (expanded — finer steps used by v3 design) ----- */
+  /* Core 4-step scale (unchanged) */
   --s-1: 4px;
   --s-2: 8px;
   --s-3: 12px;
@@ -158,6 +159,24 @@
   --s-10: 40px;
   --s-12: 48px;
   --s-16: 64px;
+  /* Fine-grain steps required by v3 layout (exact px preserved) */
+  --s-half: 2px;    /*  2px — chip/icon micro gap */
+  --s-1h: 6px;      /*  6px — tight component gap */
+  --s-2h: 10px;     /* 10px — compact padding */
+  --s-3h: 14px;     /* 14px — default card-h / grid gap */
+  --s-4h: 18px;     /* 18px — rail-brand padding-top */
+  --s-5h: 22px;     /* 22px — density-default pad-section */
+  --s-7: 28px;      /* 28px — page-head h1 / legacy sec margin */
+  --s-9: 36px;      /* 36px — legacy main padding */
+  --s-11: 44px;     /* 44px — (reserved) */
+  /* ----- Type: Extended scale (v3 additions) ----- */
+  /* --t-display through --t-mono-meta already cover most sizes; add the
+     extra literals used by v3 components that sit between named steps. */
+  --t-topbar: 17px;    /* topbar h1 (between t-h1:20px and t-h2:15px) */
+  --t-13: 13px;        /* alias of --t-h3; explicit for clarity in new rules */
+  --t-label: 10px;     /* compact label / eyebrow / badge text */
+  --t-badge: 9.5px;    /* theme-toggle pill labels (extra-tight) */
+  --t-nano: 9px;       /* smallest text — agent-grid KPI label */
 
   /* ----- Radii (small. this is not a friendly app.) ----- */
   --r-0: 0;
@@ -182,6 +201,20 @@
   --dur-fast: 80ms;
   --dur-base: 140ms;
   --dur-slow: 240ms;
+
+  /* ----- Terminal / Log surface colors ----- */
+  /* Fixed-palette terminal colors for the `.log` block. These are intentionally
+     NOT responsive to the light/dark theme toggle — the log surface is always
+     dark-terminal regardless of UI theme. Both values are defined here so
+     .log styles can reference them as tokens rather than raw hex literals. */
+  --log-bg:    #14130f;    /* deep warm black — log background */
+  --log-fg:    #ede9d8;    /* warm white — default log text */
+  --log-time:  #95917f;    /* dim timestamp color */
+  --log-info:  #88adcb;    /* info/agent tag color */
+  --log-warn:  #dfba6b;    /* warning line color */
+  --log-err:   #d99891;    /* error line color */
+  --log-ok:    #98c39a;    /* ok/success line color */
+  --log-mark:  #e89255;    /* brand/mark line color */
 }
 
 /* ============================================================
@@ -254,6 +287,32 @@
   :root:not([data-theme]) {
     /* Already light by default — nothing to do. */
   }
+}
+
+/* ============================================================
+   Density token layer — FR-026-03.
+   Activated by [data-density] on <html>. Controls row height,
+   card padding, and section spacing across all v3 views.
+   Default ("comfortable") matches the v3 design prototype values.
+   ============================================================ */
+
+/* Default density (matches comfortable; ensures tokens always resolve) */
+:root {
+  --row-y: var(--s-2h);       /* 10px — table row vertical padding */
+  --pad-card: var(--s-3h);    /* 14px — .card-b inner padding */
+  --pad-section: var(--s-5h); /* 22px — .sec bottom margin */
+}
+
+:root[data-density="comfortable"] {
+  --row-y: var(--s-3);        /* 12px */
+  --pad-card: var(--s-4);     /* 16px */
+  --pad-section: var(--s-7);  /* 28px */
+}
+
+:root[data-density="compact"] {
+  --row-y: var(--s-1h);       /*  6px */
+  --pad-card: var(--s-3);     /* 12px */
+  --pad-section: var(--s-4);  /* 16px */
 }
 
 /* ============================================================

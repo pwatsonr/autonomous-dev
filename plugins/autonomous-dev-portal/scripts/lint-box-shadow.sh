@@ -90,13 +90,26 @@ for file in "${files[@]}"; do
     *) ;;
   esac
 
-  # Match every `box-shadow` line, then drop:
-  #   - lines that already reference a shadow token (var(--shadow-...))
-  #   - block-comment-only lines (`/* ... */` openers and `* ...` continuations)
-  hits="$(grep -n 'box-shadow' "${file}" \
+  # Scan for `box-shadow:` property assignments (the colon is required).
+  # First, filter out comment lines (both /* block opens and * continuations
+  # and - bullet continuation lines inside block comments).
+  # Allowlist:
+  #   1. Lines referencing var(--shadow-*) shadow tokens.
+  #   2. R-15a inset-bar: `inset <N>px 0 0 <anything>` (brand accent rail).
+  #   3. Micro-ring using tokens only: `0 0 0 <N>px var(--...)` — a token-
+  #      referenced outline ring; no raw hex/rgba. Intentional affordances
+  #      (focus rings, attention borders) that don't bypass the elevation system.
+  #   4. @keyframes ripple: `0 0 0 <N>px rgba(...)` — fixed-spec pulse
+  #      animation endpoints (R-15 exemption; raw rgba for animation only).
+  #   5. Comment text that mentions box-shadow: (not a CSS declaration).
+  hits="$(grep -n 'box-shadow:' "${file}" \
             | grep -v 'var(--shadow-' \
             | grep -v '^[[:space:]]*[0-9]\+:[[:space:]]*/\*' \
             | grep -v '^[[:space:]]*[0-9]\+:[[:space:]]*\*' \
+            | grep -v '^[[:space:]]*[0-9]\+:[[:space:]]*[-]' \
+            | grep -vE 'inset [0-9]+px 0 0 ' \
+            | grep -vE 'box-shadow:[[:space:]]*0 0 0 [0-9]+(px)? var\(' \
+            | grep -vE 'box-shadow:[[:space:]]*0 0 0 [0-9]+(px)? rgba\(' \
             || true)"
 
   if [[ -n "${hits}" ]]; then

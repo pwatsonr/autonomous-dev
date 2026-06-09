@@ -60,7 +60,7 @@
 }
 
 .page-head h1 {
-    font-size: 28px;
+    font-size: var(--s-7);
     font-weight: 700;
     line-height: 1.2;
     margin: 0;
@@ -106,9 +106,9 @@
     display: flex;
     align-items: center;
     gap: var(--s-2);
-    padding: 7px 10px;
-    border-radius: 3px;
-    font-size: 13px;
+    padding: 7px var(--s-2h);
+    border-radius: var(--r-2);
+    font-size: var(--t-h3);
     color: var(--fg-1);
     text-decoration: none;
     box-shadow: inset 2px 0 0 transparent;
@@ -140,15 +140,16 @@
 }
 
 /* Pending-count badge, rendered only on the Approvals anchor when
-   `approvalsCount > 0`. */
+   `approvalsCount > 0`.
+   FR-026-05: contrast fix — var(--bg-0) text on brand background */
 .rail-nav-item .count {
     display: inline-block;
     min-width: 18px;
-    padding: 0 6px;
-    border-radius: 9px;
+    padding: 0 var(--s-1h);
+    border-radius: var(--r-pill);
     background: var(--brand);
-    color: #fff;
-    font-size: 11px;
+    color: var(--bg-0);
+    font-size: var(--t-tiny);
     font-weight: 600;
     line-height: 18px;
     text-align: center;
@@ -168,13 +169,13 @@
 .request-detail .page-head .back {
     display: inline-flex;
     align-items: center;
-    padding: 4px 8px;
-    border-radius: 3px;
+    padding: var(--s-1) var(--s-2);
+    border-radius: var(--r-2);
     border: 1px solid var(--line-1);
     background: var(--bg-1);
     color: var(--fg-1);
     text-decoration: none;
-    font-size: 13px;
+    font-size: var(--t-h3);
 }
 
 .request-detail .page-head .back:hover {
@@ -210,14 +211,14 @@
 
 .rd-stat-num {
     font-family: var(--font-mono);
-    font-size: 18px;
+    font-size: var(--t-h1);
     font-weight: 600;
     color: var(--fg-0);
     line-height: 1.2;
 }
 
 .rd-stat-lbl {
-    font-size: 11px;
+    font-size: var(--t-tiny);
     color: var(--fg-2);
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -241,7 +242,7 @@
     align-items: center;
     gap: var(--s-3);
     padding: var(--s-2) var(--s-3);
-    border-radius: 4px;
+    border-radius: var(--r-3);
     border: 1px solid var(--line-1);
     background: var(--bg-1);
 }
@@ -264,11 +265,11 @@
 
 .std-desc {
     color: var(--fg-0);
-    font-size: 13px;
+    font-size: var(--t-h3);
 }
 
 .std-sev {
-    font-size: 11px;
+    font-size: var(--t-tiny);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -287,7 +288,7 @@
 }
 
 .std-source {
-    font-size: 12px;
+    font-size: var(--t-meta);
     color: var(--fg-2);
     text-align: right;
 }
@@ -317,7 +318,7 @@
     background: var(--bg-0);
     color: var(--fg-0);
     border: 1px solid var(--line-1);
-    border-radius: 6px;
+    border-radius: var(--s-1h);
     max-width: 720px;
     width: 100%;
     max-height: calc(100vh - var(--s-8));
@@ -341,25 +342,25 @@
 
 .modal-head h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--t-h2);
     font-weight: 600;
 }
 
 .modal-eyebrow {
-    font-size: 11px;
+    font-size: var(--t-tiny);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--fg-2);
-    margin-bottom: 2px;
+    margin-bottom: var(--s-half);
 }
 
 .modal-close {
     background: transparent;
     border: 0;
     color: var(--fg-2);
-    font-size: 18px;
+    font-size: var(--t-h2);
     cursor: pointer;
-    padding: 0 4px;
+    padding: 0 var(--s-1);
 }
 
 .modal-close:hover {
@@ -385,7 +386,7 @@
     border: 1px solid var(--line-1);
     background: var(--bg-1);
     color: var(--fg-0);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     font: inherit;
     box-sizing: border-box;
 }

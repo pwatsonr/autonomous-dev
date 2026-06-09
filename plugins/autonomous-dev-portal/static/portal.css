@@ -22,7 +22,7 @@
 
 /* Agents intro — small explanatory paragraph below H1. */
 .agents-intro { color: var(--fg-1); font-size: 13px; line-height: 1.55; margin: 0 0 18px; max-width: 720px; }
-.agents-intro dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 10px 0 0; }
+.agents-intro dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--s-1) var(--s-3h); margin: var(--s-2h) 0 0; }
 .agents-intro dt { font-family: var(--font-mono); font-size: 11px; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.05em; }
 .agents-intro dd { margin: 0; font-size: 13px; color: var(--fg-1); }
 
@@ -37,7 +37,7 @@
 .head-actions .btn.bulk-approve { white-space: nowrap; }
 
 /* Agent inspect modal — stats grid layout (label / value pairs). */
-.modal .stats-grid { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 12px 0; font-size: 13px; }
+.modal .stats-grid { display: grid; grid-template-columns: max-content 1fr; gap: var(--s-1h) var(--s-4); margin: var(--s-3) 0; font-size: var(--t-h3); }
 .modal .stats-grid dt { font-family: var(--font-mono); font-size: 11px; color: var(--fg-2); text-transform: uppercase; letter-spacing: 0.05em; }
 .modal .stats-grid dd { margin: 0; color: var(--fg-0); }
 
@@ -78,15 +78,15 @@
     display: grid;
     grid-template-columns: auto 1fr;
     grid-template-rows: auto auto auto;
-    column-gap: 8px;
-    row-gap: 4px;
+    column-gap: var(--s-2);
+    row-gap: var(--s-1);
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: var(--s-3h);
 }
 .field[data-cost-cap-group] > label {
     grid-column: 1 / -1;
     grid-row: 1;
-    font-size: 12px;
+    font-size: var(--t-meta);
     font-weight: 500;
     color: var(--fg-1);
 }
@@ -104,7 +104,7 @@
 /* Generic `.input` styling for the Trust-level select. The vendored
    .input rule is geared at <input>; explicitly include <select> so it
    gets the same height + border treatment. */
-select.input { height: 32px; padding: 0 10px; }
+select.input { height: 32px; padding: 0 var(--s-2h); }
 
 /* PLAN-038 polish round 3 — Notifications card layout.
    The vendored .field { flex-direction: column } stacks every child
@@ -114,14 +114,14 @@ select.input { height: 32px; padding: 0 10px; }
      - DND hours: label on top, then a single row [checkbox][Start][time][End][time]
    The `.stacked-field` modifier preserves vertical label/control stacking
    but pulls inline children (chip, button, prefix etc.) onto one row.   */
-.field.stacked-field { display: block; margin-bottom: 18px; }
+.field.stacked-field { display: block; margin-bottom: var(--s-4h); }
 .field.stacked-field > label,
 .field.stacked-field > .sub-label {
     display: block;
-    font-size: 12px;
+    font-size: var(--t-meta);
     font-weight: 500;
     color: var(--fg-1);
-    margin-bottom: 6px;
+    margin-bottom: var(--s-1h);
 }
 .field.stacked-field > .input { display: inline-block; width: 100%; box-sizing: border-box; }
 .field.stacked-field[data-channel] .input { width: calc(100% - 200px); }
@@ -136,22 +136,22 @@ select.input { height: 32px; padding: 0 10px; }
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
+    gap: var(--s-3);
 }
-.dnd-row .dnd-toggle { display: inline-flex; align-items: center; gap: 6px; }
-.dnd-row .dnd-time-label { font-size: 12px; color: var(--fg-2); }
+.dnd-row .dnd-toggle { display: inline-flex; align-items: center; gap: var(--s-1h); }
+.dnd-row .dnd-time-label { font-size: var(--t-meta); color: var(--fg-2); }
 .dnd-row .dnd-time { width: 110px; flex-shrink: 0; }
 
 /* Section-level vertical breathing — give every section's content room. */
-section.sec > p.dim { margin: 4px 0 14px; line-height: 1.55; }
-section.sec > .sec-head { margin-bottom: 8px; }
+section.sec > p.dim { margin: var(--s-1) 0 var(--s-3h); line-height: 1.55; }
+section.sec > .sec-head { margin-bottom: var(--s-2); }
 
 /* Form action row at bottom of a section — primary button right-aligned. */
 .form-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
-    margin-top: 14px;
+    gap: var(--s-2);
+    margin-top: var(--s-3h);
 }
 
 /* Disabled buttons — kit pattern uses both reduced opacity and a
@@ -170,7 +170,7 @@ button.btn:disabled, button.btn[disabled] {
 }
 
 /* `.dim.small` — used by Notifications DND helper text. */
-.dim.small { font-size: 11px; margin-top: 4px; }
+.dim.small { font-size: var(--t-tiny); margin-top: var(--s-1); }
 
 /* Rail-nav count badge — readable in every state.
    Vendored app.css ships `.rail-nav a .count { color: var(--fg-2) }` and
@@ -185,10 +185,10 @@ button.btn:disabled, button.btn[disabled] {
 .rail-nav-item.active .count {
     background: var(--brand);
     color: var(--bg-0);
-    border-radius: 999px;
-    padding: 1px 8px;
+    border-radius: var(--r-pill);
+    padding: 1px var(--s-2);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: var(--t-label);
     font-weight: 700;
     min-width: 22px;
     text-align: center;
