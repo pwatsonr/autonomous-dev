@@ -26,8 +26,6 @@
 
 import type { FC } from "hono/jsx";
 
-import { escapeHtml } from "../../lib/markdown";
-
 export interface DiffFile {
     /** Relative file path (e.g. "server/lib/safe-path.ts"). */
     file: string;
@@ -164,7 +162,7 @@ export const RdV3DiffViewer: FC<Props> = ({ branch, files }) => {
                                             <div class="hunk" key={i}>
                                                 <span class="h"></span>
                                                 <span class="h">
-                                                    {escapeHtml(ln.content)}
+                                                    {ln.content}
                                                 </span>
                                             </div>
                                         );
@@ -206,7 +204,7 @@ export const RdV3DiffViewer: FC<Props> = ({ branch, files }) => {
                                                 >
                                                     {ln.prefix}
                                                 </span>
-                                                {escapeHtml(ln.content)}
+                                                {ln.content}
                                             </span>
                                         </div>
                                     );
