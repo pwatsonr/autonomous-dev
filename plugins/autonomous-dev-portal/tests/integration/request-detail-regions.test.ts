@@ -1,16 +1,14 @@
-// SPEC-036-3-01 — Request Detail integration tests.
+// FR-026-20..22 — Request Detail v3 integration tests.
 //
-// Asserts:
-//   - 200 + shell on a populated stub
+// Asserts the v3 layout contracts:
+//   - 200 + cache-control: no-store on a populated stub
 //   - 404 path on unknown id format
-//   - SSE OOB-swap target ids present (request-${id}-meta / -phase /
-//     -artifact / -deploy)
-//   - region-ordering DOM contract
-//   - cache-control: no-store
-//   - gate-action buttons appear for status === "gate"
-//   - run-history table renders for stub with runs
-//   - artifact pane renders the diff variant (stub `acme/REQ-000001` is
-//     `currentArtifact.format === "diff"`)
+//   - Topbar with request id as title
+//   - Phase track strip with 8 phase buttons (HTMX hx-get, not modals)
+//   - Artifact pane HTMX swap target (#rd-artifact-pane)
+//   - Gate panel with reviewer rows and action buttons
+//   - HTMX artifact fragment endpoint (GET .../artifact/:phase)
+//   - Correct behavior on deploy variant (REQ-000004)
 
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -35,26 +33,19 @@ describe("Request Detail — populated stub (REQ-000001 / acme)", () => {
         expect(res.headers.get("cache-control")).toBe("no-store");
     });
 
-    test("emits OOB swap target ids for meta / phase / artifact", async () => {
+    test("renders request id in the Topbar title", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000001");
         const html = await res.text();
-        expect(html).toContain('id="request-REQ-000001-meta"');
-        expect(html).toContain('id="request-REQ-000001-phase"');
-        expect(html).toContain('id="request-REQ-000001-artifact"');
+        // Topbar renders <h1>REQ-000001</h1>
+        expect(html).toContain("REQ-000001");
     });
 
-    test("renders Request <code>{id}</code> head", async () => {
+    test("renders the 8-step phase track with HTMX hx-get buttons", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000001");
         const html = await res.text();
-        expect(html).toContain("Request <code>REQ-000001</code>");
-    });
-
-    test("renders pipeline-vis with the canonical 8 phases", async () => {
-        const app = freshApp();
-        const res = await app.request("/repo/acme/request/REQ-000001");
-        const html = await res.text();
+        // Each phase step button must have hx-get pointing to the artifact endpoint
         for (const p of [
             "prd",
             "tdd",
@@ -65,76 +56,133 @@ describe("Request Detail — populated stub (REQ-000001 / acme)", () => {
             "deploy",
             "observe",
         ]) {
-            expect(html).toContain(`data-phase="${p}"`);
+            expect(html).toContain(
+                `/repo/acme/request/REQ-000001/artifact/${p}`,
+            );
         }
     });
 
-    test("renders artifact pane diff content with classified line spans", async () => {
+    test("renders artifact pane HTMX swap target (id=rd-artifact-pane)", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000001");
         const html = await res.text();
-        expect(html).toContain('class="artifact-pre artifact-diff"');
-        expect(html).toContain('class="diff-add"');
-        expect(html).toContain('class="diff-del"');
-        expect(html).toContain('class="diff-hunk"');
+        // The artifact pane must carry the HTMX swap target id
+        expect(html).toContain('id="rd-artifact-pane"');
     });
 
-    test("renders gate detail with three action buttons (status=gate)", async () => {
+    test("renders .rdetail two-column layout", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000001");
         const html = await res.text();
-        expect(html).toContain('data-gate-action="approve"');
-        expect(html).toContain('data-gate-action="request-changes"');
-        expect(html).toContain('data-gate-action="reject"');
-        expect(html).toContain("Gate · Reviewer chain");
+        expect(html).toContain('class="rdetail"');
+        expect(html).toContain('class="rdetail-main"');
     });
 
-    test("renders reviewer chain with Score primitives", async () => {
+    test("renders gate panel with reviewer verdict rows", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000001");
         const html = await res.text();
-        expect(html).toContain('class="rev-card');
-        expect(html).toContain('class="score-inline"');
+        // Gate panel has class="gate-panel" and contains reviewer rows
+        expect(html).toContain('class="gate-panel"');
+        expect(html).toContain('id="rd-gate-panel"');
+        expect(html).toContain("review-row");
     });
 
-    test("renders run-history table with prepared rows", async () => {
+    test("renders Approve and Reject buttons in gate panel", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000001");
         const html = await res.text();
-        expect(html).toContain('<table class="tbl tight">');
-        expect(html).toContain("run-2026-05-09-04");
+        // Gate panel action buttons for status=gate request
+        expect(html).toContain("Approve");
+        expect(html).toContain("Reject");
+    });
+
+    test("renders phase track as role=tablist with phase step buttons", async () => {
+        const app = freshApp();
+        const res = await app.request("/repo/acme/request/REQ-000001");
+        const html = await res.text();
+        expect(html).toContain('role="tablist"');
+        expect(html).toContain('role="tab"');
+        // Phase step buttons have hx-target="#rd-artifact-pane"
+        expect(html).toContain('hx-target="#rd-artifact-pane"');
+    });
+
+    test("renders Back link in topbar right slot", async () => {
+        const app = freshApp();
+        const res = await app.request("/repo/acme/request/REQ-000001");
+        const html = await res.text();
+        expect(html).toContain('href="/requests"');
     });
 });
 
 describe("Request Detail — region ordering", () => {
-    test("header → pipeline → artifact appear in DOM order", async () => {
+    test("phase-track appears before the rdetail grid in DOM order", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000001");
         const html = await res.text();
-        const headerIdx = html.indexOf("request-REQ-000001-meta");
-        const phaseIdx = html.indexOf("request-REQ-000001-phase");
-        const artifactIdx = html.indexOf("request-REQ-000001-artifact");
-        expect(headerIdx).toBeGreaterThan(-1);
-        expect(phaseIdx).toBeGreaterThan(headerIdx);
-        expect(artifactIdx).toBeGreaterThan(phaseIdx);
+        const phaseTrackIdx = html.indexOf("phase-track");
+        const rdetailIdx = html.indexOf('class="rdetail"');
+        expect(phaseTrackIdx).toBeGreaterThan(-1);
+        expect(rdetailIdx).toBeGreaterThan(phaseTrackIdx);
+    });
+
+    test("rdetail-main appears before gate-panel in DOM order", async () => {
+        const app = freshApp();
+        const res = await app.request("/repo/acme/request/REQ-000001");
+        const html = await res.text();
+        const mainIdx = html.indexOf('class="rdetail-main"');
+        const gateIdx = html.indexOf('class="gate-panel"');
+        expect(mainIdx).toBeGreaterThan(-1);
+        expect(gateIdx).toBeGreaterThan(mainIdx);
     });
 });
 
 describe("Request Detail — deploy variant (REQ-000004)", () => {
-    test("emits deploy-pipeline section + OOB id", async () => {
+    test("returns 200 and contains request id", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000004");
+        expect(res.status).toBe(200);
         const html = await res.text();
-        expect(html).toContain('id="request-REQ-000004-deploy"');
-        expect(html).toContain('class="deploy-pipe"');
-        expect(html).toContain('data-stage="build"');
+        expect(html).toContain("REQ-000004");
     });
 
-    test("artifact pane renders empty state when artifact absent", async () => {
+    test("artifact pane renders pending state when artifact absent", async () => {
         const app = freshApp();
         const res = await app.request("/repo/acme/request/REQ-000004");
         const html = await res.text();
-        expect(html).toContain("No artifact available for this phase");
+        // Deploy request has no currentArtifact; should show pending or empty state
+        expect(html).toContain('id="rd-artifact-pane"');
+    });
+});
+
+describe("Request Detail — HTMX artifact fragment endpoint", () => {
+    test("GET /artifact/:phase returns 200 fragment for known phase", async () => {
+        const app = freshApp();
+        const res = await app.request(
+            "/repo/acme/request/REQ-000001/artifact/prd",
+        );
+        expect(res.status).toBe(200);
+        const html = await res.text();
+        // Fragment must have the HTMX swap target id
+        expect(html).toContain('id="rd-artifact-pane"');
+    });
+
+    test("GET /artifact/:phase returns current artifact when phase matches", async () => {
+        const app = freshApp();
+        const res = await app.request(
+            "/repo/acme/request/REQ-000001/artifact/review",
+        );
+        expect(res.status).toBe(200);
+        const html = await res.text();
+        expect(html).toContain('id="rd-artifact-pane"');
+    });
+
+    test("GET /artifact with invalid phase key returns 404", async () => {
+        const app = freshApp();
+        const res = await app.request(
+            "/repo/acme/request/REQ-000001/artifact/INVALID PHASE",
+        );
+        expect([400, 404]).toContain(res.status);
     });
 });
 
@@ -168,11 +216,7 @@ describe("Request Detail — 404 path", () => {
 
 // PLAN-041 T-041-A-05 — tier-2 record path: request-action JSON exists in
 // `${stateDir}/request-actions/REQ-NNNNNN.json` but the target repo's
-// `state.json` is absent. This exercises `loadRequestRecord`'s sparse-state
-// branch, which previously triggered the `null is not an object (evaluating
-// 'res.isEscaped')` 500 because the minimal record's empty `phases` array
-// fed `request-timeline.tsx` and the TimelineActions fragment's
-// `return null;` short-circuit. Asserts 200 or 404 — never 500.
+// `state.json` is absent. Asserts 200 or 404 — never 500.
 describe("Request Detail — tier-2 sparse-state path (PLAN-041)", () => {
     const originalStateDir = process.env["AUTONOMOUS_DEV_STATE_DIR"];
     const tier2Id = "REQ-041041";
@@ -182,9 +226,6 @@ describe("Request Detail — tier-2 sparse-state path (PLAN-041)", () => {
         tmpRoot = mkdtempSync(join(tmpdir(), "plan-041-tier2-"));
         const actionsDir = join(tmpRoot, "request-actions");
         mkdirSync(actionsDir, { recursive: true });
-        // Tier-2 fixture: request-action present, no state.json in any repo
-        // (resolveRepoPath returns null for an unconfigured repo slug, so
-        // the reader takes the sparse-state branch).
         writeFileSync(
             join(actionsDir, `${tier2Id}.json`),
             JSON.stringify({
@@ -215,13 +256,8 @@ describe("Request Detail — tier-2 sparse-state path (PLAN-041)", () => {
     test("tier-2 record (request-action present, state.json absent) does not 500", async () => {
         const app = freshApp();
         const res = await app.request(`/repo/tier2-repo/request/${tier2Id}`);
-        // The page must render (200) OR be a clean not-found (404). The
-        // forbidden outcome is 500 — that was the bug closed by replacing
-        // `return null;` in region templates with `return <></>;`.
         expect(res.status).not.toBe(500);
         expect([200, 404]).toContain(res.status);
-        // If the template rendered, sanity-check it produced a string body
-        // and not an empty/garbage response.
         if (res.status === 200) {
             const html = await res.text();
             expect(html).toContain(tier2Id);

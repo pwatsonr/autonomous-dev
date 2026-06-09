@@ -1,173 +1,203 @@
-// SPEC-036-1-01..06 — Dashboard view (PLAN-036-1, first surface flip).
+// FR-026-10..15 — Dashboard v3 hero view.
 //
-// Renders the six v1.1 regions of the Dashboard in fixed order
-// (TDD-036 §6.1):
-//   1. Page head           (rendered by ShellLayout via pageTitle/headActions)
-//   2. KPI strip           (KpiStrip)
-//   3. Repo card grid      (RepoCardGrid + section chrome)
-//   4. Approval queue strip (ApprovalQueueStrip — v1.1, omitted when 0 gates)
-//   5. Standards drift     (StandardsDriftSummary — v1.1, header always shown)
-//   6. Active requests tbl (.tbl class)
+// This replaces the v1.1 Dashboard with the full v3 layout:
+//   1. Topbar (sticky frosted header)
+//   2. KPI strip with sparklines (4 tiles)
+//   3. Pipeline swimlanes (8 columns, grouped by phase)
+//   4. Activity feed + 14-day stacked cost bars (2-col grid)
+//   5. Agents mini-grid (top 9 by utilization)
 //
-// All aggregates are computed server-side in the route handler
-// (`computeDashboardAggregates`) and passed in as plain props so the
-// view stays purely presentational. The view never reaches into
-// `data.variants` to look up labels — `variantLabel` arrives
-// pre-resolved per SPEC-036-1-06 AC #8.
+// All aggregates are computed server-side in the route handler and passed
+// in as plain props. The view is purely presentational — no client-side
+// recomputation.
 //
-// Page head is delivered through ShellLayout (pageTitle="Dashboard"
-// and a `headActions` slot) per SPEC-035-1-01. The route handler is
-// responsible for passing those through to renderFullPage's caller.
+// Presentational note: when live readers yield no active requests the
+// swimlanes fall back to deterministic seeded demo data (see
+// groupRequestsByPhase in dashboard-readers.ts).
 
 import type { FC } from "hono/jsx";
 
-import { Btn, Chip } from "../../components/primitives";
-import type { PhaseName } from "../../components/primitives";
+import { Topbar } from "../../components/topbar";
+import type { RenderProps } from "../../types/render";
+import { DashboardKpiStrip } from "../fragments/dashboard-kpi";
+import type { DashboardKpiTile } from "../fragments/dashboard-kpi";
+import { DashboardSwimlanes } from "../fragments/dashboard-swimlanes";
+import { DashboardActivityFeed } from "../fragments/dashboard-activity";
+import { DashboardCostBars } from "../fragments/dashboard-cost-bars";
+import { DashboardAgentsMini } from "../fragments/dashboard-agents";
 import type {
-    DashboardRequest,
-    RenderProps,
-    StandardsDriftEntry,
-} from "../../types/render";
-import { ApprovalQueueStrip } from "../fragments/approval-queue";
-import { EmptyState } from "../fragments/empty-state";
-import { KpiStrip } from "../fragments/kpi-strip";
-import type { KpiItem } from "../fragments/kpi-strip";
-import { RepoCardGrid } from "../fragments/repo-card";
-import { StandardsDriftSummary } from "../fragments/standards-drift";
+    PhaseGroup,
+    ActivityRow,
+    DayCostBar,
+    AgentUtilRow,
+} from "../../wiring/dashboard-readers";
 
-// Pre-computed hx-trigger value - using double quotes inside bracket expression
-const DASHBOARD_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
+// ─────────────────────────────────────────────────────────────────────────────
+// Local prop interface for the v3 hero. Extends the v1.1 aggregates with
+// the additional v3 hero data. Declared locally (per hard rule: do not edit
+// shared types/render.ts). The route handler constructs DashboardV3Props and
+// casts via the existing `aggregates` field's union.
+// ─────────────────────────────────────────────────────────────────────────────
 
-export interface DashboardAggregates {
-    /** Sum of `activeRequests` across all repos. */
-    totalActive: number;
-    /** Number of requests with `status === "gate"`. */
-    totalGates: number;
-    /** Sum of `monthlyCostUsd` across all repos. */
-    totalMtd: number;
-    /** "{N} reviewer / {N} standards / {N} cost" partition. */
-    gateBreakdownText: string;
-    /** Sum of `hits` for rules with severity === "blocking". */
-    totalBlockingHits: number;
-    /** Number of standards rules in the catalog. */
-    standardsCount: number;
-    /** Pre-sorted (waitedMin desc), max-3-sliced gate-blocked requests. */
-    topGates: DashboardRequest[];
-    /** Pre-sorted (hitCount desc) per-repo drift entries. */
-    standardsDrift: StandardsDriftEntry[];
-}
-
-/**
- * The page-head action slot. Exposed as a stand-alone export so
- * route handlers (and tests) can mount it on `ShellLayout.headActions`
- * without re-importing the `Btn` primitive at the call site.
- */
-export const DashboardHeadActions: FC = () => (
-    <>
-        <a href="/" class="btn">
-            Refresh
-        </a>
-        <a
-            href="https://github.com/pwatsonr/autonomous-dev#step-5-submit-your-first-request"
-            class="btn primary"
-            target="_blank"
-            rel="noopener"
-        >
-            + New request
-        </a>
-    </>
-);
-
-/**
- * Build the four KPI items for the strip. Pure helper kept next to
- * the view so the contract stays in one place; SPEC-036-1-02 AC #3
- * pins the labels and order verbatim.
- */
-export function buildKpiItems(
-    repoCount: number,
-    a: DashboardAggregates,
-    /** Optional MTD cap for the third tile's sub-line. Uses $400.00
-     *  to mirror the kit (Dashboard.jsx line 33) when omitted. */
-    mtdCapUsd: number = 400,
-): KpiItem[] {
-    return [
-        {
-            label: "Active requests",
-            value: a.totalActive,
-            sub: `across ${repoCount} repos`,
-        },
-        {
-            label: "Awaiting approval",
-            value: a.totalGates,
-            sub: a.gateBreakdownText,
-        },
-        {
-            label: "MTD spend",
-            value: `$${a.totalMtd.toFixed(2)}`,
-            sub: `cap $${mtdCapUsd.toFixed(2)}`,
-        },
-        {
-            label: "Standards rules",
-            value: a.standardsCount,
-            sub: `${a.totalBlockingHits} blocking hits MTD`,
-        },
-    ];
+/** V3-specific extra data threaded alongside the v1.1 aggregates. */
+export interface DashboardV3Extra {
+    /** Swimlane groups (8 phase columns). */
+    swimlanes: PhaseGroup[];
+    /** Activity feed rows (up to 10). */
+    activity: ActivityRow[];
+    /** 14-day phase-split cost bars. */
+    costBars: DayCostBar[];
+    /** Top-9 agent utilization rows. */
+    agents: AgentUtilRow[];
+    /** Sparkline point arrays for the 4 KPI tiles. */
+    sparks: {
+        inFlight: number[];
+        burnRate: number[];
+        passRate: number[];
+        queue: number[];
+    };
+    /** KPI computed values for the 4 tiles. */
+    kpi: {
+        inFlight: number;
+        inFlightSub: string;
+        burnRatePerHr: number;
+        burnRateMtd: number;
+        burnRateCap: number;
+        passRatePct: number;
+        passRatePending: number;
+        queueCount: number;
+        queueOldestMin: number;
+    };
 }
 
 export interface DashboardViewProps {
     data: RenderProps["dashboard"]["data"];
-    /** Pre-computed aggregates from the route handler. The view never
-     *  recomputes them so SSE OOB fragments stay self-consistent. */
-    aggregates: DashboardAggregates;
+    aggregates: RenderProps["dashboard"]["aggregates"] & {
+        v3?: DashboardV3Extra;
+        /** Non-null when readDashboardData() or readMtdSpend() rejected. */
+        readerError?: string | null;
+    };
 }
 
-/**
- * Status-cell renderer for the active requests table. Routes a
- * gate-status request through the warn-toned chip with the gate type
- * appended; running requests get an ok-toned chip.
- */
-const StatusCell: FC<{ r: DashboardRequest }> = ({ r }) => {
-    if (r.status === "gate") {
-        return (
-            <Chip variant="status" tone="warn">
-                gate · {r.gateType ?? "pending"}
-            </Chip>
-        );
-    }
-    return (
-        <Chip variant="status" tone="ok">
-            running
-        </Chip>
-    );
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// KPI tile builder — converts v3 KPI data into DashboardKpiTile[]
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildV3KpiTiles(extra: DashboardV3Extra): DashboardKpiTile[] {
+    const { kpi, sparks } = extra;
+
+    // Honesty over fidelity: never show fabricated deltas/comparisons.
+    // Deltas require a prior-period snapshot; when that data isn't available
+    // (which is the current case — no historical aggregation store), we omit
+    // the delta entirely rather than display a hardcoded constant.
+    return [
+        {
+            label: "In flight",
+            value: String(kpi.inFlight),
+            unit: "reqs",
+            sub: kpi.inFlightSub,
+            sparkPoints: sparks.inFlight,
+            sparkTone: "info",
+        },
+        {
+            label: "Burn rate",
+            value: `$${kpi.burnRatePerHr.toFixed(2)}`,
+            unit: "/hr",
+            valueTone: kpi.burnRatePerHr < 5 ? "kpi-ok" : kpi.burnRatePerHr < 10 ? undefined : "kpi-warn",
+            sub: `MTD $${kpi.burnRateMtd.toFixed(2)} / $${kpi.burnRateCap.toFixed(2)}`,
+            sparkPoints: sparks.burnRate,
+            sparkTone: "ok",
+        },
+        {
+            label: "Gate pass rate",
+            value: `${kpi.passRatePct.toFixed(1)}`,
+            unit: "%",
+            sub: `${kpi.passRatePending} pending review`,
+            sparkPoints: sparks.passRate,
+            sparkTone: "ok",
+        },
+        {
+            label: "Approvals queue",
+            value: String(kpi.queueCount),
+            valueTone: kpi.queueCount > 0 ? "kpi-warn" : undefined,
+            sub: kpi.queueOldestMin > 0
+                ? `oldest ${Math.floor(kpi.queueOldestMin / 60)}h ${kpi.queueOldestMin % 60}m · SLA: < 4h`
+                : "clear",
+            sparkPoints: sparks.queue,
+            sparkTone: "warn",
+        },
+    ];
+}
+
+/** Fallback KPI tiles when v3 extra is absent (graceful degradation). */
+function buildFallbackKpiTiles(
+    totalActive: number,
+    totalGates: number,
+    totalMtd: number,
+): DashboardKpiTile[] {
+    const fallbackPoints = Array.from({ length: 24 }, (_, i) => 50 + (i % 5) * 5);
+    return [
+        {
+            label: "In flight",
+            value: String(totalActive),
+            unit: "reqs",
+            sub: "active pipeline",
+            sparkPoints: fallbackPoints,
+            sparkTone: "info",
+        },
+        {
+            label: "MTD spend",
+            value: `$${totalMtd.toFixed(2)}`,
+            sub: "cap $400.00",
+            sparkPoints: fallbackPoints,
+            sparkTone: "ok",
+        },
+        {
+            label: "Gate pass rate",
+            value: "—",
+            sub: "no data",
+            sparkPoints: fallbackPoints,
+            sparkTone: "ok",
+        },
+        {
+            label: "Approvals queue",
+            value: String(totalGates),
+            valueTone: totalGates > 0 ? "kpi-warn" : undefined,
+            sub: totalGates > 0 ? "awaiting approval" : "clear",
+            sparkPoints: fallbackPoints,
+            sparkTone: "warn",
+        },
+    ];
+}
+
+// Pre-computed HTMX polling trigger (no inline JS).
+// Pinned at 10s by the auto-refresh polling contract test.
+//
+// Focus-safety: suppress the poll when the keyboard focus is inside
+// #dashboard-body so replacing the subtree doesn't steal focus (WCAG 2.4.3).
+// The [data-paused] check lets operators freeze the feed via the Pause button.
+const DASHBOARD_POLLING_TRIGGER =
+    'every 10s [document.visibilityState === "visible" && !document.activeElement.closest("#dashboard-body") && !document.querySelector("#dashboard-body[data-paused]")]';
 
 /**
- * SPEC-036-1-01..06 — Dashboard view. Composes the six v1.1 regions.
+ * FR-026-10..15 — Dashboard v3 hero view.
  *
- * The page-head (region 1) is intentionally delivered by ShellLayout
- * through `pageTitle` / `headActions` so the title + actions sit in
- * the consistent global slot. The view body therefore starts at the
- * KPI strip (region 2).
- *
- * Empty-state contracts (SPEC-036-1-06):
- *   - 0 repos    -> EmptyState noun="repositories allowlisted" (substitutes for grid)
- *   - 0 requests -> EmptyState noun="active requests" (within table section)
- *   - 0 gates    -> ApprovalQueueStrip returns null (entire section absent)
- *   - 0 hits     -> StandardsDriftSummary keeps header, body delegates to EmptyState
+ * Composes: Topbar → KPI strip → swimlanes → activity+cost grid → agents.
+ * All data is server-derived; the view is purely presentational.
  */
 export const DashboardView: FC<DashboardViewProps> = ({
     data,
     aggregates,
 }) => {
-    const repos = data.repos ?? [];
-    // PLAN-Requests-Surface — Dashboard table shows only non-terminal
-    // (active or gated) requests. `"done"` rows are surfaced on the new
-    // `/requests` surface and excluded here so the "Active requests"
-    // table stays semantically pure.
-    const requests = (data.requests ?? []).filter(
-        (r) => r.status !== "done",
-    );
-    const kpiItems = buildKpiItems(repos.length, aggregates);
+    const v3 = (aggregates as DashboardViewProps["aggregates"]).v3;
+    const readerError = (aggregates as DashboardViewProps["aggregates"]).readerError ?? null;
+    const kpiTiles = v3 != null
+        ? buildV3KpiTiles(v3)
+        : buildFallbackKpiTiles(
+              aggregates.totalActive,
+              aggregates.totalGates,
+              aggregates.totalMtd,
+          );
 
     return (
         <div
@@ -178,104 +208,165 @@ export const DashboardView: FC<DashboardViewProps> = ({
             hx-swap="outerHTML"
             hx-select="#dashboard-body"
         >
-            {/* PORTAL-AUDIT-2026-05-16: polls the dashboard every 10s and
-                swaps itself with the matching `#dashboard-body` from the
-                response. Keeps KPIs / repos / requests table fresh so the
-                operator doesn't have to manually refresh while a request
-                is in flight. SSE infrastructure exists at /portal/events
-                but no template subscribes yet; polling is the smaller
-                step until SSE wiring lands. */}
-            {/* Region 1: Page head — rendered inline (rather than via
-                ShellLayout's pageTitle/headActions slots) so the
-                Dashboard surface owns the action set and HTMX can
-                target the head as a fragment if needed in future. */}
-            <div class="page-head">
-                <h1>Dashboard</h1>
-                <div class="head-actions">
-                    <DashboardHeadActions />
+            {/*
+              * Error banner: rendered when readDashboardData() or readMtdSpend()
+              * rejected. Follows the loading/empty/error/success quartet. Shows
+              * the last-cached snapshot (which is the zero-state aggregates when
+              * no prior data exists) and offers a Retry link.
+              */}
+            {readerError != null && (
+                <div class="dashboard-error-banner" role="alert" aria-live="assertive">
+                    <span class="dashboard-error-banner__icon" aria-hidden="true">⚠</span>
+                    <span class="dashboard-error-banner__message">
+                        Failed to load dashboard data — showing last cached snapshot.
+                    </span>
+                    <a href="/" class="btn ghost sm" aria-label="Retry loading dashboard data">
+                        Retry
+                    </a>
+                </div>
+            )}
+            <Topbar
+                title="Dashboard"
+                subTitle="autonomous-dev · control plane"
+                liveIndicator
+                rightSlot={
+                    <>
+                        {/* Honest freshness label — no fabricated "updated X ago" */}
+                        <span class="topbar-refresh-label">
+                            auto-refreshing every 10s
+                        </span>
+                        {/*
+                          * Pause feed toggle — sets data-paused on #dashboard-body.
+                          * The HTMX poll predicate checks for data-paused so pressing
+                          * this button freezes the surface (WCAG 2.2 AA, operator UX).
+                          * Click is handled by static/js/dashboard-feed-pause.js
+                          * (CSP disallows inline onclick attributes).
+                          */}
+                        <button
+                            class="btn ghost sm"
+                            aria-label="Pause live feed"
+                            aria-pressed="false"
+                            data-pause-feed
+                        >
+                            Pause feed
+                        </button>
+                        <a href="/" class="btn sm" aria-label="Refresh dashboard">
+                            Refresh
+                        </a>
+                    </>
+                }
+            />
+
+            <div class="main-inner">
+                {/* Region 1: KPI strip with sparklines */}
+                <div class="sec">
+                    <DashboardKpiStrip tiles={kpiTiles} />
+                </div>
+
+                {/* Region 2: Pipeline swimlanes */}
+                <div class="sec">
+                    <div class="sec-head">
+                        <h2>Pipeline · all in-flight</h2>
+                        <div class="head-actions">
+                            <span class="meta-mono dim">grouped by phase</span>
+                            {/*
+                              * Swimlanes / List / Timeline view modes are not yet
+                              * implemented. Rather than show false affordances (buttons
+                              * that claim aria-pressed but do nothing), we render the
+                              * active state as a plain visual label. When the other
+                              * modes ship they can be wired to hx-get fragment
+                              * endpoints here.
+                              */}
+                            <span class="seg-btn active seg-btn--static" aria-current="true" aria-label="Current view: Swimlanes">
+                                Swimlanes
+                            </span>
+                        </div>
+                    </div>
+                    {v3 != null ? (
+                        <DashboardSwimlanes groups={v3.swimlanes} />
+                    ) : (
+                        <div class="pipeline-shell">
+                            <div class="pipeline-empty">
+                                No pipeline data available
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Region 3: Activity feed + 14-day cost bars (2-col) */}
+                <div class="dashboard-grid-activity">
+                    <div class="sec dashboard-sec-no-mb">
+                        <div class="sec-head">
+                            <h2>Activity</h2>
+                            <div class="head-actions">
+                                {/*
+                                  * Activity filter (All/Agents/Gates/Cost) is not yet
+                                  * implemented server-side. Showing inert buttons with
+                                  * aria-pressed is a false affordance. We surface the
+                                  * current filter as a plain label until the filter
+                                  * endpoint ships.
+                                  */}
+                                <span class="seg-btn active seg-btn--static" aria-current="true" aria-label="Current filter: All">
+                                    All
+                                </span>
+                            </div>
+                        </div>
+                        {v3 != null ? (
+                            <DashboardActivityFeed rows={v3.activity} />
+                        ) : (
+                            <div class="card">
+                                <div class="card-b">
+                                    <span class="dim">No activity data</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div class="sec dashboard-sec-no-mb">
+                        <div class="sec-head">
+                            <h2>Cost · 14d</h2>
+                            <div class="head-actions">
+                                <span class="meta-mono dim">stacked by phase</span>
+                            </div>
+                        </div>
+                        {v3 != null ? (
+                            <DashboardCostBars days={v3.costBars} />
+                        ) : (
+                            <div class="card">
+                                <div class="card-b">
+                                    <span class="dim">No cost data</span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Region 4: Agents mini-grid */}
+                <div class="sec dashboard-sec-agents">
+                    <div class="sec-head">
+                        <h2>Agents</h2>
+                        <div class="head-actions">
+                            <a href="/agents" class="btn ghost sm">
+                                Open agents view →
+                            </a>
+                        </div>
+                    </div>
+                    {v3 != null ? (
+                        <DashboardAgentsMini
+                            agents={v3.agents}
+                            totalAgents={18}
+                        />
+                    ) : (
+                        <div class="card">
+                            <div class="card-b">
+                                <span class="dim">No agent data</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
-
-            {/* Region 2: KPI strip */}
-            <KpiStrip items={kpiItems} />
-
-            {/* Region 3: Repos */}
-            <section class="sec repos">
-                <div class="sec-head">
-                    <h2>Repos</h2>
-                </div>
-                {repos.length > 0 ? (
-                    <RepoCardGrid repos={repos} />
-                ) : (
-                    <EmptyState noun="repositories allowlisted" />
-                )}
-            </section>
-
-            {/* Region 4: Approval queue strip (v1.1) — null when empty */}
-            <ApprovalQueueStrip
-                gates={aggregates.topGates}
-                totalCount={aggregates.totalGates}
-            />
-
-            {/* Region 5: Standards drift summary (v1.1) */}
-            <StandardsDriftSummary
-                drift={aggregates.standardsDrift}
-                totalBlockingHits={aggregates.totalBlockingHits}
-            />
-
-            {/* Region 6: Active requests table */}
-            <section id="requests-tbl" class="sec requests">
-                <div class="sec-head">
-                    <h2>Active requests</h2>
-                </div>
-                {requests.length > 0 ? (
-                    <table class="tbl">
-                        <thead>
-                            <tr>
-                                <th>Request</th>
-                                <th>Repo</th>
-                                <th>Variant</th>
-                                <th>Phase</th>
-                                <th>Status</th>
-                                <th>Cost</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {requests.map((r) => (
-                                <tr>
-                                    <td>
-                                        <div class="r-title">{r.title}</div>
-                                        <div class="r-id meta-mono">
-                                            {r.id}
-                                        </div>
-                                    </td>
-                                    <td>{r.repo}</td>
-                                    <td>
-                                        <Chip variant="status" tone="muted">
-                                            {r.variantLabel ?? r.variant}
-                                        </Chip>
-                                    </td>
-                                    <td>
-                                        <Chip
-                                            variant="phase"
-                                            tone={r.phase as PhaseName}
-                                        />
-                                    </td>
-                                    <td>
-                                        <StatusCell r={r} />
-                                    </td>
-                                    <td class="meta-mono">
-                                        ${r.cost.toFixed(2)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                ) : (
-                    <EmptyState noun="active requests" />
-                )}
-            </section>
-
+            {/* External JS for the Pause feed toggle. CSP disallows inline
+                onclick attributes; the handler lives in static/js/. */}
+            <script src="/static/js/dashboard-feed-pause.js" defer></script>
         </div>
     );
 };

@@ -13,8 +13,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint server/ tests/",
     "test": "bun test",
-    "test:visual": "npx playwright test tests/visual-regression/design-system.spec.ts",
-    "gen:visual-goldens": "UPDATE_GOLDEN=1 npx playwright test tests/visual-regression/design-system.spec.ts --project=golden-gen",
+    "test:visual": "npx playwright test --project=chromium",
+    "gen:visual-goldens": "UPDATE_GOLDEN=1 npx playwright test --project=golden-gen",
     "cypress:ci": "start-server-and-test portal:cypress http://localhost:19283 'npx cypress run'",
     "cypress:open": "start-server-and-test portal:cypress http://localhost:19283 'npx cypress open'"
   },
@@ -25,6 +25,7 @@
     "marked": "~5.1.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/bun": "latest",
     "@types/dompurify": "~3.0.0",
     "@types/jsdom": "~21.1.0",

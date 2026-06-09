@@ -57,11 +57,13 @@ if [[ -n "${SCAN_FILE}" ]]; then
   fi
   files=("${SCAN_FILE}")
 else
-  # server/static/*.css (top-level only, excluding design-tokens.css)
-  if [[ -d "${PORTAL_ROOT}/server/static" ]]; then
+  # static/*.css (top-level only, excluding design-tokens.css). PRD-025
+  # FR-025-01: the portal stylesheets live in static/, not server/static/
+  # (which never existed) — the old path made this gate a silent no-op.
+  if [[ -d "${PORTAL_ROOT}/static" ]]; then
     while IFS= read -r -d '' f; do
       files+=("$f")
-    done < <(find "${PORTAL_ROOT}/server/static" -maxdepth 1 -type f -name '*.css' \
+    done < <(find "${PORTAL_ROOT}/static" -maxdepth 1 -type f -name '*.css' \
               ! -name 'design-tokens.css' -print0)
   fi
   # src/styles/**/*.css (recursive, excluding design-tokens.css)
@@ -70,6 +72,12 @@ else
       files+=("$f")
     done < <(find "${PORTAL_ROOT}/src/styles" -type f -name '*.css' \
               ! -name 'design-tokens.css' -print0)
+  fi
+  # Fail-closed against future path drift: a scan of 0 files reads as green
+  # but guarantees nothing (PRD-025 FR-025-01).
+  if [[ ${#files[@]} -eq 0 ]]; then
+    echo "lint-box-shadow: scanned 0 CSS files — check scan paths (${PORTAL_ROOT}/static, ${PORTAL_ROOT}/src/styles)." >&2
+    exit 2
   fi
 fi
 
@@ -82,13 +90,26 @@ for file in "${files[@]}"; do
     *) ;;
   esac
 
-  # Match every `box-shadow` line, then drop:
-  #   - lines that already reference a shadow token (var(--shadow-...))
-  #   - block-comment-only lines (`/* ... */` openers and `* ...` continuations)
-  hits="$(grep -n 'box-shadow' "${file}" \
+  # Scan for `box-shadow:` property assignments (the colon is required).
+  # First, filter out comment lines (both /* block opens and * continuations
+  # and - bullet continuation lines inside block comments).
+  # Allowlist:
+  #   1. Lines referencing var(--shadow-*) shadow tokens.
+  #   2. R-15a inset-bar: `inset <N>px 0 0 <anything>` (brand accent rail).
+  #   3. Micro-ring using tokens only: `0 0 0 <N>px var(--...)` — a token-
+  #      referenced outline ring; no raw hex/rgba. Intentional affordances
+  #      (focus rings, attention borders) that don't bypass the elevation system.
+  #   4. @keyframes ripple: `0 0 0 <N>px rgba(...)` — fixed-spec pulse
+  #      animation endpoints (R-15 exemption; raw rgba for animation only).
+  #   5. Comment text that mentions box-shadow: (not a CSS declaration).
+  hits="$(grep -n 'box-shadow:' "${file}" \
             | grep -v 'var(--shadow-' \
             | grep -v '^[[:space:]]*[0-9]\+:[[:space:]]*/\*' \
             | grep -v '^[[:space:]]*[0-9]\+:[[:space:]]*\*' \
+            | grep -v '^[[:space:]]*[0-9]\+:[[:space:]]*[-]' \
+            | grep -vE 'inset [0-9]+px 0 0 ' \
+            | grep -vE 'box-shadow:[[:space:]]*0 0 0 [0-9]+(px)? var\(' \
+            | grep -vE 'box-shadow:[[:space:]]*0 0 0 [0-9]+(px)? rgba\(' \
             || true)"
 
   if [[ -n "${hits}" ]]; then

@@ -1,0 +1,325 @@
+/* v3/dashboard.css — Dashboard view additions.
+   Built on top of shared foundation (app.css, design-tokens.css).
+   All spacing/font-size/gap/border-radius values use tokens.
+   No hex literals. No inline styles. CSP-clean.
+   ============================================================ */
+
+/* ============================================================
+   KPI strip: sparkline positioning override for v3 tiles
+   ============================================================ */
+
+/* The shared .kpi-spark rule in app.css places the SVG top-right.
+   The v3 KPI tiles use the same class; no overrides needed. */
+
+/* Ensure the kpi-sub flex wrap stays on one line when content is short. */
+.kpi-sub .dim {
+    margin: 0 var(--s-1);
+}
+
+/* ============================================================
+   Pipeline swimlanes — v3 enhancements
+   ============================================================ */
+
+/* Priority label inside .pid: uppercase mono, no extra rules needed
+   (inherits from .pcard .pid). */
+.pcard .priority-label {
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Lane empty placeholder */
+.lane-empty {
+    font-size: var(--t-label);
+    padding: var(--s-1) var(--s-half);
+    opacity: 0.6;
+}
+
+/* ============================================================
+   Activity feed: feed-row 4-col grid chip font-size token
+   ============================================================ */
+
+/* The chip inside a feed row should use the nano size token. */
+.feed-row .chip {
+    font-size: var(--t-label);
+    padding: var(--s-half) var(--s-2);
+}
+
+/* ============================================================
+   Cost bars legend
+   ============================================================ */
+
+.cost-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2);
+    margin-top: var(--s-3);
+    font-family: var(--font-mono);
+    font-size: var(--t-tiny);
+    color: var(--fg-2);
+}
+
+.cost-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+}
+
+.cost-legend-swatch {
+    width: var(--s-2);
+    height: var(--s-2);
+    border-radius: var(--r-1);
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* ============================================================
+   Agents mini-grid: chip-phase token size override for v3
+   ============================================================ */
+
+/* The agent-card .chip-phase uses the label token size (9px design target).
+   The chip-phase class already handles color; we just tighten font-size. */
+.agent-card .chip-phase {
+    font-size: var(--t-label);
+}
+
+/* ============================================================
+   Dashboard layout: activity + cost 2-col responsive
+   ============================================================ */
+
+/* On viewports narrower than the 2-col grid, stack to 1 column. */
+@media (max-width: 900px) {
+    .dashboard-grid-activity {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ============================================================
+   Pipeline swimlane: responsive — horizontal scroll for all narrow viewports.
+   We never hide phase columns (Code/Review/Deploy/Observe) because tablet
+   operators need to see the full pipeline. Instead the shell becomes a
+   scroll container at <1100px and stays one at <700px.
+   ============================================================ */
+
+@media (max-width: 1100px) {
+    .pipeline-shell {
+        overflow-x: auto;
+    }
+    .pipeline-header,
+    .pipeline-body {
+        grid-template-columns: repeat(8, minmax(140px, 1fr));
+        min-width: 1000px;
+    }
+}
+
+/* ============================================================
+   Pause-feed toggle: when #dashboard-body carries data-paused the
+   live-indicator dims and the poll trigger is suppressed by the HTMX
+   predicate. The button label swaps via CSS content for quick feedback.
+   ============================================================ */
+
+#dashboard-body[data-paused] .live-indicator {
+    opacity: 0.4;
+}
+
+/* ============================================================
+   Dashboard activity + cost grid: 2-col layout
+   ============================================================ */
+
+.dashboard-grid-activity {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: var(--s-4);
+    align-items: flex-start;
+}
+
+/* Agents region top spacing */
+.dashboard-sec-agents {
+    margin-top: var(--s-6);
+}
+
+/* Sections inside the activity+cost 2-col grid should not add bottom margin
+   (the grid gap already provides spacing). */
+.dashboard-sec-no-mb {
+    margin-bottom: 0;
+}
+
+/* Static seg-btn variant: looks like an active seg-btn but is not interactive.
+   Used when the view-mode/filter controls are not yet wired to endpoints. */
+.seg-btn--static {
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ============================================================
+   Topbar right-slot: "auto-refreshing" label
+   ============================================================ */
+
+.topbar-refresh-label {
+    font-family: var(--font-mono);
+    font-size: var(--t-label);
+    color: var(--fg-3);
+}
+
+/* ============================================================
+   KPI tone: icon+label alongside numeric color for non-color signal
+   ============================================================ */
+
+.kpi-tone-icon {
+    font-size: var(--t-body);
+    margin-right: var(--s-1);
+    vertical-align: middle;
+}
+
+/* ============================================================
+   Dashboard reader-error banner
+   ============================================================ */
+
+.dashboard-error-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    background: var(--err-tint, var(--bg-2));
+    border-left: var(--s-1) solid var(--err);
+    border-radius: var(--r-1);
+    margin-bottom: var(--s-4);
+    font-size: var(--t-meta);
+    color: var(--fg-1);
+}
+
+.dashboard-error-banner__icon {
+    font-size: var(--t-body);
+    flex-shrink: 0;
+}
+
+.dashboard-error-banner__message {
+    flex: 1;
+}
+
+/* ============================================================
+   sr-only: visually hidden but accessible to screen readers
+   ============================================================ */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* ============================================================
+   Pipeline card: inline-style replacements
+   ============================================================ */
+
+/* Progress bar inner span width is set via a CSS custom property to avoid
+   inline styles. The outer .pbar span uses --pbar-pct for its width. */
+.pbar > span {
+    display: block;
+    height: 100%;
+    width: var(--pbar-pct, 0%);
+    background: var(--brand);
+    border-radius: var(--r-1);
+    transition: width 0.3s ease;
+}
+
+/* State chip: non-color signal for .live / .attn / .blocked */
+.pcard-state-chip {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0 var(--s-1);
+    border-radius: var(--r-1);
+    vertical-align: middle;
+}
+
+.pcard.live .pcard-state-chip {
+    background: var(--ok-dim);
+    color: var(--ok);
+}
+
+.pcard.attn .pcard-state-chip {
+    background: var(--warn-dim);
+    color: var(--warn);
+}
+
+.pcard.blocked .pcard-state-chip {
+    background: var(--err-dim);
+    color: var(--err);
+}
+
+/* Phase header dot: use CSS variable to allow per-phase colors without
+   inline style. The ph-dot carries a data-phase attribute. */
+.ph-dot[data-phase="prd"]     { background: var(--phase-prd); }
+.ph-dot[data-phase="tdd"]     { background: var(--phase-tdd); }
+.ph-dot[data-phase="plan"]    { background: var(--phase-plan); }
+.ph-dot[data-phase="spec"]    { background: var(--phase-spec); }
+.ph-dot[data-phase="code"]    { background: var(--phase-code); }
+.ph-dot[data-phase="review"]  { background: var(--phase-review); }
+.ph-dot[data-phase="deploy"]  { background: var(--phase-deploy); }
+.ph-dot[data-phase="observe"] { background: var(--phase-observe); }
+
+/* Pipeline card lane-color: per-phase border-left without inline style.
+   Each .pcard carries a data-phase attribute; --lane-color is resolved
+   from the phase token via the data-phase CSS rules. */
+.pcard[data-phase="prd"]     { --lane-color: var(--phase-prd); }
+.pcard[data-phase="tdd"]     { --lane-color: var(--phase-tdd); }
+.pcard[data-phase="plan"]    { --lane-color: var(--phase-plan); }
+.pcard[data-phase="spec"]    { --lane-color: var(--phase-spec); }
+.pcard[data-phase="code"]    { --lane-color: var(--phase-code); }
+.pcard[data-phase="review"]  { --lane-color: var(--phase-review); }
+.pcard[data-phase="deploy"]  { --lane-color: var(--phase-deploy); }
+.pcard[data-phase="observe"] { --lane-color: var(--phase-observe); }
+
+/* ============================================================
+   Cost bars: segment colors without inline styles
+   ============================================================ */
+
+.cost-bar { position: relative; }
+.seg.seg-prd     { background: var(--phase-prd); }
+.seg.seg-tdd     { background: var(--phase-tdd); }
+.seg.seg-plan    { background: var(--phase-plan); }
+.seg.seg-spec    { background: var(--phase-spec); }
+.seg.seg-code    { background: var(--phase-code); }
+.seg.seg-review  { background: var(--phase-review); }
+.seg.seg-deploy  { background: var(--phase-deploy); }
+.seg.seg-observe { background: var(--phase-observe); }
+
+/* Cost bar height and segment height use CSS custom properties set by
+   data attributes to avoid inline styles. */
+.cost-bar          { height: var(--bar-h, 10%); }
+.cost-bar > .seg   { height: var(--seg-h, 100%); }
+
+/* Cost legend swatch: per-phase colors without inline styles */
+.cost-legend-swatch.swatch-prd     { background: var(--phase-prd); }
+.cost-legend-swatch.swatch-tdd     { background: var(--phase-tdd); }
+.cost-legend-swatch.swatch-plan    { background: var(--phase-plan); }
+.cost-legend-swatch.swatch-spec    { background: var(--phase-spec); }
+.cost-legend-swatch.swatch-code    { background: var(--phase-code); }
+.cost-legend-swatch.swatch-review  { background: var(--phase-review); }
+.cost-legend-swatch.swatch-deploy  { background: var(--phase-deploy); }
+.cost-legend-swatch.swatch-observe { background: var(--phase-observe); }
+
+/* ============================================================
+   Agent card: chip-phase token size + util-bar span width via CSS var
+   ============================================================ */
+
+.util-bar > span {
+    display: block;
+    height: 100%;
+    width: var(--util-pct, 0%);
+    background: var(--brand);
+    border-radius: var(--r-1);
+}
+
+/* Feed-row chip font-size via class (remove inline style) */
+.feed-row .chip {
+    font-size: var(--t-label);
+}

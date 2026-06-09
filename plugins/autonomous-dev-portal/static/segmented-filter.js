@@ -13,7 +13,10 @@
     "use strict";
 
     function applyFilter(group) {
-        var active = group.querySelector(".seg-btn.on");
+        // FR-026-15: canonical active class is `.active`; `.on` kept for
+        // backward compatibility until all server templates are updated.
+        var active = group.querySelector(".seg-btn.active") ||
+                     group.querySelector(".seg-btn.on");
         var filter = active ? active.getAttribute("data-filter") : "all";
         var section = group.closest("section") || document;
         var rows = section.querySelectorAll("[data-gate-type]");
@@ -54,10 +57,11 @@
                 btn.addEventListener("click", function () {
                     var siblings = group.querySelectorAll(".seg-btn");
                     for (var j = 0; j < siblings.length; j++) {
-                        siblings[j].classList.remove("on");
+                        // Remove both .active (canonical) and .on (legacy alias).
+                        siblings[j].classList.remove("active", "on");
                         siblings[j].setAttribute("aria-pressed", "false");
                     }
-                    btn.classList.add("on");
+                    btn.classList.add("active");
                     btn.setAttribute("aria-pressed", "true");
                     applyFilter(group);
                 });

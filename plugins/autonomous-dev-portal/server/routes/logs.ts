@@ -27,12 +27,15 @@ export const logsHandler = async (c: Context): Promise<Response> => {
             });
             return renderPage(c, "logs", { lines });
         } catch (error) {
-            // Log error but fall back to stub
-            console.warn("LogsReader failed, falling back to stub:", error);
+            // The reader threw — surface an honest error state to the user
+            // instead of silently falling through to fabricated stub data.
+            // LiveLog renders a `.l-err` system row when readError is true.
+            console.warn("LogsReader failed:", error);
+            return renderPage(c, "logs", { lines: [], readError: true });
         }
     }
 
-    // Fallback to stub data
+    // No reader configured — fall back to stub data (dev / CI only).
     const lines = await loadLogsStub();
     return renderPage(c, "logs", { lines });
 };

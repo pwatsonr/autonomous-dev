@@ -1,0 +1,121 @@
+/* v3/logs.css — Logs view overrides. Built on top of shared foundation
+   (app.css, design-tokens.css). FR-026-32 terminal layout.
+
+   Ownership: server/templates/views/logs.tsx
+              server/templates/fragments/live-log.tsx
+
+   CSS contract:
+     .log              — dark terminal container (background/font from app.css)
+     .log-line         — three-column row: timestamp | level-badge | message
+     .log-row-hidden   — client-side grep hides rows without deleting them
+     .follow-tail-chip — info chip; gains .active class when tail is locked
+*/
+
+/* -----------------------------------------------------------------------
+   Terminal height — full-page logs surface uses 60vh; the shared app.css
+   max-height:320px is overridden here so the page feels like a real terminal.
+   ----------------------------------------------------------------------- */
+#logs-root .log {
+  max-height: 60vh;
+  height: 60vh;
+  border-radius: var(--r-2);
+}
+
+/* -----------------------------------------------------------------------
+   Three-column log-line layout
+   col 1: timestamp     — 10ch fixed, muted dim color
+   col 2: level badge   — 6ch fixed, tone-classed by level
+   col 3: message       — flex-fill, tone-classed or bare
+   ----------------------------------------------------------------------- */
+.log-line {
+  display: grid;
+  grid-template-columns: 10ch 6ch 1fr;
+  gap: var(--s-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+  min-height: 0;
+}
+
+/* -----------------------------------------------------------------------
+   Tone classes — mapped to log palette tokens.
+   These extend the base declarations already in app.css (.log .l-time etc.)
+   with the column-specific sizing for the level badge.
+   ----------------------------------------------------------------------- */
+.log .l-time {
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+/* Level badge: uppercase, fixed width, right-padded */
+.log .l-info,
+.log .l-warn,
+.log .l-err,
+.log .l-ok {
+  font-weight: 600;
+  letter-spacing: var(--s-half);
+  text-transform: uppercase;
+  font-size: var(--t-label);
+  align-self: start;
+  padding-top: 1px;
+}
+
+/* -----------------------------------------------------------------------
+   Flash animation for newly-arrived rows (follow-tail).
+   Applied by the client for 600ms on rows inserted during a swap.
+   ----------------------------------------------------------------------- */
+@keyframes log-flash {
+  from { background: color-mix(in oklab, var(--log-mark) 18%, transparent); }
+  to   { background: transparent; }
+}
+
+.log-line.new {
+  animation: log-flash var(--dur-slow) var(--ease-std);
+}
+
+/* -----------------------------------------------------------------------
+   Hidden state — applied by logs-view.js grep filter.
+   Using `display:none` collapses the row cleanly without layout shift.
+   ----------------------------------------------------------------------- */
+.log-row-hidden {
+  display: none;
+}
+
+/* -----------------------------------------------------------------------
+   Follow-tail chip — info chip variant with an active/inactive toggle.
+   When .active: filled info-tint background signals the tail is locked.
+   When inactive (no .active): muted border, fg-3 text.
+   ----------------------------------------------------------------------- */
+.follow-tail-chip {
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--dur-fast) var(--ease-std),
+              color var(--dur-fast) var(--ease-std),
+              border-color var(--dur-fast) var(--ease-std);
+}
+
+.follow-tail-chip:not(.active) {
+  background: var(--bg-2);
+  border-color: var(--line-2);
+  color: var(--fg-3);
+}
+
+/* -----------------------------------------------------------------------
+   Filter-strip spacing tuning for the logs page — the strip sits directly
+   above the terminal so reduce bottom margin to keep the layout tight.
+   ----------------------------------------------------------------------- */
+#logs-root .filter-strip {
+  margin-bottom: var(--s-2);
+}
+
+/* -----------------------------------------------------------------------
+   Stream-stall row — injected by logs-view.js when an HTMX poll fails at
+   the network/transport layer. Uses the error tone so it is visually
+   distinct from normal log rows. The row is appended to the terminal; the
+   CSS below adds a top separator to set it apart from the last real line.
+   ----------------------------------------------------------------------- */
+.log-stall-row {
+  border-top: 1px solid var(--line-err, var(--line-2));
+  padding-top: var(--s-1);
+  margin-top: var(--s-1);
+  opacity: 0.85;
+}

@@ -276,6 +276,14 @@ export const ShellLayout: FC<ShellProps> = ({
                     FIRST stylesheet so `var(--…)` references resolve. */}
                 <link rel="stylesheet" href="/static/design-tokens.css" />
                 <link rel="stylesheet" href="/static/app.css" />
+                {/* FR-026-07 — per-view v3 CSS stubs loaded after app.css so
+                    view-specific overrides can safely shadow shared rules.
+                    Files are initially empty; view-agent agents populate them. */}
+                <link rel="stylesheet" href="/static/v3/dashboard.css" />
+                <link rel="stylesheet" href="/static/v3/request-detail.css" />
+                <link rel="stylesheet" href="/static/v3/approvals.css" />
+                <link rel="stylesheet" href="/static/v3/ops.css" />
+                <link rel="stylesheet" href="/static/v3/logs.css" />
                 <link rel="stylesheet" href="/static/portal.css" />
                 <link rel="stylesheet" href="/static/shell.css" />
                 <script
@@ -364,15 +372,26 @@ export const ShellLayout: FC<ShellProps> = ({
                         </div>
                     </aside>
                     <main class="main">
-                        {pageTitle !== undefined || headActions !== undefined ? (
-                            <div class="page-head">
-                                {pageTitle !== undefined ? (
-                                    <h1>{pageTitle}</h1>
-                                ) : null}
-                                <div class="head-actions">{headActions}</div>
-                            </div>
-                        ) : null}
-                        {children}
+                        {/* FR-026-02 — .main-inner: content width cap (1480px)
+                            + density-aware padding via var(--pad-section).
+                            The topbar (FR-026-01) lives outside this wrapper so
+                            it can span the full viewport width if desired; views
+                            that use the Topbar component place it before
+                            .main-inner in their own template. */}
+                        <div class="main-inner">
+                            {pageTitle !== undefined ||
+                            headActions !== undefined ? (
+                                <div class="page-head">
+                                    {pageTitle !== undefined ? (
+                                        <h1>{pageTitle}</h1>
+                                    ) : null}
+                                    <div class="head-actions">
+                                        {headActions}
+                                    </div>
+                                </div>
+                            ) : null}
+                            {children}
+                        </div>
                         {modalSlotContent !== undefined ? (
                             modalSlotContent
                         ) : (

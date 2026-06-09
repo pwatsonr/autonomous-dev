@@ -1,0 +1,269 @@
+/* v3/request-detail.css — Request Detail view overrides and extensions.
+   Built on top of app.css (shared design tokens). Only adds or extends
+   rules NOT already covered by app.css primitives.
+
+   Token usage:
+     Colors  — semantic vars (--ok, --warn, --err, --brand, --fg-*, --bg-*)
+     Spacing — --s-* / --pad-card / --pad-section / --row-y
+     Type    — --t-* / --font-mono / --font-sans
+     Radii   — --r-1..--r-3 / --r-pill
+*/
+
+/* ============================================================
+   Phase timeline section head
+   ============================================================ */
+.phase-timeline {
+    background: var(--bg-1);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-3);
+    padding: var(--s-6) var(--s-6);
+    margin-bottom: var(--pad-section);
+}
+
+.phase-timeline-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-7);
+    margin-bottom: var(--s-4);
+    flex-wrap: wrap;
+}
+
+.phase-timeline-title {
+    font-size: var(--t-h3);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.phase-branch {
+    color: var(--fg-1);
+}
+
+.phase-cost {
+    color: var(--fg-1);
+}
+
+/* ============================================================
+   Rdetail gate column wrapper (sticky container)
+   ============================================================ */
+.rd-gate-col {
+    position: sticky;
+    top: var(--s-6);
+    align-self: start;
+    min-width: 0;
+}
+
+/* ============================================================
+   Topbar right-slot chips
+   ============================================================ */
+.rd-priority-chip {
+    font-size: var(--t-badge);
+}
+
+.rd-repo-chip {
+    font-size: var(--t-badge);
+}
+
+.rd-author {
+    font-size: var(--t-tiny);
+}
+
+/* ============================================================
+   Gate panel chip summary row
+   ============================================================ */
+.rd-gate-chips {
+    display: flex;
+    gap: var(--s-3);
+    margin-bottom: var(--s-3);
+    flex-wrap: wrap;
+}
+
+.rd-gate-chips .chip {
+    font-size: var(--t-badge);
+}
+
+/* ============================================================
+   Reviewer rows separator (app.css provides .review-row itself)
+   ============================================================ */
+.rd-reviewer-rows {
+    border-top: 1px solid var(--line-1);
+    margin-bottom: var(--s-3);
+}
+
+/* ============================================================
+   Post-decision banner
+   ============================================================ */
+.rd-decision-banner {
+    margin-top: var(--s-4);
+    padding: var(--s-3) var(--s-4);
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    text-align: center;
+    border-radius: var(--r-3);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid transparent;
+}
+
+.rd-decision-banner.approved {
+    background: var(--ok-tint);
+    color: var(--ok);
+    border-color: var(--ok-line);
+}
+
+.rd-decision-banner.rejected {
+    background: var(--err-tint);
+    color: var(--err);
+    border-color: var(--err-line);
+}
+
+.rd-decision-banner.deferred {
+    background: var(--warn-tint);
+    color: var(--warn);
+    border-color: var(--warn-line);
+}
+
+/* ============================================================
+   Artifact pane wrapper (HTMX swap target)
+   ============================================================ */
+.rd-artifact-pane-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+    min-width: 0;
+}
+
+.rd-artifact-card {
+    min-width: 0;
+}
+
+/* ============================================================
+   Pending artifact message
+   ============================================================ */
+.rd-pending-msg {
+    font-size: var(--t-meta);
+    line-height: 1.6;
+}
+
+/* ============================================================
+   Diff viewer inside artifact pane:
+   The app.css .diff .body already has overflow-x: auto.
+   Enforce min-width: 0 on .rdetail-main children so the gate
+   panel is never displaced by long diffs.
+   ============================================================ */
+.rdetail-main > * {
+    min-width: 0;
+}
+
+/* ============================================================
+   Diff card extras
+   ============================================================ */
+.rd-diff-files {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+}
+
+.rd-diff-totals {
+    font-size: var(--t-meta);
+}
+
+.rd-diff-empty {
+    font-size: var(--t-meta);
+}
+
+/* Inline branch code in diff card header */
+.rd-branch-inline {
+    background: transparent;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    color: var(--fg-1);
+}
+
+/* ============================================================
+   WCAG 1.4.1 dual-cue helpers for the diff viewer
+   ============================================================ */
+
+/* Screen-reader-only text: visible to AT, hidden from sighted users. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Prefix glyph column (+/-/space) in diff lines.
+   Narrow fixed-width so it aligns cleanly with the content column.
+   Color is inherited from the parent .ln.add / .ln.del / .ln.context rule
+   in app.css so it reads consistently in any colour scheme. */
+.diff .ln .c .pfx {
+    display: inline-block;
+    width: var(--s-3);
+    font-family: var(--font-mono);
+    user-select: none;
+}
+
+/* ============================================================
+   Phase track button resets (app.css provides visual styles;
+   we add the button-reset so native UA styles don't leak)
+   ============================================================ */
+.phase-track .phase-step {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.phase-track .phase-step:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: var(--r-1);
+    border-radius: var(--r-3);
+}
+
+/* ============================================================
+   Responsive breakpoints
+   ============================================================ */
+
+/* Tablet (~900px): collapse two-column layout to single column.
+   The gate panel drops below the artifact pane and loses sticky
+   positioning (sticky in a single-column flow scrolls too far). */
+@media (max-width: 900px) {
+    .rdetail {
+        grid-template-columns: 1fr;
+    }
+
+    .rd-gate-col {
+        position: static;
+    }
+}
+
+/* Small screens (~640px): switch the phase track from an 8-column
+   grid to a horizontally-scrollable row so each step stays legible
+   rather than compressing to ~70px with tiny labels. */
+@media (max-width: 640px) {
+    .phase-track {
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        gap: var(--s-4);
+        padding-bottom: var(--s-2);
+        /* Prevent the connector hairline (::before) from spanning the full
+           flex container width; it is only meaningful on the grid layout. */
+    }
+
+    .phase-track::before {
+        display: none;
+    }
+
+    .phase-track .phase-step {
+        flex: 0 0 auto;
+        min-width: var(--s-12);
+    }
+}

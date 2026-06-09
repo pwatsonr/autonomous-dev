@@ -22,14 +22,14 @@
 .btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--s-1h);
     height: 30px;
-    padding: 0 12px;
-    font: 500 13px/1 var(--font-sans);
+    padding: 0 var(--s-3);
+    font: 500 var(--t-h3)/1 var(--font-sans);
     background: var(--bg-1);
     color: var(--fg-0);
     border: 1px solid var(--line-2);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     cursor: pointer;
     transition:
         background var(--dur-fast) var(--ease-std),
@@ -38,8 +38,8 @@
 
 .btn.sm {
     height: 24px;
-    padding: 0 8px;
-    font-size: 12px;
+    padding: 0 var(--s-2);
+    font-size: var(--t-meta);
 }
 
 .btn:hover {
@@ -52,7 +52,7 @@
 
 .btn.primary {
     background: var(--brand);
-    color: #fff;
+    color: var(--bg-0);
     border-color: var(--brand);
 }
 
@@ -108,11 +108,11 @@
 .chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--s-1);
     height: 18px;
-    padding: 0 8px;
-    border-radius: 999px;
-    font: 700 11px/1 var(--font-mono);
+    padding: 0 var(--s-2);
+    border-radius: var(--r-pill);
+    font: 700 var(--t-tiny)/1 var(--font-mono);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     background: var(--bg-2);
@@ -136,11 +136,11 @@
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--s-1);
     height: 18px;
-    padding: 0 8px 0 18px;
-    border-radius: 999px;
-    font: 700 11px/1 var(--font-mono);
+    padding: 0 var(--s-2) 0 18px;
+    border-radius: var(--r-pill);
+    font: 700 var(--t-tiny)/1 var(--font-mono);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     background: var(--bg-2);
@@ -150,7 +150,7 @@
 .chip-phase::before {
     content: "";
     position: absolute;
-    left: 8px;
+    left: var(--s-2);
     top: 50%;
     transform: translateY(-50%);
     width: 6px;
@@ -192,12 +192,16 @@
 
 /* `.dot.live` — canonical pulsing state indicator (R-15). The
    ripple uses spec rgba values from the design system; documented
-   exemption from the no-raw-hex rule. */
+   exemption from the no-raw-hex rule per R-15 / design-tokens.css. */
 .dot.live {
     background: var(--ok);
     animation: pulse 1.6s var(--ease-std) infinite;
 }
 
+/* R-15 exemption: @keyframes pulse uses raw rgba() for the ripple shadow.
+   These are fixed spec values matching the design-tokens.css definition;
+   they are intentional transparent-to-opaque animation endpoints, not
+   semantic color choices. Allowlisted by lint-box-shadow.sh @keyframes rule. */
 @keyframes pulse {
     0%   { box-shadow: 0 0 0 0 rgba(47, 122, 62, 0.45); }
     70%  { box-shadow: 0 0 0 6px rgba(47, 122, 62, 0); }
@@ -212,26 +216,26 @@
 .score-inline {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--s-1h);
 }
 
 .score-track {
     display: inline-block;
     width: 80px;
-    height: 4px;
+    height: var(--s-1);
     background: var(--bg-3);
-    border-radius: 999px;
+    border-radius: var(--r-pill);
     overflow: hidden;
 }
 
 .score-fill {
     display: block;
     height: 100%;
-    border-radius: 999px;
+    border-radius: var(--r-pill);
 }
 
 .score-num {
-    font: 700 12px/1 var(--font-mono);
+    font: 700 var(--t-meta)/1 var(--font-mono);
     color: var(--fg-0);
 }
 
@@ -258,18 +262,20 @@
 .card {
     background: var(--bg-1);
     border: 1px solid var(--line-1);
-    border-radius: 3px;
+    border-radius: var(--r-2);
 }
 
+/* FR-026-15: .card-h padding 14→12px; h3 14→13px */
 .card-h {
-    padding: 12px 16px;
+    padding: var(--s-3) var(--s-4);
     border-bottom: 1px solid var(--line-1);
-    font: 600 14px/1.2 var(--font-sans);
+    font: 600 var(--t-13)/1.2 var(--font-sans);
     color: var(--fg-0);
 }
 
+/* FR-026-03: .card-b padding uses density token */
 .card-b {
-    padding: 16px;
+    padding: var(--pad-card);
 }
 
 /* === Tables (SPEC-035-2-06 / R-14) ============================== */
@@ -278,7 +284,7 @@
 .tbl {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: var(--t-h3);
 }
 
 .tbl th {
@@ -286,7 +292,7 @@
     top: 0;
     background: var(--bg-1);
     text-align: left;
-    padding: 10px 12px;
+    padding: var(--s-2h) var(--s-3);
     font: 700 10px/1 var(--font-mono);
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -294,8 +300,9 @@
     border-bottom: 1px solid var(--line-2);
 }
 
+/* FR-026-03: .tbl td uses --row-y density token for vertical padding */
 .tbl td {
-    padding: 10px 12px;
+    padding: var(--row-y) var(--s-3);
     border-bottom: 1px solid var(--line-1);
 }
 
@@ -304,7 +311,7 @@
 }
 
 /* Active-row marker (R-14): 2px brand bar via inset box-shadow.
-   R-15a exemption: inset-bar pattern; CI lint whitelist. */
+   R-15a exemption: inset-bar pattern; CI lint allowlist. */
 .tbl tr.active td:first-child {
     box-shadow: inset 2px 0 0 var(--brand);
 }

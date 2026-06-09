@@ -31,7 +31,7 @@ export const SettingsTabs: FC<Props> = ({ activeTab }) => (
         data-active-tab={activeTab}
     >
         {TAB_IDS.map((id) => {
-            const classes = id === activeTab ? "seg-btn on" : "seg-btn";
+            const classes = id === activeTab ? "seg-btn active" : "seg-btn";
             return (
                 <button
                     type="button"

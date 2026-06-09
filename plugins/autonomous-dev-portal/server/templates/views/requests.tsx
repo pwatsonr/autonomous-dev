@@ -197,7 +197,7 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
                     <div class="seg" data-segmented-filter="requests">
                         <button
                             type="button"
-                            class="seg-btn on"
+                            class="seg-btn active"
                             data-filter="all"
                             aria-pressed="true"
                         >

@@ -26,7 +26,7 @@ name: portal-lint
 on:
   pull_request:
     paths:
-      - 'plugins/autonomous-dev-portal/server/static/**/*.css'
+      - 'plugins/autonomous-dev-portal/static/**/*.css'
       - 'plugins/autonomous-dev-portal/src/styles/**'
       - 'plugins/autonomous-dev-portal/server/templates/**'
       - 'plugins/autonomous-dev-portal/scripts/lint-css-tokens.sh'
