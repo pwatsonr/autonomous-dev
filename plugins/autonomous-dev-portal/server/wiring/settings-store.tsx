@@ -20,15 +20,16 @@ import type {
     SettingsStore,
 } from "../routes/settings-actions";
 
-import { atomicWriteJson, readJsonOrNull } from "./atomic-json";
+import { readJsonOrNull } from "./atomic-json";
 import { userConfigPath } from "./state-paths";
+import { writeConfigChangeMarker } from "./config-change-store";
 
 /**
  * The persisted daemon config shape. We use the daemon's nested structure
  * and preserve any other keys via index-signature passthrough so the daemon's
  * own settings survive a portal write.
  */
-interface UserConfigFile {
+export interface UserConfigFile {
     governance?: {
         daily_cost_cap_usd?: number;
         monthly_cost_cap_usd?: number;
@@ -114,7 +115,7 @@ export class FileSettingsStore implements SettingsStore {
 
     async saveFromForm(
         form: Record<string, unknown>,
-        _actor: string,
+        actor: string,
     ): Promise<SettingsFormSaveResult> {
         // Validate numeric constraints - support both field naming patterns
         const dailyField = "dailyCap" in form ? "dailyCap" : "daily";
@@ -247,7 +248,13 @@ export class FileSettingsStore implements SettingsStore {
             }
 
             try {
-                await atomicWriteJson(this.path, next);
+                // FR-925: route the change through the daemon (config-change
+                // marker), don't mutate the user config directly.
+                await writeConfigChangeMarker({
+                    proposed: next,
+                    actor,
+                    summary: "settings: notification preferences update",
+                });
             } catch (err) {
                 return {
                     ok: false,
@@ -270,7 +277,7 @@ export class FileSettingsStore implements SettingsStore {
 
     async addAllowlist(
         realPath: string,
-        _actor: string,
+        actor: string,
     ): Promise<AllowlistAddResult> {
         return await this.serialize(async () => {
             const current = (await this.readCurrent()) ?? {};
@@ -299,7 +306,12 @@ export class FileSettingsStore implements SettingsStore {
                 },
             };
             try {
-                await atomicWriteJson(this.path, next);
+                // FR-925: route through the daemon via a config-change marker.
+                await writeConfigChangeMarker({
+                    proposed: next,
+                    actor,
+                    summary: `settings: allowlist add ${realPath}`,
+                });
             } catch (err) {
                 return {
                     ok: false,
