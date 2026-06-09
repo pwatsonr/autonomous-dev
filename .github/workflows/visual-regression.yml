@@ -52,6 +52,11 @@ jobs:
         # the Playwright runner image has no git-lfs binary — requesting
         # `lfs: true` made checkout fail outright. Plain checkout is correct.
 
+      # The Playwright container is minimal and ships without `unzip`, which
+      # oven-sh/setup-bun needs to unpack the Bun release.
+      - name: Install unzip (Bun setup prerequisite)
+        run: apt-get update && apt-get install -y --no-install-recommends unzip
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
