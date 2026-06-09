@@ -2718,6 +2718,14 @@ check_gates() {
         return 1
     fi
 
+    # Rate-limit backoff gate (PRD-025 FR-025-12): if a recent session hit an
+    # API rate limit, honor the exponential-backoff window (or the persistent
+    # kill-switch state after the ladder maxes out) before doing more work.
+    if declare -F check_rate_limit_state >/dev/null 2>&1 && ! check_rate_limit_state; then
+        log_warn "Rate-limit backoff active. Skipping iteration."
+        return 1
+    fi
+
     return 0
 }
 
@@ -3305,6 +3313,23 @@ main_loop() {
         local exit_code session_cost output_file
         IFS='|' read -r exit_code session_cost output_file <<< "${session_result}"
 
+        # PRD-025 FR-025-12: an API rate limit is a transient infra condition,
+        # not a code failure. Detect it in the session output BEFORE the normal
+        # branching: record the cost already incurred, advance the backoff state
+        # machine, and re-poll (the phase is left in place to retry once the
+        # backoff window — enforced by check_gates -> check_rate_limit_state —
+        # elapses). Do NOT record_crash or advance the phase.
+        if declare -F detect_rate_limit >/dev/null 2>&1 \
+           && [[ -f "${output_file}" ]] \
+           && detect_rate_limit "$(cat "${output_file}" 2>/dev/null || echo "")"; then
+            log_warn "API rate limit detected for ${request_id}; engaging exponential backoff (phase retained for retry)."
+            update_state_cost "${request_id}" "${project}" "${session_cost}" || true
+            update_cost_ledger "${session_cost}" "${request_id}" || true
+            handle_rate_limit "$(cat "${EFFECTIVE_CONFIG}" 2>/dev/null || echo '{}')" || true
+            [[ "${ONCE_MODE}" == "true" ]] && break
+            continue
+        fi
+
         # Post-session state update, crash tracking, and cost ledger
         # Three-way branching: turn exhaustion / success / hard failure (SPEC-001-3-02)
         if [[ ${exit_code} -ne 0 ]] && detect_turn_exhaustion "${exit_code}" "${output_file}"; then
@@ -3322,6 +3347,11 @@ main_loop() {
             update_cost_ledger "${session_cost}" "${request_id}"
         elif [[ ${exit_code} -eq 0 ]]; then
             record_success
+            # A clean session clears any rate-limit backoff so the consecutive
+            # counter resets (PRD-025 FR-025-12).
+            if declare -F clear_rate_limit_state >/dev/null 2>&1; then
+                clear_rate_limit_state || true
+            fi
             update_state_cost "${request_id}" "${project}" "${session_cost}"
             advance_phase "${request_id}" "${project}"
             update_cost_ledger "${session_cost}" "${request_id}"
@@ -3366,6 +3396,16 @@ fi
 # shellcheck source=bin/lib/phase-helpers.sh
 if [[ -f "${LIB_DIR}/phase-helpers.sh" ]]; then
     source "${LIB_DIR}/phase-helpers.sh"
+fi
+
+# Rate-limit detection + exponential-backoff state machine (PRD-025 FR-025-12).
+# Provides detect_rate_limit / handle_rate_limit / check_rate_limit_state /
+# clear_rate_limit_state. Its logging is self-contained and delegates to this
+# daemon's loggers when present. Both files run `set -euo pipefail`, so sourcing
+# introduces no shell-option change.
+# shellcheck source=lib/rate_limit_handler.sh
+if [[ -f "${PLUGIN_DIR}/lib/rate_limit_handler.sh" ]]; then
+    source "${PLUGIN_DIR}/lib/rate_limit_handler.sh"
 fi
 
 # Guard: allow the script to be sourced for unit testing without executing main.
