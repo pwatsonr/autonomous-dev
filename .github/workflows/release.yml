@@ -139,6 +139,22 @@ jobs:
           echo "Baseline $BASELINE_RATE meets threshold $THRESHOLD"
 
   # ----------------------------------------------------------------
+  # conformance-audit (PRD-025 pre-release gate)
+  # ----------------------------------------------------------------
+  # Deterministic check that the FR-025 conformance fixes have not
+  # regressed. Runs in parallel with verify-version/verify-evals and
+  # gates generate-changelog (hence create-release). No network / no
+  # Claude — see scripts/ci/conformance-audit.js.
+  conformance-audit:
+    name: PRD-025 conformance audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1 (pinned 2026-05-02)
+      - name: Run conformance audit (deterministic PRD-025 gate)
+        run: node scripts/ci/conformance-audit.js
+
+  # ----------------------------------------------------------------
   # generate-changelog (SPEC-017-3-02)
   # ----------------------------------------------------------------
   # Generates a CHANGELOG.md entry via Claude using the commit log
@@ -151,7 +167,7 @@ jobs:
   # both jobs are declared in the same workflow file.
   generate-changelog:
     name: Generate changelog with Claude
-    needs: [budget-gate, verify-version, verify-evals]
+    needs: [budget-gate, verify-version, verify-evals, conformance-audit]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
