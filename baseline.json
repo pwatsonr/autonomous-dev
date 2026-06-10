@@ -1,0 +1,21 @@
+{
+  "total": 77,
+  "passed": 63,
+  "pass_rate": 0.8182,
+  "failed_scenarios": [
+    "cfg-agent-001",
+    "cfg-agent-002",
+    "cfg-agent-003",
+    "cfg-cost-002",
+    "cfg-daemon-004",
+    "cfg-repo-002",
+    "help-compare-004",
+    "help-compare-005",
+    "help-edge-002",
+    "help-edge-003",
+    "help-edge-004",
+    "help-edge-005",
+    "help-edge-006",
+    "help-what-002"
+  ]
+}
