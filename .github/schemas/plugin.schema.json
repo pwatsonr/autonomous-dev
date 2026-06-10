@@ -67,6 +67,33 @@
       "minLength": 1,
       "maxLength": 64,
       "description": "SPDX-style license identifier (e.g., MIT, Apache-2.0, BSD-3-Clause)."
+    },
+    "userConfig": {
+      "type": "object",
+      "description": "User-configurable plugin settings (Claude Code plugin userConfig). Map of setting key to its declaration.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["string", "number", "boolean"],
+            "description": "Value type of the setting."
+          },
+          "title": {
+            "type": "string",
+            "description": "Human-readable label for the setting."
+          },
+          "default": {
+            "description": "Default value (matches the declared type)."
+          },
+          "description": {
+            "type": "string",
+            "description": "Help text describing the setting."
+          }
+        }
+      }
     }
   },
   "$defs": {
