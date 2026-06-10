@@ -26,7 +26,7 @@ referencing PRD-015 by anchor.
 | FR-4 | If an agent's frontmatter `description:` exceeds 80 chars, the table cell MUST contain a faithful summary AND the verbatim source MUST appear as an HTML comment immediately below the table row. | T1 |
 | FR-5 | The 13 existing rows MUST be bit-identical (no edits to existing agent descriptions or pipeline-phase columns). | T1 |
 | FR-6 | Any prose reference to "13 agents" elsewhere in `skills/help/SKILL.md` MUST be updated to "18 agents". | T1 |
-| FR-7 | A one-line decomposition acknowledgement MUST be appended near the top of the file (after the file's existing intro paragraph, before any H2): "This plugin was extended under PRD-015 to cover plugin chains, deployment backends, cloud onboarding, credential proxy, and egress firewall. See [PRD-015](../../docs/prd/PRD-015.md#decomposition) for the four-TDD breakdown." | T7 |
+| FR-7 | A one-line decomposition acknowledgement MUST be appended near the top of the file (after the file's existing intro paragraph, before any H2): "This plugin was extended under PRD-015 to cover plugin chains, deployment backends, cloud onboarding, credential proxy, and egress firewall. See [PRD-015](../../docs/prd/PRD-015-assist-extension-for-chains-deploy-cloud.md#decomposition) for the four-TDD breakdown." | T7 |
 | FR-8 | The decomposition cross-reference MUST use anchor-only convention; no SHA pinning (FR-1540). | T7 |
 | FR-9 | The agent-count number in the table heading or section heading (if any pre-existing pattern like "## Available agents (13)") MUST be updated to 18. | T1 |
 | FR-10 | The five new agent files at `plugins/autonomous-dev/agents/<name>.md` MUST exist before this spec is implementable. If any are missing at implementation time, the implementer MUST escalate to TDD-020 owners and pause this spec. | T1 (precondition) |
@@ -74,7 +74,7 @@ referencing PRD-015 by anchor.
 
 +This plugin was extended under PRD-015 to cover plugin chains, deployment
 +backends, cloud onboarding, credential proxy, and egress firewall. See
-+[PRD-015](../../docs/prd/PRD-015.md#decomposition) for the four-TDD breakdown.
++[PRD-015](../../docs/prd/PRD-015-assist-extension-for-chains-deploy-cloud.md#decomposition) for the four-TDD breakdown.
 +
  ## Available agents
  

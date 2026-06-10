@@ -30,7 +30,7 @@ acknowledgement footer cross-referencing PRD-015 by anchor.
 | FR-8 | A new H2 "Document map" MUST be inserted between "Project structure" and the footer with a 10-row anchor table. Columns: question type | start surface | procedural deep-dive. | T5 |
 | FR-9 | Each Document Map row's destination MUST resolve to either (a) a repo-relative file path or (b) a heading anchor in a file under the repo root. NO external URLs. | T5 |
 | FR-10 | Sibling-pending Document-Map destinations MUST be marked `<!-- pending: TDD-XXX -->`. | T5 |
-| FR-11 | A footer paragraph MUST be appended (preceded by `---` separator): "This plugin's current capabilities were authored under PRD-015 (`docs/prd/PRD-015.md`). For decomposition rationale and the four-TDD breakdown (TDD-025, TDD-026, TDD-027, TDD-028), see [PRD-015 §Decomposition](../../docs/prd/PRD-015.md#decomposition)." | T6 |
+| FR-11 | A footer paragraph MUST be appended (preceded by `---` separator): "This plugin's current capabilities were authored under PRD-015 (`docs/prd/PRD-015.md`). For decomposition rationale and the four-TDD breakdown (TDD-025, TDD-026, TDD-027, TDD-028), see [PRD-015 §Decomposition](../../docs/prd/PRD-015-assist-extension-for-chains-deploy-cloud.md#decomposition)." | T6 |
 | FR-12 | All cross-references in the changed sections MUST be repo-relative paths or section anchors. NO commit-SHA references (FR-1540). | T2-T6 |
 | FR-13 | The "Available commands" section MUST be unchanged (still 3 commands; the toggle is a flag, not a new command). | T2-T6 (regression-stable) |
 | FR-14 | The 10 Document-Map rows MUST cover the question types: (1) "What does this plugin do?", (2) "How do I install/use it?", (3) "How do I deploy?", (4) "How do I work with chains?", (5) "How do I configure cred-proxy?", (6) "How do I work with the firewall?", (7) "How do I onboard to cloud?", (8) "Why did my deploy fail?" (troubleshoot), (9) "How do I run evals locally?", (10) "Where is the decomposition rationale?". (Exact wording per TDD-028 §7.2 if defined; otherwise use these as canonical.) | T5 |
@@ -168,7 +168,7 @@ additive.
 | How do I onboard to cloud? | `skills/onboarding/SKILL.md` | `instructions/cloud-prompt-tree.md` <!-- pending: TDD-027 --> |
 | Why did my deploy fail? | `skills/troubleshoot/SKILL.md` | `instructions/runbook.md#deploy-failure-modes` |
 | How do I run evals locally? | This README §How to run evals | `evals/eval-config.yaml`, `commands/eval.md` |
-| Where is the decomposition rationale? | This README §footer | [PRD-015 §Decomposition](../../docs/prd/PRD-015.md#decomposition) |
+| Where is the decomposition rationale? | This README §footer | [PRD-015 §Decomposition](../../docs/prd/PRD-015-assist-extension-for-chains-deploy-cloud.md#decomposition) |
 ```
 
 #### Decomposition footer
@@ -179,7 +179,7 @@ additive.
 This plugin's current capabilities were authored under
 [PRD-015](../../docs/prd/PRD-015.md). For decomposition rationale and the
 four-TDD breakdown (TDD-025, TDD-026, TDD-027, TDD-028), see
-[PRD-015 §Decomposition](../../docs/prd/PRD-015.md#decomposition).
+[PRD-015 §Decomposition](../../docs/prd/PRD-015-assist-extension-for-chains-deploy-cloud.md#decomposition).
 ```
 
 ### Validation procedure

@@ -1591,8 +1591,8 @@ concurrency:
 
 ## 19. References
 
-- **[PRD-010: GitHub Actions CI/CD Pipeline](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/prd/PRD-010-github-actions-pipeline.md)** — Parent requirements document
-- **[TDD-001: Daemon Engine](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/tdd/TDD-001-daemon-engine.md)** — Architecture voice and technical depth reference
+- **[PRD-010: GitHub Actions CI/CD Pipeline](../../docs/prd/PRD-010-github-actions-pipeline.md)** — Parent requirements document
+- **[TDD-001: Daemon Engine](../../docs/tdd/TDD-001-daemon-engine.md)** — Architecture voice and technical depth reference
 - **TDD-016: Baseline CI Workflows** (sibling) — Non-Claude CI infrastructure this TDD builds upon
 - **[PRD-002: Document Pipeline & Review Gates](../prd/PRD-002-document-pipeline.md)** — Reviewer agents invoked by document workflows
 - **[PRD-003: Agent Factory & Self-Improvement](../prd/PRD-003-agent-factory.md)** — Agent meta-reviewer security requirements

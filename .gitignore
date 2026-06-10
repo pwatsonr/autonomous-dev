@@ -23,3 +23,4 @@ heartbeat.json
 crash-state.json
 kill-switch.flag
 .claude/
+.lycheecache

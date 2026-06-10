@@ -1858,27 +1858,27 @@ Control hook execution behavior globally and per phase:
 
 ### 18.1 Related PRDs
 
-**[PRD-001: Multi-Agent System Architecture](../prd-001-multi-agent-architecture.md)**  
+**[PRD-001: Multi-Agent System Architecture](../PRD-001-system-core.md)**  
 Defines the core agent architecture and communication patterns that extension hooks integrate with.
 
-**[PRD-002: Request Intake & State Management](../prd-002-request-intake-state.md)**  
+**[PRD-002: Request Intake & State Management](../PRD-002-document-pipeline.md)**  
 Describes the request processing pipeline and state management systems that pipeline variants extend.
 
-**[PRD-003: Agent-Meta-Reviewer for Quality Gates](../prd-003-agent-meta-reviewer.md)**  
+**[PRD-003: Agent-Meta-Reviewer for Quality Gates](../PRD-003-agent-factory.md)**  
 Defines the review system that custom reviewer hooks integrate with and extend.
 
-**[PRD-008: Assist Plugin for Development Teams](../prd-008-assist-plugin.md)**  
+**[PRD-008: Assist Plugin for Development Teams](../PRD-008-unified-request-submission.md)**  
 Describes the user-facing plugin that will include new skills for pipeline variant guidance and extension development.
 
 ### 18.2 Forward References
 
-**[PRD-012: Specialized Agent Marketplace](../prd-012-specialized-agents.md)**  
+**[PRD-012: Specialized Agent Marketplace](../PRD-012-quality-reviewer-suite.md)**  
 Will define the ecosystem for deploying custom reviewer agents that this PRD enables through reviewer-slot extension hooks.
 
-**[PRD-013: Rule-Based Requirement Validation](../prd-013-rule-validation.md)**  
+**[PRD-013: Rule-Based Requirement Validation](../PRD-013-engineering-standards-plugin-chaining.md)**  
 Will implement the rule-set DSL and evaluation engine that this PRD provides injection points for.
 
-**[PRD-014: Multi-Cloud Deployment Adapters](../prd-014-deployment-adapters.md)**  
+**[PRD-014: Multi-Cloud Deployment Adapters](../PRD-014-deployment-backends-framework.md)**  
 Will define deployment backends that can be integrated through deploy-phase extension hooks.
 
 ### 18.3 Technical Standards
