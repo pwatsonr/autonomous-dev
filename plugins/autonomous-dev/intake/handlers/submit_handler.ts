@@ -16,6 +16,7 @@ import type {
   IncomingCommand,
   Priority,
 } from '../adapters/adapter_interface';
+import { channelTypeToRequestSource } from '../types/request_source';
 import type { Repository, RequestEntity } from '../db/repository';
 import type { IntakeEventEmitter } from '../core/intake_router';
 import type { ClaudeApiClient } from '../core/request_parser';
@@ -234,7 +235,9 @@ export class SubmitHandler implements CommandHandler {
       last_promoted_at: null,
       paused_at_phase: null,
       type: requestType,
-      source: 'cli',
+      // Derived server-side from the authenticated channel, not a client claim
+      // (FR-025-17) — previously hard-coded 'cli', mislabeling every non-CLI request.
+      source: channelTypeToRequestSource(command.source.channelType),
       adapter_metadata: {},
       created_at: now,
       updated_at: now,
