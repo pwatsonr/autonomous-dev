@@ -4,7 +4,6 @@
 # Cache: results valid for 1 day so repeated CI runs reuse them.
 cache = true
 max_cache_age = "1d"
-verbose = true
 
 # Status codes that count as "link OK" (in addition to default 2xx).
 accept = [200, 201, 204, 301, 302, 307, 308, 403, 429]
@@ -36,8 +35,7 @@ timeout = 20
 # Identify the bot for upstream sites that gate by user-agent.
 user_agent = "lychee/autonomous-dev-ci"
 
-# Resolve relative links from the repo root.
-base = "."
-
-# Validate fragment (#anchor) targets in markdown files.
-include_fragments = true
+# NOTE: the old `base = "."` key was removed — newer lychee (now pulled by
+# lychee-action@v1) rejects it and fails to load the whole config, silently
+# breaking this gate repo-wide. Relative links resolve relative to their
+# containing file by default, which is how the markdown links here are written.

@@ -162,7 +162,7 @@ in PRD-015. The cost-cap-enforcer behavior on actual deploys is in
 PRD-017 (FR-1701-1705).
 
 PRD-015 reference: docs/prds/PRD-015-ci-cd-pipeline-and-chain-orchestration.md
-PRD-017 reference: docs/prds/PRD-017-cost-cap-enforcer.md
+PRD-017 reference: docs/prd/PRD-017-cost-cap-enforcer.md
 
 This phase performs DRY-RUN verification only; no cloud resources
 are created.
@@ -199,7 +199,7 @@ per sentence and naming the PRDs rather than restating their content.
 `linked-prd-no-duplication.md`:
 - Render phase 16 output (banner + prompts + verification line).
 - Tokenize sentences (split on `.` / `\n\n`).
-- For each sentence ≥ 40 chars, grep for verbatim presence in `docs/prds/PRD-015-*.md` and `docs/prds/PRD-017-*.md`.
+- For each sentence ≥ 40 chars, grep for verbatim presence in `docs/prds/PRD-015-*.md` and `docs/prd/PRD-017-*.md`.
 - Assertion: zero matches.
 
 `credential-leak.md` (AMENDMENT-002 AC-08 anchor):

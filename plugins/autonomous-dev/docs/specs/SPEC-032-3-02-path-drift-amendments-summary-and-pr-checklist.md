@@ -113,7 +113,7 @@ placeholder.
 
 ## Cross-references
 
-- [PRD-017 §5.4](../prds/PRD-017-cleanup-and-operational-closeout.md#54-spec-path-drift)
+- [PRD-017 §5.4](../prd/PRD-017-cleanup-and-operational-closeout.md#54-spec-path-drift)
 - [TDD-032 §5.4](../tdd/TDD-032-cleanup-and-operational-closeout.md#54-spec-path-drift-sweep)
 - [SPEC-032-3-01](./SPEC-032-3-01-spec-drift-audit-script-and-hand-edits.md)
 - PRD-016 (test-side sweep, forthcoming) — picks up "Deferred to PRD-016" rows.

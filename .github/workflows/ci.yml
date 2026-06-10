@@ -96,11 +96,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # Pin the lychee binary so config compatibility can't drift out from
+          # under us (the floating action silently upgraded lychee and the old
+          # `base` config key started failing the whole gate).
+          lycheeVersion: v0.24.2
           args: >-
-            --verbose
             --cache
             --max-cache-age 1d
             --config lychee.toml
+            --root-dir ${{ github.workspace }}
             "plugins/**/docs/**/*.md"
             "README.md"
           fail: true

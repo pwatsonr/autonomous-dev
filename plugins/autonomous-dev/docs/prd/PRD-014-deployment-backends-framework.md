@@ -1213,12 +1213,12 @@ environments:
 
 | Document | Relationship | Key Integration Points |
 |----------|--------------|----------------------|
-| **[PRD-001: System Core & Daemon Engine](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/prd/PRD-001-system-core.md)** | Foundation | Pipeline state machine (deploy phase), cost governance integration, daemon lifecycle management |
-| **[PRD-004: Parallel Execution Engine](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/prd/PRD-004-parallel-execution.md)** | Upstream dependency | Integration phase produces final commit SHA that deploy phase consumes as build input |
-| **[PRD-007: Escalation & Trust Framework](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/prd/PRD-007-escalation-trust.md)** | Cross-cutting concern | Trust level gates for environment-specific approval, escalation integration for deployment failures |
-| **[PRD-008: Unified Request Submission Packaging](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/prd/PRD-008-unified-request-submission.md)** | Adjacent | Request metadata and audit trail integration, cost tracking consistency |
-| **[PRD-009: Web Control Plane (autonomous-dev-portal)](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/prd/PRD-009-web-control-plane.md)** | Consumer | Portal displays deployment status, logs, and cost information; provides deployment approval interface |
-| **[PRD-010: GitHub Actions CI/CD Pipeline](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/prd/PRD-010-github-actions-pipeline.md)** | Upstream dependency | CI validation must complete successfully before deploy phase begins; security scanning integration |
+| **[PRD-001: System Core & Daemon Engine](../../docs/prd/PRD-001-system-core.md)** | Foundation | Pipeline state machine (deploy phase), cost governance integration, daemon lifecycle management |
+| **[PRD-004: Parallel Execution Engine](../../docs/prd/PRD-004-parallel-execution.md)** | Upstream dependency | Integration phase produces final commit SHA that deploy phase consumes as build input |
+| **[PRD-007: Escalation & Trust Framework](../../docs/prd/PRD-007-escalation-trust.md)** | Cross-cutting concern | Trust level gates for environment-specific approval, escalation integration for deployment failures |
+| **[PRD-008: Unified Request Submission Packaging](../../docs/prd/PRD-008-unified-request-submission.md)** | Adjacent | Request metadata and audit trail integration, cost tracking consistency |
+| **[PRD-009: Web Control Plane (autonomous-dev-portal)](../../docs/prd/PRD-009-web-control-plane.md)** | Consumer | Portal displays deployment status, logs, and cost information; provides deployment approval interface |
+| **[PRD-010: GitHub Actions CI/CD Pipeline](../../docs/prd/PRD-010-github-actions-pipeline.md)** | Upstream dependency | CI validation must complete successfully before deploy phase begins; security scanning integration |
 | **PRD-011: Pipeline Variants & Extension Hooks** (referenced) | Framework pattern | Extension hooks model used for backend plugin registration and lifecycle management |
 | **PRD-013: Code Quality Standards** (referenced) | Build input | Standards compliance validation feeds into build context for deployment |
 | **Homelab Plugin Repository** (separate repo) | Sibling integration | Forward reference to homelab-specific backends (homelab-k3s, homelab-vm, homelab-bare-metal) |

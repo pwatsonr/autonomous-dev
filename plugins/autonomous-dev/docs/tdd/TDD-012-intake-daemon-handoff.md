@@ -2213,13 +2213,13 @@ class MigrationValidator {
 
 ## 17. References
 
-- **[TDD-001: Daemon Engine](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/tdd/TDD-001-daemon-engine.md)** — `select_request()` implementation and state.json consumption patterns
-- **[TDD-002: State Machine & Request Lifecycle](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/tdd/TDD-002-state-machine.md)** — state.json schema v1 specification and transition rules  
-- **[PRD-008: Unified Request Submission Packaging](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/docs/prd/PRD-008-unified-request-submission.md)** — parent requirements and channel specifications
-- **[supervisor-loop.sh lines 640-722](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/bin/supervisor-loop.sh)** — current daemon request selection implementation
-- **[Repository Implementation](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/intake/db/repository.ts)** — existing SQLite data access layer
-- **[Submit Handler](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/intake/handlers/submit_handler.ts)** — current submission processing pipeline
-- **[State Fixture](/Users/pwatson/codebase/autonomous-dev/plugins/autonomous-dev/tests/fixtures/state_v1_intake.json)** — canonical state.json format for daemon compatibility
+- **[TDD-001: Daemon Engine](../../docs/tdd/TDD-001-daemon-engine.md)** — `select_request()` implementation and state.json consumption patterns
+- **[TDD-002: State Machine & Request Lifecycle](../../docs/tdd/TDD-002-state-machine.md)** — state.json schema v1 specification and transition rules  
+- **[PRD-008: Unified Request Submission Packaging](../../docs/prd/PRD-008-unified-request-submission.md)** — parent requirements and channel specifications
+- **[supervisor-loop.sh lines 640-722](../../bin/supervisor-loop.sh)** — current daemon request selection implementation
+- **[Repository Implementation](../../intake/db/repository.ts)** — existing SQLite data access layer
+- **[Submit Handler](../../intake/handlers/submit_handler.ts)** — current submission processing pipeline
+- **[State Fixture](../../tests/fixtures/state_v1_intake.json)** — canonical state.json format for daemon compatibility
 - **POSIX.1-2008**: rename(2) system call specification for atomic file operations
 - **SQLite Documentation**: WAL mode and transaction isolation levels
 - **better-sqlite3 Documentation**: prepared statements and transaction API

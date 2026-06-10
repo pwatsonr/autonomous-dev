@@ -168,12 +168,12 @@ issue you file. Re-attempt the pin in a future refresh session.
 
 ## Cross-references
 
-- [PRD-017 FR-1710](../prds/PRD-017-cleanup-and-operational-closeout.md#fr-1710)
+- [PRD-017 FR-1710](../prd/PRD-017-cleanup-and-operational-closeout.md#fr-1710)
 - [TDD-032 §5.2](../tdd/TDD-032-cleanup-and-operational-closeout.md#52-action-sha-pinning)
 - [SPEC-032-2-01](../specs/SPEC-032-2-01-action-pin-audit-and-resolution.md)
 - [SPEC-032-2-02](../specs/SPEC-032-2-02-lint-no-tbd-shas-guard-and-ci-wiring.md)
 - [SPEC-032-2-03](../specs/SPEC-032-2-03-observe-yml-example-and-doc-test.md)
-- [SPEC-024-1](../specs/SPEC-024-1-...) (version-comment convention origin; verify exact filename at author time)
+- SPEC-024-1 (version-comment convention origin; verify exact filename at author time)
 ```
 
 The above outline is a starting point. The implementer fleshes out
