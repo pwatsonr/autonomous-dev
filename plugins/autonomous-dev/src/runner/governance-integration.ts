@@ -23,6 +23,7 @@ import { evaluateEffectiveness } from '../governance/effectiveness';
 import { writeEffectivenessResult, findPendingEffectivenessObservations } from '../governance/effectiveness-writeback';
 import { checkCooldown } from '../governance/cooldown';
 import { checkOscillation, buildOscillationWarningMarkdown } from '../governance/oscillation';
+import { findRecentFixDeployment, findObservationsByServiceAndError } from '../governance/observation-store';
 import type {
   GovernanceConfig,
   CooldownResult,
@@ -139,7 +140,7 @@ export async function applyGovernanceChecks(
   errorClass: string,
   config: GovernanceConfig,
   rootDir: string,
-  readDeploymentMetadata: (id: string) => DeploymentInfo | null,
+  readDeploymentMetadata: (id: string) => FixDeployment | null,
   logger: AuditLogger,
 ): Promise<GovernanceFlags> {
   // 3e.i -- Check cooldown
@@ -204,22 +205,13 @@ export function findRecentFixDeploymentFromStore(
   rootDir: string,
   service: string,
   errorClass: string,
-  readDeploymentMetadata: (id: string) => DeploymentInfo | null,
+  readDeploymentMetadata: (id: string) => FixDeployment | null,
 ): FixDeployment | null {
-  // In the real implementation, this would scan the deployments
-  // directory or query a deployments index. For now, it delegates
-  // to the provided readDeploymentMetadata function.
-  //
-  // The deployment store is at:
-  //   .autonomous-dev/deployments/<deployment-id>.yaml
-  //
-  // Each deployment file contains service, error_class, deployed_at, etc.
-  // This function is intentionally synchronous to match the checkCooldown
-  // callback signature.
-
-  // Stub: in production this scans the deployment store
-  // The actual scanning logic is provided by SPEC-007-5-1
-  return null;
+  // Delegates to the real observation-store scanner (SPEC-007-5-1): scans
+  // promoted observations for this service+error_class under
+  // .autonomous-dev/observations/ and resolves the linked deployment via
+  // readDeploymentMetadata. Synchronous to match the checkCooldown callback.
+  return findRecentFixDeployment(rootDir, service, errorClass, readDeploymentMetadata);
 }
 
 /**
@@ -232,16 +224,10 @@ export function findObservationsByServiceAndErrorFromStore(
   errorClass: string,
   afterDate: Date,
 ): ObservationSummary[] {
-  // In the real implementation, this would scan observation files
-  // in the .autonomous-dev/observations/ directory tree and filter
-  // by service, error_class, and timestamp.
-  //
-  // This function is intentionally synchronous to match the
-  // checkOscillation callback signature.
-
-  // Stub: in production this scans the observations store
-  // The actual scanning logic is provided by SPEC-007-5-1
-  return [];
+  // Delegates to the real observation-store scanner (SPEC-007-5-1): scans
+  // .autonomous-dev/observations/ for matching service+error_class after
+  // afterDate. Synchronous to match the checkOscillation callback.
+  return findObservationsByServiceAndError(rootDir, service, errorClass, afterDate);
 }
 
 // ---------------------------------------------------------------------------
