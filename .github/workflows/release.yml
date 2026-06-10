@@ -189,34 +189,35 @@ jobs:
           # trusted maintainer. See SPEC-017-3-02 §Trust-Gate Note.
           author-association: OWNER
 
-      - name: Generate changelog with Claude
+      - name: Generate changelog (Anthropic API with git-log fallback)
         if: steps.trust.outputs.is-trusted == 'true'
-        uses: anthropics/claude-code-action@c3d45e8e941e1b2ad7b278c57482d9c5bf1f35b3  # anthropics/claude-code-action@v1.0.99 (pinned 2026-05-02)
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_args: "--attach /tmp/commits.txt --max-turns 5"
-          prompt: |
-            Generate a CHANGELOG.md entry for release ${{ github.ref_name }}.
-
-            The attached file contains every commit in this release as
-            "<sha> <subject>" lines.  Use ONLY the attached content; do not
-            invent features or guess at scope.  For every line in the
-            changelog you produce, include the commit SHA in parentheses,
-            e.g. "- Added retry logic for token refresh (a1b2c3d)".
-
-            Output strictly the following Markdown structure (omit any
-            section that has no entries):
-
-            ## ${{ github.ref_name }} — $(date -u +%Y-%m-%d)
-
-            ### Added
-            ### Changed
-            ### Deprecated
-            ### Removed
-            ### Fixed
-            ### Security
-
-            Write the result to /tmp/changelog.md.  Do not write anything else.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -uo pipefail
+          # claude-code-action only supports pull_request/issue events — on the
+          # tag `push` that triggers a release it fails with "Unsupported event
+          # type: push". Call the Messages API directly so it works on any
+          # trigger, with a deterministic git-log fallback so create-release
+          # always has a non-empty body.
+          DATE="$(date -u +%Y-%m-%d)"
+          INSTR="Generate a CHANGELOG.md entry for release ${REF_NAME} dated ${DATE}. The text after 'Commits:' lists every commit in this release as '<sha> <subject>'. Use ONLY those commits; do not invent scope. Put the commit SHA in parentheses on each bullet. Output strictly this Markdown and nothing else (omit any empty section): first a line '## ${REF_NAME} — ${DATE}', then the sections '### Added', '### Changed', '### Deprecated', '### Removed', '### Fixed', '### Security', each with bullets placed under the most appropriate section. Commits: "
+          REQ="$(jq -n --arg model "claude-haiku-4-5-20251001" --arg instr "$INSTR" --rawfile commits /tmp/commits.txt \
+            '{model:$model, max_tokens:2000, messages:[{role:"user", content:($instr + $commits)}]}')"
+          curl -sS --max-time 120 https://api.anthropic.com/v1/messages \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$REQ" > /tmp/resp.json 2>/dev/null || true
+          jq -r '.content[0].text // empty' /tmp/resp.json > /tmp/changelog.md 2>/dev/null || true
+          if [ ! -s /tmp/changelog.md ]; then
+            echo "::warning::Anthropic API changelog unavailable; using git-log fallback"
+            { printf '## %s — %s\n\n### Changed\n' "$REF_NAME" "$DATE"
+              while IFS= read -r l; do printf -- '- %s (%s)\n' "${l#* }" "${l%% *}"; done < /tmp/commits.txt
+            } > /tmp/changelog.md
+          fi
+          echo "Changelog produced:"; cat /tmp/changelog.md
 
       - name: Verify changelog produced
         id: locate
