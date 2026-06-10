@@ -51,7 +51,7 @@ describe('hook-manifest-v1.json schema', () => {
     expect(def.additionalProperties).toBe(false);
   });
 
-  test('declares all 10 HookPoint enum strings on hook_point', () => {
+  test('declares all 12 HookPoint enum strings on hook_point', () => {
     const def = schema.$defs.hookEntry as { properties: { hook_point: { enum: string[] } } };
     expect(def.properties.hook_point.enum.sort()).toEqual([
       'code-post-write',
@@ -59,10 +59,12 @@ describe('hook-manifest-v1.json schema', () => {
       'deploy-post',
       'deploy-pre',
       'intake-pre-validate',
+      'plan-pre-author',
       'prd-pre-author',
       'review-post-score',
       'review-pre-score',
       'rule-evaluation',
+      'spec-pre-author',
       'tdd-pre-author',
     ]);
   });

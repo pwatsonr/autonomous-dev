@@ -43,6 +43,8 @@
             "intake-pre-validate",
             "prd-pre-author",
             "tdd-pre-author",
+            "plan-pre-author",
+            "spec-pre-author",
             "code-pre-write",
             "code-post-write",
             "review-pre-score",
