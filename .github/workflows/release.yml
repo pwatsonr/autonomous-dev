@@ -29,7 +29,8 @@ name: release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'           # bare scheme, e.g. v0.3.9
+      - '*--v*'        # `claude plugin tag` scheme, e.g. autonomous-dev--v0.3.9
 
 permissions:
   contents: write       # required by softprops/action-gh-release in SPEC-017-3-02
@@ -62,9 +63,15 @@ jobs:
         name: Extract tag and manifest versions
         run: |
           set -euo pipefail
-          # Strip exactly one leading "v" -- "vv0.2.0" must surface as a
-          # mismatch, not be silently normalized.
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          # Accept both tag schemes and extract the version:
+          #   v0.3.9                  (bare)            -> 0.3.9
+          #   autonomous-dev--v0.3.9  (`claude plugin tag`) -> 0.3.9
+          # For the bare form, strip exactly one leading "v" so "vv0.2.0"
+          # still surfaces as a mismatch rather than being normalized away.
+          case "${GITHUB_REF_NAME}" in
+            *--v*) TAG_VERSION="${GITHUB_REF_NAME##*--v}" ;;
+            *)     TAG_VERSION="${GITHUB_REF_NAME#v}" ;;
+          esac
           MANIFEST_VERSION="$(jq -r '.version' plugins/autonomous-dev/.claude-plugin/plugin.json)"
           echo "Tag version:      $TAG_VERSION"
           echo "Manifest version: $MANIFEST_VERSION"
