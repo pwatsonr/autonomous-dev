@@ -105,8 +105,8 @@ function createConfig(): ParallelConfig {
   return loadConfig({
     worktree_root: '/tmp/worktrees',
     max_worktrees: 5,
-    disk_warning_threshold_gb: 5,
-    disk_hard_limit_gb: 2,
+    disk_warning_threshold_gb: 2,
+    disk_hard_limit_gb: 5,
   });
 }
 
@@ -878,8 +878,8 @@ describe('preCommitSharedTypes', () => {
     config = loadConfig({
       worktree_root: worktreeDir,
       max_worktrees: 10,
-      disk_warning_threshold_gb: 5,
-      disk_hard_limit_gb: 2,
+      disk_warning_threshold_gb: 2,
+      disk_hard_limit_gb: 5,
     });
 
     worktreeManager = new WorktreeManager(config, repoRoot, emitter);

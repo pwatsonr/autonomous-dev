@@ -173,9 +173,9 @@ describe('config', () => {
   it('returns valid defaults', () => {
     const cfg = loadConfig();
     expect(cfg.max_worktrees).toBe(5);
-    expect(cfg.max_tracks).toBe(5);
-    expect(cfg.disk_warning_threshold_gb).toBe(5);
-    expect(cfg.disk_hard_limit_gb).toBe(2);
+    expect(cfg.max_tracks).toBe(3);
+    expect(cfg.disk_warning_threshold_gb).toBe(2);
+    expect(cfg.disk_hard_limit_gb).toBe(5);
     expect(cfg.worktree_cleanup_delay_seconds).toBe(300);
     expect(cfg.worktree_root).toBe('.worktrees');
     expect(cfg.state_dir).toBe('.autonomous-dev/state');
@@ -184,7 +184,7 @@ describe('config', () => {
     expect(cfg.max_revision_cycles).toBe(2);
     expect(cfg.conflict_ai_confidence_threshold).toBe(0.85);
     expect(cfg.merge_conflict_escalation_threshold).toBe(5);
-    expect(cfg.disk_hard_limit_gb).toBeLessThan(cfg.disk_warning_threshold_gb);
+    expect(cfg.disk_hard_limit_gb).toBeGreaterThan(cfg.disk_warning_threshold_gb);
   });
 
   it('accepts valid overrides', () => {
@@ -192,7 +192,7 @@ describe('config', () => {
     expect(cfg.max_worktrees).toBe(10);
     expect(cfg.max_tracks).toBe(8);
     // other fields remain at defaults
-    expect(cfg.disk_warning_threshold_gb).toBe(5);
+    expect(cfg.disk_warning_threshold_gb).toBe(2);
   });
 
   it('rejects negative max_worktrees', () => {
@@ -207,9 +207,9 @@ describe('config', () => {
     expect(() => validateConfig({ ...loadConfig(), max_worktrees: 1.5 })).toThrow();
   });
 
-  it('rejects hard limit >= warning threshold', () => {
+  it('rejects hard limit <= warning threshold', () => {
     expect(() =>
-      validateConfig({ ...loadConfig(), disk_hard_limit_gb: 10, disk_warning_threshold_gb: 5 }),
+      validateConfig({ ...loadConfig(), disk_hard_limit_gb: 2, disk_warning_threshold_gb: 5 }),
     ).toThrow();
   });
 

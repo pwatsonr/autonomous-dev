@@ -74,8 +74,8 @@ describe('WorktreeManager', () => {
     config = loadConfig({
       worktree_root: worktreeRoot,
       max_worktrees: 5,
-      disk_warning_threshold_gb: 5,
-      disk_hard_limit_gb: 2,
+      disk_warning_threshold_gb: 2,
+      disk_hard_limit_gb: 5,
     });
     wm = new WorktreeManager(config, repoRoot, emitter);
   });
@@ -141,8 +141,8 @@ describe('WorktreeManager', () => {
       const limitedConfig = loadConfig({
         worktree_root: worktreeRoot,
         max_worktrees: 1,
-        disk_warning_threshold_gb: 5,
-        disk_hard_limit_gb: 2,
+        disk_warning_threshold_gb: 2,
+        disk_hard_limit_gb: 5,
       });
       const limitedWm = new WorktreeManager(limitedConfig, repoRoot, emitter);
 
@@ -392,8 +392,8 @@ describe('WorktreeManager', () => {
       // Configure very low warning threshold (1 byte = ~0.00000000093 GB)
       const lowConfig = loadConfig({
         worktree_root: worktreeRoot,
-        disk_warning_threshold_gb: 0.0000001, // ~107 bytes
-        disk_hard_limit_gb: 0.00000001,        // ~10 bytes
+        disk_warning_threshold_gb: 0.00000001, // ~10 bytes
+        disk_hard_limit_gb: 0.0000001,        // ~107 bytes
       });
       const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter);
 
@@ -424,8 +424,8 @@ describe('WorktreeManager', () => {
     it('emits critical event when hard limit exceeded', async () => {
       const lowConfig = loadConfig({
         worktree_root: worktreeRoot,
-        disk_warning_threshold_gb: 0.0000001,
-        disk_hard_limit_gb: 0.00000001,
+        disk_warning_threshold_gb: 0.00000001, // ~10 bytes
+        disk_hard_limit_gb: 0.0000001,        // ~107 bytes
       });
       const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter);
 
@@ -449,8 +449,8 @@ describe('WorktreeManager', () => {
     it('getDiskPressureLevel updates after checkDiskUsage', async () => {
       const lowConfig = loadConfig({
         worktree_root: worktreeRoot,
-        disk_warning_threshold_gb: 0.0000001,
-        disk_hard_limit_gb: 0.00000001,
+        disk_warning_threshold_gb: 0.00000001, // ~10 bytes
+        disk_hard_limit_gb: 0.0000001,        // ~107 bytes
       });
       const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter);
 

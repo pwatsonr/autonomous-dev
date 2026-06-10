@@ -36,12 +36,12 @@ export interface ParallelConfig {
   merge_conflict_escalation_threshold: number;
 }
 
-/** Default values matching TDD Appendix A. */
+/** Default values per PRD-004 Appendix D (warn at 2 GB, hard-stop at 5 GB). */
 export const DEFAULT_PARALLEL_CONFIG: ParallelConfig = {
   max_worktrees: 5,
-  max_tracks: 5,
-  disk_warning_threshold_gb: 5,
-  disk_hard_limit_gb: 2,
+  max_tracks: 3,
+  disk_warning_threshold_gb: 2,
+  disk_hard_limit_gb: 5,
   worktree_cleanup_delay_seconds: 300,
   worktree_root: '.worktrees',
   state_dir: '.autonomous-dev/state',
@@ -90,11 +90,12 @@ export function validateConfig(cfg: ParallelConfig): void {
     throw new ConfigValidationError('disk_hard_limit_gb', 'must be a number > 0');
   }
 
-  // disk_hard_limit_gb must be < disk_warning_threshold_gb
-  if (cfg.disk_hard_limit_gb >= cfg.disk_warning_threshold_gb) {
+  // disk_hard_limit_gb must be > disk_warning_threshold_gb: warn at the lower
+  // usage, then refuse new worktrees at the higher one (PRD-004 Appendix D).
+  if (cfg.disk_hard_limit_gb <= cfg.disk_warning_threshold_gb) {
     throw new ConfigValidationError(
       'disk_hard_limit_gb',
-      `must be less than disk_warning_threshold_gb (${cfg.disk_warning_threshold_gb}), got ${cfg.disk_hard_limit_gb}`,
+      `must be greater than disk_warning_threshold_gb (${cfg.disk_warning_threshold_gb}), got ${cfg.disk_hard_limit_gb}`,
     );
   }
 
