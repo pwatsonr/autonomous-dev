@@ -123,6 +123,24 @@ const CHECKS = [
       return secs <= 5 ? pass() : fail(`dashboard refresh ${secs}s exceeds 5s`);
     },
   },
+  {
+    id: 'config-change-apply-merges',
+    issue: 386,
+    fr: 'FR-025-05',
+    desc: 'Portal config-change apply merges proposed over existing config (no destructive overwrite)',
+    run() {
+      const s = read('plugins/autonomous-dev/bin/supervisor-loop.sh');
+      if (s === null) return fail('supervisor-loop.sh not found');
+      // Must shallow-merge proposed over the existing config so a partial
+      // proposal cannot destroy unmentioned keys like repositories.allowlist.
+      const merges = /\.\[0\]\s*\+\s*\.\[1\]\.proposed/.test(s);
+      // The old destructive path wrote `.proposed` straight over CONFIG_FILE.
+      const destructive = /jq '\.proposed' "\$\{marker\}"\s*>\s*"\$\{cfg_tmp\}"/.test(s);
+      if (!merges) return fail('config-change apply no longer merges proposed over existing config');
+      if (destructive) return fail('destructive replace of CONFIG_FILE present (regression of #386)');
+      return pass();
+    },
+  },
 ];
 
 function main() {

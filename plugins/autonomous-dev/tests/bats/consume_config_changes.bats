@@ -64,3 +64,29 @@ _marker() { # $1=file $2=json
     run jq -r '.governance.daily_cost_cap_usd' "$CFG"
     [ "$output" = "100" ]
 }
+
+# --- #386: a partial proposal must not destroy unmentioned config keys -------
+
+@test "partial proposed (notifications-only) preserves repositories.allowlist (#386)" {
+    echo '{"repositories":{"allowlist":["/repo/a","/repo/b"]},"notifications":{"dndEnabled":false}}' > "$CFG"
+    _marker "c6.json" '{"id":"c6","source":"portal","actor":"op","ts":"2026-06-09T00:00:00Z","summary":"toggle dnd","proposed":{"notifications":{"dndEnabled":true}}}'
+    consume_config_changes
+    # the notifications edit IS applied...
+    run jq -r '.notifications.dndEnabled' "$CFG"
+    [ "$output" = "true" ]
+    # ...and the allowlist survives (the bug wiped it to null)
+    run jq -c '.repositories.allowlist' "$CFG"
+    [ "$output" = '["/repo/a","/repo/b"]' ]
+    [ -f "$CC_DIR/applied/c6.json" ]
+}
+
+@test "proposed that includes repositories still replaces the allowlist (#386)" {
+    echo '{"repositories":{"allowlist":["/repo/a"]},"notifications":{"dndEnabled":false}}' > "$CFG"
+    _marker "c7.json" '{"id":"c7","source":"portal","actor":"op","ts":"2026-06-09T00:00:00Z","summary":"set allowlist","proposed":{"repositories":{"allowlist":["/repo/x","/repo/y"]}}}'
+    consume_config_changes
+    run jq -c '.repositories.allowlist' "$CFG"
+    [ "$output" = '["/repo/x","/repo/y"]' ]
+    # an unmentioned key (notifications) is still preserved
+    run jq -r '.notifications.dndEnabled' "$CFG"
+    [ "$output" = "false" ]
+}

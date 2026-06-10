@@ -2942,11 +2942,14 @@ handle_phase_failure() {
 # consume_config_changes() -> void
 #   PRD-025 FR-025-05 / #353. Applies portal-originated config-change markers.
 #   The portal writes a marker {id, source:"portal", actor, ts, summary,
-#   proposed:<full user config>} into CONFIG_CHANGES_DIR rather than mutating
-#   CONFIG_FILE directly (FR-925). This validates each marker, atomically
-#   applies `.proposed` to CONFIG_FILE, logs an audit line, and archives the
-#   marker. Invalid markers are moved to a `rejected/` subdir (never applied,
-#   never retried forever). Runs during reconcile. Safe under `set -e`.
+#   proposed:<partial user config>} into CONFIG_CHANGES_DIR rather than mutating
+#   CONFIG_FILE directly (FR-925). This validates each marker, then SHALLOW-
+#   MERGES `.proposed` over the existing CONFIG_FILE (proposed wins per top-level
+#   key; keys absent from proposed are preserved), logs an audit line, and
+#   archives the marker. A partial proposal (e.g. notifications-only) must never
+#   destroy unmentioned keys such as repositories.allowlist (#386). Invalid
+#   markers are moved to a `rejected/` subdir (never applied, never retried
+#   forever). Runs during reconcile. Safe under `set -e`.
 consume_config_changes() {
     [[ -d "${CONFIG_CHANGES_DIR}" ]] || return 0
 
@@ -2977,10 +2980,15 @@ consume_config_changes() {
         actor=$(jq -r '.actor // "unknown"' "${marker}" 2>/dev/null || echo "unknown")
         summary=$(jq -r '.summary // ""' "${marker}" 2>/dev/null || echo "")
 
-        # 2. Apply: atomically write `.proposed` to CONFIG_FILE.
+        # 2. Apply: shallow-merge `.proposed` OVER the existing config, then write
+        # atomically. Proposed wins per top-level key; keys absent from proposed
+        # (e.g. repositories.allowlist) are preserved -- a partial proposal must
+        # not destroy unmentioned config (#386). Merge from files (not a shell
+        # arg) so config values can't be interpolated by the shell.
         local cfg_tmp="${CONFIG_FILE}.tmp.$$"
         mkdir -p "$(dirname "${CONFIG_FILE}")" 2>/dev/null || true
-        if jq '.proposed' "${marker}" > "${cfg_tmp}" 2>/dev/null && mv "${cfg_tmp}" "${CONFIG_FILE}"; then
+        [[ -f "${CONFIG_FILE}" ]] || echo '{}' > "${CONFIG_FILE}"
+        if jq -s '.[0] + .[1].proposed' "${CONFIG_FILE}" "${marker}" > "${cfg_tmp}" 2>/dev/null && mv "${cfg_tmp}" "${CONFIG_FILE}"; then
             # 3. Audit (structured log line is the daemon's audit trail) + archive.
             log_info "Applied portal config change ${id} by '${actor}': ${summary}"
             mkdir -p "${applied_dir}"; mv "${marker}" "${applied_dir}/" 2>/dev/null || rm -f "${marker}"
