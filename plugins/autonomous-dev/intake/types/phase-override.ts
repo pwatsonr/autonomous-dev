@@ -102,8 +102,10 @@ export const PHASE_OVERRIDE_MATRIX: Record<RequestType, PhaseOverrideConfig> = {
     phaseTimeouts: { code: 90 },
   },
   [RequestType.HOTFIX]: {
-    skippedPhases: ['prd', 'prd_review', 'plan_review'],
-    enhancedPhases: ['tdd', 'code'],
+    // FR-1102: hotfixes skip the full upfront design (PRD + TDD) to reach code
+    // fast; the fix itself gets extra scrutiny via enhancedPhases.
+    skippedPhases: ['prd', 'prd_review', 'tdd', 'tdd_review'],
+    enhancedPhases: ['code'],
     expeditedReviews: true,
     additionalGates: ['incident_correlation', 'rollback_validation'],
     maxRetries: 5,

@@ -35,7 +35,6 @@ exports[`PHASE_OVERRIDE_MATRIX matches TDD-018 §5.2 1`] = `
       "rollback_validation",
     ],
     "enhancedPhases": [
-      "tdd",
       "code",
     ],
     "expeditedReviews": true,
@@ -48,7 +47,8 @@ exports[`PHASE_OVERRIDE_MATRIX matches TDD-018 §5.2 1`] = `
     "skippedPhases": [
       "prd",
       "prd_review",
-      "plan_review",
+      "tdd",
+      "tdd_review",
     ],
   },
   "infra": {
