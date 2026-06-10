@@ -34,7 +34,9 @@ on:
 
 permissions:
   contents: write       # required by softprops/action-gh-release in SPEC-017-3-02
-  pull-requests: read
+  pull-requests: write  # the reusable budget-gate.yml requests pull-requests:write;
+                        # a called workflow can't exceed the caller's grant, so this
+                        # must be >= write or the whole release file fails at startup.
 
 concurrency:
   group: release-${{ github.ref }}
