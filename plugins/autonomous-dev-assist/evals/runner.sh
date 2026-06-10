@@ -304,7 +304,7 @@ run_troubleshoot_suite() {
 
     # Build the question from scenario + symptoms
     local symptoms_text
-    symptoms_text=$(yq -r ".cases[$i].symptoms | join(\". \")" "$test_file")
+    symptoms_text=$(yq -r ".cases[$i].symptoms // [] | join(\". \")" "$test_file")
     local full_question="I'm experiencing this problem: ${scenario}. Symptoms: ${symptoms_text}"
 
     # Expected criteria -- for troubleshoot we use expected_commands as must_mention
