@@ -145,7 +145,7 @@ This PRD defines that foundation.
 
 | ID     | Requirement                                                                                                                                                           | Priority |
 |--------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| FR-200 | Each request SHALL be tracked by a unique ID in the format `REQ-{YYYYMMDD}-{4-char-hex}` (e.g., `REQ-20260408-a3f1`).                                                 | P0       |
+| FR-200 | Each request SHALL be tracked by a unique ID matching `^REQ-\d{6}$` — a zero-padded monotonic counter (e.g., `REQ-000123`).                                                 | P0       |
 | FR-201 | Each request SHALL have a JSON state file at `{project}/.autonomous-dev/requests/{request-id}/state.json`.                                                             | P0       |
 | FR-202 | The state file SHALL contain at minimum: `id`, `status` (current state), `priority`, `created_at`, `updated_at`, `phase_history` (array of state transitions with timestamps), `current_phase_metadata` (phase-specific data), `error` (if any), `cost_accrued`, `turn_count`, and `escalation_count`. | P0 |
 | FR-203 | The state machine SHALL support the following ordered states: `intake` -> `prd` -> `prd_review` -> `tdd` -> `tdd_review` -> `plan` -> `plan_review` -> `spec` -> `spec_review` -> `code` -> `code_review` -> `integration` -> `deploy` -> `monitor`. | P0 |
@@ -425,12 +425,12 @@ This PRD defines that foundation.
 ```json
 {
   "schema_version": 1,
-  "id": "REQ-20260408-a3f1",
+  "id": "REQ-000123",
   "status": "prd_review",
   "priority": 1,
   "title": "Add dark mode support to dashboard",
   "repository": "/Users/pwatson/codebase/dashboard-app",
-  "branch": "autonomous/REQ-20260408-a3f1",
+  "branch": "autonomous/REQ-000123",
   "created_at": "2026-04-08T09:15:00Z",
   "updated_at": "2026-04-08T10:42:00Z",
   "cost_accrued_usd": 2.47,
