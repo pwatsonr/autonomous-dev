@@ -171,13 +171,13 @@ function buildFallbackKpiTiles(
 }
 
 // Pre-computed HTMX polling trigger (no inline JS).
-// Pinned at 10s by the auto-refresh polling contract test.
+// Pinned at 5s by the auto-refresh polling contract test.
 //
 // Focus-safety: suppress the poll when the keyboard focus is inside
 // #dashboard-body so replacing the subtree doesn't steal focus (WCAG 2.4.3).
 // The [data-paused] check lets operators freeze the feed via the Pause button.
 const DASHBOARD_POLLING_TRIGGER =
-    'every 10s [document.visibilityState === "visible" && !document.activeElement.closest("#dashboard-body") && !document.querySelector("#dashboard-body[data-paused]")]';
+    'every 5s [document.visibilityState === "visible" && !document.activeElement.closest("#dashboard-body") && !document.querySelector("#dashboard-body[data-paused]")]';
 
 /**
  * FR-026-10..15 — Dashboard v3 hero view.
@@ -233,7 +233,7 @@ export const DashboardView: FC<DashboardViewProps> = ({
                     <>
                         {/* Honest freshness label — no fabricated "updated X ago" */}
                         <span class="topbar-refresh-label">
-                            auto-refreshing every 10s
+                            auto-refreshing every 5s
                         </span>
                         {/*
                           * Pause feed toggle — sets data-paused on #dashboard-body.

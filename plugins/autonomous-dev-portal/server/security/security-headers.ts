@@ -8,7 +8,7 @@
 //                                 (NEVER on localhost — would brick dev).
 //   - X-Frame-Options:           DENY (clickjacking)
 //   - X-Content-Type-Options:    nosniff
-//   - Referrer-Policy:           strict-origin-when-cross-origin
+//   - Referrer-Policy:           same-origin
 //   - Permissions-Policy:        camera=(), microphone=(), geolocation=()
 //   - X-Permitted-Cross-Domain-Policies: none
 //   - X-XSS-Protection:          1; mode=block (legacy browsers)
@@ -32,7 +32,7 @@ export interface SecurityHeadersConfig {
     hstsPreload: boolean;
     /** X-Frame-Options value. Default DENY. */
     frameOptions: "DENY" | "SAMEORIGIN";
-    /** Referrer-Policy value. Default strict-origin-when-cross-origin. */
+    /** Referrer-Policy value. Default same-origin. */
     referrerPolicy:
         | "no-referrer"
         | "same-origin"
@@ -55,7 +55,7 @@ export const DEFAULT_SECURITY_HEADERS_CONFIG: SecurityHeadersConfig =
         hstsIncludeSubdomains: true,
         hstsPreload: false,
         frameOptions: "DENY",
-        referrerPolicy: "strict-origin-when-cross-origin",
+        referrerPolicy: "same-origin",
         permissionsPolicy: [
             "camera=()",
             "microphone=()",
