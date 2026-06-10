@@ -27,6 +27,8 @@
  *   3. Extend AdapterMetadata with the new shape
  *   4. Implement the adapter
  */
+
+import type { ChannelType } from '../adapters/adapter_interface';
 export type RequestSource =
   | 'cli'
   | 'claude-app'
@@ -51,6 +53,26 @@ export function isRequestSource(value: unknown): value is RequestSource {
     typeof value === 'string'
     && (REQUEST_SOURCES as readonly string[]).includes(value)
   );
+}
+
+/**
+ * Server-side derivation of the persistence-layer {@link RequestSource} from
+ * the runtime {@link ChannelType} the command arrived on. The source is taken
+ * from the authenticated channel — never from a client-supplied field — so an
+ * adapter cannot misreport its origin (FR-025-17). Maps the underscore runtime
+ * names to the hyphenated persistence names.
+ */
+export function channelTypeToRequestSource(channelType: ChannelType): RequestSource {
+  switch (channelType) {
+    case 'cli':
+      return 'cli';
+    case 'claude_app':
+      return 'claude-app';
+    case 'discord':
+      return 'discord';
+    case 'slack':
+      return 'slack';
+  }
 }
 
 /**

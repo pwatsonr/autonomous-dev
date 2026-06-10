@@ -20,6 +20,7 @@ import {
   REQUEST_SOURCES,
   ValidationError,
   isRequestSource,
+  channelTypeToRequestSource,
   parseAdapterMetadata,
   type AdapterMetadata,
   type RequestSource,
@@ -288,5 +289,22 @@ describe('ValidationError', () => {
     expect(e.name).toBe('ValidationError');
     expect(e).toBeInstanceOf(Error);
     expect(e.message).toBe('test');
+  });
+});
+
+describe('channelTypeToRequestSource (FR-025-17)', () => {
+  test.each([
+    ['cli', 'cli'],
+    ['claude_app', 'claude-app'],
+    ['discord', 'discord'],
+    ['slack', 'slack'],
+  ] as const)('derives source %s -> %s from the channel', (channel, expected) => {
+    expect(channelTypeToRequestSource(channel)).toBe(expected);
+  });
+
+  test('every derived source is a valid RequestSource', () => {
+    for (const ch of ['cli', 'claude_app', 'discord', 'slack'] as const) {
+      expect(isRequestSource(channelTypeToRequestSource(ch))).toBe(true);
+    }
   });
 });
