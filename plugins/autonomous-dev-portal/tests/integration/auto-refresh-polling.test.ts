@@ -40,7 +40,7 @@ interface PolledPage {
 }
 
 const POLLED_PAGES: PolledPage[] = [
-    { path: "/", bodyId: "dashboard-body", intervalSeconds: 10 },
+    { path: "/", bodyId: "dashboard-body", intervalSeconds: 5 },
     { path: "/approvals", bodyId: "approvals-body", intervalSeconds: 10 },
     { path: "/requests", bodyId: "requests-body", intervalSeconds: 10 },
     { path: "/costs", bodyId: "costs-body", intervalSeconds: 10 },
