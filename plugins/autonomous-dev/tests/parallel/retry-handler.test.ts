@@ -120,8 +120,8 @@ describe('RetryHandler', () => {
     config = loadConfig({
       worktree_root: worktreeDir,
       max_worktrees: 5,
-      disk_warning_threshold_gb: 5,
-      disk_hard_limit_gb: 2,
+      disk_warning_threshold_gb: 2,
+      disk_hard_limit_gb: 5,
     });
 
     worktreeManager = new WorktreeManager(config, repoRoot, emitter);
