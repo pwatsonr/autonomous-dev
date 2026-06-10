@@ -32,7 +32,7 @@ import {
   type EffectivenessRunSummary,
   type GovernanceFlags,
 } from './governance-integration';
-import type { DeploymentInfo, PrometheusClient } from '../governance/types';
+import type { DeploymentInfo, FixDeployment, PrometheusClient } from '../governance/types';
 import {
   validateConnectivity,
   type ConnectivityResult,
@@ -217,7 +217,11 @@ export type HealthCheckProviderFn = (
  * Function type for reading deployment metadata by deployment ID.
  * Used by effectiveness evaluations (SPEC-007-5-3).
  */
-export type ReadDeploymentMetadataFn = (id: string) => DeploymentInfo | null;
+// Returns the full FixDeployment (id, deployed_at, observation_id, service,
+// error_class) so cooldown's findRecentFixDeployment can resolve linked
+// deployments. Effectiveness only reads id/deployed_at (a structural subset),
+// so a FixDeployment-returning reader satisfies it too.
+export type ReadDeploymentMetadataFn = (id: string) => FixDeployment | null;
 
 /**
  * Function type for providing a Prometheus client.
