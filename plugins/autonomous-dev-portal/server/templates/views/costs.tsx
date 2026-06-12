@@ -20,7 +20,7 @@ import type { CostSeries, RenderProps } from "../../types/render";
 
 // Pre-computed hx-trigger value - using double quotes inside bracket expression
 const COSTS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
-import { CostChart } from "../fragments/cost-chart";
+import { CostChartWithAxis } from "../fragments/cost-chart";
 import { CostProjection } from "../fragments/cost-projection";
 import { EmptyState } from "../fragments/empty-state";
 import { KpiStrip } from "../fragments/kpi-strip";
@@ -133,7 +133,7 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                     <h2>Daily spend · last 30 days</h2>
                 </div>
                 <div class="chart-card">
-                    <CostChart
+                    <CostChartWithAxis
                         points={series.points}
                         budgetUsd={series.budgetUsd}
                     />
@@ -160,7 +160,6 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                 <section class="sec">
                     <div class="sec-head">
                         <h2>Spend by reviewer</h2>
-                        <span class="meta-mono dim">PRD-012</span>
                     </div>
                     {reviewerSpend.length > 0 ? (
                         <table class="tbl tight reviewer-spend">
@@ -216,7 +215,6 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
             <section class="sec">
                 <div class="sec-head">
                     <h2>Spend by deploy backend</h2>
-                    <span class="meta-mono dim">PRD-014</span>
                 </div>
                 {deploySpend.length > 0 ? (
                     <table class="tbl deploy-spend">

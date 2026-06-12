@@ -354,3 +354,36 @@
     color: var(--fg-3);
     font-size: var(--t-meta);
 }
+
+/* ---------- Cost chart axis context (crawl p5) ---------- */
+.chart-wrap {
+    position: relative;
+}
+
+.chart-ymax {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: var(--t-nano);
+}
+
+/* ---------- Key/value definition rows (.kv) ---------- */
+.kv {
+    display: grid;
+    grid-template-columns: max-content max-content;
+    column-gap: var(--s-4);
+    row-gap: var(--s-1);
+    align-items: baseline;
+    margin: 0;
+}
+
+.kv dt {
+    color: var(--fg-3);
+    font-size: var(--t-label);
+}
+
+.kv dd {
+    margin: 0;
+    color: var(--fg-1);
+    font-size: var(--t-meta);
+}
