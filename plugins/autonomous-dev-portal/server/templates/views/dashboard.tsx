@@ -62,8 +62,10 @@ export interface DashboardV3Extra {
         inFlightSub: string;
         burnRatePerHr: number;
         burnRateMtd: number;
-        burnRateCap: number;
-        passRatePct: number;
+        /** Configured monthly cap; null = no cap configured (#389: never invent one). */
+        burnRateCap: number | null;
+        /** Gate pass rate; null = no outcome-history source exists yet (#389). */
+        passRatePct: number | null;
         passRatePending: number;
         queueCount: number;
         queueOldestMin: number;
@@ -83,7 +85,7 @@ export interface DashboardViewProps {
 // KPI tile builder — converts v3 KPI data into DashboardKpiTile[]
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildV3KpiTiles(extra: DashboardV3Extra): DashboardKpiTile[] {
+export function buildV3KpiTiles(extra: DashboardV3Extra): DashboardKpiTile[] {
     const { kpi, sparks } = extra;
 
     // Honesty over fidelity: never show fabricated deltas/comparisons.
@@ -104,15 +106,21 @@ function buildV3KpiTiles(extra: DashboardV3Extra): DashboardKpiTile[] {
             value: `$${kpi.burnRatePerHr.toFixed(2)}`,
             unit: "/hr",
             valueTone: kpi.burnRatePerHr < 5 ? "kpi-ok" : kpi.burnRatePerHr < 10 ? undefined : "kpi-warn",
-            sub: `MTD $${kpi.burnRateMtd.toFixed(2)} / $${kpi.burnRateCap.toFixed(2)}`,
+            // #389: only claim a cap when one is actually configured.
+            sub: kpi.burnRateCap !== null
+                ? `MTD $${kpi.burnRateMtd.toFixed(2)} / $${kpi.burnRateCap.toFixed(2)}`
+                : `MTD $${kpi.burnRateMtd.toFixed(2)} — no cap configured`,
             sparkPoints: sparks.burnRate,
             sparkTone: "ok",
         },
         {
             label: "Gate pass rate",
-            value: `${kpi.passRatePct.toFixed(1)}`,
-            unit: "%",
-            sub: `${kpi.passRatePending} pending review`,
+            // #389: no outcome-history source exists — show "—", never 94.2.
+            value: kpi.passRatePct !== null ? `${kpi.passRatePct.toFixed(1)}` : "—",
+            unit: kpi.passRatePct !== null ? "%" : undefined,
+            sub: kpi.passRatePct !== null
+                ? `${kpi.passRatePending} pending review`
+                : "no data source yet",
             sparkPoints: sparks.passRate,
             sparkTone: "ok",
         },
@@ -120,8 +128,9 @@ function buildV3KpiTiles(extra: DashboardV3Extra): DashboardKpiTile[] {
             label: "Approvals queue",
             value: String(kpi.queueCount),
             valueTone: kpi.queueCount > 0 ? "kpi-warn" : undefined,
+            // #389: no SLA is configured anywhere — don't invent one.
             sub: kpi.queueOldestMin > 0
-                ? `oldest ${Math.floor(kpi.queueOldestMin / 60)}h ${kpi.queueOldestMin % 60}m · SLA: < 4h`
+                ? `oldest ${Math.floor(kpi.queueOldestMin / 60)}h ${kpi.queueOldestMin % 60}m`
                 : "clear",
             sparkPoints: sparks.queue,
             sparkTone: "warn",
@@ -353,7 +362,7 @@ export const DashboardView: FC<DashboardViewProps> = ({
                     {v3 != null ? (
                         <DashboardAgentsMini
                             agents={v3.agents}
-                            totalAgents={18}
+                            totalAgents={v3.agents.length}
                         />
                     ) : (
                         <div class="card">

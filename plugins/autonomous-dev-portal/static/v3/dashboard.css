@@ -288,6 +288,8 @@
 .seg.seg-plan    { background: var(--phase-plan); }
 .seg.seg-spec    { background: var(--phase-spec); }
 .seg.seg-code    { background: var(--phase-code); }
+/* #389: single-tone bar when the ledger has no per-phase attribution */
+.seg.seg-unattributed { background: var(--accent, #6b7280); opacity: 0.75; }
 .seg.seg-review  { background: var(--phase-review); }
 .seg.seg-deploy  { background: var(--phase-deploy); }
 .seg.seg-observe { background: var(--phase-observe); }
@@ -303,6 +305,7 @@
 .cost-legend-swatch.swatch-plan    { background: var(--phase-plan); }
 .cost-legend-swatch.swatch-spec    { background: var(--phase-spec); }
 .cost-legend-swatch.swatch-code    { background: var(--phase-code); }
+.cost-legend-swatch.swatch-unattributed { background: var(--accent, #6b7280); opacity: 0.75; }
 .cost-legend-swatch.swatch-review  { background: var(--phase-review); }
 .cost-legend-swatch.swatch-deploy  { background: var(--phase-deploy); }
 .cost-legend-swatch.swatch-observe { background: var(--phase-observe); }

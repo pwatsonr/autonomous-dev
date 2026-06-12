@@ -26,9 +26,29 @@ export interface DashboardAgentsMiniProps {
  */
 export const DashboardAgentsMini: FC<DashboardAgentsMiniProps> = ({
     agents,
-    totalAgents = 18,
+    totalAgents = 0, // #389: never default to an invented fleet size
 }) => {
     const top9 = agents.slice(0, 9);
+    // #389: no per-agent utilization source exists yet — honest empty state
+    // instead of nine fabricated agents with fake util/runs/p50/MTD.
+    if (top9.length === 0) {
+        return (
+            <div class="card">
+                <div class="card-h">
+                    <h3>Agents</h3>
+                    <span class="spacer"></span>
+                    <a href="/agents" class="btn ghost sm">
+                        All agents →
+                    </a>
+                </div>
+                <p class="empty dim">
+                    No agent utilization data yet — the daemon does not
+                    record per-agent runs. Frozen/shadowed state lives on
+                    the Agents page.
+                </p>
+            </div>
+        );
+    }
     return (
         <div class="card">
             <div class="card-h">
