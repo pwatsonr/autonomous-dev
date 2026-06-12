@@ -61,8 +61,12 @@ export function computeRequestsAggregates(
             inGateCount++;
         } else if (r.status === "done") {
             if (isWithin24h(r.completedAt, now)) completedTodayCount++;
+        } else if (r.status === "failed" || r.status === "cancelled") {
+            // Terminal non-success states are NOT active. The old `else`
+            // counted them, so a board of corpses showed "Active 7" while
+            // the daemon was idle (visual crawl, page 2).
         } else {
-            // Anything that isn't a terminal state is "active".
+            // queued | running
             activeCount++;
         }
     }

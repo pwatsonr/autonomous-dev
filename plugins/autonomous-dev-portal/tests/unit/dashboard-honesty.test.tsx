@@ -133,3 +133,33 @@ describe("KPI tiles honesty (#389)", () => {
         expect(q.sub).not.toContain("SLA");
     });
 });
+
+// Page-2 crawl regression (#421-class) — the requests view must render
+// the FULL status union; failed/cancelled used to show as green RUNNING
+// and count as "Active".
+import { RequestsView } from "../../server/templates/views/requests";
+
+describe("requests view lifecycle honesty", () => {
+    const row = (id: string, status: string) => ({
+        id, repo: "r", title: "t", phase: "code", status,
+        cost: 1, turns: 0, score: 0, variant: "",
+    });
+
+    test("failed and cancelled render their own chips, never RUNNING", async () => {
+        const html = await render(RequestsView({
+            items: [row("REQ-1", "failed"), row("REQ-2", "cancelled")] as any,
+            aggregates: { activeCount: 0, inGateCount: 0, completedTodayCount: 0, totalCostMtdUsd: 0, repoCount: 1 } as any,
+        } as any));
+        expect(html).toContain("FAILED");
+        expect(html).toContain("CANCELLED");
+        expect(html).not.toContain(">RUNNING<");
+    });
+
+    test("terminal rows carry the completed filter token", async () => {
+        const html = await render(RequestsView({
+            items: [row("REQ-1", "failed")] as any,
+            aggregates: { activeCount: 0, inGateCount: 0, completedTodayCount: 0, totalCostMtdUsd: 0, repoCount: 1 } as any,
+        } as any));
+        expect(html).toMatch(/data-gate-type="done"/);
+    });
+});

@@ -100,7 +100,15 @@ export function buildRequestsKpiItems(
  */
 function filterTokenFor(r: DashboardRequest): "gate" | "done" | "active" {
     if (r.status === "gate") return "gate";
-    if (r.status === "done") return "done";
+    // Terminal states (done/failed/cancelled) bucket under the
+    // "Completed" filter; only queued/running are "active".
+    if (
+        r.status === "done" ||
+        r.status === "failed" ||
+        r.status === "cancelled"
+    ) {
+        return "done";
+    }
     return "active";
 }
 
@@ -123,8 +131,10 @@ function ageLabel(createdAt: string | undefined, now: number): string {
 }
 
 /**
- * Status-cell renderer for the requests table. Three branches: gate
- * (warn), done (muted), running (ok). UPPERCASE per R-10 (kit rule).
+ * Status-cell renderer for the requests table. UPPERCASE per R-10.
+ * Covers the FULL lifecycle union — the old three-branch version mapped
+ * failed/cancelled to a green RUNNING chip, so a page of dead requests
+ * looked like a busy pipeline (visual crawl, page 2).
  */
 const StatusCell: FC<{ r: DashboardRequest }> = ({ r }) => {
     if (r.status === "gate") {
@@ -138,6 +148,27 @@ const StatusCell: FC<{ r: DashboardRequest }> = ({ r }) => {
         return (
             <Chip variant="status" tone="muted">
                 DONE
+            </Chip>
+        );
+    }
+    if (r.status === "failed") {
+        return (
+            <Chip variant="status" tone="err">
+                FAILED
+            </Chip>
+        );
+    }
+    if (r.status === "cancelled") {
+        return (
+            <Chip variant="status" tone="muted">
+                CANCELLED
+            </Chip>
+        );
+    }
+    if (r.status === "queued") {
+        return (
+            <Chip variant="status" tone="muted">
+                QUEUED
             </Chip>
         );
     }
@@ -257,9 +288,15 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
                                     </td>
                                     <td>{r.repo}</td>
                                     <td>
-                                        <Chip variant="status" tone="muted">
-                                            {r.variantLabel ?? r.variant}
-                                        </Chip>
+                                        {/* No variant recorded → plain dash,
+                                            not an empty capsule glyph. */}
+                                        {(r.variantLabel ?? r.variant) ? (
+                                            <Chip variant="status" tone="muted">
+                                                {r.variantLabel ?? r.variant}
+                                            </Chip>
+                                        ) : (
+                                            <span class="dim">—</span>
+                                        )}
                                     </td>
                                     <td>
                                         <Chip
