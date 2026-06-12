@@ -182,6 +182,7 @@ export async function renderFullPage<V extends ViewName>(
     cspNonce: string = "",
     theme: Theme = "dark",
     shellState?: ShellRailState,
+    csrfToken: string = "",
 ): Promise<string> {
     const body = renderViewBody(view, props);
     // SPEC-037-3-05 AC-01/02 — derive once when not supplied. The helper
@@ -195,6 +196,7 @@ export async function renderFullPage<V extends ViewName>(
             activePath={activeOverride ?? activePathFor(view)}
             cspNonce={cspNonce}
             theme={theme}
+            csrfToken={csrfToken}
             {...resolvedShellState}
         >
             {body}
@@ -247,6 +249,7 @@ export async function renderViewToContext<V extends ViewName>(
               c.get("cspNonce") ?? "",
               getThemeFromCookie(c),
               ctxShellState,
+              (c.get("csrfToken") as string | undefined) ?? "",
           );
     // Cast to ContentfulStatusCode-compatible literal union.
     return c.html(

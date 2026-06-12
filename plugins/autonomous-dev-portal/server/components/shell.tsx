@@ -76,6 +76,11 @@ export interface ShellProps {
     theme?: Theme;
     /** SPEC-014-2-04 — per-request CSP nonce. Empty string disables (tests). */
     cspNonce?: string;
+    /** Per-request CSRF token; emitted as `<meta name="csrf-token">` so the
+     *  global htmx hook (static/csrf-htmx.js) can attach X-CSRF-Token to
+     *  EVERY htmx request — per-button hx-include of `_csrf` repeatedly
+     *  missed controls (#391, rd-v3, the notification test buttons). */
+    csrfToken?: string;
     /**
      * Optional override for the modal slot. When omitted, an empty
      * `<div id="modal-slot">` is rendered as the HTMX swap target.
@@ -204,6 +209,7 @@ export const ShellLayout: FC<ShellProps> = ({
     activePath,
     theme = "dark",
     cspNonce,
+    csrfToken = "",
     modalSlotContent,
     pageTitle,
     headActions,
@@ -258,6 +264,13 @@ export const ShellLayout: FC<ShellProps> = ({
                     content="width=device-width, initial-scale=1"
                 />
                 <title>autonomous-dev portal</title>
+                {/* Per-request CSRF token for the global htmx header hook.
+                    Meta content is not submitted by forms and not readable
+                    cross-origin; the enforcer's canonical input is the
+                    X-CSRF-Token header csrf-htmx.js sets from this tag. */}
+                {csrfToken.length > 0 && (
+                    <meta name="csrf-token" content={csrfToken} />
+                )}
                 {/* PLAN-038 TASK-001 — SVG favicon points at the kit's mark.
                     Served from /static/favicon.svg (copy of mark.svg). */}
                 <link
@@ -309,6 +322,14 @@ export const ShellLayout: FC<ShellProps> = ({
                     them by default, leaving actions silently dead). */}
                 <script
                     src="/static/htmx-error-feedback.js"
+                    defer
+                    nonce={nonce}
+                ></script>
+                {/* Global CSRF header injection for every htmx request —
+                    reads the csrf-token meta above. Fixes the recurring
+                    missed-hx-include class (notification Test buttons etc.). */}
+                <script
+                    src="/static/csrf-htmx.js"
                     defer
                     nonce={nonce}
                 ></script>

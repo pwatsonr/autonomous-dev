@@ -62,6 +62,8 @@ export async function renderPage<V extends ViewName>(
               undefined,
               c.get("cspNonce") ?? "",
               getThemeFromCookie(c),
+              undefined,
+              (c.get("csrfToken") as string | undefined) ?? "",
           );
     return c.html(html, 200);
 }
@@ -84,6 +86,8 @@ export async function notFound(c: Context): Promise<Response> {
               undefined,
               c.get("cspNonce") ?? "",
               getThemeFromCookie(c),
+              undefined,
+              (c.get("csrfToken") as string | undefined) ?? "",
           );
     return c.html(html, 404);
 }
