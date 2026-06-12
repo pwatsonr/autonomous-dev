@@ -2956,9 +2956,25 @@ consume_config_changes() {
     local applied_dir="${CONFIG_CHANGES_DIR}/applied"
     local rejected_dir="${CONFIG_CHANGES_DIR}/rejected"
     local applied_count=0
+
+    # Apply in CHRONOLOGICAL (.ts) order, not glob/filename order. Marker
+    # filenames are random UUIDs, so glob order is arbitrary — two pending
+    # saves could apply newest-first and the older one would clobber the
+    # newer (observed live: a webhook save reversed by an earlier save).
+    # Markers with no parseable ts sort first (empty key) and still get
+    # the corrupt-marker rejection below.
+    local marker_list
+    marker_list=$(
+        for m in "${CONFIG_CHANGES_DIR}"/*.json; do
+            [[ -f "$m" ]] || continue
+            printf '%s\t%s\n' "$(jq -r '.ts // ""' "$m" 2>/dev/null)" "$m"
+        done | sort | cut -f2-
+    )
+    [[ -z "${marker_list}" ]] && return 0
+
     local marker
-    for marker in "${CONFIG_CHANGES_DIR}"/*.json; do
-        [[ -f "${marker}" ]] || continue   # literal glob when no markers present
+    while IFS= read -r marker; do
+        [[ -f "${marker}" ]] || continue   # removed mid-loop
 
         # 1. Validate: parseable JSON, source=="portal", .proposed is an object.
         if ! jq empty "${marker}" 2>/dev/null; then
@@ -2997,7 +3013,7 @@ consume_config_changes() {
             rm -f "${cfg_tmp}" 2>/dev/null || true
             log_warn "Failed to apply config-change marker ${id}; leaving for retry: ${marker}"
         fi
-    done
+    done <<< "${marker_list}"
 
     # Reload so applied changes take effect this run (poll interval, caps, etc.).
     if [[ ${applied_count} -gt 0 ]]; then

@@ -90,3 +90,17 @@ _marker() { # $1=file $2=json
     run jq -r '.notifications.dndEnabled' "$CFG"
     [ "$output" = "false" ]
 }
+
+# --- apply ORDER: chronological by .ts, never filename/glob order ----------
+
+@test "markers apply in ts order — newer save wins over older despite filenames (#chrono)" {
+    # Filename order (aaa < zzz) is the REVERSE of ts order here.
+    _marker "aaa-newer.json" '{"id":"n1","source":"portal","actor":"op","ts":"2026-06-12T15:20:00Z","summary":"newer","proposed":{"notifications":{"delivery":{"discord":{"webhook_url":"https://discord.com/api/webhooks/1/NEW"}}}}}'
+    _marker "zzz-older.json" '{"id":"o1","source":"portal","actor":"op","ts":"2026-06-12T15:14:00Z","summary":"older","proposed":{"notifications":{"delivery":{"discord":{"webhook_url":""}},"dndEnabled":true}}}'
+    consume_config_changes
+    # newer (15:20) must apply LAST → webhook present
+    run jq -r '.notifications.delivery.discord.webhook_url' "$CFG"
+    [ "$output" = "https://discord.com/api/webhooks/1/NEW" ]
+    [ -f "$CC_DIR/applied/aaa-newer.json" ]
+    [ -f "$CC_DIR/applied/zzz-older.json" ]
+}
