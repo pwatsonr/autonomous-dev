@@ -62,9 +62,9 @@ export const ReposView: FC<RenderProps["repos"]> = ({ kpis, repos }) => (
                 <div class="kpi-sub">with running requests</div>
             </div>
             <div class="kpi">
-                <div class="kpi-label">Allowlist misses</div>
-                <div class="kpi-num">{kpis.allowlistMisses}</div>
-                <div class="kpi-sub">paths not resolvable</div>
+                <div class="kpi-label">Not in allowlist</div>
+                <div class="kpi-num">{kpis.notInAllowlist}</div>
+                <div class="kpi-sub">seen in request history</div>
             </div>
         </div>
 

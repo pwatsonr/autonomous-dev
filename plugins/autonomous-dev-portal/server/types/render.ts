@@ -816,7 +816,10 @@ export interface ReposPageData {
         /** Repos with at least one RUNNING or GATE request. */
         activeRepos: number;
         /** Allowlist entries whose path does not resolve on disk. */
-        allowlistMisses: number;
+        /** Repos seen in request history that are NOT allowlisted
+         *  (matches the table badges). Replaces `allowlistMisses`,
+         *  which was hardcoded 0 (crawl p7). */
+        notInAllowlist: number;
     };
     /** Full repo list, not truncated (the dashboard repos grid pulls a
      *  subset; the `/repos` surface always shows everything). */

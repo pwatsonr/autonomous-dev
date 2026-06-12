@@ -50,10 +50,12 @@ export async function readReposData(
     }
 
     const activeRepos = repos.filter((r) => r.activeRequests > 0).length;
-    // `allowlistMisses` would need fs.access() per path — out of scope for
-    // this composition (would block on disk I/O). Defaulting to 0; future
-    // work can add an optional probe.
-    const allowlistMisses = 0;
+    // Crawl p7: the old `allowlistMisses` KPI was HARDCODED 0 (the
+    // fs.access probe was never built) while the table visibly badged
+    // rows NOT IN ALLOWLIST — a constant posing as a metric, directly
+    // contradicting the UI below it. Count the real, derivable fact
+    // instead: repos seen in request history that aren't allowlisted.
+    const notInAllowlist = repos.filter((r) => r.inAllowlist !== true).length;
 
     return {
         kpis: {
@@ -62,7 +64,7 @@ export async function readReposData(
             // historical repos).
             totalRepos: settings.allowlist.length,
             activeRepos,
-            allowlistMisses,
+            notInAllowlist,
         },
         repos,
     };
