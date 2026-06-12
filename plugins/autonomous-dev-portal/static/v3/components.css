@@ -387,3 +387,13 @@
     color: var(--fg-1);
     font-size: var(--t-meta);
 }
+
+/* Agents lifecycle reference (crawl p8 — glossary moved below table) */
+.agents-lifecycle-ref {
+    padding: var(--s-4);
+}
+
+.agents-lifecycle-ref dt {
+    font-size: var(--t-label);
+    letter-spacing: 0.04em;
+}

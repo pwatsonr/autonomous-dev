@@ -59,18 +59,14 @@ export const agentsInspectModalHandler = async (
     const agent = data.agents.find((a) => a.name === name);
     if (agent === undefined) {
         return c.html(
-            <div class="modal-bg" data-modal-backdrop>
+            <div class="modal-bg" data-modal-overlay>
                 <div class="modal">
                     <h3>Agent not found</h3>
                     <p>
                         No agent named <code>{name}</code> in the manifest.
                     </p>
                     <div class="modal-actions">
-                        <button
-                            type="button"
-                            class="btn"
-                            onclick="document.getElementById('modal-slot').innerHTML=''"
-                        >
+                        <button type="button" class="btn" data-modal-close>
                             Close
                         </button>
                     </div>
@@ -82,18 +78,13 @@ export const agentsInspectModalHandler = async (
     const isFrozen = agent.status === "frozen";
     const isShadow = agent.status === "shadow";
     const isBaseline = agent.status === "baseline";
-    // Close-and-reload: dismissing the modal also refreshes the page so
-    // the underlying agents table reflects any state change made via the
-    // modal actions. Full reload is simple and reliable; the page is
-    // fast (sub-30ms cold reader path per AC-3715).
-    const close =
-        "document.getElementById('modal-slot').innerHTML='';location.reload()";
+    // CSP is strict (no inline handlers, no eval): dismissal goes through
+    // static/js/modal-overlay.js — backdrop carries data-modal-overlay,
+    // close/action buttons carry data-modal-close. Action buttons swap
+    // the agent's table row in place (the POST endpoints return a row
+    // fragment), so no page reload is needed.
     return c.html(
-        <div
-            class="modal-bg"
-            data-modal-backdrop
-            onclick={`if(event.target===this){${close}}`}
-        >
+        <div class="modal-bg" data-modal-overlay>
             <div class="modal" role="dialog" aria-labelledby="inspect-modal-title">
                 <h3 id="inspect-modal-title">
                     {agent.name}
@@ -104,8 +95,6 @@ export const agentsInspectModalHandler = async (
                 <dl class="stats-grid">
                     <dt>Version</dt>
                     <dd class="mono">{agent.version}</dd>
-                    <dt>Mode</dt>
-                    <dd>{agent.mode}</dd>
                     <dt>Last dispatch</dt>
                     <dd class="mono">{agent.lastDispatchAt ?? "—"}</dd>
                     <dt>Runs (30d)</dt>
@@ -121,20 +110,27 @@ export const agentsInspectModalHandler = async (
                             : "—"}
                     </dd>
                 </dl>
-                <p style="margin-top:14px;color:var(--fg-2);font-size:12px;">
+                <p class="modal-help">
                     Daemon does not currently track per-agent dispatch
                     history, run count, or false-positive rate. Those
                     fields render <code>—</code> until the daemon emits
                     them.
                 </p>
+                {/* CSP-safe actions (crawl p8): the old hx-on reload
+                    chains and inline onclick were dead under strict CSP —
+                    Close did nothing and actions never refreshed the UI.
+                    Each action now swaps its agent's TABLE ROW in place
+                    (the POST endpoints return a row fragment) and closes
+                    the modal via modal-overlay.js's data-modal-close. */}
                 <div class="modal-actions">
                     {isShadow ? (
                         <button
                             type="button"
                             class="btn"
                             hx-post={`/api/agents/${agent.name}/unshadow`}
-                            hx-swap="none"
-                            hx-on={`htmx:afterRequest: if(event.detail.successful){htmx.ajax('GET','/agents/${agent.name}/inspect-modal','#modal-slot')}`}
+                            hx-target={`tr[data-agent="${agent.name}"]`}
+                            hx-swap="outerHTML"
+                            data-modal-close
                             title="Stop shadowing and return to baseline"
                         >
                             Unshadow
@@ -145,8 +141,9 @@ export const agentsInspectModalHandler = async (
                             class="btn"
                             disabled={isFrozen}
                             hx-post={`/api/agents/${agent.name}/shadow`}
-                            hx-swap="none"
-                            hx-on={`htmx:afterRequest: if(event.detail.successful){htmx.ajax('GET','/agents/${agent.name}/inspect-modal','#modal-slot')}`}
+                            hx-target={`tr[data-agent="${agent.name}"]`}
+                            hx-swap="outerHTML"
+                            data-modal-close
                             title="Run in parallel for evaluation only — output does not affect gates"
                         >
                             Shadow
@@ -157,8 +154,9 @@ export const agentsInspectModalHandler = async (
                             type="button"
                             class="btn"
                             hx-post={`/api/agents/${agent.name}/unfreeze`}
-                            hx-swap="none"
-                            hx-on={`htmx:afterRequest: if(event.detail.successful){htmx.ajax('GET','/agents/${agent.name}/inspect-modal','#modal-slot')}`}
+                            hx-target={`tr[data-agent="${agent.name}"]`}
+                            hx-swap="outerHTML"
+                            data-modal-close
                             title="Allow auto-upgrade again"
                         >
                             Unfreeze
@@ -168,8 +166,9 @@ export const agentsInspectModalHandler = async (
                             type="button"
                             class="btn destructive"
                             hx-post={`/api/agents/${agent.name}/freeze`}
-                            hx-swap="none"
-                            hx-on={`htmx:afterRequest: if(event.detail.successful){htmx.ajax('GET','/agents/${agent.name}/inspect-modal','#modal-slot')}`}
+                            hx-target={`tr[data-agent="${agent.name}"]`}
+                            hx-swap="outerHTML"
+                            data-modal-close
                             title="Pin at current version — daemon will not auto-upgrade"
                         >
                             Freeze
@@ -180,17 +179,14 @@ export const agentsInspectModalHandler = async (
                         class="btn primary"
                         disabled={isBaseline}
                         hx-post={`/api/agents/${agent.name}/promote?version=${agent.version}`}
-                        hx-target="#modal-slot"
-                        hx-swap="innerHTML"
+                        hx-target={`tr[data-agent="${agent.name}"]`}
+                        hx-swap="outerHTML"
+                        data-modal-close
                         title="Promote shadow agent to baseline traffic"
                     >
                         Promote
                     </button>
-                    <button
-                        type="button"
-                        class="btn ghost"
-                        onclick={close}
-                    >
+                    <button type="button" class="btn ghost" data-modal-close>
                         Close
                     </button>
                 </div>

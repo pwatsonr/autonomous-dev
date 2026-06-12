@@ -316,6 +316,14 @@ export const ShellLayout: FC<ShellProps> = ({
                 {/* SPEC-037-4-02 — Approvals segmented filter; pure DOM
                     module that self-attaches on DOMContentLoaded and
                     on htmx:afterSwap so OOB swaps re-bind cleanly. */}
+                {/* crawl p8: modal-overlay.js existed but was loaded by
+                    NO page — modals had no working dismissal under strict
+                    CSP (inline onclick is dead). Global like the filter. */}
+                <script
+                    src={asset("/static/js/modal-overlay.js")}
+                    defer
+                    nonce={cspNonce}
+                ></script>
                 <script
                     src={asset("/static/js/segmented-filter.js")}
                     defer
