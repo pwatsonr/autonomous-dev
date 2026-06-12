@@ -145,7 +145,11 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                 <div class="sec-head">
                     <h2>Month-end projection</h2>
                 </div>
-                <CostProjection projection={proj} cap={cap} mtd={mtd} />
+                <div class="card">
+                    <div class="card-b">
+                        <CostProjection projection={proj} cap={cap} mtd={mtd} />
+                    </div>
+                </div>
             </section>
 
             {/* Region 5: 2-col grid — phase spend + reviewer spend */}
@@ -154,13 +158,16 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                     <div class="sec-head">
                         <h2>Spend by phase</h2>
                     </div>
-                    <PhaseSpendTable rows={phaseSpend} />
+                    <div class="card">
+                        <PhaseSpendTable rows={phaseSpend} />
+                    </div>
                 </section>
 
                 <section class="sec">
                     <div class="sec-head">
                         <h2>Spend by reviewer</h2>
                     </div>
+                    <div class="card">
                     {reviewerSpend.length > 0 ? (
                         <table class="tbl tight reviewer-spend">
                             <thead>
@@ -208,6 +215,7 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                     ) : (
                         <EmptyState noun="reviewer spend" />
                     )}
+                    </div>
                 </section>
             </div>
 
@@ -216,6 +224,7 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                 <div class="sec-head">
                     <h2>Spend by deploy backend</h2>
                 </div>
+                <div class="card">
                 {deploySpend.length > 0 ? (
                     <table class="tbl deploy-spend">
                         <thead>
@@ -269,6 +278,7 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                 ) : (
                     <EmptyState noun="deploy spend" />
                 )}
+                </div>
             </section>
             </div>
         </div>
