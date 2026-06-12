@@ -186,7 +186,12 @@ describe("BUG-1 regression test — settings persist properly", () => {
         expect(loadRes.status).toBe(200);
         const loadHtml = await loadRes.text();
 
-        expect(loadHtml).toMatch(/name="discordWebhook"[^>]*value="https:\/\/discord\.com\/api\/webhooks\/test"/);
+        // #392: the saved webhook must NEVER round-trip into the page. The
+        // persisted state is conveyed by the masked placeholder; the input
+        // value stays empty (empty submit preserves, Clear removes).
+        expect(loadHtml).not.toContain("https://discord.com/api/webhooks/test");
+        expect(loadHtml).toMatch(/name="discordWebhook"[^>]*value=""/);
+        expect(loadHtml).toContain("configured — ends …test");
         expect(loadHtml).toMatch(/name="dndEnabled"[^>]*checked/);
         expect(loadHtml).toMatch(/name="dndStart"[^>]*value="22:00"/);
         expect(loadHtml).toMatch(/name="dndEnd"[^>]*value="08:00"/);

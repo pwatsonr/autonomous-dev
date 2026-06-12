@@ -49,6 +49,7 @@ function buildSummary(days: DayCostBar[]): { grandTotal: number; topPhase: Phase
     const phaseTotals: Record<string, number> = {};
     for (const d of days) {
         grandTotal += d.total;
+        if (d.segs === null) continue; // #389: no per-phase attribution
         for (const pk of PHASE_KEYS) {
             phaseTotals[pk] = (phaseTotals[pk] ?? 0) + (d.segs[pk] ?? 0);
         }
@@ -75,9 +76,15 @@ function buildSummary(days: DayCostBar[]): { grandTotal: number; topPhase: Phase
 export const DashboardCostBars: FC<DashboardCostBarsProps> = ({ days }) => {
     const maxTotal = Math.max(...days.map((d) => d.total), 1);
     const { grandTotal, topPhase, topTotal } = buildSummary(days);
+    // #389: the ledger records per-request sessions, not phases — only
+    // claim a phase split when the data actually carries one.
+    const hasPhaseData = days.some((d) => d.segs !== null);
 
-    const figureLabel = `Cost by phase over 14 days: total $${grandTotal.toFixed(2)}, ` +
-        `top phase ${PHASE_LABELS[topPhase].toLowerCase()} at $${topTotal.toFixed(2)}`;
+    const figureLabel = hasPhaseData
+        ? `Cost by phase over 14 days: total $${grandTotal.toFixed(2)}, ` +
+          `top phase ${PHASE_LABELS[topPhase].toLowerCase()} at $${topTotal.toFixed(2)}`
+        : `Daily cost over 14 days from the cost ledger: total $${grandTotal.toFixed(2)} ` +
+          `(per-phase attribution not recorded)`;
 
     return (
         <div class="card">
@@ -101,20 +108,28 @@ export const DashboardCostBars: FC<DashboardCostBarsProps> = ({ days }) => {
                                     style={`--bar-h:${barHeightPct}%`}
                                     title={`Day ${i + 1}: $${d.total.toFixed(2)}`}
                                 >
-                                    {PHASE_KEYS.map((pk: PhaseKey) => {
-                                        const segVal = d.segs[pk];
-                                        const segHeightPct = Math.round(
-                                            (segVal / Math.max(d.total, 0.01)) * 100,
-                                        );
-                                        return (
-                                            <span
-                                                key={pk}
-                                                class={`seg seg-${pk}`}
-                                                style={`--seg-h:${segHeightPct}%`}
-                                                title={`${PHASE_LABELS[pk]}: $${segVal.toFixed(2)}`}
-                                            ></span>
-                                        );
-                                    })}
+                                    {d.segs !== null ? (
+                                        PHASE_KEYS.map((pk: PhaseKey) => {
+                                            const segVal = d.segs![pk];
+                                            const segHeightPct = Math.round(
+                                                (segVal / Math.max(d.total, 0.01)) * 100,
+                                            );
+                                            return (
+                                                <span
+                                                    key={pk}
+                                                    class={`seg seg-${pk}`}
+                                                    style={`--seg-h:${segHeightPct}%`}
+                                                    title={`${PHASE_LABELS[pk]}: $${segVal.toFixed(2)}`}
+                                                ></span>
+                                            );
+                                        })
+                                    ) : (
+                                        <span
+                                            class="seg seg-unattributed"
+                                            style="--seg-h:100%"
+                                            title={`Total: $${d.total.toFixed(2)}`}
+                                        ></span>
+                                    )}
                                 </div>
                             );
                         })}
@@ -131,13 +146,18 @@ export const DashboardCostBars: FC<DashboardCostBarsProps> = ({ days }) => {
                       * the chart visually. Satisfies WCAG 1.1.1 + 2.1.
                       */}
                     <table class="sr-only">
-                        <caption>14-day cost by phase (most recent day last)</caption>
+                        <caption>
+                            {hasPhaseData
+                                ? "14-day cost by phase (most recent day last)"
+                                : "14-day daily cost totals (most recent day last)"}
+                        </caption>
                         <thead>
                             <tr>
                                 <th scope="col">Day</th>
-                                {PHASE_KEYS.map((pk) => (
-                                    <th key={pk} scope="col">{PHASE_LABELS[pk]}</th>
-                                ))}
+                                {hasPhaseData &&
+                                    PHASE_KEYS.map((pk) => (
+                                        <th key={pk} scope="col">{PHASE_LABELS[pk]}</th>
+                                    ))}
                                 <th scope="col">Total</th>
                             </tr>
                         </thead>
@@ -145,9 +165,10 @@ export const DashboardCostBars: FC<DashboardCostBarsProps> = ({ days }) => {
                             {days.map((d, i) => (
                                 <tr key={String(i)}>
                                     <td>{axisLabel(i) !== "" ? axisLabel(i) : `Day ${i + 1}`}</td>
-                                    {PHASE_KEYS.map((pk) => (
-                                        <td key={pk}>${d.segs[pk].toFixed(2)}</td>
-                                    ))}
+                                    {hasPhaseData &&
+                                        PHASE_KEYS.map((pk) => (
+                                            <td key={pk}>${(d.segs?.[pk] ?? 0).toFixed(2)}</td>
+                                        ))}
                                     <td>${d.total.toFixed(2)}</td>
                                 </tr>
                             ))}
@@ -155,18 +176,30 @@ export const DashboardCostBars: FC<DashboardCostBarsProps> = ({ days }) => {
                     </table>
                 </figure>
 
-                {/* Phase legend */}
-                <div class="cost-legend" role="list" aria-label="Phase legend">
-                    {PHASE_KEYS.map((pk: PhaseKey) => (
-                        <span key={pk} class="cost-legend-item" role="listitem">
+                {/* Legend: phases when attributed, single honest entry otherwise */}
+                {hasPhaseData ? (
+                    <div class="cost-legend" role="list" aria-label="Phase legend">
+                        {PHASE_KEYS.map((pk: PhaseKey) => (
+                            <span key={pk} class="cost-legend-item" role="listitem">
+                                <span
+                                    class={`cost-legend-swatch swatch-${pk}`}
+                                    aria-hidden="true"
+                                ></span>
+                                {PHASE_LABELS[pk].toLowerCase()}
+                            </span>
+                        ))}
+                    </div>
+                ) : (
+                    <div class="cost-legend" role="list" aria-label="Legend">
+                        <span class="cost-legend-item" role="listitem">
                             <span
-                                class={`cost-legend-swatch swatch-${pk}`}
+                                class="cost-legend-swatch swatch-unattributed"
                                 aria-hidden="true"
                             ></span>
-                            {PHASE_LABELS[pk].toLowerCase()}
+                            daily total (per-phase attribution not recorded)
                         </span>
-                    ))}
-                </div>
+                    </div>
+                )}
             </div>
         </div>
     );

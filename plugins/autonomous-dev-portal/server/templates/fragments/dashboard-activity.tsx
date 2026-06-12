@@ -5,9 +5,9 @@
 // Each row uses the `.feed-row` 4-column grid:
 //   timestamp | actor chip | verb/subject | reference label
 //
-// Presentational note: feed data comes from buildActivityFeed() in
-// dashboard-readers.ts, which returns a deterministic seeded list when
-// live readers are unavailable.
+// #389: the feed renders ONLY real rows. With no event source wired yet
+// the card shows an honest empty state — no "Streaming" indicator, no
+// aria-live region, no fabricated rows.
 
 import type { FC } from "hono/jsx";
 import type { ActivityRow } from "../../wiring/dashboard-readers";
@@ -35,6 +35,23 @@ export const DashboardActivityFeed: FC<DashboardActivityFeedProps> = ({
     rows,
 }) => {
     const visible = rows.slice(0, 10);
+    // #389: empty feed = honest empty state. The liveness affordances
+    // (Streaming chip, aria-live, flash animation) only render when there
+    // are real rows to stream.
+    if (visible.length === 0) {
+        return (
+            <div class="card" aria-label="Activity feed">
+                <div class="card-h">
+                    <h3>Activity feed</h3>
+                </div>
+                <p class="empty dim">
+                    No activity feed yet — the daemon does not stream
+                    events to the portal. Request history lives on the
+                    Requests page.
+                </p>
+            </div>
+        );
+    }
     return (
         <div class="card" role="log" aria-label="Activity feed" aria-live="polite" aria-relevant="additions">
             <div class="card-h">

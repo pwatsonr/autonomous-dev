@@ -10,9 +10,9 @@
 //   3. Gate pass rate — percentage + pending review count
 //   4. Approvals queue — count + oldest wait + SLA hint
 //
-// Presentational note: sparkline points are generated deterministically
-// server-side via sparklinePoints() when live readers are not available.
-// The tile data itself is derived from the aggregates prop passed down from
+// #389: sparkline points come only from real series (currently the daily
+// cost ledger); tiles without a history source render no sparkline. The
+// tile data itself is derived from the aggregates prop passed down from
 // the route handler.
 
 import type { FC } from "hono/jsx";
@@ -82,12 +82,15 @@ export interface DashboardKpiProps {
 export const DashboardKpiStrip: FC<DashboardKpiProps> = ({ tiles }) => (
     <div id="dashboard-kpi-strip" class="kpi-strip" role="region" aria-label="Key performance indicators">
         {tiles.map((tile) => {
-            const sparkSvg = renderSparkline(tile.sparkPoints, {
-                width: 84,
-                height: 28,
-                color: sparkColor(tile.sparkTone),
-                a11yLabel: `${tile.label} sparkline`,
-            });
+            // #389: no history source → no sparkline (never a fabricated walk).
+            const sparkSvg = tile.sparkPoints.length > 1
+                ? renderSparkline(tile.sparkPoints, {
+                      width: 84,
+                      height: 28,
+                      color: sparkColor(tile.sparkTone),
+                      a11yLabel: `${tile.label} sparkline`,
+                  })
+                : "";
             const deltaClass =
                 tile.deltaDir === "up"
                     ? "delta-up"

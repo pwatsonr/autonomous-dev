@@ -14,10 +14,8 @@ import {
 import {
     readDashboardData,
     groupRequestsByPhase,
-    buildActivityFeed,
-    build14DayCostBars,
-    buildAgentUtilRows,
-    sparklinePoints,
+    read14DayCostBars,
+    readMonthlyCapUsd,
 } from "../wiring/dashboard-readers";
 import { readMtdSpend } from "../wiring/daemon-readers";
 import type {
@@ -81,42 +79,54 @@ export function computeDashboardAggregates(
 /**
  * FR-026-10..15 — Build v3 hero extra data.
  *
- * Derives all v3 hero sections (swimlanes, activity, cost bars, agents,
- * sparklines, KPI values) server-side. Deterministic seeded fallbacks are
- * used when live readers yield empty data so the dashboard is never blank.
+ * #389: every section is REAL data or an honest empty/zero — the seeded
+ * demo builders and hardcoded KPI constants ($400 cap, 94.2 pass rate,
+ * 82m oldest, inFlight 12, $186.40 MTD) misled operators and are gone.
  */
-function buildV3Extra(
+async function buildV3Extra(
     data: DashboardData,
     aggregates: DashboardAggregatesProp,
     totalMtd: number,
-): DashboardV3Extra {
+): Promise<DashboardV3Extra> {
     const requests = data.requests ?? [];
 
-    // Swimlanes
+    // Swimlanes from the live ledger (empty lanes when idle).
     const swimlanes = groupRequestsByPhase(requests);
 
-    // Activity feed
-    const activity = buildActivityFeed();
+    // Activity feed / agent utilization: the daemon records neither yet —
+    // honest empty states (no fabricated "Streaming" rows or fake agents).
+    const activity: DashboardV3Extra["activity"] = [];
+    const agents: DashboardV3Extra["agents"] = [];
 
-    // 14-day cost bars
-    const costBars = build14DayCostBars();
+    // 14-day cost bars from the real ledger.
+    const costBars = await read14DayCostBars();
 
-    // Agent utilization rows
-    const agents = buildAgentUtilRows();
-
-    // Sparkline points (seeded deterministic)
+    // Sparklines: the only real time series available is the daily cost
+    // ledger (burn rate). The other tiles have no history source — empty
+    // arrays render no sparkline rather than a fabricated walk.
     const sparks = {
-        inFlight: sparklinePoints(7, 24, 60),
-        burnRate:  sparklinePoints(13, 24, 55),
-        passRate:  sparklinePoints(19, 24, 70),
-        queue:     sparklinePoints(23, 24, 40),
+        inFlight: [] as number[],
+        burnRate: costBars.map((d) => d.total),
+        passRate: [] as number[],
+        queue: [] as number[],
     };
 
-    // KPI computed values
-    const inFlight = Math.max(aggregates.totalActive, swimlanes.reduce((s, g) => s + g.cards.length, 0));
-    const inFlightBreakdown = buildInFlightBreakdown(swimlanes);
-    const burnRatePerHr = totalMtd > 0 ? totalMtd / (30 * 24) : 2.41;
-    const burnRateCap = 400;
+    // KPI values — real numbers, honest zeros, no invented fallbacks.
+    const inFlight = Math.max(
+        aggregates.totalActive,
+        swimlanes.reduce((s, g) => s + g.cards.length, 0),
+    );
+    const monthlyCap = await readMonthlyCapUsd();
+    const now = new Date();
+    const hoursElapsedThisMonth = Math.max(
+        1,
+        (now.getTime() - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)) / 3_600_000,
+    );
+    const gateRows = requests.filter((r) => r.status === "gate");
+    const queueOldestMin = gateRows.reduce(
+        (m, r) => Math.max(m, r.waitedMin ?? 0),
+        0,
+    );
 
     return {
         swimlanes,
@@ -125,15 +135,15 @@ function buildV3Extra(
         agents,
         sparks,
         kpi: {
-            inFlight: inFlight > 0 ? inFlight : 12,
-            inFlightSub: inFlightBreakdown,
-            burnRatePerHr,
-            burnRateMtd: totalMtd > 0 ? totalMtd : 186.4,
-            burnRateCap,
-            passRatePct: 94.2,
+            inFlight,
+            inFlightSub: buildInFlightBreakdown(swimlanes),
+            burnRatePerHr: totalMtd > 0 ? totalMtd / hoursElapsedThisMonth : 0,
+            burnRateMtd: totalMtd,
+            burnRateCap: monthlyCap,
+            passRatePct: null, // no gate-outcome history source exists yet
             passRatePending: aggregates.totalGates,
-            queueCount: aggregates.totalGates > 0 ? aggregates.totalGates : 3,
-            queueOldestMin: 82, // 1h 22m
+            queueCount: aggregates.totalGates,
+            queueOldestMin,
         },
     };
 }
@@ -195,7 +205,7 @@ export const dashboardHandler = async (c: Context): Promise<Response> => {
     // FR-026-10..15 — Build v3 hero extra data and attach to aggregates prop.
     // We cast to a wider local type here to avoid editing the shared
     // types/render.ts registry (per hard rule in PRD-026).
-    const v3Extra = buildV3Extra(data, aggregates, totalMtd);
+    const v3Extra = await buildV3Extra(data, aggregates, totalMtd);
     const aggregatesWithV3 = {
         ...aggregates,
         v3: v3Extra,

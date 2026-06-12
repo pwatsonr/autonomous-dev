@@ -165,6 +165,27 @@ const CHECKS = [
       return pass();
     },
   },
+  {
+    id: 'dashboard-no-fabrication',
+    issue: 389,
+    fr: 'portal-audit-2026-06-11',
+    desc: 'Dashboard renders real/empty data — seeded demo builders must not return',
+    run() {
+      const s = read('plugins/autonomous-dev-portal/server/wiring/dashboard-readers.ts');
+      if (s === null) return fail('dashboard-readers.ts not found');
+      if (/seededRng|buildActivityFeed\s*\(|buildAgentUtilRows\s*\(|build14DayCostBars\s*\(|sparklinePoints\s*\(/.test(
+        s.replace(/\/\/[^\n]*/g, ''))) {
+        return fail('seeded demo builder present in dashboard-readers (regression of #389)');
+      }
+      if (!/read14DayCostBars/.test(s)) return fail('real ledger-driven read14DayCostBars missing');
+      const route = read('plugins/autonomous-dev-portal/server/routes/dashboard.ts');
+      if (route === null) return fail('routes/dashboard.ts not found');
+      if (/passRatePct:\s*94\.2|burnRateCap\s*=\s*400|queueOldestMin:\s*82/.test(route)) {
+        return fail('hardcoded KPI constants present in dashboard route (regression of #389)');
+      }
+      return pass();
+    },
+  },
 ];
 
 function main() {
