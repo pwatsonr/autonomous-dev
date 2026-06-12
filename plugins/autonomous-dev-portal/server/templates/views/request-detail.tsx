@@ -184,6 +184,14 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
     // Priority: derive from the gate type or fall back to "MED"
     const priority = status === "gate" ? "HIGH" : "MED";
 
+    // Terminal requests (done/cancelled/failed) must not render live gate
+    // controls — approving a dead request writes a gate decision the
+    // daemon will never consume (visual crawl p4: a CANCELLED request
+    // showed "Approve · promote to code").
+    const isTerminal =
+        status === "done" || status === "cancelled" || status === "failed";
+    const terminalLabel = status.toUpperCase();
+
     return (
         <>
             <Topbar
@@ -209,6 +217,17 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
                     selectedPhase={currentPhase}
                 />
 
+                {isTerminal ? (
+                    <div
+                        class={`rd-terminal-banner rd-terminal-${status}`}
+                        role="status"
+                    >
+                        <span class="rd-terminal-chip">{terminalLabel}</span>
+                        This request is terminal — phases are frozen and
+                        gate actions are disabled.
+                    </div>
+                ) : null}
+
                 {/* Two-column layout: artifact pane + gate panel */}
                 <div class="rdetail">
                     <div class="rdetail-main">
@@ -223,16 +242,28 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
                         />
                     </div>
 
-                    {/* Gate panel — sticky 360px right column */}
+                    {/* Gate panel — sticky 360px right column. Terminal
+                        requests get a static notice, never live controls. */}
                     <div class="rd-gate-col">
-                        <RdV3GatePanel
-                            requestId={request.id}
-                            repo={request.repo}
-                            gateLabel={gateLabel}
-                            reviewers={gateReviewers}
-                            csrfToken={csrfToken}
-                            decision={request.gateDecision ?? null}
-                        />
+                        {isTerminal ? (
+                            <section class="gate-panel" aria-label="Gate status">
+                                <h3>{gateLabel}</h3>
+                                <p class="empty dim">
+                                    No gate is open — the request is{" "}
+                                    {status}. Decisions are recorded in the
+                                    audit log.
+                                </p>
+                            </section>
+                        ) : (
+                            <RdV3GatePanel
+                                requestId={request.id}
+                                repo={request.repo}
+                                gateLabel={gateLabel}
+                                reviewers={gateReviewers}
+                                csrfToken={csrfToken}
+                                decision={request.gateDecision ?? null}
+                            />
+                        )}
                     </div>
                 </div>
             </div>

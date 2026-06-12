@@ -163,3 +163,34 @@ describe("requests view lifecycle honesty", () => {
         expect(html).toMatch(/data-gate-type="done"/);
     });
 });
+
+// Crawl p4 — request-detail terminal honesty: a cancelled/failed/done
+// request must never render live gate controls (Approve/Reject) or
+// fabricate a "pending" phase narrative.
+import { RequestDetailView } from "../../server/templates/views/request-detail";
+
+describe("request-detail terminal honesty", () => {
+    const record = (status: string) => ({
+        id: "REQ-9", repo: "r", summary: "s", phases: [],
+        currentPhase: "code", status, cost: 1,
+    });
+
+    test("cancelled request: no approve/reject controls, terminal banner instead", async () => {
+        const html = await render(RequestDetailView({
+            request: record("cancelled") as any, csrfToken: "t",
+        } as any));
+        expect(html).toContain("rd-terminal-banner");
+        expect(html).toContain("CANCELLED");
+        expect(html).not.toContain("Approve · promote");
+        expect(html).not.toContain("Reject · requeue");
+        expect(html).toContain("No gate is open");
+    });
+
+    test("running request keeps the live gate panel", async () => {
+        const html = await render(RequestDetailView({
+            request: record("running") as any, csrfToken: "t",
+        } as any));
+        expect(html).not.toContain("rd-terminal-banner");
+        expect(html).toContain("Approve");
+    });
+});

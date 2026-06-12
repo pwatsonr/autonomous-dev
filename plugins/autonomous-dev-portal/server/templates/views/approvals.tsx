@@ -418,6 +418,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
     return (
         <div
             id="approvals-body"
+            data-filter-root
             hx-get="/approvals"
             hx-trigger={APPROVALS_POLLING_TRIGGER}
             hx-target="this"
@@ -540,6 +541,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                     <GateStatsCard stats={stats} />
                 </div>
             </div>
+            <script src="/static/js/segmented-filter.js" defer></script>
         </div>
     );
 };

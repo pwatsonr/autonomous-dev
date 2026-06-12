@@ -188,8 +188,12 @@ export interface RequestRecord {
     pipelinePhases?: string[];
     /** Currently-active phase name (must appear in `pipelinePhases`). */
     currentPhase?: string;
-    /** Top-level lifecycle status — `"gate"` activates the gate-detail card. */
-    status?: "running" | "gate";
+    /** Top-level lifecycle status — `"gate"` activates the gate-detail
+     *  card; terminal states (done/cancelled/failed) freeze the page and
+     *  disable gate controls. The old `"running" | "gate"` union made
+     *  terminal states UNREPRESENTABLE at the type level — the same
+     *  lifecycle gap as the requests table (crawl p2/p4). */
+    status?: "queued" | "running" | "gate" | "done" | "cancelled" | "failed";
     /** Active gate type when `status === "gate"`. */
     gateType?: string;
     /** Free-form gate description rendered in the gate detail card body. */
