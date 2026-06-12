@@ -126,7 +126,6 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
                         <th>Agent</th>
                         <th>Version</th>
                         <th>Status</th>
-                        <th>Mode</th>
                         <th>Last dispatch</th>
                         <th>Runs (30d)</th>
                         <th>FP rate</th>
@@ -153,7 +152,9 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
                                     {a.status.toUpperCase()}
                                 </span>
                             </td>
-                            <td>{a.mode}</td>
+                            {/* crawl p8: the old Mode column was hardcoded
+                                "active" for every agent — a constant posing
+                                as data. Status already carries lifecycle. */}
                             <td class="mono">{fmtLastDispatch(a.lastDispatchAt)}</td>
                             <td>{fmtRuns(a.runs30d)}</td>
                             <td>{fmtFpRate(a.fpRate)}</td>
