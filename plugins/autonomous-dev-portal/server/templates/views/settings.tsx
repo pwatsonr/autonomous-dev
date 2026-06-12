@@ -17,6 +17,7 @@
 // path). The default `SettingsView` is the redesigned tabbed page.
 
 import type { FC } from "hono/jsx";
+import { Topbar } from "../../components/topbar";
 
 import { Btn, Card, Chip, CostRing } from "../../components/primitives";
 import type { RenderProps, SettingsData, TabId } from "../../types/render";
@@ -408,11 +409,12 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
     // notification now" Btn — server is authoritative.
     const canSendTest = data.notifications.notifyDefault !== "none";
 
+    // v3 Topbar; also: this was a nested <main> inside the shell's
+    // <main class="main"> — invalid HTML, now a div.
     return (
-        <main class="settings settings-redesign" data-page="settings">
-            <div class="page-head">
-                <h1>Settings</h1>
-            </div>
+        <div class="settings settings-redesign" data-page="settings">
+            <Topbar title="Settings" subTitle="config & lifecycle" />
+            <div class="main-inner">
 
             <SettingsTabs activeTab={activeTab} />
 
@@ -463,7 +465,8 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
             <script type="module" src="/static/js/settings-tabs.js"></script>
             <script type="module" src="/static/js/form-validation.js"></script>
             <script type="module" src="/static/js/settings-modals.js"></script>
-        </main>
+        </div>
+        </div>
     );
 };
 
