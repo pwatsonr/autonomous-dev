@@ -87,7 +87,14 @@ export const ReposView: FC<RenderProps["repos"]> = ({ kpis, repos }) => (
                 <tbody>
                     {repos.map((r) => (
                         <tr>
-                            <td class="repo-name">{r.repo}</td>
+                            <td class="repo-name">
+                                {r.repo}
+                                {r.inAllowlist === false && (
+                                    <span class="chip muted" title="Historical activity only — the daemon does not scan this repo">
+                                        {" "}not in allowlist
+                                    </span>
+                                )}
+                            </td>
                             <td class="mono">{r.trust ?? "—"}</td>
                             <td>{r.activeRequests}</td>
                             <td>{fmtUsd(r.monthlyCostUsd)}</td>

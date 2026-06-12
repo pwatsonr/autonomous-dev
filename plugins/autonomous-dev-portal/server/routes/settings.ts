@@ -60,6 +60,8 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
         perRequest: realSettings.perRequestCostCap,
         monthly: realSettings.monthlyCostCap
     };
+    // #393: tell the view whether these are saved values or daemon defaults.
+    data.capsFromConfig = realSettings.capsFromConfig;
     data.dailyCap = realSettings.dailyCostCap;
 
     // Notifications
