@@ -34,6 +34,12 @@ const TONE: Record<WebhookTestStatus, "ok" | "warn" | "err" | "muted"> = {
     muted: "muted",
 };
 
+/** "configured — ends …Ca21 (enter…)" -> "ends …Ca21" (display short). */
+function maskShort(masked: string): string {
+    const m = masked.match(/ends …\S+/);
+    return m ? m[0] : "";
+}
+
 export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken }) => {
     const dndDisabled = config.notifyDefault === "none";
     return (
@@ -86,10 +92,26 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                         {" "}Clear saved webhook
                     </label>
                 )}
+                {/* crawl p9 follow-up: configured-ness was invisible —
+                    it lived only in the dim placeholder while this chip
+                    said "unknown" (the untested delivery status), so a
+                    saved webhook LOOKED absent. Configured-ness is now
+                    the primary signal; test status stays secondary. */}
                 <span class="webhook-status">
-                    <Chip variant="status" tone={TONE[config.discordStatus]}>
-                        {config.discordStatus}
-                    </Chip>
+                    {config.discordWebhook !== "" ? (
+                        <>
+                            <Chip variant="status" tone="ok">
+                                CONFIGURED
+                            </Chip>
+                            <span class="mono dim webhook-ends">
+                                {maskShort(config.discordWebhook)}
+                            </span>
+                        </>
+                    ) : (
+                        <Chip variant="status" tone="muted">
+                            NOT SET
+                        </Chip>
+                    )}
                 </span>
                 <Btn
                     type="button"
@@ -125,10 +147,26 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                         {" "}Clear saved webhook
                     </label>
                 )}
+                {/* crawl p9 follow-up: configured-ness was invisible —
+                    it lived only in the dim placeholder while this chip
+                    said "unknown" (the untested delivery status), so a
+                    saved webhook LOOKED absent. Configured-ness is now
+                    the primary signal; test status stays secondary. */}
                 <span class="webhook-status">
-                    <Chip variant="status" tone={TONE[config.slackStatus]}>
-                        {config.slackStatus}
-                    </Chip>
+                    {config.slackWebhook !== "" ? (
+                        <>
+                            <Chip variant="status" tone="ok">
+                                CONFIGURED
+                            </Chip>
+                            <span class="mono dim webhook-ends">
+                                {maskShort(config.slackWebhook)}
+                            </span>
+                        </>
+                    ) : (
+                        <Chip variant="status" tone="muted">
+                            NOT SET
+                        </Chip>
+                    )}
                 </span>
                 <Btn
                     type="button"
