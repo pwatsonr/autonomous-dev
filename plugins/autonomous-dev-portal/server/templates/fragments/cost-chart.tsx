@@ -179,23 +179,40 @@ export const CostChart: FC<CostChartProps | CostSeries> = (props) => {
                 stroke-width="2"
                 fill="none"
             />
-            {showLabels && points.length > 5 && (
-                <g class="x-labels">
-                    {points.map((p, i) =>
-                        i % 5 === 0 ? (
-                            <text
-                                x={toX(i, points.length).toFixed(2)}
-                                y={String(VB_H - 4)}
-                                text-anchor="middle"
-                                fill="var(--fg-2)"
-                                font-size="9"
-                            >
-                                {p.label}
-                            </text>
-                        ) : null,
-                    )}
-                </g>
-            )}
         </svg>
+    );
+};
+
+/**
+ * Chart with axis context: relative wrapper carrying a "peak $" badge
+ * (the gridlines previously had no readable scale) and an HTML
+ * .x-labels row BELOW the plot. The labels used to be <text> nodes
+ * inside the preserveAspectRatio="none" SVG — stretched, overlapping
+ * the baseline, and the first one clipped at the left edge (visual
+ * crawl p5).
+ */
+export const CostChartWithAxis: FC<CostChartProps | CostSeries> = (props) => {
+    const points = props.points;
+    const showLabels =
+        "showLabels" in props && props.showLabels !== undefined
+            ? props.showLabels
+            : true;
+    const max = Math.max(...points.map((p) => p.value), 0);
+    return (
+        <div class="chart-wrap">
+            {points.length > 1 && max > 0 ? (
+                <span class="chart-ymax meta-mono dim">
+                    peak {`$${max.toFixed(2)}`}
+                </span>
+            ) : null}
+            <CostChart {...props} showLabels={false} />
+            {showLabels && points.length > 5 ? (
+                <div class="x-labels" aria-hidden="true">
+                    {points.map((p, i) =>
+                        i % 5 === 0 ? <span>{p.label}</span> : null,
+                    )}
+                </div>
+            ) : null}
+        </div>
     );
 };
