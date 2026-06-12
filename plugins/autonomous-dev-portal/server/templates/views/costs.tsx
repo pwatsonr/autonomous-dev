@@ -12,6 +12,7 @@
 // in the route handler so the view stays purely presentational.
 
 import type { FC } from "hono/jsx";
+import { Topbar } from "../../components/topbar";
 
 import { Chip } from "../../components/primitives";
 import type { ProjectionResult } from "../../lib/costs-projection";
@@ -119,13 +120,9 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
             {/* PORTAL-AUDIT-2026-05-16: 10s polling. The MTD-spend tile
                 and daily/projection chart tick up as the daemon writes
                 to ~/.autonomous-dev/cost-ledger.json. */}
-            {/* Region 1: page head */}
-            <div class="page-head">
-                <h1>Costs</h1>
-                <div class="head-actions">
-                    <CostsHeadActions />
-                </div>
-            </div>
+            {/* Region 1: v3 Topbar (sticky frosted) */}
+            <Topbar title="Costs" subTitle="spend & projections" rightSlot={<CostsHeadActions />} />
+            <div class="main-inner">
 
             {/* Region 2: KPI strip with SSE targets */}
             <KpiStrip items={kpis} />
@@ -275,6 +272,7 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
                     <EmptyState noun="deploy spend" />
                 )}
             </section>
+            </div>
         </div>
     );
 };

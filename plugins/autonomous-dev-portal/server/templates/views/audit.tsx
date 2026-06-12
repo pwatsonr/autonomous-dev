@@ -5,6 +5,7 @@
 // and pagination. Otherwise it falls back to the stub `rows` table.
 
 import type { FC } from "hono/jsx";
+import { Topbar } from "../../components/topbar";
 
 import type {
     AuditFiltersProp,
@@ -198,7 +199,8 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
     if (page === undefined) {
         return (
             <section class="audit">
-                <h1>Audit log</h1>
+                <Topbar title="Audit log" subTitle="HMAC-chained operator log" />
+                <div class="main-inner">
                 {configChanges !== undefined && configChanges.length > 0 && (
                     <ConfigChangesSection changes={configChanges} />
                 )}
@@ -224,6 +226,7 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                         ))}
                     </tbody>
                 </table>
+                </div>
             </section>
         );
     }
@@ -231,7 +234,8 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
     const liveFilters: AuditFiltersProp = filters ?? {};
     return (
         <section class="audit">
-            <h1>Audit log</h1>
+            <Topbar title="Audit log" subTitle="HMAC-chained operator log" />
+            <div class="main-inner">
             {configChanges !== undefined && configChanges.length > 0 && (
                 <ConfigChangesSection changes={configChanges} />
             )}
@@ -278,6 +282,7 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                     </tbody>
                 </table>
                 <Pagination page={page} filters={liveFilters} />
+            </div>
             </div>
         </section>
     );

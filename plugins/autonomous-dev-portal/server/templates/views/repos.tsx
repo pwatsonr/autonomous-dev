@@ -10,6 +10,7 @@
 // allowlist — add one in Settings to get started".
 
 import type { FC } from "hono/jsx";
+import { Topbar } from "../../components/topbar";
 
 import type { RenderProps } from "../../types/render";
 
@@ -46,9 +47,8 @@ export const ReposView: FC<RenderProps["repos"]> = ({ kpis, repos }) => (
     >
         {/* PORTAL-AUDIT-2026-05-16: 10s polling so per-repo activity
             counts and last-activity timestamps stay current. */}
-        <div class="page-head">
-            <h1>Repositories</h1>
-        </div>
+        <Topbar title="Repos" subTitle="allowlist & activity" />
+        <div class="main-inner">
 
         <div class="kpi-strip">
             <div class="kpi">
@@ -104,5 +104,6 @@ export const ReposView: FC<RenderProps["repos"]> = ({ kpis, repos }) => (
                 </tbody>
             </table>
         )}
+        </div>
     </section>
 );

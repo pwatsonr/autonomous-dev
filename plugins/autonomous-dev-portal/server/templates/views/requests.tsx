@@ -22,6 +22,7 @@
 import type { FC } from "hono/jsx";
 
 import { Chip } from "../../components/primitives";
+import { Topbar } from "../../components/topbar";
 import type { PhaseName } from "../../components/primitives";
 import type {
     DashboardRequest,
@@ -213,13 +214,14 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
             {/* PORTAL-AUDIT-2026-05-16: polls every 10s so the requests
                 table stays fresh while a pipeline is running. See the
                 matching wrapper on the dashboard. */}
-            <div class="page-head">
-                <h1>Requests</h1>
-                <div class="head-actions">
-                    <RequestsHeadActions />
-                </div>
-            </div>
-
+            {/* v3 Topbar (sticky frosted) — the old .page-head h1 was the
+                pre-v3 shell generation (operator-reported mismatch). */}
+            <Topbar
+                title="Requests"
+                subTitle={`${items.length} total`}
+                rightSlot={<RequestsHeadActions />}
+            />
+            <div class="main-inner">
             <KpiStrip items={kpiItems} />
 
             <section class="sec requests">
@@ -319,6 +321,7 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
                     </table>
                 )}
             </section>
+            </div>
         </div>
     );
 };

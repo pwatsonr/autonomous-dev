@@ -10,6 +10,7 @@
 // — the rich kit-screenshot metrics are not part of the daemon's writeset.
 
 import type { FC } from "hono/jsx";
+import { Topbar } from "../../components/topbar";
 
 import type { AgentRow, RenderProps } from "../../types/render";
 
@@ -60,9 +61,8 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
             row-click handler is a separate script and survives the
             re-render because the modal lives in #modal-slot (in the
             shell layout, outside this wrapper). */}
-        <div class="page-head">
-            <h1>Agents</h1>
-        </div>
+        <Topbar title="Agents" subTitle="lifecycle & manifest" />
+        <div class="main-inner">
 
         {/* PLAN-038 polish — intro + lifecycle explanation. Operators
             new to the system need to know what BASELINE / SHADOW / FROZEN
@@ -165,5 +165,6 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
         {/* Modal-slot lives in ShellLayout (shell.tsx) so it's available
             on every surface — do not duplicate the id here. */}
         <script src="/static/js/agents-row-click.js" defer></script>
+        </div>
     </section>
 );
