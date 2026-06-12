@@ -33,6 +33,11 @@ suites:
     description: "Validates the onboarding skill walks new users through setup correctly."
     enabled: true  # 4 cases per TDD-027 §7.2
 
+  portal-check:
+    file: test-cases/portal-check-questions.yaml
+    description: "Validates the portal-check skill diagnoses portal service health, data-accuracy, and known failure modes correctly."
+    enabled: true  # 8 cases; informed by the 2026-06-11 portal audit (issues #389-#396)
+
   # --- New eval suites added under TDD-028 / SPEC-028-1-03 ---
   chains:
     file: test-cases/chains-eval.yaml
