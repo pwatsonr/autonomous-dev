@@ -181,3 +181,14 @@ export async function readPortalSettings(
         }
     };
 }
+
+/**
+ * Mask a stored webhook URL for display (#392). The raw secret must never
+ * reach the rendered page; the settings route passes this masked string to
+ * the notifications card, which uses it as a placeholder (never as an input
+ * value, so it can never round-trip into a save).
+ */
+export function maskWebhookForDisplay(url: string): string {
+    if (url === "") return "";
+    return `configured — ends …${url.slice(-4)} (enter new value to replace)`;
+}

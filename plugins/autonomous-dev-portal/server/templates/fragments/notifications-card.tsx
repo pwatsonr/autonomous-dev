@@ -54,15 +54,28 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
             {/* Discord webhook --------------------------------------- */}
             <div class="field stacked-field" data-channel="discord">
                 <label for="discord-webhook">Discord webhook URL</label>
+                {/* #392: the saved secret is never rendered — config.discordWebhook
+                    carries a masked display string, used only as placeholder.
+                    Empty submit preserves the saved value; Clear removes it. */}
                 <input
                     type="url"
                     id="discord-webhook"
                     name="discordWebhook"
                     class="input"
-                    value={config.discordWebhook}
-                    placeholder="https://discord.com/api/webhooks/..."
+                    value=""
+                    placeholder={
+                        config.discordWebhook !== ""
+                            ? config.discordWebhook
+                            : "https://discord.com/api/webhooks/..."
+                    }
                     data-validate="webhook-url"
                 />
+                {config.discordWebhook !== "" && (
+                    <label class="dim webhook-clear">
+                        <input type="checkbox" name="discordWebhookClear" value="1" />
+                        {" "}Clear saved webhook
+                    </label>
+                )}
                 <span class="webhook-status">
                     <Chip variant="status" tone={TONE[config.discordStatus]}>
                         {config.discordStatus}
@@ -87,10 +100,20 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                     id="slack-webhook"
                     name="slackWebhook"
                     class="input"
-                    value={config.slackWebhook}
-                    placeholder="https://hooks.slack.com/services/..."
+                    value=""
+                    placeholder={
+                        config.slackWebhook !== ""
+                            ? config.slackWebhook
+                            : "https://hooks.slack.com/services/..."
+                    }
                     data-validate="webhook-url"
                 />
+                {config.slackWebhook !== "" && (
+                    <label class="dim webhook-clear">
+                        <input type="checkbox" name="slackWebhookClear" value="1" />
+                        {" "}Clear saved webhook
+                    </label>
+                )}
                 <span class="webhook-status">
                     <Chip variant="status" tone={TONE[config.slackStatus]}>
                         {config.slackStatus}

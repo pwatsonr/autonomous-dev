@@ -103,6 +103,11 @@ function allowlistRowFragment(entry: AllowlistEntry): JSX.Element {
     );
 }
 
+/** Form checkbox truthiness: HTML checkboxes submit "1"/"on"; tests may pass true. */
+function isChecked(v: unknown): boolean {
+    return v === true || v === "1" || v === "on" || v === "true";
+}
+
 /**
  * Atomic-write-backed settings store. Reads the current config, merges
  * the requested change in, and writes a single rename — preserving every
@@ -208,8 +213,16 @@ export class FileSettingsStore implements SettingsStore {
                 // Ensure delivery structure exists
                 next.notifications.delivery = { ...(next.notifications.delivery ?? {}) };
 
-                // Handle Discord webhook
-                if (typeof form["discordWebhook"] === "string") {
+                // Handle Discord webhook (#392): the form never round-trips the
+                // saved secret, so an EMPTY submit must preserve the existing
+                // value. Explicit removal goes through the Clear checkbox.
+                if (isChecked(form["discordWebhookClear"])) {
+                    next.notifications.delivery.discord = {
+                        ...(next.notifications.delivery.discord ?? {}),
+                        webhook_url: ""
+                    };
+                    next.notifications.discordWebhook = "";
+                } else if (typeof form["discordWebhook"] === "string" && form["discordWebhook"] !== "") {
                     next.notifications.delivery.discord = {
                         ...(next.notifications.delivery.discord ?? {}),
                         webhook_url: form["discordWebhook"]
@@ -218,8 +231,14 @@ export class FileSettingsStore implements SettingsStore {
                     next.notifications.discordWebhook = form["discordWebhook"];
                 }
 
-                // Handle Slack webhook
-                if (typeof form["slackWebhook"] === "string") {
+                // Handle Slack webhook (#392: same preserve-on-empty semantics)
+                if (isChecked(form["slackWebhookClear"])) {
+                    next.notifications.delivery.slack = {
+                        ...(next.notifications.delivery.slack ?? {}),
+                        webhook_url: ""
+                    };
+                    next.notifications.slackWebhook = "";
+                } else if (typeof form["slackWebhook"] === "string" && form["slackWebhook"] !== "") {
                     next.notifications.delivery.slack = {
                         ...(next.notifications.delivery.slack ?? {}),
                         webhook_url: form["slackWebhook"]
@@ -280,7 +299,8 @@ export class FileSettingsStore implements SettingsStore {
     private hasNotificationFields(form: Record<string, unknown>): boolean {
         const notificationFields = [
             "discordWebhook", "slackWebhook", "defaultMethod",
-            "dndEnabled", "dndStart", "dndEnd"
+            "dndEnabled", "dndStart", "dndEnd",
+            "discordWebhookClear", "slackWebhookClear"
         ];
         return notificationFields.some(field => field in form);
     }
