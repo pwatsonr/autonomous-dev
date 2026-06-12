@@ -252,7 +252,15 @@ export async function deriveShellRailState(
                 );
             }
         }
-        state.killSwitchEngaged = hb.kill_switch_active;
+        // #396: the heartbeat has NO kill_switch_active field — the daemon's
+        // signal is the kill-switch.flag FILE (existence-only). Reading the
+        // phantom field meant the rail could never render the engaged state.
+        try {
+            await readFile(join(resolveStateDir(), "kill-switch.flag"), "utf8");
+            state.killSwitchEngaged = true;
+        } catch {
+            state.killSwitchEngaged = false;
+        }
     } catch {
         state.daemonStatus = "unknown";
     }

@@ -1,10 +1,19 @@
-// BUG-7 regression test: DND inputs should not be hardcoded disabled
+// BUG-7 regression test: DND inputs should not be hardcoded disabled.
 //
-// Before the fix, DND checkbox + start/end time inputs were rendered with
-// `disabled=""` unconditionally. After the fix, they should only be disabled
-// when `notifyDefault === "none"`.
+// Design (notifications-card.tsx): DND inputs are disabled ONLY when
+// `notifyDefault === "none"` (no delivery method → DND is meaningless).
+//
+// #396 rewrite: the old test read the REAL ~/.claude/autonomous-dev.json
+// (non-hermetic — its result depended on the operator's machine; it had
+// been red for weeks) and its conditional had an operator-precedence bug.
+// Now hermetic via AUTONOMOUS_DEV_USER_CONFIG, asserting BOTH directions
+// of the design.
 
-import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 
 import { registerRoutes } from "../../server/routes";
@@ -17,43 +26,62 @@ function freshApp(): Hono {
 }
 
 const ORIGINAL_STATE_DIR = process.env["AUTONOMOUS_DEV_STATE_DIR"];
+const ORIGINAL_USER_CONFIG = process.env["AUTONOMOUS_DEV_USER_CONFIG"];
+
+let dir: string;
+
+function writeConfig(defaultMethod: string): void {
+    const p = join(dir, "autonomous-dev.json");
+    writeFileSync(p, JSON.stringify({
+        notifications: { delivery: { default_method: defaultMethod } },
+    }));
+    process.env["AUTONOMOUS_DEV_USER_CONFIG"] = p;
+}
+
+beforeAll(() => {
+    process.env["AUTONOMOUS_DEV_STATE_DIR"] = kitParityFixtureRoot();
+    dir = mkdtempSync(join(tmpdir(), "bug7-"));
+});
+
+afterAll(() => {
+    process.env["AUTONOMOUS_DEV_STATE_DIR"] = ORIGINAL_STATE_DIR;
+    rmSync(dir, { recursive: true, force: true });
+});
+
+afterEach(() => {
+    if (ORIGINAL_USER_CONFIG === undefined) {
+        delete process.env["AUTONOMOUS_DEV_USER_CONFIG"];
+    } else {
+        process.env["AUTONOMOUS_DEV_USER_CONFIG"] = ORIGINAL_USER_CONFIG;
+    }
+});
+
+function dndInputs(html: string): string[] {
+    return ["dnd-enabled", "dnd-start", "dnd-end"].map((id) => {
+        const m = html.match(new RegExp(`<input[^>]+id="${id}"[^>]*>`));
+        expect(m).not.toBeNull();
+        return m![0];
+    });
+}
 
 describe("BUG-7: DND inputs not hardcoded disabled", () => {
-    beforeAll(() => {
-        process.env["AUTONOMOUS_DEV_STATE_DIR"] = kitParityFixtureRoot();
-    });
-
-    afterAll(() => {
-        process.env["AUTONOMOUS_DEV_STATE_DIR"] = ORIGINAL_STATE_DIR;
-    });
-
     it("should not render DND inputs as disabled when notifications are enabled", async () => {
+        writeConfig("discord");
         const app = freshApp();
         const response = await app.request("/settings");
         expect(response.status).toBe(200);
-
-        const html = await response.text();
-
-        // DND inputs should exist
-        expect(html).toMatch(/id="dnd-enabled"/);
-        expect(html).toMatch(/id="dnd-start"/);
-        expect(html).toMatch(/id="dnd-end"/);
-
-        // When notifications are enabled (not "none"), DND inputs should NOT have disabled=""
-        // Check that they don't have the hardcoded disabled attribute
-        const dndEnabledMatch = html.match(/<input[^>]+id="dnd-enabled"[^>]*>/);
-        const dndStartMatch = html.match(/<input[^>]+id="dnd-start"[^>]*>/);
-        const dndEndMatch = html.match(/<input[^>]+id="dnd-end"[^>]*>/);
-
-        if (dndEnabledMatch && !dndEnabledMatch[0].includes('notifyDefault') || !dndEnabledMatch[0].includes('none')) {
-            // If notifications are not disabled, DND inputs should not be disabled
-            expect(dndEnabledMatch[0]).not.toMatch(/disabled=""/);
+        for (const input of dndInputs(await response.text())) {
+            expect(input).not.toMatch(/\bdisabled(=""|\b)/);
         }
-        if (dndStartMatch) {
-            expect(dndStartMatch[0]).not.toMatch(/disabled=""/);
-        }
-        if (dndEndMatch) {
-            expect(dndEndMatch[0]).not.toMatch(/disabled=""/);
+    });
+
+    it("renders DND inputs disabled when delivery method is none (designed behavior)", async () => {
+        writeConfig("none");
+        const app = freshApp();
+        const response = await app.request("/settings");
+        expect(response.status).toBe(200);
+        for (const input of dndInputs(await response.text())) {
+            expect(input).toMatch(/\bdisabled(=""|\b)/);
         }
     });
 });

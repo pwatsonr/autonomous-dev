@@ -56,7 +56,8 @@ function buildAreaPath(
 
 export interface CostChartProps {
     points: CostPoint[];
-    budgetUsd: number;
+    /** Accepted for CostSeries compatibility; null = no cap (#396). Unused. */
+    budgetUsd: number | null;
     /** When `true` (default), render axis labels every 5th point. */
     showLabels?: boolean;
 }

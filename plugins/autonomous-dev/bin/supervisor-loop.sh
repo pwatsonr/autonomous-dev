@@ -3091,7 +3091,7 @@ SQL
 
     # Find orphan state.json files
     local known_repos
-    known_repos=$(jq -r '.repos[]?' "$EFFECTIVE_CONFIG" 2>/dev/null || echo "")
+    known_repos=$(jq -r '.repositories.allowlist[]?' "$EFFECTIVE_CONFIG" 2>/dev/null || echo "")
 
     while read -r repo_path; do
         [[ -z "$repo_path" || ! -d "$repo_path" ]] && continue

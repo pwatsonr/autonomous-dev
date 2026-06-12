@@ -14,10 +14,18 @@ import { readFile } from "node:fs/promises";
 import type { CostPoint, CostSeries } from "../types/render";
 
 import { costLedgerPath, readMtdSpend } from "./daemon-readers";
-import { readRequestLedger, type RequestLedgerReaderOptions } from "./request-ledger-reader";
+import { readMonthlyCapUsd } from "./dashboard-readers";
+import { type RequestLedgerReaderOptions } from "./request-ledger-reader";
 
 interface CostLedgerFile {
-    daily?: Record<string, { total_usd?: number } | undefined>;
+    daily?: Record<
+        string,
+        | {
+              total_usd?: number;
+              sessions?: Array<{ request_id?: string } | undefined>;
+          }
+        | undefined
+    >;
 }
 
 async function readJsonOrNull<T>(path: string): Promise<T | null> {
@@ -29,24 +37,51 @@ async function readJsonOrNull<T>(path: string): Promise<T | null> {
     }
 }
 
-/** Convert cost-ledger.daily into a stable-ordered CostPoint[]. */
-function dailyToPoints(
-    daily: Record<string, { total_usd?: number } | undefined> | undefined,
-): CostPoint[] {
-    if (daily === undefined) return [];
-    const entries = Object.entries(daily)
-        .filter(([, v]) => v !== undefined)
-        .sort(([a], [b]) => a.localeCompare(b)); // chronological
-    return entries.map(([date, v]) => ({
-        label: date.slice(-2), // "d10" → "10"; chart x-axis is compact
-        value: typeof v?.total_usd === "number" ? v.total_usd : 0,
-    }));
+/**
+ * Convert cost-ledger.daily into the last-30-CALENDAR-day series,
+ * zero-filled (#396). The old version emitted only days present in the
+ * ledger, so "last 30 days" could span months of sparse entries — which
+ * also poisoned the projection's trailing-7 run rate (last 7 *entries*,
+ * not last 7 days: $7.54/day rendered vs a real ~$3.00/day).
+ */
+function dailyToPoints(daily: CostLedgerFile["daily"]): CostPoint[] {
+    const out: CostPoint[] = [];
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+        const d = new Date(Date.UTC(
+            now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i,
+        ));
+        const key = d.toISOString().slice(0, 10);
+        const v = daily?.[key];
+        out.push({
+            label: key.slice(-2),
+            value: typeof v?.total_usd === "number" ? v.total_usd : 0,
+        });
+    }
+    return out;
+}
+
+/**
+ * Distinct request ids with ledger sessions in the CURRENT month (#396).
+ * The avg/request KPI divides MTD spend by this; the old denominator was
+ * the all-time request count, deflating the average (e.g. $2.10 vs $10.53).
+ */
+function countMonthRequests(daily: CostLedgerFile["daily"]): number {
+    const monthPrefix = new Date().toISOString().slice(0, 7);
+    const ids = new Set<string>();
+    for (const [date, day] of Object.entries(daily ?? {})) {
+        if (!date.startsWith(monthPrefix)) continue;
+        for (const s of day?.sessions ?? []) {
+            if (typeof s?.request_id === "string") ids.add(s.request_id);
+        }
+    }
+    return ids.size;
 }
 
 export interface CostsReaderOptions extends RequestLedgerReaderOptions {
     /** Override the cost-ledger.json path. */
     ledgerPath?: string;
-    /** Monthly cap for the cost ring + projection. Default $500. */
+    /** Monthly cap override; default = cost-cap.json or null (#396). */
     monthlyCap?: number;
 }
 
@@ -58,7 +93,8 @@ export async function readCostsData(
     );
     const points = dailyToPoints(ledgerFile?.daily);
     const totalMtd = await readMtdSpend();
-    const monthlyCap = opts.monthlyCap ?? 500;
+    // #396: never invent a cap — read the configured one or carry null.
+    const monthlyCap = opts.monthlyCap ?? (await readMonthlyCapUsd());
 
     // Per O.Q. #6: per-reviewer / per-phase / per-deploy breakdowns are
     // not tracked by the daemon. The view's render-time code already
@@ -69,8 +105,8 @@ export async function readCostsData(
     const reviewerSpend: NonNullable<CostSeries["reviewerSpend"]> = [];
     const deploySpend: NonNullable<CostSeries["deploySpend"]> = [];
 
-    // Request count for the "avg / request" KPI.
-    const requests = await readRequestLedger(opts);
+    // Request count for the "avg / request" KPI — month-scoped (#396).
+    const requestCount = countMonthRequests(ledgerFile?.daily);
 
     return {
         points,
@@ -79,7 +115,7 @@ export async function readCostsData(
         reviewerSpend,
         deploySpend,
         totalMtd,
-        requestCount: requests.length,
+        requestCount,
         costCap: monthlyCap,
     };
 }

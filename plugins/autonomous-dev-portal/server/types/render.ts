@@ -535,7 +535,8 @@ export interface DeploySpend {
 
 export interface CostSeries {
     points: CostPoint[];
-    budgetUsd: number;
+    /** Monthly budget; null = no cap configured (#396: never invent one). */
+    budgetUsd: number | null;
     // SPEC-036-2-01 §FR-9 extensions.
     /** Per-phase spend rows for the "Spend by phase" table. */
     phaseSpend?: PhaseSpend[];
@@ -547,8 +548,8 @@ export interface CostSeries {
     totalMtd?: number;
     /** Number of requests MTD (denominator for avg/request KPI). */
     requestCount?: number;
-    /** Monthly cost cap in USD (denominator for ring + KPI sub-line). */
-    costCap?: number;
+    /** Monthly cost cap in USD; null = no cap configured (#396). */
+    costCap?: number | null;
 }
 
 export interface LogLine {
