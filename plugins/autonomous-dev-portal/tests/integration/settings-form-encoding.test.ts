@@ -59,6 +59,11 @@ describe("Settings form encoding compatibility", () => {
         TEST_CONFIG_PATH = join(TEST_CONFIG_DIR, "autonomous-dev.json");
         writeFileSync(TEST_CONFIG_PATH, "{}", "utf-8");
         process.env["AUTONOMOUS_DEV_USER_CONFIG"] = TEST_CONFIG_PATH;
+        // Incident fix: the store ALSO writes config-change markers to
+        // ${AUTONOMOUS_DEV_STATE_DIR}/config-changes — without this the
+        // suite wrote REAL markers the daemon applied (wiping the
+        // operator's webhook). The global preload guards this too.
+        process.env["AUTONOMOUS_DEV_STATE_DIR"] = TEST_CONFIG_DIR;
     });
 
     afterAll(() => {

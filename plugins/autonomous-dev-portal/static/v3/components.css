@@ -407,3 +407,8 @@
 .agents-lifecycle-sec {
     margin-top: var(--s-8);
 }
+
+/* DND time inputs were clipping their AM/PM suffix (crawl p9). */
+.dnd-time {
+    min-width: 7.5em;
+}

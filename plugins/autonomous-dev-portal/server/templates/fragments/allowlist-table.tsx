@@ -46,7 +46,6 @@ export const AllowlistTable: FC<Props> = ({ entries }) => {
                 <tr>
                     <th>Path</th>
                     <th>Status</th>
-                    <th>Added at</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -59,7 +58,6 @@ export const AllowlistTable: FC<Props> = ({ entries }) => {
                                 {entry.status}
                             </Chip>
                         </td>
-                        <td class="mono">{entry.addedAt}</td>
                         <td>
                             <Btn
                                 kind="ghost"

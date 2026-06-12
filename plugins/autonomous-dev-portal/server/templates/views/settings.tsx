@@ -55,6 +55,7 @@ const TrustCard: FC<{ data: SettingsData }> = ({ data }) => (
             take precedence over the global default.
         </p>
         <form
+            data-autosave
             hx-post="/settings"
             hx-swap="outerHTML"
             hx-target="closest section"
@@ -74,9 +75,7 @@ const TrustCard: FC<{ data: SettingsData }> = ({ data }) => (
                 ))}
             </select>
             <div class="form-actions">
-                <Btn kind="primary" type="submit">
-                    Save Trust Level
-                </Btn>
+                <span class="meta-mono dim">auto-saves on change</span>
             </div>
         </form>
     </section>
@@ -121,6 +120,7 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
             </p>
         )}
         <form
+            data-autosave
             hx-post="/settings"
             hx-swap="outerHTML"
             hx-target="closest section"
@@ -178,10 +178,8 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
             </div>
 
             <div class="form-actions">
-                <Btn kind="primary" type="submit">
-                    Save Cost Caps
-                </Btn>
-                <Btn kind="ghost" data-action="reset-cost-caps">
+                <span class="meta-mono dim">auto-saves on change</span>
+                <Btn type="button" kind="ghost" data-action="reset-cost-caps">
                     Reset to defaults
                 </Btn>
             </div>
@@ -464,6 +462,7 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
             ))}
 
             <script type="module" src={asset("/static/js/settings-tabs.js")}></script>
+            <script src={asset("/static/js/settings-autosave.js")} defer></script>
             <script type="module" src={asset("/static/js/form-validation.js")}></script>
             <script type="module" src={asset("/static/js/settings-modals.js")}></script>
         </div>
