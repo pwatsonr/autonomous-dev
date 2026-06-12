@@ -304,6 +304,14 @@ export const ShellLayout: FC<ShellProps> = ({
                     defer
                     nonce={nonce}
                 ></script>
+                {/* #391 — global HTMX error feedback: surfaces 4xx/5xx and
+                    network failures as a dismissible banner (HTMX swallows
+                    them by default, leaving actions silently dead). */}
+                <script
+                    src="/static/htmx-error-feedback.js"
+                    defer
+                    nonce={nonce}
+                ></script>
             </head>
             <body>
                 <div class="app">

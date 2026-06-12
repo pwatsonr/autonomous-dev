@@ -369,3 +369,36 @@ describe("ApprovalsView — schema / token cleanliness", () => {
         expect(html).toContain('id="approvals-body"');
     });
 });
+
+// #391 regression — every action button must carry the CSRF token via
+// hx-include of the hidden _csrf field, or the enforcer 403s the action.
+describe("ApprovalsView CSRF wiring (#391)", () => {
+    test("renders the hidden _csrf input with the threaded token", async () => {
+        const html = await render(
+            ApprovalsView({
+                items: [baseItem()],
+                costCapDailyUsd: 25,
+                csrfToken: "tok-391-test",
+            }),
+        );
+        expect(html).toMatch(
+            /<input[^>]*id="approvals-csrf"[^>]*name="_csrf"[^>]*value="tok-391-test"/,
+        );
+    });
+
+    test("approve, reject, and bulk buttons hx-include the csrf field", async () => {
+        const html = await render(
+            ApprovalsView({
+                items: [baseItem()],
+                costCapDailyUsd: 25,
+                csrfToken: "tok-391-test",
+            }),
+        );
+        const approve = html.match(/<button[^>]*hx-post="\/api\/approvals\/REQ-1\/approve"[^>]*>/)?.[0] ?? "";
+        const reject = html.match(/<button[^>]*hx-post="\/api\/approvals\/REQ-1\/reject"[^>]*>/)?.[0] ?? "";
+        const bulk = html.match(/<button[^>]*hx-post="\/api\/approvals\/bulk-approve"[^>]*>/)?.[0] ?? "";
+        expect(approve).toContain('hx-include="#approvals-csrf"');
+        expect(reject).toContain('hx-include="#approvals-csrf"');
+        expect(bulk).toContain("#approvals-csrf");
+    });
+});
