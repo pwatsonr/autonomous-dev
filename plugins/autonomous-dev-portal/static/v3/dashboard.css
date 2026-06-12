@@ -20,6 +20,197 @@
    Pipeline swimlanes — v3 enhancements
    ============================================================ */
 
+/* Base layout (kit parity) — design targets verbatim from
+   PORTAL-V3-DESIGN-GAP-2026-06-08 §"Pipeline swimlanes — layout and CSS"
+   and §"Pipeline card (.pcard)". This block was missing entirely: the
+   header comment above assumed app.css carried the pipeline foundation,
+   but the design's pipeline CSS was never vendored — the lanes rendered
+   as unstyled text flow. */
+
+.pipeline-shell {
+    background: var(--bg-1);
+    border: 1px solid var(--border-thin);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.pipeline-header {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--border-thin);
+}
+
+.ph-col {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+    min-width: 0;
+}
+
+.ph-col > span:nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ph-dot {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+.ph-count {
+    margin-left: auto;
+    flex: none;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--bg-3);
+    color: var(--fg-2);
+    font-size: 10px;
+}
+
+.pipeline-body {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    min-height: 480px;
+}
+
+.lane {
+    border-right: 1px solid var(--border-thin);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.lane:last-child {
+    border-right: none;
+}
+
+/* Per-phase lane color: drives the card's left border + progress bar. */
+.pcard[data-phase="prd"]     { --lane-color: var(--phase-prd); }
+.pcard[data-phase="tdd"]     { --lane-color: var(--phase-tdd); }
+.pcard[data-phase="plan"]    { --lane-color: var(--phase-plan); }
+.pcard[data-phase="spec"]    { --lane-color: var(--phase-spec); }
+.pcard[data-phase="code"]    { --lane-color: var(--phase-code); }
+.pcard[data-phase="review"]  { --lane-color: var(--phase-review); }
+.pcard[data-phase="deploy"]  { --lane-color: var(--phase-deploy); }
+.pcard[data-phase="observe"] { --lane-color: var(--phase-observe); }
+
+.pcard {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-thin);
+    border-left: 3px solid var(--lane-color, var(--border-thin));
+    border-radius: 3px;
+    padding: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+
+.pcard:hover {
+    transform: translateY(-1px);
+}
+
+.pcard.attn {
+    border-color: var(--warn);
+    box-shadow: 0 0 0 1px var(--warn);
+    border-left-color: var(--lane-color, var(--warn));
+}
+
+.pcard.blocked {
+    border-color: var(--err);
+    box-shadow: 0 0 0 1px var(--err);
+    border-left-color: var(--lane-color, var(--err));
+}
+
+/* Pulsing live dot (design ::after) — supplements the non-color
+   .pcard-state-chip below for WCAG 1.4.1. */
+.pcard.live::after {
+    content: "";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ok);
+    animation: pcard-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pcard-pulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 1; }
+}
+
+.pid {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--fg-3);
+}
+
+.ptitle {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--fg-0);
+    line-height: 1.35;
+}
+
+.pbar {
+    height: 3px;
+    background: var(--bg-3);
+    border-radius: var(--r-1);
+    overflow: hidden;
+}
+
+.pfoot {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+}
+
+.pfoot .agent {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.av {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--bg-3);
+    color: var(--fg-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    line-height: 1;
+}
+
 /* Priority label inside .pid: uppercase mono, no extra rules needed
    (inherits from .pcard .pid). */
 .pcard .priority-label {
@@ -222,7 +413,8 @@
     display: block;
     height: 100%;
     width: var(--pbar-pct, 0%);
-    background: var(--brand);
+    /* kit parity: progress uses the card's phase color, not brand */
+    background: var(--lane-color, var(--brand));
     border-radius: var(--r-1);
     transition: width 0.3s ease;
 }
