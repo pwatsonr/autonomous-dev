@@ -3125,6 +3125,49 @@ SQL
     log_info "Orphan reconciliation complete"
 }
 
+# reconcile_portal_markers() -> void
+#   #390 daemon half. Portal request-action markers and gate-decision files
+#   go stale when a request reaches a terminal state outside the supervisor's
+#   phase-advance path (CLI cancel runs in a different process; the failed
+#   path historically skipped gate cleanup; crashes skip everything). Sweep
+#   every marker against its canonical state.json: refresh markers whose
+#   status disagrees on terminality, and remove gate-decision files for
+#   terminal requests so the portal can never resurrect them as in-gate.
+#   Tolerant: missing dirs/files are skipped; failures are logged, not fatal.
+reconcile_portal_markers() {
+    [[ -d "${PORTAL_REQUEST_ACTIONS_DIR}" ]] || return 0
+    local repos
+    repos=$(jq -r '.repositories.allowlist[]?' "${EFFECTIVE_CONFIG}" 2>/dev/null)
+    [[ -z "${repos}" ]] && return 0
+
+    local marker req_id m_status repo state_file s_status
+    for marker in "${PORTAL_REQUEST_ACTIONS_DIR}"/*.json; do
+        [[ -f "$marker" ]] || continue
+        req_id=$(jq -r '.id // empty' "$marker" 2>/dev/null)
+        [[ -z "$req_id" ]] && continue
+        m_status=$(jq -r '.status // empty' "$marker" 2>/dev/null)
+        # Terminal markers are already correct; nothing to reconcile.
+        case "$m_status" in
+            done|cancelled|failed) continue ;;
+        esac
+        # Find the request's canonical state.json in an allowlisted repo.
+        while IFS= read -r repo; do
+            [[ -z "$repo" ]] && continue
+            state_file="${repo}/.autonomous-dev/requests/${req_id}/state.json"
+            [[ -f "$state_file" ]] || continue
+            s_status=$(jq -r '.status // empty' "$state_file" 2>/dev/null)
+            case "$s_status" in
+                done|cancelled|failed)
+                    log_info "reconcile_portal_markers: refreshing stale marker for ${req_id} (marker=${m_status:-unset} state=${s_status})"
+                    write_portal_request_action "$req_id" "$repo"
+                    rm -f "${GATE_DECISIONS_DIR}/$(basename "$repo")__${req_id}.json" 2>/dev/null || true
+                    ;;
+            esac
+            break
+        done <<< "${repos}"
+    done
+}
+
 ###############################################################################
 # Marketplace auto-update
 ###############################################################################
@@ -3481,6 +3524,7 @@ main_loop() {
         # Run orphan reconciliation on first poll and every N polls
         if [[ $(( POLL_COUNT % RECONCILE_EVERY_N_POLLS )) -eq 1 ]]; then
             reconcile_orphans || log_error "Orphan reconciliation failed"
+            reconcile_portal_markers || log_error "Portal marker reconciliation failed"
         fi
 
         # Apply any portal-originated config-change markers (PRD-025 FR-025-05).
