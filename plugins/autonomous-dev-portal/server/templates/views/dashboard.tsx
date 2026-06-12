@@ -280,21 +280,16 @@ export const DashboardView: FC<DashboardViewProps> = ({
                     <div class="sec-head">
                         <h2>Pipeline · all in-flight</h2>
                         <div class="head-actions">
-                            <span class="meta-mono dim">grouped by phase</span>
                             {/*
                               * Swimlanes / List / Timeline view modes are not yet
-                              * implemented. Rather than show false affordances (buttons
-                              * that claim aria-pressed but do nothing), we render the
-                              * active state as a plain visual label. When the other
-                              * modes ship they can be wired to hx-get fragment
-                              * endpoints here.
+                              * implemented. A single-option segmented control reads
+                              * as a stray button (operator-reported), so until the
+                              * other modes ship this is a plain meta label — no
+                              * button costume, no false affordance.
                               */}
-                            {/* #417: seg-btn must live inside a .seg group */}
-                            <div class="seg" role="group">
-                                <span class="seg-btn active seg-btn--static" aria-current="true" aria-label="Current view: Swimlanes">
-                                    Swimlanes
-                                </span>
-                            </div>
+                            <span class="meta-mono dim">
+                                grouped by phase · swimlanes
+                            </span>
                         </div>
                     </div>
                     {v3 != null ? (
@@ -313,21 +308,13 @@ export const DashboardView: FC<DashboardViewProps> = ({
                     <div class="sec dashboard-sec-no-mb">
                         <div class="sec-head">
                             <h2>Activity</h2>
-                            <div class="head-actions">
-                                {/*
-                                  * Activity filter (All/Agents/Gates/Cost) is not yet
-                                  * implemented server-side. Showing inert buttons with
-                                  * aria-pressed is a false affordance. We surface the
-                                  * current filter as a plain label until the filter
-                                  * endpoint ships.
-                                  */}
-                                {/* #417: seg-btn must live inside a .seg group */}
-                                <div class="seg" role="group">
-                                    <span class="seg-btn active seg-btn--static" aria-current="true" aria-label="Current filter: All">
-                                        All
-                                    </span>
-                                </div>
-                            </div>
+                            {/*
+                              * Activity filter (All/Agents/Gates/Cost) is not yet
+                              * implemented server-side. A lone "All" chip conveyed
+                              * nothing and read as a stray button (operator-
+                              * reported) — omit the control entirely until the
+                              * filter endpoint ships.
+                              */}
                         </div>
                         {v3 != null ? (
                             <DashboardActivityFeed rows={v3.activity} />
@@ -343,7 +330,9 @@ export const DashboardView: FC<DashboardViewProps> = ({
                         <div class="sec-head">
                             <h2>Cost · 14d</h2>
                             <div class="head-actions">
-                                <span class="meta-mono dim">stacked by phase</span>
+                                {/* #389: bars are single-tone daily totals — the
+                                    ledger records no per-phase attribution. */}
+                                <span class="meta-mono dim">daily totals</span>
                             </div>
                         </div>
                         {v3 != null ? (

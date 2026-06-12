@@ -334,13 +334,6 @@
     margin-bottom: 0;
 }
 
-/* Static seg-btn variant: looks like an active seg-btn but is not interactive.
-   Used when the view-mode/filter controls are not yet wired to endpoints. */
-.seg-btn--static {
-    cursor: default;
-    pointer-events: none;
-}
-
 /* ============================================================
    Topbar right-slot: "auto-refreshing" label
    ============================================================ */
