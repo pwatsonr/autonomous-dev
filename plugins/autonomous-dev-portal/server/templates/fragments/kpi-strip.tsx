@@ -26,6 +26,8 @@ export interface KpiItem {
     label: string;
     value: string | number;
     sub?: string;
+    /** Optional hover tooltip explaining what the figure counts. */
+    title?: string;
 }
 
 export interface KpiStripProps {
@@ -38,7 +40,7 @@ export interface KpiStripProps {
 export const KpiStrip: FC<KpiStripProps> = ({ items, id = "kpi-strip" }) => (
     <div id={id} class="kpi-strip">
         {items.map((it) => (
-            <div class="kpi">
+            <div class="kpi" title={it.title}>
                 <div class="kpi-label">{it.label}</div>
                 <div class="kpi-num">{it.value}</div>
                 {it.sub != null && <div class="kpi-sub">{it.sub}</div>}

@@ -85,7 +85,7 @@ const CostsHeadActions: FC = () => (
     // requirement). Dropped. "Set caps" now deeplinks to the cost-caps
     // section on the Settings General tab.
     <>
-        <a class="btn" href="/settings#cost-caps">
+        <a class="btn ghost sm" href="/settings#cost-caps">
             Set caps
         </a>
     </>

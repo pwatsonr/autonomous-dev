@@ -44,12 +44,12 @@ const REQUESTS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visib
  */
 export const RequestsHeadActions: FC = () => (
     <>
-        <a href="/requests" class="btn">
+        <a href="/requests" class="btn ghost sm">
             Refresh
         </a>
         <a
             href="https://github.com/pwatsonr/autonomous-dev#step-5-submit-your-first-request"
-            class="btn primary"
+            class="btn primary sm"
             target="_blank"
             rel="noopener"
         >
@@ -75,15 +75,18 @@ export function buildRequestsKpiItems(
             label: "Active",
             value: a.activeCount,
             sub: `across ${repoCount} repo${repoCount === 1 ? "" : "s"}`,
+            title: "Requests with status QUEUED or RUNNING — mirrors the Active filter",
         },
         {
             label: "In gate",
             value: a.inGateCount,
             sub: "awaiting approval",
+            title: "Requests with status GATE — mirrors the In gate filter",
         },
         {
             label: "Completed today",
             value: a.completedTodayCount,
+            title: "Requests DONE in the last 24h — the Completed filter shows all terminal requests (done, failed, cancelled)",
             sub: "last 24h",
         },
         {
@@ -224,7 +227,7 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
             <div class="main-inner">
             <KpiStrip items={kpiItems} />
 
-            <section class="sec requests">
+            <section class="sec requests" data-filter-root>
                 <div class="sec-head">
                     <h2>All requests · {items.length}</h2>
                     <div class="seg" data-segmented-filter="requests">
@@ -318,10 +321,21 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
                                 </tr>
                             ))}
                         </tbody>
+                        {/* shown by segmented-filter.js when 0 rows match */}
+                        <tbody data-filter-empty hidden>
+                            <tr>
+                                <td colspan={7} class="empty dim">
+                                    No requests match this filter.
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 )}
             </section>
             </div>
+            {/* Powers the All/Active/In gate/Completed seg (and any other
+                [data-segmented-filter] group). */}
+            <script src="/static/js/segmented-filter.js" defer></script>
         </div>
     );
 };

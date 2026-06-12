@@ -16,15 +16,13 @@ const ROOT = join(import.meta.dir, "..", "..");
 // fails this test.
 const TIER2_ALLOWLIST = new Set([
     // request-detail subcomponents
-    "artifact-diff", "artifact-empty", "artifact-pane", "artifact-pre",
-    "artifact-prose", "artifact-placeholder", "phase-artifact-modal",
+    "artifact-diff", "artifact-placeholder", "phase-artifact-modal",
     "gate-action-panel", "gate-form", "gate-button", "comment-input",
     "comment-label", "char-count", "resolution-comment", "resolution-status",
     "resolved", "request-timeline", "timeline-entry", "entry-body",
     "status-icon", "reviewer-chain-section", "rev-dims", "rev-dim",
-    "rev-dim-link", "rev-dim-name", "run-history", "dot-big", "phase-meta",
-    "phase-name", "rd-verification-override", "applied", "note", "decision",
-    "verdict", "clarifying-questions", "question-options", "question-text",
+    "rev-dim-link", "rev-dim-name", "run-history", "rd-verification-override", "applied", "decision",
+    "clarifying-questions", "question-options", "question-text",
     "error-details-content", "request-header-summary",
     // legacy pre-v3 fragments
     "approval-queue", "gate-strip", "gate-id", "gate-repo", "gate-age",
