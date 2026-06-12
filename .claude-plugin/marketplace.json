@@ -72,7 +72,7 @@
       "name": "autonomous-dev-portal",
       "source": "./plugins/autonomous-dev-portal",
       "description": "Local web portal for monitoring autonomous-dev requests, runs, and audit logs.",
-      "version": "0.3.5",
+      "version": "0.3.6",
       "author": {
         "name": "pwatsonr",
         "url": "https://github.com/pwatsonr"
