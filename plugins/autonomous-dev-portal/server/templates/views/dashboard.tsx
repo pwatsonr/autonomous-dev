@@ -227,7 +227,10 @@ export const DashboardView: FC<DashboardViewProps> = ({
                 <div class="dashboard-error-banner" role="alert" aria-live="assertive">
                     <span class="dashboard-error-banner__icon" aria-hidden="true">⚠</span>
                     <span class="dashboard-error-banner__message">
-                        Failed to load dashboard data — showing last cached snapshot.
+                        {/* #396: there is no cache — zeros render where data
+                            is unavailable. Don't claim a snapshot exists. */}
+                        Failed to load dashboard data — values below may be
+                        incomplete (zeros where data is unavailable).
                     </span>
                     <a href="/" class="btn ghost sm" aria-label="Retry loading dashboard data">
                         Retry

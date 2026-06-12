@@ -748,6 +748,8 @@ export interface RenderProps {
         rows: AuditRow[];
         page?: AuditPageResultProp;
         filters?: AuditFiltersProp;
+        /** Daemon-applied config changes (#396) — separate from the HMAC chain. */
+        configChanges?: Array<{ id: string; actor: string; ts: string; summary: string }>;
     };
     "404": { path: string };
     "500": { message: string };

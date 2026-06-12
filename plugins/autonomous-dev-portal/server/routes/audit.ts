@@ -11,6 +11,7 @@ import { renderPage } from "../lib/response-utils";
 import type { AuditLogReader } from "../services/audit-log-reader";
 import { loadAuditStub } from "../stubs/audit";
 import type { AuditFilters } from "../types/audit-types";
+import { readAppliedConfigChanges } from "../wiring/config-change-store";
 
 let activeReader: AuditLogReader | null = null;
 
@@ -42,7 +43,8 @@ function parseDate(value: string | undefined): {
 export const auditHandler = async (c: Context): Promise<Response> => {
     if (activeReader === null) {
         const rows = await loadAuditStub();
-        return renderPage(c, "audit", { rows });
+        const configChanges = await readAppliedConfigChanges();
+        return renderPage(c, "audit", { rows, configChanges });
     }
     const startDateRaw = c.req.query("startDate");
     const endDateRaw = c.req.query("endDate");
@@ -65,5 +67,8 @@ export const auditHandler = async (c: Context): Promise<Response> => {
     };
     const page = parsePage(c.req.query("page"));
     const result = await activeReader.getPage(page, 50, filters);
-    return renderPage(c, "audit", { rows: [], page: result, filters });
+    // #396: daemon-applied config changes never enter the portal's HMAC
+    // chain — surface them as a separate section.
+    const configChanges = await readAppliedConfigChanges();
+    return renderPage(c, "audit", { rows: [], page: result, filters, configChanges });
 };

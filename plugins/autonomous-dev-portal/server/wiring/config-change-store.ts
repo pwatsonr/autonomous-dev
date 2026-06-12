@@ -58,3 +58,50 @@ export async function writeConfigChangeMarker(opts: {
     await atomicWriteJson(configChangePath(id), marker);
     return id;
 }
+
+export interface AppliedConfigChange {
+    id: string;
+    actor: string;
+    ts: string;
+    summary: string;
+}
+
+/**
+ * #396: list daemon-applied config changes (newest first) for the audit
+ * page. These applications happen DAEMON-side, so they never enter the
+ * portal's HMAC-chained audit log — the page renders them as a clearly
+ * separate section sourced from `config-changes/applied/`.
+ */
+export async function readAppliedConfigChanges(
+    limit = 20,
+): Promise<AppliedConfigChange[]> {
+    const { readdir, readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const { configChangesDir } = await import("./state-paths");
+    const dir = join(configChangesDir(), "applied");
+    let files: string[];
+    try {
+        files = (await readdir(dir)).filter((f) => f.endsWith(".json"));
+    } catch {
+        return [];
+    }
+    const out: AppliedConfigChange[] = [];
+    for (const f of files) {
+        try {
+            const m = JSON.parse(await readFile(join(dir, f), "utf-8")) as
+                Partial<AppliedConfigChange>;
+            if (typeof m.id === "string" && typeof m.ts === "string") {
+                out.push({
+                    id: m.id,
+                    actor: typeof m.actor === "string" ? m.actor : "unknown",
+                    ts: m.ts,
+                    summary: typeof m.summary === "string" ? m.summary : "",
+                });
+            }
+        } catch {
+            /* skip unreadable marker */
+        }
+    }
+    out.sort((a, b) => b.ts.localeCompare(a.ts));
+    return out.slice(0, limit);
+}

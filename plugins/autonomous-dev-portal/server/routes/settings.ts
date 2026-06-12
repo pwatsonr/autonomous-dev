@@ -11,6 +11,8 @@ import { loadSettingsData, loadSettingsStub } from "../stubs/settings";
 import { TAB_IDS, type TabId } from "../types/render";
 import { readPortalSettings, maskWebhookForDisplay } from "../wiring/settings-reader";
 import { readAgentsData } from "../wiring/agents-readers";
+import { costLedgerPath, readMtdSpend } from "../wiring/daemon-readers";
+import { readFile } from "node:fs/promises";
 
 /**
  * SPEC-036-4-01 AC-01 / AC-06 — pure function so it can be unit-tested
@@ -36,6 +38,24 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
 
     // Read real settings from daemon config file and overlay onto stub data
     const realSettings = await readPortalSettings();
+
+    // #396: real spend rings — the stub's {today: 4.18, month: 67.42}
+    // rendered as live data. Today = the ledger's entry for today; month
+    // = the same readMtdSpend() every other surface uses.
+    {
+        const month = await readMtdSpend();
+        let today = 0;
+        try {
+            const ledger = JSON.parse(
+                await readFile(costLedgerPath(), "utf-8"),
+            ) as { daily?: Record<string, { total_usd?: number } | undefined> };
+            const t = ledger.daily?.[new Date().toISOString().slice(0, 10)]?.total_usd;
+            if (typeof t === "number") today = t;
+        } catch {
+            /* zeros are honest when the ledger is unreadable */
+        }
+        data.currentSpend = { today, month };
+    }
 
     // Allowlist
     data.allowlist = realSettings.allowlist.map((entry) => ({
