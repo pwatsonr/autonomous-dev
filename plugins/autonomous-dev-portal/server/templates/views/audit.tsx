@@ -158,11 +158,50 @@ const FilterForm: FC<FilterFormProps> = ({ filters }) => (
     </form>
 );
 
-export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters }) => {
+// #396: daemon-applied config changes happen outside the portal process,
+// so they never enter the HMAC-chained portal audit log. Render them as a
+// clearly-separate section (sourced from config-changes/applied/) instead
+// of silently omitting config history from the audit surface.
+const ConfigChangesSection: FC<{
+    changes: NonNullable<RenderProps["audit"]["configChanges"]>;
+}> = ({ changes }) => (
+    <div class="audit-config-changes">
+        <h2>Config changes (daemon-applied)</h2>
+        <p class="dim">
+            Applied by the daemon from portal-submitted markers — recorded
+            here from the marker archive, outside the HMAC chain below.
+        </p>
+        <table class="audit-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Actor</th>
+                    <th>Summary</th>
+                    <th>Marker</th>
+                </tr>
+            </thead>
+            <tbody>
+                {changes.map((m) => (
+                    <tr key={m.id}>
+                        <td class="mono">{m.ts}</td>
+                        <td>{m.actor}</td>
+                        <td>{m.summary}</td>
+                        <td class="mono">{m.id.slice(0, 8)}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </div>
+);
+
+export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, configChanges }) => {
     if (page === undefined) {
         return (
             <section class="audit">
                 <h1>Audit log</h1>
+                {configChanges !== undefined && configChanges.length > 0 && (
+                    <ConfigChangesSection changes={configChanges} />
+                )}
                 <table class="audit-table">
                     <thead>
                         <tr>
@@ -193,6 +232,9 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters }) => 
     return (
         <section class="audit">
             <h1>Audit log</h1>
+            {configChanges !== undefined && configChanges.length > 0 && (
+                <ConfigChangesSection changes={configChanges} />
+            )}
             <FilterForm filters={liveFilters} />
             <div class="audit-status">
                 <IntegrityIndicator

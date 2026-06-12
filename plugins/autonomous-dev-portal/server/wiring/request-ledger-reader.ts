@@ -57,6 +57,25 @@ async function readJsonOrNull<T>(path: string): Promise<T | null> {
     }
 }
 
+/**
+ * Normalize a daemon phase string to the portal's lowercase PhaseKey
+ * vocabulary (#396). The daemon writes UPPERCASE phases and a wider set
+ * (INTEGRATION, MONITOR, SPEC_REVIEW, ...) than the 8 lane keys; the old
+ * exact-match check meant every live card fell into the "prd" lane and
+ * phase chips rendered unstyled uppercase classes.
+ */
+export function normalizePhase(raw: unknown): string {
+    const p = typeof raw === "string" ? raw.toLowerCase() : "";
+    const KNOWN = ["prd", "tdd", "plan", "spec", "code", "review", "deploy", "observe"];
+    if (KNOWN.includes(p)) return p;
+    if (p === "") return "prd";
+    if (p.endsWith("_review")) return "review";
+    if (p === "integration") return "deploy";
+    if (p === "monitor" || p === "observation") return "observe";
+    if (p === "intake") return "prd";
+    return "prd";
+}
+
 /** Lift a parsed request-action file into the view-input shape, with safe defaults. */
 function projectAction(a: RequestActionFile): DashboardRequest | null {
     // Without an id the row has no identity — skip it, but say so (the
@@ -76,7 +95,7 @@ function projectAction(a: RequestActionFile): DashboardRequest | null {
         id: a.id,
         repo: typeof a.repo === "string" ? a.repo : "unknown",
         title: a.title ?? "",
-        phase: a.phase ?? "",
+        phase: normalizePhase(a.phase), // #396: daemon vocab → lane keys
         status: a.status ?? "running",
         cost: typeof a.cost === "number" ? a.cost : 0,
         turns: typeof a.turns === "number" ? a.turns : 0,
