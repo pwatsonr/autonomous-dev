@@ -44,7 +44,8 @@ export function buildCostsKpis(s: CostSeries): KpiItem[] {
     ).length;
     const reqCount = s.requestCount ?? 0;
     const avgPerReq = reqCount > 0 ? totalMtd / reqCount : 0;
-    const cap = s.costCap ?? 400;
+    // #396: cap is null when none is configured — say so, never invent $400.
+    const cap = s.costCap ?? null;
 
     return [
         {
@@ -52,7 +53,7 @@ export function buildCostsKpis(s: CostSeries): KpiItem[] {
             sseChannel: "costs:kpis",
             label: "MTD spend",
             value: `$${totalMtd.toFixed(2)}`,
-            sub: `cap $${cap.toFixed(2)}`,
+            sub: cap !== null ? `cap $${cap.toFixed(2)}` : "no cap configured",
         },
         {
             id: "kpi-reviewers",
@@ -97,7 +98,7 @@ export const CostsView: FC<RenderProps["costs"] & { projection?: ProjectionResul
     const reviewerSpend = series.reviewerSpend ?? [];
     const deploySpend = series.deploySpend ?? [];
     const phaseSpend = series.phaseSpend ?? [];
-    const cap = series.costCap ?? 400;
+    const cap = series.costCap ?? null; // #396: null = no cap configured
     const mtd = series.totalMtd ?? 0;
     const proj: ProjectionResult = projection ?? {
         projected: 0,

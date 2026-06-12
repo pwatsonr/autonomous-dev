@@ -28,9 +28,10 @@ describe("readCostsData — kit-parity fixture", () => {
 
     test("emits a daily chart series from cost-ledger.json", async () => {
         const series = await readCostsData();
-        // kit-parity has 10 daily entries.
-        expect(series.points.length).toBe(10);
-        // All points have a non-negative value.
+        // #396: the series is the last 30 CALENDAR days, zero-filled.
+        // The kit-parity fixture's static dates fall outside the live
+        // window, so values are zero — but the shape contract holds.
+        expect(series.points.length).toBe(30);
         for (const p of series.points) {
             expect(p.value).toBeGreaterThanOrEqual(0);
         }
@@ -43,10 +44,13 @@ describe("readCostsData — kit-parity fixture", () => {
         expect(series.deploySpend).toEqual([]);
     });
 
-    test("requestCount reflects the request ledger", async () => {
+    test("requestCount is month-scoped from ledger sessions (#396)", async () => {
         const series = await readCostsData();
-        // kit-parity has 9 request-actions/*.json files.
-        expect(series.requestCount).toBe(9);
+        // #396: the avg/request denominator counts DISTINCT request ids
+        // with sessions in the CURRENT month (the old all-time request
+        // count deflated the average). The kit-parity fixture's sessions
+        // carry static dates outside the current month → 0.
+        expect(series.requestCount).toBe(0);
     });
 });
 
@@ -70,9 +74,12 @@ describe("readCostsData — empty state-dir (honesty contract)", () => {
 
     test("empty state-dir yields zero KPIs across the board", async () => {
         const series = await readCostsData();
-        expect(series.points.length).toBe(0);
+        // #396: 30 zero-filled calendar days (honest empty), not [].
+        expect(series.points.length).toBe(30);
+        expect(series.points.every((p) => p.value === 0)).toBe(true);
         expect(series.totalMtd).toBe(0);
         expect(series.requestCount).toBe(0);
+        expect(series.costCap).toBeNull();
         expect(series.reviewerSpend).toEqual([]);
         expect(series.phaseSpend).toEqual([]);
         expect(series.deploySpend).toEqual([]);

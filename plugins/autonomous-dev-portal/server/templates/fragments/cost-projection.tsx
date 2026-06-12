@@ -19,8 +19,8 @@ import { EmptyState } from "./empty-state";
 export interface CostProjectionProps {
     /** Output of `projectMonthEnd` — already-clamped numbers. */
     projection: ProjectionResult;
-    /** Monthly cap in USD; passed straight into the CostRing. */
-    cap: number;
+    /** Monthly cap in USD; null = no cap configured (#396). */
+    cap: number | null;
     /** Month-to-date spend in USD; drives the empty-state branch. */
     mtd: number;
 }
@@ -45,11 +45,20 @@ export const CostProjection: FC<CostProjectionProps> = ({
     }
     return (
         <div class="cost-projection">
-            <CostRing
-                spent={projection.projected}
-                cap={cap}
-                label="Projected"
-            />
+            {cap !== null ? (
+                <CostRing
+                    spent={projection.projected}
+                    cap={cap}
+                    label="Projected"
+                />
+            ) : (
+                // #396: no cap configured — show the projection as a plain
+                // stat instead of a ring against an invented denominator.
+                <div class="cost-projection-nocap">
+                    <div class="kpi-num">{fmtUsd(projection.projected)}</div>
+                    <div class="dim">Projected · no cap configured</div>
+                </div>
+            )}
             <dl class="kv mono">
                 <dt>Run rate / day</dt>
                 <dd>{fmtUsd(projection.runRateDaily)}</dd>

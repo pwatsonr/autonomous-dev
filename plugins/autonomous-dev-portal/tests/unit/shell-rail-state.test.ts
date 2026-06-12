@@ -171,8 +171,12 @@ describe("deriveShellRailState — SPEC-037-3-05", () => {
         expect(state.agentsAlertCount).toBeGreaterThanOrEqual(0);
     });
 
-    test("kill_switch_active flag flows into killSwitchEngaged", async () => {
+    test("kill-switch flag file flows into killSwitchEngaged", async () => {
+        // #396: the old assertion wrote a `kill_switch_active` heartbeat
+        // field that the real daemon never writes — pinning a phantom.
+        // The daemon's actual signal is the kill-switch.flag file.
         writeHeartbeat(new Date().toISOString(), true);
+        writeFileSync(join(stateDir, "kill-switch.flag"), "");
         const state = await deriveShellRailState();
         expect(state.killSwitchEngaged).toBe(true);
     });
@@ -208,5 +212,22 @@ describe("breaker state from crash-state.json (#396)", () => {
         writeHeartbeat(new Date().toISOString());
         const state = await deriveShellRailState();
         expect(state.breakerState).toBeUndefined();
+    });
+});
+
+// #396 — kill-switch engaged state comes from the FLAG FILE, not a
+// phantom heartbeat field (which never existed → never rendered engaged).
+describe("kill-switch from flag file (#396)", () => {
+    test("SR-09: flag present → engaged", async () => {
+        writeHeartbeat(new Date().toISOString());
+        writeFileSync(join(stateDir, "kill-switch.flag"), "");
+        const state = await deriveShellRailState();
+        expect(state.killSwitchEngaged).toBe(true);
+    });
+
+    test("SR-10: no flag → not engaged", async () => {
+        writeHeartbeat(new Date().toISOString());
+        const state = await deriveShellRailState();
+        expect(state.killSwitchEngaged).toBe(false);
     });
 });
