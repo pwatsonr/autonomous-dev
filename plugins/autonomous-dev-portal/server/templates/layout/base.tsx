@@ -27,6 +27,7 @@
 //   3. /static/theme-toggle.js (SPEC-034-1-05) is loaded `defer` after
 //      the IIFE when the asset is present.
 
+import { asset } from "../../lib/plugin-version";
 import type { FC } from "hono/jsx";
 
 import { Navigation } from "../fragments/navigation";
@@ -74,10 +75,10 @@ export const BaseLayout: FC<Props> = ({ activePath, cspNonce, children }) => (
             ></script>
             {/* SPEC-034-1-06 AC-01/02/03 — design-tokens.css is the FIRST
                 stylesheet; portal.css consumes its CSS variables. */}
-            <link rel="stylesheet" href="/static/design-tokens.css" />
-            <link rel="stylesheet" href="/static/portal.css" />
+            <link rel="stylesheet" href={asset("/static/design-tokens.css")} />
+            <link rel="stylesheet" href={asset("/static/portal.css")} />
             <script
-                src="/static/htmx.min.js"
+                src={asset("/static/htmx.min.js")}
                 defer
                 nonce={cspNonce ?? ""}
             ></script>

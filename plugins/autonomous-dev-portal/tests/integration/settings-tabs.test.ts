@@ -72,8 +72,8 @@ describe("GET /settings?tab=<id>", () => {
 
     test("renders three module scripts (settings-tabs, form-validation, settings-modals)", async () => {
         const html = await fetchSettingsHtml("/settings");
-        expect(html).toContain('src="/static/js/settings-tabs.js"');
-        expect(html).toContain('src="/static/js/form-validation.js"');
-        expect(html).toContain('src="/static/js/settings-modals.js"');
+        expect(html).toContain('src="/static/js/settings-tabs.js');
+        expect(html).toContain('src="/static/js/form-validation.js');
+        expect(html).toContain('src="/static/js/settings-modals.js');
     });
 });

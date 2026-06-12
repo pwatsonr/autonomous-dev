@@ -121,3 +121,16 @@ describe("portal-wide CSS coverage (#417)", () => {
         expect(offenders).toEqual([]);
     });
 });
+
+describe("asset cache-busting (crawl p6 follow-up)", () => {
+    test("no raw /static/ href|src in templates — must use asset()", () => {
+        const offenders: string[] = [];
+        for (const f of templateFiles()) {
+            const src = readFileSync(f, "utf-8");
+            if (/(href|src)="\/static\//.test(src)) {
+                offenders.push(f.split("/").pop()!);
+            }
+        }
+        expect(offenders).toEqual([]);
+    });
+});

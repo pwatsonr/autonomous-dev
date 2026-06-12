@@ -9,6 +9,7 @@
 // because the daemon's `agent-states.json` only persists `{frozen[], shadowed[]}`
 // — the rich kit-screenshot metrics are not part of the daemon's writeset.
 
+import { asset } from "../../lib/plugin-version";
 import type { FC } from "hono/jsx";
 import { Topbar } from "../../components/topbar";
 
@@ -164,7 +165,7 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
 
         {/* Modal-slot lives in ShellLayout (shell.tsx) so it's available
             on every surface — do not duplicate the id here. */}
-        <script src="/static/js/agents-row-click.js" defer></script>
+        <script src={asset("/static/js/agents-row-click.js")} defer></script>
         </div>
     </section>
 );

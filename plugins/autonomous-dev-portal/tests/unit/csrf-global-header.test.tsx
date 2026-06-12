@@ -20,7 +20,7 @@ describe("global CSRF header wiring", () => {
             "tok-global-csrf",
         );
         expect(html).toContain('<meta name="csrf-token" content="tok-global-csrf"');
-        expect(html).toContain('src="/static/csrf-htmx.js"');
+        expect(html).toContain('src="/static/csrf-htmx.js');
     });
 
     test("no token → no meta tag (script still loads, no-ops)", async () => {
