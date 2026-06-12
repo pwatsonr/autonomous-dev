@@ -1,0 +1,123 @@
+# portal-check-questions.yaml -- Test cases for the portal-check skill
+# 8 cases across: service health, surface sweep, data cross-checks, known
+# failure modes. Informed by the 2026-06-11 portal audit (issues #389-#396).
+
+suite: portal-check
+skill: portal-check
+description: >
+  Validates that the portal-check skill diagnoses autonomous-dev portal
+  problems correctly: service health, data-accuracy cross-checks against
+  daemon state files, and the confirmed known failure modes.
+schema: eval-case-v1
+case_minimum: 8
+negative_minimum: 4
+
+cases:
+
+  - id: portal-svc-001
+    category: troubleshoot-scenario
+    difficulty: easy
+    question: "The autonomous-dev portal won't load at localhost:19280. How do I check if it's running and restart it?"
+    expected_topics:
+      - launchctl
+      - com.autonomous-dev.portal
+      - portal-stderr.log
+      - curl
+    must_mention:
+      - "19280"
+      - "launchctl"
+    must_not_mention:
+      - "0.0.0.0"
+
+  - id: portal-svc-002
+    category: troubleshoot-scenario
+    difficulty: medium
+    question: "After updating the portal plugin, the portal service fails with 'ENOENT while resolving package hono'. What happened?"
+    expected_topics:
+      - node_modules not shipped by plugin update
+      - bun install
+      - plugin cache directory
+    must_mention:
+      - "bun install"
+    must_not_mention:
+      - "npm install"
+
+  - id: portal-svc-003
+    category: troubleshoot-scenario
+    difficulty: medium
+    question: "portal-stderr.log shows repeated PORT_IN_USE startup_failed entries every 10 seconds. What's going on?"
+    expected_topics:
+      - manually started instance holding the port
+      - launchd retry loop
+      - kill the manual process
+    must_mention:
+      - "launchd"
+    must_not_mention:
+      - "reboot"
+
+  - id: portal-data-001
+    category: concept-explanation
+    difficulty: medium
+    question: "The portal dashboard shows a 14-day cost chart with hundreds of dollars but my MTD spend KPI says about twenty. Which is right?"
+    expected_topics:
+      - dashboard cost chart is fabricated/hardcoded demo data
+      - cost-ledger.json is ground truth
+      - MTD KPI is real
+    must_mention:
+      - "cost-ledger.json"
+    must_not_mention:
+      - "the chart is accurate"
+
+  - id: portal-data-002
+    category: concept-explanation
+    difficulty: medium
+    question: "The portal says 6 approvals are pending but the daemon is idle and /api/daemon-status says approvalsCount is 0. Why?"
+    expected_topics:
+      - stale pending gate-decision files
+      - terminal requests resurrected
+      - gate-decisions directory
+      - daemon-status is correct
+    must_mention:
+      - "gate-decision"
+    must_not_mention:
+      - "restart the portal"
+
+  - id: portal-data-003
+    category: config-lookup
+    difficulty: easy
+    question: "Where does the portal read the daemon heartbeat from, and what fields does that file actually have?"
+    expected_topics:
+      - heartbeat.json
+      - timestamp pid iteration_count active_request_id
+    must_mention:
+      - "heartbeat.json"
+      - "iteration_count"
+    must_not_mention:
+      - "version field"
+
+  - id: portal-known-001
+    category: troubleshoot-scenario
+    difficulty: medium
+    question: "Clicking Approve on the portal approvals page does nothing. No error appears. Is my gate decision being recorded?"
+    expected_topics:
+      - 403 CSRF failure
+      - token not rendered on approvals page
+      - no UI feedback
+      - use the CLI instead
+    must_mention:
+      - "CSRF"
+    must_not_mention:
+      - "try a different browser"
+
+  - id: portal-known-002
+    category: troubleshoot-scenario
+    difficulty: hard
+    question: "I saved notification settings in the portal and later my daemon stopped picking up requests entirely. Are these related?"
+    expected_topics:
+      - config-change marker overwrite wiped repositories.allowlist
+      - fixed in daemon 0.3.11 (merge instead of replace)
+      - check config-changes/applied and the allowlist
+    must_mention:
+      - "allowlist"
+    must_not_mention:
+      - "coincidence"
