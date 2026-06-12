@@ -151,7 +151,7 @@ export const OpsView: FC<OpsViewV3Props> = ({
                         <OpsDaemonTile
                             status={health.daemon.status}
                             pid={health.daemon.pid}
-                            uptime={health.uptime}
+                            lastHeartbeat={health.lastHeartbeat}
                             port={daemonPort}
                             csrfToken={csrfToken}
                         />

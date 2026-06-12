@@ -27,8 +27,7 @@ const TIER2_ALLOWLIST = new Set([
     // legacy pre-v3 fragments
     "approval-queue", "gate-strip", "gate-id", "gate-repo", "gate-age",
     "gate-left", "gate-mid", "deploy-pipeline-section", "pipeline-section",
-    "standards-drift", "heartbeat", "heartbeat-svg", "breaker-grid",
-    "requests", "audit-row", "result",
+    "standards-drift", "heartbeat", "heartbeat-svg",     "requests", "audit-row", "result",
     "integrity", "error-icon-svg", "error-nav-suggestions",
     "approvals-table-rows",
 ]);

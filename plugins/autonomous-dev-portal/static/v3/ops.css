@@ -428,3 +428,63 @@
 .kill-tile.engaged {
   animation: ops-kill-pulse 1.4s ease-in-out infinite;
 }
+
+/* ============================================================
+   Circuit breakers — #417 tier-2 burndown (crawl p6). The section
+   rendered as bare text lines: .breaker-grid and .breaker had no CSS.
+   ============================================================ */
+.breaker-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--s-3);
+}
+
+.breaker {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    background: var(--bg-1);
+    border: 1px solid var(--border-thin);
+    border-radius: 3px;
+    padding: var(--s-3);
+    min-width: 0;
+}
+
+.breaker .label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    color: var(--fg-1);
+}
+
+.breaker .state {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ok);
+}
+
+.breaker.unavail .state {
+    color: var(--fg-3);
+}
+
+.breaker.tripped {
+    border-color: var(--err-line);
+}
+
+.breaker.tripped .state {
+    color: var(--err);
+}
+
+@media (max-width: 1100px) {
+    .breaker-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

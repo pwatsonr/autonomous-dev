@@ -54,7 +54,10 @@ export const OpsKillTile: FC<OpsKillTileProps> = ({
         <div class={`kill-tile${engaged ? " engaged" : ""} sec`}>
             <div class="kill-tile-inner">
                 <div class="kill-tile-body">
-                    <h3>Kill switch · {engaged ? "ENGAGED" : "armed"}</h3>
+                    {/* "armed" CSS-uppercases to ARMED and reads as an alarm
+                        state while the chip says DISENGAGED (crawl p6).
+                        "ready" states the same fact without the scare. */}
+                    <h3>Kill switch · {engaged ? "ENGAGED" : "ready"}</h3>
                     <p class="kill-tile-desc">
                         Engaging halts every running agent within ~3s,
                         returns in-flight requests to the queue, and refuses
