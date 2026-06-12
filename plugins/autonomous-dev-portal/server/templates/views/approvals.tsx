@@ -541,7 +541,6 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                     <GateStatsCard stats={stats} />
                 </div>
             </div>
-            <script src="/static/js/segmented-filter.js" defer></script>
         </div>
     );
 };

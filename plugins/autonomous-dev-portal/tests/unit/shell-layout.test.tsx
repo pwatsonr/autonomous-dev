@@ -271,10 +271,10 @@ describe("ShellLayout — SPEC-035-1-01", () => {
             <ShellLayout activePath="/" cspNonce={NONCE} />,
         );
         const htmxMatch = html.match(
-            /<script[^>]*src=["']\/static\/htmx\.min\.js["'][^>]*>/,
+            /<script[^>]*src=["']\/static\/htmx\.min\.js[^"']*["'][^>]*>/,
         );
         const themeMatch = html.match(
-            /<script[^>]*src=["']\/static\/theme-toggle\.js["'][^>]*>/,
+            /<script[^>]*src=["']\/static\/theme-toggle\.js[^"']*["'][^>]*>/,
         );
         expect(htmxMatch).not.toBeNull();
         expect(themeMatch).not.toBeNull();

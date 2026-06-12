@@ -20,8 +20,8 @@
 // AC-04: bracket color comes from .rail-brand .wm .br { color: var(--brand) }
 //        in portal.css; this component does not inline a color style.
 
+import { PLUGIN_VERSION } from "../lib/plugin-version";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import type { FC } from "hono/jsx";
 
@@ -36,34 +36,6 @@ import type { FC } from "hono/jsx";
  * Caption renders the U+00B7 middle dot (·) between literal `CONTROL PLANE`
  * and `v{PLUGIN_VERSION}` — not a hyphen (AC-04).
  */
-const PLUGIN_VERSION: string = (() => {
-    const fallback = "0.0.0";
-    try {
-        // `import.meta.dir` is provided by Bun and resolves to this file's
-        // directory; `..` twice walks up to the plugin root where
-        // `.claude-plugin/plugin.json` lives.
-        const path = join(
-            import.meta.dir,
-            "..",
-            "..",
-            ".claude-plugin",
-            "plugin.json",
-        );
-        const raw = readFileSync(path, "utf-8");
-        const parsed = JSON.parse(raw) as unknown;
-        if (
-            typeof parsed === "object" &&
-            parsed !== null &&
-            "version" in parsed &&
-            typeof (parsed as { version: unknown }).version === "string"
-        ) {
-            return (parsed as { version: string }).version;
-        }
-        return fallback;
-    } catch {
-        return fallback;
-    }
-})();
 
 export interface BrandWordmarkProps {
     // When true, wraps the wordmark in `[ ... ]` brackets colored via

@@ -41,6 +41,7 @@
 //   - No inline `style="…"` attributes; styling lives in shell.css and
 //     consumes design tokens only (R-15a).
 
+import { asset } from "../lib/plugin-version";
 import type { FC } from "hono/jsx";
 
 import type { Theme } from "../lib/theme";
@@ -276,7 +277,7 @@ export const ShellLayout: FC<ShellProps> = ({
                 <link
                     rel="icon"
                     type="image/svg+xml"
-                    href="/static/favicon.svg"
+                    href={asset("/static/favicon.svg")}
                 />
                 {/* SPEC-034-1-06 — synchronous FOUC-prevention IIFE.
                     Must run BEFORE any stylesheet so `data-theme` is set
@@ -287,28 +288,28 @@ export const ShellLayout: FC<ShellProps> = ({
                 ></script>
                 {/* SPEC-034-1-06 AC-01/02/03 — design-tokens.css is the
                     FIRST stylesheet so `var(--…)` references resolve. */}
-                <link rel="stylesheet" href="/static/design-tokens.css" />
-                <link rel="stylesheet" href="/static/app.css" />
+                <link rel="stylesheet" href={asset("/static/design-tokens.css")} />
+                <link rel="stylesheet" href={asset("/static/app.css")} />
                 {/* FR-026-07 — per-view v3 CSS stubs loaded after app.css so
                     view-specific overrides can safely shadow shared rules.
                     Files are initially empty; view-agent agents populate them. */}
-                <link rel="stylesheet" href="/static/v3/dashboard.css" />
-                <link rel="stylesheet" href="/static/v3/request-detail.css" />
-                <link rel="stylesheet" href="/static/v3/approvals.css" />
-                <link rel="stylesheet" href="/static/v3/ops.css" />
-                <link rel="stylesheet" href="/static/v3/logs.css" />
+                <link rel="stylesheet" href={asset("/static/v3/dashboard.css")} />
+                <link rel="stylesheet" href={asset("/static/v3/request-detail.css")} />
+                <link rel="stylesheet" href={asset("/static/v3/approvals.css")} />
+                <link rel="stylesheet" href={asset("/static/v3/ops.css")} />
+                <link rel="stylesheet" href={asset("/static/v3/logs.css")} />
                 {/* #417 tier-1: rules for previously-unstyled template
                     classes (see tests/unit/css-coverage.test.ts). */}
-                <link rel="stylesheet" href="/static/v3/components.css" />
-                <link rel="stylesheet" href="/static/portal.css" />
-                <link rel="stylesheet" href="/static/shell.css" />
+                <link rel="stylesheet" href={asset("/static/v3/components.css")} />
+                <link rel="stylesheet" href={asset("/static/portal.css")} />
+                <link rel="stylesheet" href={asset("/static/shell.css")} />
                 <script
-                    src="/static/htmx.min.js"
+                    src={asset("/static/htmx.min.js")}
                     defer
                     nonce={nonce}
                 ></script>
                 <script
-                    src="/static/theme-toggle.js"
+                    src={asset("/static/theme-toggle.js")}
                     type="module"
                     nonce={nonce}
                 ></script>
@@ -316,7 +317,7 @@ export const ShellLayout: FC<ShellProps> = ({
                     module that self-attaches on DOMContentLoaded and
                     on htmx:afterSwap so OOB swaps re-bind cleanly. */}
                 <script
-                    src="/static/segmented-filter.js"
+                    src={asset("/static/js/segmented-filter.js")}
                     defer
                     nonce={nonce}
                 ></script>
@@ -324,7 +325,7 @@ export const ShellLayout: FC<ShellProps> = ({
                     network failures as a dismissible banner (HTMX swallows
                     them by default, leaving actions silently dead). */}
                 <script
-                    src="/static/htmx-error-feedback.js"
+                    src={asset("/static/htmx-error-feedback.js")}
                     defer
                     nonce={nonce}
                 ></script>
@@ -332,7 +333,7 @@ export const ShellLayout: FC<ShellProps> = ({
                     reads the csrf-token meta above. Fixes the recurring
                     missed-hx-include class (notification Test buttons etc.). */}
                 <script
-                    src="/static/csrf-htmx.js"
+                    src={asset("/static/csrf-htmx.js")}
                     defer
                     nonce={nonce}
                 ></script>

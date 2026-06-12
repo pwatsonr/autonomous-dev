@@ -16,6 +16,7 @@
 // for the existing POST /settings round-trip (server-side persistence
 // path). The default `SettingsView` is the redesigned tabbed page.
 
+import { asset } from "../../lib/plugin-version";
 import type { FC } from "hono/jsx";
 import { Topbar } from "../../components/topbar";
 
@@ -462,9 +463,9 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
                 <AgentInspectModal agent={agent} />
             ))}
 
-            <script type="module" src="/static/js/settings-tabs.js"></script>
-            <script type="module" src="/static/js/form-validation.js"></script>
-            <script type="module" src="/static/js/settings-modals.js"></script>
+            <script type="module" src={asset("/static/js/settings-tabs.js")}></script>
+            <script type="module" src={asset("/static/js/form-validation.js")}></script>
+            <script type="module" src={asset("/static/js/settings-modals.js")}></script>
         </div>
         </div>
     );

@@ -15,6 +15,7 @@
 // swimlanes fall back to deterministic seeded demo data (see
 // groupRequestsByPhase in dashboard-readers.ts).
 
+import { asset } from "../../lib/plugin-version";
 import type { FC } from "hono/jsx";
 
 import { Topbar } from "../../components/topbar";
@@ -373,7 +374,7 @@ export const DashboardView: FC<DashboardViewProps> = ({
             </div>
             {/* External JS for the Pause feed toggle. CSP disallows inline
                 onclick attributes; the handler lives in static/js/. */}
-            <script src="/static/js/dashboard-feed-pause.js" defer></script>
+            <script src={asset("/static/js/dashboard-feed-pause.js")} defer></script>
         </div>
     );
 };

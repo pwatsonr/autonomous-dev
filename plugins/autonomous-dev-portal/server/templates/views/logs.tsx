@@ -2,6 +2,7 @@
 // FR-026-32 — v3 rework: full terminal layout with Topbar, filter strip,
 // follow-tail chip, tone-colored log rows, and HTMX polling.
 
+import { asset } from "../../lib/plugin-version";
 import type { FC } from "hono/jsx";
 
 import type { RenderProps } from "../../types/render";
@@ -112,7 +113,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                 aria-pressed management + error state; loaded here so it is
                 scoped to this page only. The module self-initialises on
                 DOMContentLoaded and re-binds after htmx:afterSettle swaps. */}
-            <script src="/static/js/logs-view.js" type="module"></script>
+            <script src={asset("/static/js/logs-view.js")} type="module"></script>
 
             <div class="main-inner" id="logs-root">
                 {/* Filter strip: grep input + follow-tail chip + clear button */}

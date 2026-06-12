@@ -333,9 +333,6 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
                 )}
             </section>
             </div>
-            {/* Powers the All/Active/In gate/Completed seg (and any other
-                [data-segmented-filter] group). */}
-            <script src="/static/js/segmented-filter.js" defer></script>
         </div>
     );
 };
