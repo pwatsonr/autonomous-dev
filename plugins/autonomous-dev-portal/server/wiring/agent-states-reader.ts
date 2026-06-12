@@ -18,6 +18,7 @@
 // (PLAN-038 O.Q. #3); the view renders `—`.
 
 import { readdir, readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 import type { AgentRow } from "../types/render";
@@ -72,35 +73,92 @@ async function readAgentManifest(
 export interface AgentStatesReaderOptions {
     /** Override the agent-states.json path (default: state-paths). */
     statesPath?: string;
-    /** Override the manifest directory (default: ../../autonomous-dev/agents). */
+    /** Override the manifest directory (skips resolution entirely). */
     manifestDir?: string;
+    /** Override the installed-plugin cache root (tests). Default:
+     *  ~/.claude/plugins/cache/autonomous-dev/autonomous-dev */
+    cacheRootDir?: string;
 }
 
-/** Default manifest directory: `plugins/autonomous-dev/agents` relative
- *  to this file's location (server/wiring → ../../../autonomous-dev/agents). */
-function defaultManifestDir(): string {
-    return join(import.meta.dir, "..", "..", "..", "autonomous-dev", "agents");
+/** True when `path` is a readable directory. */
+async function dirExists(path: string): Promise<boolean> {
+    try {
+        await readdir(path);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** Sort semver-ish version strings descending ("0.3.11" before "0.3.9"). */
+function compareSemverDesc(a: string, b: string): number {
+    const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+    const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const d = (pb[i] ?? 0) - (pa[i] ?? 0);
+        if (d !== 0) return d;
+    }
+    return 0;
+}
+
+/**
+ * Resolve the agent-manifest directory (#394). The old default climbed
+ * `../../../autonomous-dev/agents` from this file — correct in the repo
+ * checkout but nonexistent in the INSTALLED layout, where each plugin
+ * lives under its own version dir in the cache
+ * (`~/.claude/plugins/cache/autonomous-dev/<plugin>/<version>/...`), so
+ * /agents rendered 0 agents on every real install. Resolution order:
+ *   1. repo layout relative to this file (dev checkouts)
+ *   2. installed cache: highest version of autonomous-dev with an agents/ dir
+ */
+export async function resolveManifestDir(
+    cacheRootDir?: string,
+    repoDirOverride?: string,
+): Promise<string | null> {
+    const repoDir = repoDirOverride ??
+        join(import.meta.dir, "..", "..", "..", "autonomous-dev", "agents");
+    if (await dirExists(repoDir)) return repoDir;
+
+    const cacheRoot = cacheRootDir ??
+        join(homedir(), ".claude", "plugins", "cache", "autonomous-dev", "autonomous-dev");
+    try {
+        const versions = (await readdir(cacheRoot))
+            .filter((v) => /^\d+\.\d+/.test(v))
+            .sort(compareSemverDesc);
+        for (const v of versions) {
+            const d = join(cacheRoot, v, "agents");
+            if (await dirExists(d)) return d;
+        }
+    } catch {
+        /* no cache root — fall through */
+    }
+    return null;
 }
 
 export async function readAgentStates(
     opts: AgentStatesReaderOptions = {},
 ): Promise<AgentRow[]> {
-    const manifestRoot = opts.manifestDir ?? defaultManifestDir();
+    const manifestRoot =
+        opts.manifestDir ?? (await resolveManifestDir(opts.cacheRootDir));
     const statesFile = opts.statesPath ?? agentStatesPath();
 
     // ---------- 1. Manifest scan ----------
-    let manifestFiles: string[];
-    try {
-        manifestFiles = (await readdir(manifestRoot)).filter((f) =>
-            f.endsWith(".md"),
-        );
-    } catch {
-        manifestFiles = [];
+    let manifestFiles: string[] = [];
+    if (manifestRoot !== null) {
+        try {
+            manifestFiles = (await readdir(manifestRoot)).filter((f) =>
+                f.endsWith(".md"),
+            );
+        } catch {
+            manifestFiles = [];
+        }
     }
 
-    const manifestEntries = await Promise.all(
-        manifestFiles.map((f) => readAgentManifest(join(manifestRoot, f))),
-    );
+    const manifestEntries = manifestRoot !== null
+        ? await Promise.all(
+              manifestFiles.map((f) => readAgentManifest(join(manifestRoot, f))),
+          )
+        : [];
 
     // ---------- 2. State overlay ----------
     const states = (await readJsonOrNull<AgentStatesFile>(statesFile)) ?? {};
@@ -124,6 +182,28 @@ export async function readAgentStates(
             lastDispatchAt: null,
             runs30d: null,
             fpRate: null,
+        });
+    }
+
+    // #394: agents named in the lifecycle overlay must surface even when
+    // the manifest scan finds nothing (degraded install) — a shadowed
+    // code-executor disappearing entirely is worse than a row with an
+    // unknown version.
+    const known = new Set(rows.map((r) => r.name));
+    for (const name of frozen) {
+        if (known.has(name)) continue;
+        known.add(name);
+        rows.push({
+            name, version: "0.0.0", status: "frozen", mode: "active",
+            lastDispatchAt: null, runs30d: null, fpRate: null,
+        });
+    }
+    for (const name of shadowed) {
+        if (known.has(name)) continue;
+        known.add(name);
+        rows.push({
+            name, version: "0.0.0", status: "shadow", mode: "active",
+            lastDispatchAt: null, runs30d: null, fpRate: null,
         });
     }
 
