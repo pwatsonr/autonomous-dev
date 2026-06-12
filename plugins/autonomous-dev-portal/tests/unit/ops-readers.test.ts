@@ -24,12 +24,14 @@ describe("readOpsHealth — empty state-dir (honesty contract)", () => {
         }
     });
 
-    test("with no heartbeat, daemon renders dead + uptime dash", async () => {
+    test("with no heartbeat, daemon renders dead + last-heartbeat dash", async () => {
         const ops = await readOpsHealth();
         // Daemon goes to "dead" when heartbeat is missing.
         expect(ops.daemon.status).toBe("dead");
         expect(ops.daemon.pid).toBeNull();
-        expect(ops.uptime).toBe("—");
+        // Crawl p6: the old `uptime` field put the string "alive" in a
+        // duration row — replaced by the honest relative timestamp.
+        expect(ops.lastHeartbeat).toBe("—");
     });
 
     test("untracked subsystems are empty (not fake fixtures)", async () => {

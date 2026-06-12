@@ -260,7 +260,7 @@ const BASE: OpsHealth = {
         changedAt: null,
     },
     killSwitch: { engaged: false, armed: false },
-    uptime: "4d 12h",
+    lastHeartbeat: "3s ago",
 };
 
 export async function loadOpsStub(): Promise<OpsHealth> {

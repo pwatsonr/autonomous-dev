@@ -117,13 +117,14 @@ export async function readOpsHealth(): Promise<OpsHealth> {
 
     // DaemonStatus has `status` ("fresh"/"stale"/"dead"), pid, last_seen.
     // It does NOT track a start-time, so true uptime can't be derived
-    // (the kit screenshot's "4d 12h" is therefore aspirational on a
-    // real install). We render "—" when the daemon is dead, otherwise
-    // a generic "alive" marker.
+    // (the kit screenshot's "4d 12h" is aspirational on a real install).
+    // The old code put the string "alive" in an "Uptime" row — a label
+    // lie (visual crawl p6). heartbeat.json DOES carry a timestamp, so
+    // we render the honest fact we have: how long ago the daemon last
+    // heartbeat.
     const daemonStatus = daemon?.status ?? "dead";
     const daemonPid = daemon?.pid ?? null;
-    const uptime =
-        daemonStatus === "dead" || daemonStatus === undefined ? "—" : "alive";
+    const lastHeartbeat = relativeAgo(daemon?.last_seen ?? null);
 
     return {
         daemon: { status: daemonStatus, pid: daemonPid },
@@ -138,6 +139,20 @@ export async function readOpsHealth(): Promise<OpsHealth> {
         standardsCount: 0,
         immutableCount: 0,
         heartbeat: [],
-        uptime,
+        lastHeartbeat,
     };
+}
+
+/** "3s ago" / "2m ago" / "5h ago" / "3d ago", or "—" when unknown. */
+function relativeAgo(iso: string | null): string {
+    if (iso === null) return "—";
+    const t = Date.parse(iso);
+    if (Number.isNaN(t)) return "—";
+    const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
 }

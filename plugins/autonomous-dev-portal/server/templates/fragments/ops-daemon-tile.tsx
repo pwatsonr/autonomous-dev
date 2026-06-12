@@ -14,8 +14,8 @@ export interface OpsDaemonTileProps {
     status: string;
     /** Daemon PID, or `null` when not running. */
     pid: number | null;
-    /** Human-readable uptime label (e.g. "4d 02h", "alive", "—"). */
-    uptime?: string;
+    /** Relative time since the last heartbeat (e.g. "3s ago", "—"). */
+    lastHeartbeat?: string;
     /** Port the daemon listens on. */
     port?: number;
     /** Runtime label (e.g. "Bun", "Node"). */
@@ -37,7 +37,7 @@ export interface OpsDaemonTileProps {
 export const OpsDaemonTile: FC<OpsDaemonTileProps> = ({
     status,
     pid,
-    uptime = "—",
+    lastHeartbeat = "—",
     port,
     runtime = "Bun",
     csrfToken = "",
@@ -68,8 +68,8 @@ export const OpsDaemonTile: FC<OpsDaemonTileProps> = ({
                 </div>
                 <div class="ops-kv-row">
                     <span class="dot-placeholder" aria-hidden="true" />
-                    <dt class="ops-kv-k">Uptime</dt>
-                    <dd class="ops-kv-v">{uptime}</dd>
+                    <dt class="ops-kv-k">Last heartbeat</dt>
+                    <dd class="ops-kv-v">{lastHeartbeat ?? "—"}</dd>
                 </div>
                 <div class="ops-kv-row">
                     <span class="dot-placeholder" aria-hidden="true" />

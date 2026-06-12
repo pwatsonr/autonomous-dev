@@ -660,8 +660,11 @@ export interface OpsHealth {
     circuitBreaker?: CircuitBreakerState;
     /** Kill switch idle/armed/engaged state. */
     killSwitch?: KillSwitchState;
-    /** Daemon uptime label ("4d 12h"). */
-    uptime?: string;
+    /** Relative time since the last daemon heartbeat ("3s ago", "—").
+     *  Replaces the old `uptime` label, which rendered the string
+     *  "alive" in a duration field — heartbeat.json has no start time,
+     *  so true uptime is underivable (crawl p6). */
+    lastHeartbeat?: string;
 }
 
 export interface AuditRow {
