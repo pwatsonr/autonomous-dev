@@ -1,6 +1,6 @@
 {
   "name": "autonomous-dev-portal",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "description": "Local web portal for monitoring autonomous-dev requests, runs, and audit logs.",
   "author": {
     "name": "pwatsonr",
