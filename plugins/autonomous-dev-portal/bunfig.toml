@@ -1,0 +1,5 @@
+[test]
+# State-isolation guard: tests must never read/write the operator's real
+# ~/.autonomous-dev or ~/.claude/autonomous-dev.json (see
+# tests/setup/isolate-state-dir.ts for the incident this prevents).
+preload = ["./tests/setup/isolate-state-dir.ts"]

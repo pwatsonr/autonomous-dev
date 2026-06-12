@@ -62,7 +62,10 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
         id: entry.id,
         path: entry.path,
         status: "ok" as const,
-        addedAt: new Date().toISOString(),
+        // crawl p9: config stores a plain path array — there IS no
+        // per-entry timestamp. The old code stamped render-time "now"
+        // on every row (all three showed the same fake instant).
+        addedAt: "",
     }));
 
     // Trust settings

@@ -46,6 +46,16 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                 are sent server-side only — never from the browser.
             </p>
 
+            {/* crawl p9: real <form> with optimistic auto-save — changes
+                submit on blur/toggle (settings-autosave.js); failures
+                surface via the global error banner. Test buttons carry
+                type="button" so they never trigger the form. */}
+            <form
+                data-autosave
+                hx-post="/api/settings/notifications"
+                hx-target="closest .sec"
+                hx-swap="outerHTML"
+            >
             {/* Hidden CSRF token for form submissions */}
             {csrfToken && csrfToken.length > 0 && (
                 <input type="hidden" name="_csrf" value={csrfToken} />
@@ -82,6 +92,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                     </Chip>
                 </span>
                 <Btn
+                    type="button"
                     kind="ghost"
                     size="sm"
                     hx-post="/api/settings/notifications/test/discord"
@@ -120,6 +131,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                     </Chip>
                 </span>
                 <Btn
+                    type="button"
                     kind="ghost"
                     size="sm"
                     hx-post="/api/settings/notifications/test/slack"
@@ -189,16 +201,9 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
             </div>
 
             <div class="form-actions">
+                <span class="meta-mono dim">auto-saves on change</span>
                 <Btn
-                    kind="primary"
-                    hx-post="/api/settings/notifications"
-                    hx-include="closest .sec"
-                    hx-target="closest .sec"
-                    hx-swap="outerHTML"
-                >
-                    Save notifications
-                </Btn>
-                <Btn
+                    type="button"
                     kind="secondary"
                     disabled={!canSendTest}
                     hx-post="/api/settings/notifications/test/send"
@@ -208,6 +213,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                     Send test notification now
                 </Btn>
             </div>
+            </form>
         </section>
     );
 };
