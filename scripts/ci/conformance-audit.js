@@ -141,6 +141,30 @@ const CHECKS = [
       return pass();
     },
   },
+  {
+    id: 'stale-gate-no-resurrection',
+    issue: 390,
+    fr: 'portal-audit-2026-06-11',
+    desc: 'Terminal requests cannot be resurrected by stale gate markers (portal guard + daemon sweep)',
+    run() {
+      const reader = read('plugins/autonomous-dev-portal/server/wiring/request-ledger-reader.ts');
+      if (reader === null) return fail('request-ledger-reader.ts not found');
+      // Portal half: the gate overlay must bail out on terminal statuses.
+      const guard =
+        /existing\.status === "done"[\s\S]{0,200}existing\.status === "cancelled"[\s\S]{0,200}existing\.status === "failed"/.test(reader);
+      if (!guard) return fail('gate overlay terminal-status guard missing (regression of #390 portal half)');
+      const sl = read('plugins/autonomous-dev/bin/supervisor-loop.sh');
+      if (sl === null) return fail('supervisor-loop.sh not found');
+      // Daemon half: the marker sweep must exist and be called from the loop.
+      if (!/reconcile_portal_markers\(\)\s*\{/.test(sl)) return fail('reconcile_portal_markers() missing');
+      // The call site is `reconcile_portal_markers || log_error ...` in the
+      // main loop — match it specifically (comments/definition don't count).
+      if (!/^\s*reconcile_portal_markers\s*\|\|/m.test(sl)) {
+        return fail('reconcile_portal_markers defined but never called from the loop');
+      }
+      return pass();
+    },
+  },
 ];
 
 function main() {
