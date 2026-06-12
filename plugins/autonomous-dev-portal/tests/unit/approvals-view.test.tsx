@@ -127,11 +127,17 @@ describe("ApprovalsView — FR-026-30 filter strip", () => {
         expect(firstBtn?.[0] ?? "").toContain("active");
     });
 
-    test("SLA meta line is present", async () => {
+    test("no invented SLA claim; honest gate-stats empty state", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain("SLA");
+        // #389-class honesty: no SLA is configured anywhere; the old meta
+        // line claimed "SLA < 4h" and the stats card posed design-reference
+        // constants (68/9/3/1, median 48m) as live telemetry.
+        expect(html).not.toContain("SLA");
+        expect(html).not.toContain("example data");
+        expect(html).toContain("No gate history yet");
+        expect(html).not.toContain("48m");
     });
 });
 
@@ -316,28 +322,16 @@ describe("ApprovalsView — FR-026-30 gate-stats-7d card", () => {
         expect(html).toContain("Gate stats · 7d");
     });
 
-    test("renders Auto-approved / Operator approved / Rejected / Re-spec'd rows", async () => {
+    test("renders the honest no-data state, never the design-reference constants", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain("Auto-approved");
-        expect(html).toContain("Operator approved");
-        expect(html).toContain("Rejected");
-        expect(html).toContain("Re-spec&#39;d");
-    });
-
-    test("renders median time-to-approve label", async () => {
-        const html = await render(
-            <ApprovalsView items={[]} costCapDailyUsd={25} />,
-        );
-        expect(html).toContain("Median time-to-approve");
-    });
-
-    test("stat-row-track elements have ARIA progressbar role", async () => {
-        const html = await render(
-            <ApprovalsView items={[]} costCapDailyUsd={25} />,
-        );
-        expect(html).toContain('role="progressbar"');
+        // #389-class honesty: no 7d decision ledger exists — the old card
+        // posed constants (Auto-approved 68, median 48m) as live telemetry.
+        expect(html).toContain("No gate history yet");
+        expect(html).not.toContain("Auto-approved");
+        expect(html).not.toContain("Median time-to-approve");
+        expect(html).not.toContain("48m");
     });
 });
 
