@@ -17,5 +17,7 @@ export const approvalsHandler = async (c: Context): Promise<Response> => {
     // `selected` is set by the row hx-get; keep the requested row highlighted
     // across the polling swap instead of always defaulting to rows[0].
     const selectedId = c.req.query("selected") ?? undefined;
-    return renderPage(c, "approvals", { items, costCapDailyUsd, selectedId });
+    // #391: thread the issued CSRF token so the action buttons can submit it.
+    const csrfToken = (c.get("csrfToken") as string | undefined) ?? "";
+    return renderPage(c, "approvals", { items, costCapDailyUsd, selectedId, csrfToken });
 };

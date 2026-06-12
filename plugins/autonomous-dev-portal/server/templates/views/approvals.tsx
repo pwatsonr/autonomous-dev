@@ -171,6 +171,7 @@ const ApprovalRow: FC<ApprovalRowProps> = ({ item, selected }) => {
                     type="button"
                     class="btn xs ok-btn"
                     hx-post={`/api/approvals/${item.id}/approve`}
+                    hx-include="#approvals-csrf"
                     hx-confirm="Approve this gate?"
                     hx-target={`[data-approval-id="${item.id}"]`}
                     hx-swap="outerHTML"
@@ -183,6 +184,7 @@ const ApprovalRow: FC<ApprovalRowProps> = ({ item, selected }) => {
                     type="button"
                     class="btn xs destructive"
                     hx-post={`/api/approvals/${item.id}/reject`}
+                    hx-include="#approvals-csrf"
                     hx-confirm="Reject this gate? This will block the pipeline."
                     hx-target={`[data-approval-id="${item.id}"]`}
                     hx-swap="outerHTML"
@@ -355,6 +357,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
     items,
     costCapDailyUsd,
     selectedId: selectedIdProp,
+    csrfToken,
 }) => {
     // Cast to view-local extended shape; checks will be undefined on most
     // items until the reader populates them.
@@ -406,7 +409,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                 class="btn primary sm bulk-approve"
                 disabled={rows.length === 0}
                 hx-post="/api/approvals/bulk-approve"
-                hx-include="[data-segmented-filter='approvals'] .seg-btn.active"
+                hx-include="[data-segmented-filter='approvals'] .seg-btn.active, #approvals-csrf"
                 hx-vals='js:{filter: document.querySelector("[data-segmented-filter=\"approvals\"] .seg-btn.active")?.dataset.filter}'
                 hx-confirm="Approve every gate matching the current filter?"
                 hx-target=".approvals-table-rows"
@@ -432,6 +435,15 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
             hx-select="#approvals-body"
             hx-vals='js:{selected: document.querySelector("[data-approval-id].selected")?.dataset.approvalId ?? ""}'
         >
+            {/* #391: CSRF token for the approve/reject/bulk actions. The
+                enforcer's form-field fallback reads `_csrf`; each action
+                button pulls this in via hx-include="#approvals-csrf". */}
+            <input
+                type="hidden"
+                id="approvals-csrf"
+                name="_csrf"
+                value={csrfToken ?? ""}
+            />
             <Topbar
                 title="Approvals"
                 subTitle={`${rows.length} pending`}

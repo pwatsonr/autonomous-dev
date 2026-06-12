@@ -714,6 +714,8 @@ export interface RenderProps {
         /** When set, overrides the default first-row selection. Threaded
          *  from `?selected=` query param so HTMX row clicks survive polls. */
         selectedId?: string;
+        /** CSRF token for the approve/reject/bulk actions (#391). */
+        csrfToken?: string;
     };
     settings: { config: SettingsView; data?: SettingsData };
     costs: {
