@@ -72,7 +72,7 @@ export const ConfirmModal: FC<Props> = ({ requiredText = "REJECT" }) => (
                     id="confirm-modal-submit"
                     type="button"
                     disabled
-                    class="btn-danger"
+                    class="btn destructive"
                 >
                     Reject
                 </button>

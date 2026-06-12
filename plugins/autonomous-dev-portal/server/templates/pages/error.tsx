@@ -59,7 +59,7 @@ const NavigationSuggestions: FC = () => (
         <ul>
             {NAV_SUGGESTIONS.map((s) => (
                 <li>
-                    <a href={s.href} class="btn btn-secondary">
+                    <a href={s.href} class="btn ghost">
                         {s.label}
                     </a>
                 </li>
@@ -123,12 +123,12 @@ export const ErrorPage: FC<ErrorContext> = ({
             <div class="error-actions">
                 <button
                     type="button"
-                    class="btn btn-secondary"
+                    class="btn ghost"
                     data-action="history-back"
                 >
                     Go back
                 </button>
-                <a href="/" class="btn btn-primary" autofocus>
+                <a href="/" class="btn primary" autofocus>
                     Return to dashboard
                 </a>
             </div>

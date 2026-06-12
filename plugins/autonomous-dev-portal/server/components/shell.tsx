@@ -297,6 +297,9 @@ export const ShellLayout: FC<ShellProps> = ({
                 <link rel="stylesheet" href="/static/v3/approvals.css" />
                 <link rel="stylesheet" href="/static/v3/ops.css" />
                 <link rel="stylesheet" href="/static/v3/logs.css" />
+                {/* #417 tier-1: rules for previously-unstyled template
+                    classes (see tests/unit/css-coverage.test.ts). */}
+                <link rel="stylesheet" href="/static/v3/components.css" />
                 <link rel="stylesheet" href="/static/portal.css" />
                 <link rel="stylesheet" href="/static/shell.css" />
                 <script

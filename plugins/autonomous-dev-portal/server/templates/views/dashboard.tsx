@@ -289,9 +289,12 @@ export const DashboardView: FC<DashboardViewProps> = ({
                               * modes ship they can be wired to hx-get fragment
                               * endpoints here.
                               */}
-                            <span class="seg-btn active seg-btn--static" aria-current="true" aria-label="Current view: Swimlanes">
-                                Swimlanes
-                            </span>
+                            {/* #417: seg-btn must live inside a .seg group */}
+                            <div class="seg" role="group">
+                                <span class="seg-btn active seg-btn--static" aria-current="true" aria-label="Current view: Swimlanes">
+                                    Swimlanes
+                                </span>
+                            </div>
                         </div>
                     </div>
                     {v3 != null ? (
@@ -318,9 +321,12 @@ export const DashboardView: FC<DashboardViewProps> = ({
                                   * current filter as a plain label until the filter
                                   * endpoint ships.
                                   */}
-                                <span class="seg-btn active seg-btn--static" aria-current="true" aria-label="Current filter: All">
-                                    All
-                                </span>
+                                {/* #417: seg-btn must live inside a .seg group */}
+                                <div class="seg" role="group">
+                                    <span class="seg-btn active seg-btn--static" aria-current="true" aria-label="Current filter: All">
+                                        All
+                                    </span>
+                                </div>
                             </div>
                         </div>
                         {v3 != null ? (

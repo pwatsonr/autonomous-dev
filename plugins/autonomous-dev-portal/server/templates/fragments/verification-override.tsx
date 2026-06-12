@@ -71,7 +71,7 @@ export const VerificationOverride: FC<VerificationOverrideProps> = ({
                         placeholder="Why is this override safe? (e.g., flaky network test)"
                     ></textarea>
                 </label>
-                <button type="submit" class="btn-destructive">
+                <button type="submit" class="btn destructive">
                     Authorize this run
                 </button>
             </form>

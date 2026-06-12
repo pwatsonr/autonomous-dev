@@ -668,7 +668,7 @@ export const SettingsEditor: FC<SettingsEditorProps> = ({
             </SettingsSection>
 
             <div class="form-actions">
-                <button type="submit" class="btn-primary">
+                <button type="submit" class="btn primary">
                     Save settings
                 </button>
             </div>
