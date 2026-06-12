@@ -47,6 +47,18 @@ function statusToneClass(status: AgentRow["status"]): string {
     }
 }
 
+/** One-line lifecycle definitions — chip tooltips + bottom reference. */
+const STATUS_HELP: Record<string, string> = {
+    baseline:
+        "The default. Runs at its declared version on every matching request.",
+    shadow:
+        "Runs in parallel for evaluation only — output does not affect gates or scoring.",
+    frozen:
+        "Pinned at the current version — the daemon will not auto-upgrade it.",
+    promoted:
+        "A previously-shadow agent promoted to serve traffic. Reverts to baseline if rolled back.",
+};
+
 export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
     <section
         id="agents-body"
@@ -65,39 +77,10 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
         <Topbar title="Agents" subTitle="lifecycle & manifest" />
         <div class="main-inner">
 
-        {/* PLAN-038 polish — intro + lifecycle explanation. Operators
-            new to the system need to know what BASELINE / SHADOW / FROZEN
-            / PROMOTED mean before they decide what to do with a row. */}
-        <div class="agents-intro">
-            <p>
-                Plugin agents run reviewers, executors, and analysts during
-                request processing. Each agent has a lifecycle state:
-            </p>
-            <dl>
-                <dt>baseline</dt>
-                <dd>
-                    The default. The agent runs at its declared version on
-                    every matching request.
-                </dd>
-                <dt>shadow</dt>
-                <dd>
-                    Runs in parallel for evaluation but its output does not
-                    affect gates or scoring. Use to evaluate a new agent or
-                    a version bump without risk.
-                </dd>
-                <dt>frozen</dt>
-                <dd>
-                    Pinned at the current version — the daemon will not
-                    auto-upgrade it. Use when a newer version regressed
-                    behavior.
-                </dd>
-                <dt>promoted</dt>
-                <dd>
-                    A previously-shadow agent that has been promoted to
-                    serve traffic. Reverts to baseline if rolled back.
-                </dd>
-            </dl>
-        </div>
+        {/* crawl p8 follow-up: the lifecycle glossary used to sit ABOVE
+            the table (operator: "seems odd at the top") — definitions now
+            live as tooltips on the status chips, with the full reference
+            in a compact section below the table. */}
 
         <div class="kpi-strip">
             <div class="kpi">
@@ -148,6 +131,7 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
                             <td>
                                 <span
                                     class={`chip status ${statusToneClass(a.status)}`}
+                                    title={STATUS_HELP[a.status]}
                                 >
                                     {a.status.toUpperCase()}
                                 </span>
@@ -163,6 +147,24 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
                 </tbody>
             </table>
         )}
+
+        {/* Lifecycle reference — moved below the table (tooltips on the
+            status chips carry the same definitions in context). */}
+        <section class="sec">
+            <div class="sec-head">
+                <h2>Lifecycle reference</h2>
+            </div>
+            <div class="card">
+                <dl class="kv agents-lifecycle-ref">
+                    {Object.entries(STATUS_HELP).map(([k, v]) => (
+                        <>
+                            <dt class="mono">{k.toUpperCase()}</dt>
+                            <dd>{v}</dd>
+                        </>
+                    ))}
+                </dl>
+            </div>
+        </section>
 
         {/* Modal-slot lives in ShellLayout (shell.tsx) so it's available
             on every surface — do not duplicate the id here. */}
