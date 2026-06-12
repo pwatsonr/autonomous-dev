@@ -59,10 +59,22 @@ async function readJsonOrNull<T>(path: string): Promise<T | null> {
 
 /** Lift a parsed request-action file into the view-input shape, with safe defaults. */
 function projectAction(a: RequestActionFile): DashboardRequest | null {
-    if (typeof a.id !== "string" || typeof a.repo !== "string") return null;
+    // Without an id the row has no identity — skip it, but say so (the
+    // resilience contract above promises a warning, not a silent drop, #390).
+    if (typeof a.id !== "string") {
+        console.warn("request-ledger: skipping action file without string id");
+        return null;
+    }
+    // A missing repo is schema-incomplete but still renderable — surface the
+    // row as repo "unknown" instead of silently hiding the request (#390).
+    if (typeof a.repo !== "string") {
+        console.warn(
+            `request-ledger: action file for ${a.id} lacks 'repo'; rendering as repo "unknown"`,
+        );
+    }
     return {
         id: a.id,
-        repo: a.repo,
+        repo: typeof a.repo === "string" ? a.repo : "unknown",
         title: a.title ?? "",
         phase: a.phase ?? "",
         status: a.status ?? "running",
@@ -109,7 +121,10 @@ export async function readRequestLedger(
             const raw = await readJsonOrNull<RequestActionFile>(
                 join(actionsRoot, f),
             );
-            if (raw === null) return;
+            if (raw === null) {
+                console.warn(`request-ledger: skipping unreadable action file ${f}`);
+                return;
+            }
             const projected = projectAction(raw);
             if (projected === null) return;
             // Latest write wins for duplicate ids (filesystem mtime would be
@@ -137,6 +152,19 @@ export async function readRequestLedger(
             if (raw === null || typeof raw.id !== "string") return;
             const existing = actionsById.get(raw.id);
             if (existing === undefined) return;
+            // #390: terminal action status is AUTHORITATIVE. The daemon does
+            // not clean up gate-decision files when a request ends, so a stale
+            // "pending" decision must never resurrect a done/cancelled/failed
+            // request as in-gate (the source of phantom approvals + fake
+            // active counts across dashboard/requests/approvals/repos).
+            if (
+                existing.status === "done" ||
+                existing.status === "cancelled" ||
+                existing.status === "failed" ||
+                existing.completedAt !== undefined
+            ) {
+                return;
+            }
             // If gate decision is still pending, mark the request as "gate".
             if (raw.state === "pending" || raw.state === undefined) {
                 existing.status = "gate";
