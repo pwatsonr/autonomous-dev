@@ -412,3 +412,26 @@
 .dnd-time {
     min-width: 7.5em;
 }
+
+/* ============================================================
+   Settings groups as blocks + stable tab height (crawl p9 follow-up)
+   ============================================================ */
+
+/* Every settings section reads as a card, like every other surface. */
+.settings-redesign section.sec {
+    background: var(--bg-1);
+    border: 1px solid var(--border-thin);
+    border-radius: 3px;
+    padding: var(--s-4) var(--s-5);
+}
+
+/* Tab panels reserve a stable height so switching tabs doesn't
+   collapse/expand the document (operator: "the page jumps around"). */
+.settings-redesign [data-tab-panel] {
+    min-height: 72vh;
+}
+
+.webhook-ends {
+    margin-left: var(--s-2);
+    font-size: var(--t-label);
+}

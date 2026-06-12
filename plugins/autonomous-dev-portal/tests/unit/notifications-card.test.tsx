@@ -55,13 +55,29 @@ describe("NotificationsCard", () => {
         expect(tag.includes("disabled")).toBe(false);
     });
 
-    test("ok state renders ok-tone chip", async () => {
-        const html = await render(
+    test("configured webhook renders CONFIGURED chip + ends-short; unset renders NOT SET", async () => {
+        // Crawl p9 follow-up: configured-ness used to live only in the
+        // dim placeholder (looked absent) while the chip showed the
+        // untested delivery status ("unknown"). Configured-ness is now
+        // the chip's primary signal.
+        const configured = await render(
             NotificationsCard({
-                config: { ...BASE, discordStatus: "ok" },
+                config: {
+                    ...BASE,
+                    discordWebhook:
+                        "configured — ends …Ca21 (enter new value to replace)",
+                },
                 canSendTest: true,
             }),
         );
-        expect(html).toContain('class="chip ok"');
+        expect(configured).toContain("CONFIGURED");
+        expect(configured).toContain("ends …Ca21");
+        const unset = await render(
+            NotificationsCard({
+                config: { ...BASE, discordWebhook: "" },
+                canSendTest: true,
+            }),
+        );
+        expect(unset).toContain("NOT SET");
     });
 });
