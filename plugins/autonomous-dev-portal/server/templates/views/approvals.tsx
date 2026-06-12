@@ -220,7 +220,7 @@ const PreviewCard: FC<PreviewCardProps> = ({ selected, onOpenPath }) => (
                     ? `Selected · ${selected.id}`
                     : "No selection"}
             </h3>
-            <span class="meta">tab-preview</span>
+            <span class="meta">reviewer verdicts</span>
             <span class="spacer" />
             {selected !== undefined ? (
                 <a class="btn xs ghost" href={onOpenPath}>
@@ -265,20 +265,30 @@ interface GateStats {
     medianMinutes: number;
 }
 
-/** Derive rough gate stats from the item list (approximation from current data). */
-function deriveGateStats(_items: ApprovalsRowItem[]): GateStats {
-    // In a real implementation these numbers come from a 7d ledger query.
-    // For now we use representative static values matching the design reference.
-    return {
-        autoApproved: 68,
-        operatorApproved: 9,
-        rejected: 3,
-        reSpecd: 1,
-        medianMinutes: 48,
-    };
+/**
+ * Derive gate stats. #389-class honesty: no 7-day decision ledger exists
+ * yet, so there is NOTHING to derive — returning null renders an honest
+ * empty card instead of the old design-reference constants (68/9/3/1,
+ * median 48m) that posed as live telemetry on an ops surface.
+ */
+function deriveGateStats(_items: ApprovalsRowItem[]): GateStats | null {
+    return null;
 }
 
-const GateStatsCard: FC<{ stats: GateStats }> = ({ stats }) => {
+const GateStatsCard: FC<{ stats: GateStats | null }> = ({ stats }) => {
+    if (stats === null) {
+        return (
+            <div class="card">
+                <div class="card-h">
+                    <h3>Gate stats · 7d</h3>
+                </div>
+                <p class="empty dim">
+                    No gate history yet — stats appear once gate decisions
+                    are recorded.
+                </p>
+            </div>
+        );
+    }
     const total =
         stats.autoApproved +
         stats.operatorApproved +
@@ -509,8 +519,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                         Oldest{" "}
                         {rows.length > 0
                             ? `${Math.max(...rows.map((r) => r.waitedMin))}m`
-                            : "—"}{" "}
-                        · SLA &lt; 4h
+                            : "—"}
                     </span>
                 </div>
 
