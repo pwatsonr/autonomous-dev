@@ -197,3 +197,29 @@ describe("LogReader.readRecent", () => {
         }
     });
 });
+
+// #396 regression — the daemon's real NDJSON shape (timestamp + UPPERCASE
+// level) must parse into structured entries, not fall through to the
+// raw-dump fallback (render-time ts, level info, raw JSON as message).
+describe("daemon NDJSON normalization (#396)", () => {
+    test("daemon-shaped lines parse with real ts/level/message", async () => {
+        const { dir, logPath } = setupRepo();
+        ctx.dir = dir;
+        ctx.cache = new AggregationCache();
+        writeFileSync(
+            logPath,
+            '{"timestamp":"2026-06-10T21:59:56Z","level":"INFO","pid":76148,"iteration":3,"message":"No actionable work. Sleeping 30s"}\n' +
+            '{"timestamp":"2026-06-10T22:00:26Z","level":"WARN","pid":76148,"message":"something odd"}\n',
+        );
+        const reader = new LogReader({ basePath: dir, cache: ctx.cache });
+        const r = await reader.readRecent();
+        expect(r.ok).toBe(true);
+        if (!r.ok) return;
+        expect(r.value).toHaveLength(2);
+        expect(r.value[0]!.ts).toBe("2026-06-10T21:59:56Z");
+        expect(r.value[0]!.level).toBe("info");
+        expect(r.value[0]!.message).toBe("No actionable work. Sleeping 30s");
+        expect(r.value[0]!.message).not.toContain("{");
+        expect(r.value[1]!.level).toBe("warn");
+    });
+});

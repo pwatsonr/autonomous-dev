@@ -177,3 +177,36 @@ describe("deriveShellRailState — SPEC-037-3-05", () => {
         expect(state.killSwitchEngaged).toBe(true);
     });
 });
+
+// #396 regression — breaker state wired from crash-state.json (was a
+// permanent "Breaker unknown --/--" although the daemon writes the file).
+describe("breaker state from crash-state.json (#396)", () => {
+    test("SR-06: ok breaker → OK with count/threshold", async () => {
+        writeHeartbeat(new Date().toISOString());
+        writeFileSync(
+            join(stateDir, "crash-state.json"),
+            JSON.stringify({ consecutive_crashes: 1, circuit_breaker_tripped: false }),
+        );
+        const state = await deriveShellRailState();
+        expect(state.breakerState).toBe("OK");
+        expect(state.breakerCount).toBe(1);
+        expect(state.breakerThreshold).toBeGreaterThan(0);
+    });
+
+    test("SR-07: tripped breaker → TRIPPED", async () => {
+        writeHeartbeat(new Date().toISOString());
+        writeFileSync(
+            join(stateDir, "crash-state.json"),
+            JSON.stringify({ consecutive_crashes: 3, circuit_breaker_tripped: true }),
+        );
+        const state = await deriveShellRailState();
+        expect(state.breakerState).toBe("TRIPPED");
+        expect(state.breakerCount).toBe(3);
+    });
+
+    test("SR-08: missing crash-state → fields stay undefined (honest unknown)", async () => {
+        writeHeartbeat(new Date().toISOString());
+        const state = await deriveShellRailState();
+        expect(state.breakerState).toBeUndefined();
+    });
+});

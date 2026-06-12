@@ -133,10 +133,13 @@ export const RdV3GatePanel: FC<Props> = ({
                 </div>
             ) : (
                 <>
-                    {/* Hidden CSRF field included by hx-include */}
+                    {/* Hidden CSRF field included by hx-include. #396: the
+                        enforcer's body fallback reads `_csrf` — the old
+                        `csrf_token` name was silently ignored, making every
+                        gate decision on this panel 403 (write-only). */}
                     <input
                         type="hidden"
-                        name="csrf_token"
+                        name="_csrf"
                         value={csrfToken}
                         id="rd-gate-csrf"
                     />

@@ -74,7 +74,13 @@ const PipelineCard: FC<{ card: SwimlaneCard }> = ({ card }) => {
 
     return (
         <a
-            href={`/requests/${encodeURIComponent(card.id)}`}
+            // #396: detail lives at /repo/:repo/request/:id — the old
+            // /requests/:id href 404'd on every card click. card.agent
+            // carries the repo for live ledger cards; fall back to the
+            // requests list when absent.
+            href={card.agent
+                ? `/repo/${encodeURIComponent(card.agent)}/request/${encodeURIComponent(card.id)}`
+                : "/requests"}
             class={`pcard${stateClass}`}
             data-phase={card.phase}
             aria-label={ariaLabel}
