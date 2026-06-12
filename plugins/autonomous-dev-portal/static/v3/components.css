@@ -1,0 +1,356 @@
+/* v3/components.css — #417 tier-1 burndown.
+   Rules for template classes that previously had NO css anywhere
+   (the "106 missing classes" inventory). Design-target values come from
+   PORTAL-V3-DESIGN-GAP-2026-06-08 where specified; everything else uses
+   kit tokens for consistency. Tier-2 (request-detail subcomponents etc.)
+   is allowlisted in tests/unit/css-coverage.test.ts and burned down
+   page-by-page during the visual crawl.
+   ============================================================ */
+
+/* ---------- Empty states (operator-visible on every surface) ---------- */
+.empty,
+.empty-state {
+    padding: var(--s-6);
+    color: var(--fg-3);
+    font-size: var(--t-meta);
+    line-height: 1.5;
+}
+
+.empty-state {
+    text-align: center;
+}
+
+.empty-state-msg {
+    color: var(--fg-2);
+}
+
+.empty-state-hint {
+    margin-top: var(--s-2);
+    color: var(--fg-3);
+    font-size: var(--t-label);
+}
+
+/* ---------- Dashboard: 14-day cost bars (design targets verbatim) ----- */
+.cost-bars {
+    display: grid;
+    grid-template-columns: repeat(14, 1fr);
+    height: 110px;
+    align-items: end;
+    gap: 4px;
+    margin: 12px 0 6px;
+}
+
+.cost-bar {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 1px;
+    border-radius: 2px 2px 0 0;
+    min-height: 2px; /* visibility floor for tiny daily totals */
+}
+
+.cost-bar:hover {
+    filter: brightness(1.12);
+}
+
+.cost-axis {
+    display: grid;
+    grid-template-columns: repeat(14, 1fr);
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+    color: var(--fg-3);
+}
+
+/* ---------- Costs page: SVG chart block ---------- */
+.chart-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.x-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+    color: var(--fg-3);
+    margin-top: var(--s-1);
+}
+
+.cost-projection {
+    display: flex;
+    align-items: center;
+    gap: var(--s-6);
+}
+
+.cost-projection-nocap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+}
+
+.phase-spend,
+.reviewer-spend,
+.deploy-spend {
+    width: 100%;
+}
+
+/* ---------- Audit page ---------- */
+.audit {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--t-meta);
+}
+
+.audit-table th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: var(--t-label);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-3);
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--border-strong);
+}
+
+.audit-table td {
+    padding: var(--s-2) var(--s-3);
+    border-bottom: 1px solid var(--border-thin);
+    color: var(--fg-1);
+}
+
+.audit-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--s-3);
+}
+
+.audit-status {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.audit-totals {
+    color: var(--fg-3);
+    font-family: var(--font-mono);
+    font-size: var(--t-label);
+}
+
+.audit-pagination {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    margin-top: var(--s-3);
+}
+
+.audit-config-changes {
+    background: var(--bg-1);
+    border: 1px solid var(--border-thin);
+    border-radius: 3px;
+    padding: var(--s-4);
+}
+
+.audit-config-changes h2 {
+    font-size: var(--t-h3);
+    margin: 0 0 var(--s-2);
+}
+
+/* ---------- Modals (confirm / typed-confirm) ---------- */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: var(--bg-1);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: var(--s-6);
+    max-width: 480px;
+    width: calc(100% - var(--s-8));
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.modal-help {
+    color: var(--fg-3);
+    font-size: var(--t-label);
+    margin-top: var(--s-2);
+}
+
+.ops-confirm-modal .modal-content {
+    border-color: var(--err-line);
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ---------- Settings ---------- */
+.settings-redesign,
+.settings-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+}
+
+.settings-section {
+    margin-bottom: var(--s-6);
+}
+
+.add-allowlist-form {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.cost-rings {
+    display: flex;
+    gap: var(--s-6);
+    align-items: center;
+}
+
+.caps-source-note {
+    font-size: var(--t-label);
+    color: var(--warn);
+}
+
+.success-message {
+    color: var(--ok);
+    font-size: var(--t-meta);
+    padding: var(--s-2) var(--s-3);
+    background: var(--ok-tint);
+    border: 1px solid var(--ok-line);
+    border-radius: 3px;
+}
+
+.service-error,
+.validation-error {
+    color: var(--err);
+    font-size: var(--t-meta);
+    padding: var(--s-2) var(--s-3);
+    background: var(--err-tint);
+    border: 1px solid var(--err-line);
+    border-radius: 3px;
+}
+
+.warnings {
+    color: var(--warn);
+    font-size: var(--t-meta);
+}
+
+.checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.webhook-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    font-size: var(--t-label);
+    margin-top: var(--s-1);
+}
+
+/* ---------- Field errors (forms) ---------- */
+.field-error {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    color: var(--err);
+    font-size: var(--t-label);
+    margin-top: var(--s-1);
+}
+
+.error-icon {
+    flex: none;
+    color: var(--err);
+}
+
+.error-text {
+    color: var(--err);
+}
+
+/* ---------- Logs controls ---------- */
+.logs-grep-input {
+    background: var(--bg-2);
+    border: 1px solid var(--border-thin);
+    border-radius: 3px;
+    color: var(--fg-1);
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    padding: var(--s-1) var(--s-2);
+    min-width: 220px;
+}
+
+.logs-clear-btn {
+    background: transparent;
+    border: 1px solid var(--border-thin);
+    border-radius: 3px;
+    color: var(--fg-2);
+    font-size: var(--t-label);
+    padding: var(--s-1) var(--s-2);
+    cursor: pointer;
+}
+
+.logs-clear-btn:hover {
+    background: var(--bg-2);
+}
+
+/* ---------- Small identity/label classes ---------- */
+.repo-name,
+.agent-name {
+    font-weight: 500;
+    color: var(--fg-0);
+}
+
+.agent-grid .name {
+    font-weight: 500;
+    color: var(--fg-0);
+}
+
+.summary {
+    color: var(--fg-2);
+    font-size: var(--t-meta);
+}
+
+.escalation-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 0 var(--s-1);
+    border-radius: var(--r-1);
+    background: var(--warn-dim);
+    color: var(--warn);
+}
+
+.pipeline-empty {
+    padding: var(--s-8);
+    text-align: center;
+    color: var(--fg-3);
+    font-size: var(--t-meta);
+}

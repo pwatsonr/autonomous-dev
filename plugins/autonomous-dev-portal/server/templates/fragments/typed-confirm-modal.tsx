@@ -92,7 +92,7 @@ export const TypedConfirmModal: FC<Props> = ({ requiredPhrase = "CONFIRM" }) => 
                         id="ops-confirm-modal-submit"
                         type="submit"
                         disabled
-                        class="btn-danger"
+                        class="btn destructive"
                     >
                         Confirm
                     </button>

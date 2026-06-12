@@ -34,14 +34,24 @@
     box-sizing: border-box;
 }
 
-/* Content column. The 1280px cap keeps long-form content readable
-   on wide displays; pages that want full-width can opt in via
-   `<main class="main wide">`. */
+/* #417: .main is THE scroll container (v3 model, app.css:141) — it must
+   keep height:100vh + overflow-y:auto or the sticky frosted .topbar
+   sticks to the wrong ancestor. This file loads LAST and historically
+   overrode that model with a padded 1280px column, breaking the header
+   on scroll and double-padding v3 pages (.main-inner adds its own). */
 .main {
+    height: 100vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+/* Legacy surfaces that haven't adopted <div class="main-inner"> keep the
+   old padded 1280px column. Pages converge automatically as they migrate
+   to .main-inner (the v3 1480px cap in app.css). */
+.main:not(:has(.main-inner)) {
     padding: var(--s-8) var(--s-10);
     max-width: 1280px;
     width: 100%;
-    box-sizing: border-box;
 }
 
 .main.wide {
