@@ -189,6 +189,9 @@
     color: var(--fg-3);
     font-size: var(--t-label);
     margin-top: var(--s-2);
+    /* crawl p8 polish: keep the footnote's last line off the
+       modal-actions divider. */
+    margin-bottom: var(--s-4);
 }
 
 .ops-confirm-modal .modal-content {
@@ -396,4 +399,11 @@
 .agents-lifecycle-ref dt {
     font-size: var(--t-label);
     letter-spacing: 0.04em;
+}
+
+/* Lifecycle reference sits directly after the agents table — give the
+   section the standard vertical rhythm (the header used to butt flush
+   against the table's bottom border). */
+.agents-lifecycle-sec {
+    margin-top: var(--s-8);
 }

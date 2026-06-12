@@ -150,7 +150,7 @@ export const AgentsView: FC<RenderProps["agents"]> = ({ kpis, agents }) => (
 
         {/* Lifecycle reference — moved below the table (tooltips on the
             status chips carry the same definitions in context). */}
-        <section class="sec">
+        <section class="sec agents-lifecycle-sec">
             <div class="sec-head">
                 <h2>Lifecycle reference</h2>
             </div>
