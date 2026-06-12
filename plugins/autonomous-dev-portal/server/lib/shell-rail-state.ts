@@ -285,9 +285,67 @@ export async function deriveShellRailState(
         // that as the "no badge" branch (SPEC-037-3-02 AC-03).
     }
 
-    // Breaker state is not yet wired (PLAN-037-2 owns the source). We
-    // intentionally leave the fields undefined so the rail shows the
-    // muted dot + `--/--` rather than fabricating data.
+    // Source 4 (#396): circuit-breaker state from the daemon's
+    // crash-state.json — {consecutive_crashes, circuit_breaker_tripped}.
+    // The rail previously showed a permanent "Breaker unknown --/--"
+    // although the daemon has always written this file.
+    try {
+        const breaker = await readBreakerState();
+        if (breaker !== undefined) {
+            state.breakerState = breaker.tripped ? "TRIPPED" : "OK";
+            state.breakerCount = breaker.count;
+            state.breakerThreshold = breaker.threshold;
+        }
+    } catch {
+        // Leave undefined → muted dot + `--/--` (honest unknown).
+    }
 
     return state;
+}
+
+interface CrashStateFile {
+    consecutive_crashes?: number;
+    circuit_breaker_tripped?: boolean;
+}
+
+/**
+ * Read circuit-breaker state from `crash-state.json` (#396). Threshold
+ * comes from the user config's `daemon.circuit_breaker_threshold`,
+ * falling back to the daemon's shipped default (3, config_defaults.json).
+ */
+async function readBreakerState(): Promise<
+    { tripped: boolean; count: number; threshold: number } | undefined
+> {
+    try {
+        const raw = await readFile(
+            join(resolveStateDir(), "crash-state.json"),
+            "utf8",
+        );
+        const parsed = JSON.parse(raw) as CrashStateFile;
+        if (typeof parsed.circuit_breaker_tripped !== "boolean") return undefined;
+        let threshold = 3; // daemon shipped default
+        try {
+            const cfgRaw = await readFile(
+                join(homedir(), ".claude", "autonomous-dev.json"),
+                "utf8",
+            );
+            const cfg = JSON.parse(cfgRaw) as {
+                daemon?: { circuit_breaker_threshold?: number };
+            };
+            if (typeof cfg.daemon?.circuit_breaker_threshold === "number") {
+                threshold = cfg.daemon.circuit_breaker_threshold;
+            }
+        } catch {
+            /* keep default */
+        }
+        return {
+            tripped: parsed.circuit_breaker_tripped,
+            count: typeof parsed.consecutive_crashes === "number"
+                ? parsed.consecutive_crashes
+                : 0,
+            threshold,
+        };
+    } catch {
+        return undefined;
+    }
 }

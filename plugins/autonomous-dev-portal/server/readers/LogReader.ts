@@ -133,7 +133,7 @@ export class LogReader {
         if (line.startsWith("{")) {
             try {
                 const obj = JSON.parse(line) as unknown;
-                const r = parseStructuredLogLine(obj);
+                const r = parseStructuredLogLine(normalizeDaemonLine(obj));
                 if (r.ok && r.value) return r.value;
             } catch {
                 // fall through to plain-text fallback
@@ -148,6 +148,26 @@ export class LogReader {
             raw: line,
         };
     }
+}
+
+/**
+ * #396: the daemon's NDJSON writes `timestamp` (not `ts`) and UPPERCASE
+ * levels (INFO/WARN/ERROR), so every real daemon line failed schema
+ * validation and fell through to the raw-dump fallback — the log viewer
+ * showed render-time timestamps, level "info" for everything, and raw
+ * JSON as the message. Normalize the daemon shape before validating.
+ */
+function normalizeDaemonLine(obj: unknown): unknown {
+    if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return obj;
+    const o = obj as Record<string, unknown>;
+    const out: Record<string, unknown> = { ...o };
+    if (typeof out["ts"] !== "string" && typeof out["timestamp"] === "string") {
+        out["ts"] = out["timestamp"];
+    }
+    if (typeof out["level"] === "string") {
+        out["level"] = (out["level"] as string).toLowerCase();
+    }
+    return out;
 }
 
 /**
