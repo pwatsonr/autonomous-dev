@@ -9,7 +9,7 @@ import type { Context } from "hono";
 import { renderPage } from "../lib/response-utils";
 import { loadSettingsData, loadSettingsStub } from "../stubs/settings";
 import { TAB_IDS, type TabId } from "../types/render";
-import { readPortalSettings } from "../wiring/settings-reader";
+import { readPortalSettings, maskWebhookForDisplay } from "../wiring/settings-reader";
 import { readAgentsData } from "../wiring/agents-readers";
 
 /**
@@ -64,8 +64,10 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
 
     // Notifications
     data.notifications = {
-        discordWebhook: realSettings.notifications.discordWebhook,
-        slackWebhook: realSettings.notifications.slackWebhook,
+        // #392: never pass the raw webhook secret to the view — masked
+        // display string only (the card renders it as a placeholder).
+        discordWebhook: maskWebhookForDisplay(realSettings.notifications.discordWebhook),
+        slackWebhook: maskWebhookForDisplay(realSettings.notifications.slackWebhook),
         discordStatus: "unknown", // Stub for now
         slackStatus: "unknown",   // Stub for now
         notifyDefault: realSettings.notifications.defaultMethod as "discord" | "slack" | "none",
