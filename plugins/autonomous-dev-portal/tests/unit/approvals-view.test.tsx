@@ -55,13 +55,16 @@ describe("ApprovalsView — FR-026-30 Topbar", () => {
         expect(html).toContain("2 pending");
     });
 
-    test("topbar rightSlot contains Pending/Approved/Rejected seg buttons", async () => {
+    test("topbar has NO dead status tabs (removed until gate history exists)", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        expect(html).toContain("Pending");
-        expect(html).toContain("Approved");
-        expect(html).toContain("Rejected");
+        // Operator-reported dead controls: no JS binding + no data source.
+        expect(html).not.toContain(">Pending<");
+        expect(html).not.toContain(">Approved<");
+        expect(html).not.toContain(">Rejected<");
+        // Bulk approve stays.
+        expect(html).toContain("Bulk approve");
     });
 
     test("Bulk approve button is present in topbar rightSlot", async () => {

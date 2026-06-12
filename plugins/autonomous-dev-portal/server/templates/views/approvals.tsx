@@ -388,32 +388,12 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
 
     const topbarRight = (
         <>
-            <div class="seg" role="group" aria-label="Approval status filter">
-                <button
-                    type="button"
-                    class="seg-btn active"
-                    data-filter="pending"
-                    aria-pressed="true"
-                >
-                    Pending
-                </button>
-                <button
-                    type="button"
-                    class="seg-btn"
-                    data-filter="approved"
-                    aria-pressed="false"
-                >
-                    Approved
-                </button>
-                <button
-                    type="button"
-                    class="seg-btn"
-                    data-filter="rejected"
-                    aria-pressed="false"
-                >
-                    Rejected
-                </button>
-            </div>
+            {/* Pending/Approved/Rejected tabs removed (operator-reported
+                dead controls): they had no JS binding (no
+                data-segmented-filter hook) AND no data to show — decided
+                gates leave the queue and no gate-history reader exists.
+                They return with the gate-history feature (sourced from
+                the HMAC audit log), which also powers the stats card. */}
             <button
                 type="button"
                 class="btn primary sm bulk-approve"
