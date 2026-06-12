@@ -7,7 +7,8 @@
 // Distinct from `settings-store.tsx` which is the mutating store (writer)
 // for the Settings surface. This file is the read-side composition input.
 
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
 import { userConfigPath } from "./state-paths";
@@ -29,6 +30,10 @@ export interface PortalSettings {
     perRequestCostCap: number;
     /** Monthly cost cap from governance */
     monthlyCostCap: number;
+    /** True when the caps come from the user config's governance section;
+     *  false = the values are the DAEMON's defaults (#393 — the UI must
+     *  say so instead of presenting them as saved settings). */
+    capsFromConfig: boolean;
     /** Notification settings */
     notifications: {
         discordWebhook: string;
@@ -75,6 +80,81 @@ interface DaemonConfigFile {
 export interface SettingsReaderOptions {
     /** Override the config file path (default: userConfigPath). */
     configPath?: string;
+    /** Override the daemon defaults file (tests). */
+    daemonDefaultsPath?: string;
+}
+
+export interface DaemonDefaultCaps {
+    daily: number;
+    perRequest: number;
+    monthly: number;
+}
+
+/** Last-resort fallback mirroring plugins/autonomous-dev/config_defaults.json
+ *  governance — drift-locked by a test against the repo file (#393). */
+const SHIPPED_DEFAULT_CAPS: DaemonDefaultCaps = {
+    daily: 100,
+    perRequest: 50,
+    monthly: 2000,
+};
+
+/** Sort semver-ish version strings descending. */
+function semverDesc(a: string, b: string): number {
+    const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+    const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const d = (pb[i] ?? 0) - (pa[i] ?? 0);
+        if (d !== 0) return d;
+    }
+    return 0;
+}
+
+/**
+ * Read the DAEMON's actual default cost caps from its config_defaults.json
+ * (#393 — the portal previously invented 25/10/500, which the daemon never
+ * enforces; real shipped defaults are 100/50/2000). Resolution: explicit
+ * path → repo layout → installed cache (highest version) → shipped constants.
+ */
+export async function readDaemonDefaultCaps(opts: {
+    daemonDefaultsPath?: string;
+    cacheRootDir?: string;
+} = {}): Promise<DaemonDefaultCaps> {
+    const candidates: string[] = [];
+    candidates.push(
+        opts.daemonDefaultsPath ??
+            join(import.meta.dir, "..", "..", "..", "autonomous-dev", "config_defaults.json"),
+    );
+    const cacheRoot = opts.cacheRootDir ??
+        join(homedir(), ".claude", "plugins", "cache", "autonomous-dev", "autonomous-dev");
+    try {
+        const versions = (await readdir(cacheRoot))
+            .filter((v) => /^\d+\.\d+/.test(v))
+            .sort(semverDesc);
+        for (const v of versions) {
+            candidates.push(join(cacheRoot, v, "config_defaults.json"));
+        }
+    } catch {
+        /* no cache root */
+    }
+    for (const p of candidates) {
+        try {
+            const parsed = JSON.parse(await readFile(p, "utf-8")) as {
+                governance?: Record<string, unknown>;
+            };
+            const g = parsed.governance ?? {};
+            const num = (x: unknown): number | null =>
+                typeof x === "number" && x > 0 ? x : null;
+            const daily = num(g["daily_cost_cap_usd"]);
+            const perRequest = num(g["per_request_cost_cap_usd"]);
+            const monthly = num(g["monthly_cost_cap_usd"]);
+            if (daily !== null && perRequest !== null && monthly !== null) {
+                return { daily, perRequest, monthly };
+            }
+        } catch {
+            /* try the next candidate */
+        }
+    }
+    return SHIPPED_DEFAULT_CAPS;
 }
 
 export function portalSettingsPath(configPath?: string): string {
@@ -114,6 +194,9 @@ export async function readPortalSettings(
     opts: SettingsReaderOptions = {},
 ): Promise<PortalSettings> {
     const path = portalSettingsPath(opts.configPath);
+    const dcaps = await readDaemonDefaultCaps({
+        daemonDefaultsPath: opts.daemonDefaultsPath,
+    });
     let raw: string;
     try {
         raw = await readFile(path, "utf-8");
@@ -123,9 +206,10 @@ export async function readPortalSettings(
             allowlist: [],
             trustOverrides: {},
             globalTrust: "L1",
-            dailyCostCap: 25,
-            perRequestCostCap: 10,
-            monthlyCostCap: 500,
+            dailyCostCap: dcaps.daily,
+            perRequestCostCap: dcaps.perRequest,
+            monthlyCostCap: dcaps.monthly,
+            capsFromConfig: false,
             notifications: {
                 discordWebhook: "",
                 slackWebhook: "",
@@ -145,9 +229,10 @@ export async function readPortalSettings(
             allowlist: [],
             trustOverrides: {},
             globalTrust: "L1",
-            dailyCostCap: 25,
-            perRequestCostCap: 10,
-            monthlyCostCap: 500,
+            dailyCostCap: dcaps.daily,
+            perRequestCostCap: dcaps.perRequest,
+            monthlyCostCap: dcaps.monthly,
+            capsFromConfig: false,
             notifications: {
                 discordWebhook: "",
                 slackWebhook: "",
@@ -167,9 +252,13 @@ export async function readPortalSettings(
         allowlist: formatAllowlist(parsed.repositories?.allowlist),
         trustOverrides: parsed.trust?.per_repo_overrides ?? {},
         globalTrust: formatTrustLevel(parsed.trust?.system_default_level),
-        dailyCostCap: parsed.governance?.daily_cost_cap_usd ?? 25,
-        perRequestCostCap: parsed.governance?.per_request_cost_cap_usd ?? 10,
-        monthlyCostCap: parsed.governance?.monthly_cost_cap_usd ?? 500,
+        dailyCostCap: parsed.governance?.daily_cost_cap_usd ?? dcaps.daily,
+        perRequestCostCap: parsed.governance?.per_request_cost_cap_usd ?? dcaps.perRequest,
+        monthlyCostCap: parsed.governance?.monthly_cost_cap_usd ?? dcaps.monthly,
+        capsFromConfig:
+            parsed.governance?.daily_cost_cap_usd !== undefined ||
+            parsed.governance?.per_request_cost_cap_usd !== undefined ||
+            parsed.governance?.monthly_cost_cap_usd !== undefined,
         notifications: {
             // Prefer nested daemon shape, fallback to legacy flat shape
             discordWebhook: delivery.discord?.webhook_url ?? notifications.discordWebhook ?? "",

@@ -36,15 +36,16 @@ export async function readReposData(
         const summary = byRepo.get(id);
         if (summary === undefined) continue;
         const trust = settings.trustOverrides[id] ?? settings.globalTrust;
-        const withTrust: RepoSummary = { ...summary, trust };
+        const withTrust: RepoSummary = { ...summary, trust, inAllowlist: true };
         repos.push(withTrust);
     }
 
     // Append any repos with activity that aren't in the allowlist
-    // (defensive — honesty contract).
+    // (defensive — honesty contract). #395: flagged so the view can badge
+    // them instead of rendering them indistinguishably from allowlisted.
     for (const [id, summary] of byRepo) {
         if (!allowlistRepos.includes(id)) {
-            repos.push({ ...summary, trust: settings.globalTrust });
+            repos.push({ ...summary, trust: settings.globalTrust, inAllowlist: false });
         }
     }
 
@@ -56,7 +57,10 @@ export async function readReposData(
 
     return {
         kpis: {
-            totalRepos: repos.length,
+            // #395: the KPI sub-label claims "in allowlist" — count the
+            // allowlist, not the table rows (which may include appended
+            // historical repos).
+            totalRepos: settings.allowlist.length,
             activeRepos,
             allowlistMisses,
         },

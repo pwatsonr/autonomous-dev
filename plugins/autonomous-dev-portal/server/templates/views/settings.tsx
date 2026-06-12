@@ -112,6 +112,12 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
         <p class="dim">
             Hard caps. Pipelines pause when reached until reset or override.
         </p>
+        {data.capsFromConfig === false && (
+            <p class="dim caps-source-note">
+                Showing the daemon&#39;s defaults — no caps are set in your
+                config. Saving writes these values into config.
+            </p>
+        )}
         <form
             hx-post="/settings"
             hx-swap="outerHTML"

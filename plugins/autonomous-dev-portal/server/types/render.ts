@@ -36,6 +36,8 @@ export interface RepoSummary {
     monthlyCostUsd: number;
     attentionCount: number;
     // SPEC-036-1-06 §RepoSummary extensions — all optional for back-compat.
+    /** False = historical-activity row NOT in the allowlist (#395). */
+    inAllowlist?: boolean;
     /** Trust level (`L0`/`L1`/`L2`/`L3`); rendered in mono in the top row. */
     trust?: string;
     /** Active phase name; drives the 4px phase-colored left bar (R-12). */
@@ -469,6 +471,8 @@ export interface SettingsData {
     trustOverrides: TrustOverride[];
     allowlist: AllowlistEntry[];
     costCaps: CostCaps;
+    /** False = costCaps are the daemon's defaults, not saved config (#393). */
+    capsFromConfig?: boolean;
     currentSpend: CurrentSpend;
     notifications: NotificationsConfig;
     variants: PipelineVariant[];
