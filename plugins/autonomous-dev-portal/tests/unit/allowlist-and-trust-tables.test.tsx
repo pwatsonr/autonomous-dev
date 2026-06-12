@@ -50,11 +50,13 @@ describe("TrustOverridesTable", () => {
 });
 
 describe("AllowlistTable", () => {
-    test("0 entries renders empty state with primary CTA", async () => {
+    test("0 entries renders the inline empty row + add-row (operator design)", async () => {
         const html = await render(AllowlistTable({ entries: [] }));
-        expect(html).toContain("No repos allowlisted");
-        expect(html).toContain('data-allowlist=""');
-        expect(html).toContain("Add your first repo");
+        // crawl p9 round 3: empty state + add form live INSIDE the table
+        // now — the add input is a row, new entries insert above it.
+        expect(html).toContain("No repositories in the allowlist yet");
+        expect(html).toContain("allowlist-add-row");
+        expect(html).toContain('form="allowlist-add-form"');
     });
 
     test("3 entries with mixed statuses render correct chip tones", async () => {

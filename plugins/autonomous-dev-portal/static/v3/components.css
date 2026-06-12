@@ -410,7 +410,7 @@
 
 /* DND time inputs were clipping their AM/PM suffix (crawl p9). */
 .dnd-time {
-    min-width: 7.5em;
+    min-width: 9em;
 }
 
 /* ============================================================
@@ -434,4 +434,49 @@
 .webhook-ends {
     margin-left: var(--s-2);
     font-size: var(--t-label);
+}
+
+/* ============================================================
+   Settings density polish (crawl p9, round 3)
+   ============================================================ */
+
+/* Joined $-prefix money inputs (caps) — the $ floated outside the box. */
+.input-money {
+    display: flex;
+    align-items: center;
+    background: var(--bg-2);
+    border: 1px solid var(--border-thin);
+    border-radius: 3px;
+}
+
+.input-money .prefix {
+    padding: 0 var(--s-2);
+    color: var(--fg-3);
+    font-family: var(--font-mono);
+}
+
+.input-money .input {
+    border: none;
+    background: transparent;
+    flex: 1;
+}
+
+/* Webhook field: label row carries the status + Test inline. */
+.field-label-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+/* Allowlist inline add-row. */
+.allowlist-add-row .allowlist-add-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Tabs with different heights toggled the viewport scrollbar — the
+   content column width changed and the whole page shifted (operator:
+   "switching tabs jumps"). Reserve the gutter permanently. */
+.main {
+    scrollbar-gutter: stable;
 }

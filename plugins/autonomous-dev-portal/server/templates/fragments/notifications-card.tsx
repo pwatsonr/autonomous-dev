@@ -69,7 +69,36 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
 
             {/* Discord webhook --------------------------------------- */}
             <div class="field stacked-field" data-channel="discord">
-                <label for="discord-webhook">Discord webhook URL</label>
+                <div class="field-label-row">
+                    <label for="discord-webhook">Discord webhook URL</label>
+                    <span class="spacer"></span>
+                    <span class="webhook-status">
+                        {config.discordWebhook !== "" ? (
+                            <>
+                                <Chip variant="status" tone="ok">
+                                    CONFIGURED
+                                </Chip>
+                                <span class="mono dim webhook-ends">
+                                    {maskShort(config.discordWebhook)}
+                                </span>
+                            </>
+                        ) : (
+                            <Chip variant="status" tone="muted">
+                                NOT SET
+                            </Chip>
+                        )}
+                    </span>
+                    <Btn
+                        type="button"
+                        kind="ghost"
+                        size="sm"
+                        hx-post="/api/settings/notifications/test/discord"
+                        hx-target="closest [data-channel='discord']"
+                        hx-swap="outerHTML"
+                    >
+                        Test
+                    </Btn>
+                </div>
                 {/* #392: the saved secret is never rendered — config.discordWebhook
                     carries a masked display string, used only as placeholder.
                     Empty submit preserves the saved value; Clear removes it. */}
@@ -92,42 +121,40 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                         {" "}Clear saved webhook
                     </label>
                 )}
-                {/* crawl p9 follow-up: configured-ness was invisible —
-                    it lived only in the dim placeholder while this chip
-                    said "unknown" (the untested delivery status), so a
-                    saved webhook LOOKED absent. Configured-ness is now
-                    the primary signal; test status stays secondary. */}
-                <span class="webhook-status">
-                    {config.discordWebhook !== "" ? (
-                        <>
-                            <Chip variant="status" tone="ok">
-                                CONFIGURED
-                            </Chip>
-                            <span class="mono dim webhook-ends">
-                                {maskShort(config.discordWebhook)}
-                            </span>
-                        </>
-                    ) : (
-                        <Chip variant="status" tone="muted">
-                            NOT SET
-                        </Chip>
-                    )}
-                </span>
-                <Btn
-                    type="button"
-                    kind="ghost"
-                    size="sm"
-                    hx-post="/api/settings/notifications/test/discord"
-                    hx-target="closest [data-channel='discord']"
-                    hx-swap="outerHTML"
-                >
-                    Test
-                </Btn>
             </div>
 
             {/* Slack webhook ----------------------------------------- */}
             <div class="field stacked-field" data-channel="slack">
-                <label for="slack-webhook">Slack webhook URL</label>
+                <div class="field-label-row">
+                    <label for="slack-webhook">Slack webhook URL</label>
+                    <span class="spacer"></span>
+                    <span class="webhook-status">
+                        {config.slackWebhook !== "" ? (
+                            <>
+                                <Chip variant="status" tone="ok">
+                                    CONFIGURED
+                                </Chip>
+                                <span class="mono dim webhook-ends">
+                                    {maskShort(config.slackWebhook)}
+                                </span>
+                            </>
+                        ) : (
+                            <Chip variant="status" tone="muted">
+                                NOT SET
+                            </Chip>
+                        )}
+                    </span>
+                    <Btn
+                        type="button"
+                        kind="ghost"
+                        size="sm"
+                        hx-post="/api/settings/notifications/test/slack"
+                        hx-target="closest [data-channel='slack']"
+                        hx-swap="outerHTML"
+                    >
+                        Test
+                    </Btn>
+                </div>
                 <input
                     type="url"
                     id="slack-webhook"
@@ -147,37 +174,6 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                         {" "}Clear saved webhook
                     </label>
                 )}
-                {/* crawl p9 follow-up: configured-ness was invisible —
-                    it lived only in the dim placeholder while this chip
-                    said "unknown" (the untested delivery status), so a
-                    saved webhook LOOKED absent. Configured-ness is now
-                    the primary signal; test status stays secondary. */}
-                <span class="webhook-status">
-                    {config.slackWebhook !== "" ? (
-                        <>
-                            <Chip variant="status" tone="ok">
-                                CONFIGURED
-                            </Chip>
-                            <span class="mono dim webhook-ends">
-                                {maskShort(config.slackWebhook)}
-                            </span>
-                        </>
-                    ) : (
-                        <Chip variant="status" tone="muted">
-                            NOT SET
-                        </Chip>
-                    )}
-                </span>
-                <Btn
-                    type="button"
-                    kind="ghost"
-                    size="sm"
-                    hx-post="/api/settings/notifications/test/slack"
-                    hx-target="closest [data-channel='slack']"
-                    hx-swap="outerHTML"
-                >
-                    Test
-                </Btn>
             </div>
 
             {/* Default method --------------------------------------- */}

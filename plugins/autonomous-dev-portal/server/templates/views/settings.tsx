@@ -130,6 +130,7 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
             )}
             <div class="field" data-cost-cap-group>
                 <label for="cost-cap-per-request">Per-request cap</label>
+                <div class="input-money">
                 <span class="prefix">$</span>
                 <input
                     type="number"
@@ -142,10 +143,12 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
                     data-validate="cost-cap"
                     data-cost-cap-field="perRequest"
                 />
+                </div>
                 <FieldError field="perRequest" message={undefined} />
             </div>
             <div class="field" data-cost-cap-group>
                 <label for="cost-cap-daily">Daily cap</label>
+                <div class="input-money">
                 <span class="prefix">$</span>
                 <input
                     type="number"
@@ -158,10 +161,12 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
                     data-validate="cost-cap"
                     data-cost-cap-field="daily"
                 />
+                </div>
                 <FieldError field="daily" message={undefined} />
             </div>
             <div class="field" data-cost-cap-group>
                 <label for="cost-cap-monthly">Monthly cap</label>
+                <div class="input-money">
                 <span class="prefix">$</span>
                 <input
                     type="number"
@@ -174,6 +179,7 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
                     data-validate="cost-cap"
                     data-cost-cap-field="monthly"
                 />
+                </div>
                 <FieldError field="monthly" message={undefined} />
             </div>
 
@@ -209,33 +215,10 @@ const AllowlistCard: FC<{ data: SettingsData }> = ({ data }) => (
         <p class="dim">
             Only repositories on this list can be the target of a request.
         </p>
-        <AllowlistTable entries={data.allowlist} />
-        <form
-            class="add-allowlist-form"
-            hx-post="/api/settings/allowlist"
-            hx-target="[data-fragment='allowlist-table']"
-            hx-swap="outerHTML"
-        >
-{data.csrfToken && data.csrfToken.length > 0 && (
-                <input type="hidden" name="_csrf" value={data.csrfToken} />
-            )}
-            <div class="field">
-                <label for="allowlist-new-path">Add repo (absolute path)</label>
-                <input
-                    type="text"
-                    id="allowlist-new-path"
-                    name="path"
-                    class="input mono"
-                    placeholder="/Users/op/repos/foo"
-                    data-validate="allowlist-path"
-                    autocomplete="off"
-                />
-                <FieldError field="allowlist-new-path" message={undefined} />
-            </div>
-            <Btn kind="primary" disabled>
-                Add
-            </Btn>
-        </form>
+        <AllowlistTable
+            entries={data.allowlist}
+            csrfToken={data.csrfToken}
+        />
     </section>
 );
 
