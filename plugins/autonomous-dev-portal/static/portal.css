@@ -72,34 +72,23 @@
    `.sec` is defined in app.css with `margin-bottom: 28px` so sections
    get proper breathing room.
 
-   Cost-cap inputs use a 2-row grid: label on top, `$` prefix inline
-   with the input on the second row. */
+   Crawl p9 round 6: the old auto/1fr GRID here predates the joined
+   .input-money wrapper — it slotted the wrapper and the new cap-usage
+   bar SIDE-BY-SIDE in its columns (operator: bars beside narrow
+   inputs). Stacked column now; .input-money fills the cell. */
 .field[data-cost-cap-group] {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    grid-template-rows: auto auto auto;
-    column-gap: var(--s-2);
-    row-gap: var(--s-1);
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-1);
     margin-bottom: var(--s-3h);
+    min-width: 0;
 }
 .field[data-cost-cap-group] > label {
-    grid-column: 1 / -1;
-    grid-row: 1;
     font-size: var(--t-meta);
     font-weight: 500;
     color: var(--fg-1);
 }
-.field[data-cost-cap-group] > .prefix {
-    grid-column: 1;
-    grid-row: 2;
-    width: 18px;
-    text-align: right;
-    color: var(--fg-2);
-    font-family: var(--font-mono);
-}
-.field[data-cost-cap-group] > .input { grid-column: 2; grid-row: 2; width: 100%; }
-.field[data-cost-cap-group] > [data-field-error] { grid-column: 1 / -1; grid-row: 3; }
 
 /* Generic `.input` styling for the Trust-level select. The vendored
    .input rule is geared at <input>; explicitly include <select> so it

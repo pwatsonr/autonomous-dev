@@ -20,7 +20,7 @@ import { asset } from "../../lib/plugin-version";
 import type { FC } from "hono/jsx";
 import { Topbar } from "../../components/topbar";
 
-import { Btn, Card, Chip, CostRing } from "../../components/primitives";
+import { Btn, Card, Chip } from "../../components/primitives";
 import type { RenderProps, SettingsData, TabId } from "../../types/render";
 import { AgentInspectModal, AgentTable } from "../fragments/agent-table";
 import { AllowlistTable } from "../fragments/allowlist-table";
@@ -105,6 +105,38 @@ const TrustOverridesCard: FC<{ data: SettingsData }> = ({ data }) => {
     );
 };
 
+/**
+ * Thin usage bar under a cap input: spend lives WITH the cap it counts
+ * against (crawl p9 round 6 — replaces the disconnected donut rings,
+ * which showed a bare % with no $ context). Width via CSS var (the
+ * CSP-safe .pbar pattern). Tone shifts warn ≥80%, err ≥95%.
+ */
+const CapUsage: FC<{ spent: number; cap: number; period: string }> = ({
+    spent,
+    cap,
+    period,
+}) => {
+    const pct = cap > 0 ? Math.min(100, (spent / cap) * 100) : 0;
+    const tone = pct >= 95 ? " err" : pct >= 80 ? " warn" : "";
+    return (
+        <div class="cap-usage">
+            <div
+                class={`cap-usage-bar${tone}`}
+                role="progressbar"
+                aria-valuenow={Math.round(pct)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${period} spend vs cap`}
+            >
+                <span style={`--cap-pct:${pct.toFixed(1)}%`}></span>
+            </div>
+            <span class="cap-usage-label mono dim">
+                ${spent.toFixed(2)} {period} · {Math.round(pct)}%
+            </span>
+        </div>
+    );
+};
+
 const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
     <section class="sec" id="cost-caps" aria-labelledby="cost-caps-heading">
         <div class="sec-head">
@@ -164,6 +196,11 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
                 />
                 </div>
                 <FieldError field="daily" message={undefined} />
+                <CapUsage
+                    spent={data.currentSpend.today}
+                    cap={data.costCaps.daily}
+                    period="today"
+                />
             </div>
             <div class="field" data-cost-cap-group>
                 <label for="cost-cap-monthly">Monthly cap</label>
@@ -182,6 +219,11 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
                 />
                 </div>
                 <FieldError field="monthly" message={undefined} />
+                <CapUsage
+                    spent={data.currentSpend.month}
+                    cap={data.costCaps.monthly}
+                    period="this month"
+                />
             </div>
             </div>
 
@@ -193,19 +235,6 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
             </div>
         </form>
 
-        <h4>Current spend</h4>
-        <div class="cost-rings">
-            <CostRing
-                spent={data.currentSpend.today}
-                cap={data.costCaps.daily}
-                label="TODAY"
-            />
-            <CostRing
-                spent={data.currentSpend.month}
-                cap={data.costCaps.monthly}
-                label="MONTH"
-            />
-        </div>
     </section>
 );
 

@@ -555,3 +555,36 @@ select[name="trust-level"] {
     gap: var(--s-1);
     white-space: nowrap;
 }
+
+/* Cap usage bars (replace the donut rings — spend lives with its cap). */
+.cap-usage {
+    margin-top: var(--s-2);
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.cap-usage-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--bg-3);
+    border-radius: var(--r-1);
+    overflow: hidden;
+}
+
+.cap-usage-bar > span {
+    display: block;
+    height: 100%;
+    width: var(--cap-pct, 0%);
+    background: var(--ok);
+    border-radius: var(--r-1);
+}
+
+.cap-usage-bar.warn > span { background: var(--warn); }
+.cap-usage-bar.err > span { background: var(--err); }
+
+.cap-usage-label {
+    flex: none;
+    font-size: var(--t-nano);
+    white-space: nowrap;
+}
