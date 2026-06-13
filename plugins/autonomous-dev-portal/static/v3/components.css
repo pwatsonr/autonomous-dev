@@ -535,3 +535,23 @@
 select[name="trust-level"] {
     max-width: 560px;
 }
+
+/* Webhook row: input + CONFIGURED/ends + Test on ONE line, centered. */
+.webhook-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.webhook-row .input {
+    flex: 1;
+    min-width: 0;
+}
+
+.webhook-row .webhook-status {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    white-space: nowrap;
+}
