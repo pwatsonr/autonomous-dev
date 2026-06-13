@@ -777,6 +777,8 @@ export interface RenderProps {
         filters?: AuditFiltersProp;
         /** Daemon-applied config changes (#396) — separate from the HMAC chain. */
         configChanges?: Array<{ id: string; actor: string; ts: string; summary: string }>;
+        /** Active tab (crawl p11 round 4): "chain" | "config". */
+        activeTab?: string;
     };
     "404": { path: string };
     "500": { message: string };

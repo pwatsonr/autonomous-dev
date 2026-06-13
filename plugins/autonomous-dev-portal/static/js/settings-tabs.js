@@ -35,7 +35,8 @@
         if (!nav || nav.dataset.bound === "1") return;
         nav.dataset.bound = "1";
 
-        var initialTab = nav.dataset.activeTab || "general";
+        var fallback = nav.dataset.defaultTab || "general";
+        var initialTab = nav.dataset.activeTab || fallback;
         showTab(initialTab);
 
         nav.querySelectorAll(".seg-btn").forEach(function (btn) {
@@ -53,7 +54,7 @@
 
         window.addEventListener("popstate", function () {
             var params = new URLSearchParams(location.search);
-            showTab(params.get("tab") || "general");
+            showTab(params.get("tab") || fallback);
         });
     }
 

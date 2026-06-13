@@ -697,3 +697,13 @@ select[name="trust-level"] {
 .audit-stub-table {
     table-layout: auto;
 }
+
+/* Audit tab panels: stable height between tabs (same rule family as
+   settings — crawl p11 round 4). */
+.audit [data-tab-panel] {
+    min-height: 60vh;
+}
+
+.audit .seg-tabs {
+    margin-bottom: var(--s-5);
+}
