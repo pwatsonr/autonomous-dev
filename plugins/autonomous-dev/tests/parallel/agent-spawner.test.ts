@@ -202,6 +202,71 @@ describe('AgentSpawner', () => {
   });
 
   // -----------------------------------------------------------------------
+  // Filesystem isolation hook wiring (#355 / FR-025-13, PRD-004 NFR-006)
+  // -----------------------------------------------------------------------
+
+  describe('filesystem isolation hook', () => {
+    let worktreeDir: string;
+
+    beforeEach(() => {
+      worktreeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'iso-wt-'));
+    });
+
+    afterEach(() => {
+      fs.rmSync(worktreeDir, { recursive: true, force: true });
+    });
+
+    it('registers a FilesystemIsolationHook for the spawned session', async () => {
+      const assignment = createAssignment({ worktreePath: worktreeDir });
+      const sessionId = await spawner.spawnAgent(assignment, createBundle());
+      expect(spawner.getIsolationHook(sessionId)).toBeDefined();
+    });
+
+    it('passes the hook to the session factory as a PostToolUse callback', async () => {
+      let received: unknown;
+      const factory: CreateSubagentSessionFn = async (opts) => {
+        received = opts.postToolUse;
+        return { id: 'sess-1', terminate: async () => {} };
+      };
+      const s = new AgentSpawner(config, emitter, factory);
+      await s.spawnAgent(
+        createAssignment({ worktreePath: worktreeDir }),
+        createBundle(),
+      );
+      expect(typeof received).toBe('function');
+    });
+
+    it('the registered hook allows in-worktree paths and blocks traversal', async () => {
+      const assignment = createAssignment({ worktreePath: worktreeDir });
+      const sessionId = await spawner.spawnAgent(assignment, createBundle());
+      const hook = spawner.getIsolationHook(sessionId)!;
+
+      // In-worktree write is allowed.
+      await expect(
+        hook.validate('Write', {
+          file_path: path.join(worktreeDir, 'src/index.ts'),
+        }),
+      ).resolves.toBe(true);
+
+      // Escape to a sibling path is blocked, and a violation is emitted.
+      const violations: unknown[] = [];
+      emitter.on('security.isolation_violation', (e) => violations.push(e));
+      await expect(
+        hook.validate('Read', { file_path: '/etc/passwd' }),
+      ).resolves.toBe(false);
+      expect(violations.length).toBe(1);
+    });
+
+    it('drops the hook when the agent is terminated', async () => {
+      const assignment = createAssignment({ worktreePath: worktreeDir });
+      const sessionId = await spawner.spawnAgent(assignment, createBundle());
+      expect(spawner.getIsolationHook(sessionId)).toBeDefined();
+      await spawner.terminateAgent(sessionId);
+      expect(spawner.getIsolationHook(sessionId)).toBeUndefined();
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Turn budget enforcement
   // -----------------------------------------------------------------------
 

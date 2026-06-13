@@ -18,6 +18,7 @@ import * as path from 'path';
 
 import { ParallelConfig } from './config';
 import { integrationBranchName } from './naming';
+import { FilesystemIsolationHook } from './isolation-hook';
 import type { WorktreeManager } from './worktree-manager';
 import type {
   TrackAssignment,
@@ -295,9 +296,26 @@ export async function prepareContextBundle(
  * The default implementation can be overridden for testing or
  * when the Claude Code SDK provides a concrete implementation.
  */
+/**
+ * PostToolUse callback signature. Invoked after every agent tool call;
+ * returns `true` to allow the call, `false` to block it. The filesystem
+ * isolation hook (#355) is registered through this channel so a real
+ * Claude Code SDK integration can enforce per-worktree path isolation.
+ */
+export type PostToolUseCallback = (
+  toolName: string,
+  toolInput: Record<string, unknown>,
+) => Promise<boolean>;
+
 export type CreateSubagentSessionFn = (opts: {
   workingDirectory: string;
   initialPrompt: string;
+  /**
+   * Optional PostToolUse hook the runtime must invoke after each tool
+   * call. The default stub ignores it; production session factories wire
+   * it to the Claude Code PostToolUse hook so blocked calls are enforced.
+   */
+  postToolUse?: PostToolUseCallback;
 }) => Promise<SubagentProcess>;
 
 /**
@@ -412,6 +430,8 @@ export async function preCommitSharedTypes(
  */
 export class AgentSpawner {
   private activeAgents = new Map<string, AgentSession>();
+  /** Per-session filesystem isolation hooks (#355), keyed by session id. */
+  private isolationHooks = new Map<string, FilesystemIsolationHook>();
   private livenessInterval: NodeJS.Timeout | null = null;
   private createSubagentSession: CreateSubagentSessionFn;
 
@@ -443,13 +463,27 @@ export class AgentSpawner {
   async spawnAgent(assignment: TrackAssignment, bundle: ContextBundle): Promise<string> {
     assignment.lifecyclePhase = AgentLifecyclePhase.Spawning;
 
+    // #355 (FR-025-13 / PRD-004 NFR-006): enforce filesystem isolation.
+    // Every tool call this agent makes must resolve within its assigned
+    // worktree; the hook is registered as a PostToolUse callback so the
+    // runtime blocks path-traversal attempts and emits
+    // `security.isolation_violation`.
+    const isolationHook = new FilesystemIsolationHook({
+      trackName: assignment.trackName,
+      worktreePath: assignment.worktreePath,
+      eventEmitter: this.eventEmitter,
+    });
+
     // Create Claude Code subagent session
     const session = await this.createSubagentSession({
       workingDirectory: bundle.workingDirectory,
       initialPrompt: this.formatInitialPrompt(bundle),
+      postToolUse: (toolName, toolInput) =>
+        isolationHook.validate(toolName, toolInput),
     });
 
     const sessionId = session.id;
+    this.isolationHooks.set(sessionId, isolationHook);
     assignment.agentSessionId = sessionId;
     assignment.lifecyclePhase = AgentLifecyclePhase.Executing;
     assignment.startedAt = new Date().toISOString();
@@ -594,6 +628,16 @@ export class AgentSpawner {
 
     agent.assignment.lifecyclePhase = AgentLifecyclePhase.Failed;
     this.activeAgents.delete(sessionId);
+    this.isolationHooks.delete(sessionId);
+  }
+
+  /**
+   * The filesystem isolation hook registered for a session's agent
+   * (PostToolUse). Returns `undefined` once the agent is terminated or
+   * for an unknown session. Exposed for inspection and testing (#355).
+   */
+  getIsolationHook(sessionId: string): FilesystemIsolationHook | undefined {
+    return this.isolationHooks.get(sessionId);
   }
 
   /**
