@@ -119,3 +119,8 @@
   margin-top: var(--s-1);
   opacity: 0.85;
 }
+
+/* One entry = one line (crawl p10). */
+.log .l-time {
+  white-space: nowrap;
+}

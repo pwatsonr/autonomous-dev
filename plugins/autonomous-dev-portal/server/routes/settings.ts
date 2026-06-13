@@ -39,6 +39,23 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
     // Read real settings from daemon config file and overlay onto stub data
     const realSettings = await readPortalSettings();
 
+    // Crawl p10: the Variants/Agents tabs rendered kit FIXTURES (stub
+    // "Fast-track/8-phase" cards; agents with fabricated approval/
+    // precision/recall). Overlay the real sources:
+    {
+        const { readRequestTypes } = await import(
+            "../wiring/settings-reader"
+        );
+        data.requestTypes = await readRequestTypes();
+        const { readAgentsData } = await import("../wiring/agents-readers");
+        const agentsData = await readAgentsData();
+        data.agentRows = agentsData.agents.map((a) => ({
+            name: a.name,
+            version: a.version,
+            status: a.status,
+        }));
+    }
+
     // #396: real spend rings — the stub's {today: 4.18, month: 67.42}
     // rendered as live data. Today = the ledger's entry for today; month
     // = the same readMtdSpend() every other surface uses.

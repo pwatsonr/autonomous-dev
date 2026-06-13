@@ -40,14 +40,17 @@ export interface SSEBroadcaster {
     publish(topic: string, payload: Record<string, unknown>): void;
 }
 
-/** Resolve the actor (source_user_id) from a Hono context. */
+/** Resolve the actor (source_user_id) from a Hono context.
+ *  Fallback is "operator": the portal is a localhost single-operator
+ *  surface — daemon/audit lines reading "by 'unknown'" for the
+ *  operator's own actions was misleading (crawl p10). */
 export function resolveActor(ctxAuth: unknown): string {
-    if (ctxAuth === null || typeof ctxAuth !== "object") return "unknown";
+    if (ctxAuth === null || typeof ctxAuth !== "object") return "operator";
     const a = ctxAuth as { source_user_id?: unknown };
     if (typeof a.source_user_id === "string" && a.source_user_id.length > 0) {
         return a.source_user_id;
     }
-    return "unknown";
+    return "operator";
 }
 
 /**

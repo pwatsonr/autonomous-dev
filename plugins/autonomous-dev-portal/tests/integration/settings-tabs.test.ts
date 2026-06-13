@@ -70,10 +70,13 @@ describe("GET /settings?tab=<id>", () => {
         expect(html).not.toContain("../etc/passwd");
     });
 
-    test("renders three module scripts (settings-tabs, form-validation, settings-modals)", async () => {
+    test("renders the settings module scripts (tabs, validation, autosave)", async () => {
         const html = await fetchSettingsHtml("/settings");
         expect(html).toContain('src="/static/js/settings-tabs.js');
         expect(html).toContain('src="/static/js/form-validation.js');
-        expect(html).toContain('src="/static/js/settings-modals.js');
+        // Crawl p10: settings-modals.js retired with the fabricated
+        // agents modal — the tab reuses the shared /agents inspect modal.
+        expect(html).not.toContain("settings-modals.js");
+        expect(html).toContain('src="/static/js/settings-autosave.js');
     });
 });

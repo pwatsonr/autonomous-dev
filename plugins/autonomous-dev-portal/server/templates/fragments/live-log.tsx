@@ -90,6 +90,14 @@ export interface LiveLogProps {
  *
  * @param props - {@link LiveLogProps}
  */
+/** "2026-06-12T20:40:34Z" -> "20:40:34" (full ISO stays on title=). The
+ *  raw ISO wrapped at the T inside the narrow time column, splitting
+ *  every entry across two lines (crawl p10). */
+function timeOnly(ts: string): string {
+    const m = ts.match(/(?:^|T)(\d{2}:\d{2}:\d{2})/);
+    return m?.[1] ?? ts;
+}
+
 export const LiveLog: FC<LiveLogProps> = ({ entries, offline = false, readError = false }) => {
     if (readError) {
         return (
@@ -160,7 +168,9 @@ export const LiveLog: FC<LiveLogProps> = ({ entries, offline = false, readError 
                 const marker = isMarker(e.message);
                 return (
                     <div class="log-line" key={i}>
-                        <span class="l-time">{e.ts}</span>
+                        <span class="l-time" title={e.ts}>
+                            {timeOnly(e.ts)}
+                        </span>
                         <span class={lvlCls}>{e.level.toUpperCase()}</span>
                         {marker ? (
                             <span class="l-mark">{e.message}</span>
