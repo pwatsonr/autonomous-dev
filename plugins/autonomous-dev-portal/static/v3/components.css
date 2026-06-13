@@ -588,3 +588,47 @@ select[name="trust-level"] {
     font-size: var(--t-nano);
     white-space: nowrap;
 }
+
+/* Request-type cards (settings › variants, real data — crawl p10). */
+.rt-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-4);
+}
+
+.rt-card {
+    padding: var(--s-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+
+.rt-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.rt-name {
+    font-weight: 700;
+    color: var(--fg-0);
+}
+
+.rt-desc {
+    min-height: 2.6em;
+}
+
+.rt-kv {
+    padding-top: var(--s-2);
+    border-top: 1px solid var(--border-thin);
+}
+
+@media (max-width: 1280px) {
+    .rt-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.rt-kv dd {
+    overflow-wrap: anywhere;
+}

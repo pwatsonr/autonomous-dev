@@ -46,7 +46,12 @@ describe("LiveLog — SPEC-037-6-02", () => {
         const html = await render(
             <LiveLog entries={[entry("INFO", "boot complete")]} />,
         );
-        expect(html).toContain('<span class="l-time">14:32:04Z</span>');
+        // Crawl p10: full ISO wrapped at the T inside the narrow column,
+        // splitting every entry across two lines. Time-only now; full
+        // ISO survives on title=.
+        expect(html).toContain('class="l-time"');
+        expect(html).toContain(">14:32:04<");
+        expect(html).toContain('title="');
         expect(html).not.toContain('class="ts"');
     });
 

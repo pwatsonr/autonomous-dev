@@ -11,6 +11,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
+import type { RequestTypeInfo } from "../types/render";
 import { userConfigPath } from "./state-paths";
 
 export interface AllowlistEntry {
@@ -280,4 +281,57 @@ export async function readPortalSettings(
 export function maskWebhookForDisplay(url: string): string {
     if (url === "") return "";
     return `configured — ends …${url.slice(-4)} (enter new value to replace)`;
+}
+
+
+/**
+ * Real request types from the daemon plugin's config/request-types.json
+ * (resolved via the same cache-root logic as the agent manifest). The
+ * old Variants tab rendered kit fixtures ("Fast-track", "8-phase
+ * canonical") with dead Edit buttons — these are the actual pipeline
+ * variants the daemon accepts (crawl p10).
+ */
+export async function readRequestTypes(): Promise<RequestTypeInfo[]> {
+    try {
+        const { resolveManifestDir } = await import("./agent-states-reader");
+        const dir = await resolveManifestDir();
+        if (dir === null) return [];
+        const { readFile } = await import("node:fs/promises");
+        const { join } = await import("node:path");
+        // resolveManifestDir points at the plugin root's agents dir parent
+        // (plugin root); request-types.json lives under config/.
+        const raw = await readFile(
+            join(dir, "..", "config", "request-types.json"),
+            "utf-8",
+        );
+        const parsed = JSON.parse(raw) as unknown;
+        if (!Array.isArray(parsed)) return [];
+        return parsed.flatMap((t) => {
+            if (t === null || typeof t !== "object") return [];
+            const o = t as Record<string, unknown>;
+            if (typeof o["id"] !== "string") return [];
+            return [{
+                id: o["id"],
+                description:
+                    typeof o["description"] === "string"
+                        ? o["description"]
+                        : "",
+                defaultCostCapUsd:
+                    typeof o["default_cost_cap_usd"] === "number"
+                        ? o["default_cost_cap_usd"]
+                        : null,
+                defaultTrustThreshold:
+                    typeof o["default_trust_threshold"] === "number"
+                        ? o["default_trust_threshold"]
+                        : null,
+                defaultReviewers: Array.isArray(o["default_reviewers"])
+                    ? (o["default_reviewers"] as unknown[]).filter(
+                          (r): r is string => typeof r === "string",
+                      )
+                    : [],
+            }];
+        });
+    } catch {
+        return [];
+    }
 }

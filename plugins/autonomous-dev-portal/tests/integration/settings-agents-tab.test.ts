@@ -29,9 +29,11 @@ test("settings Agents tab renders real agent names from live registry", async ()
     expect(html).toMatch(/data-tab-panel="agents"[^>]*>/);
     expect(html).not.toMatch(/data-tab-panel="agents"[^>]*hidden/);
 
-    // Should have at least 18 agents listed (based on current manifest)
-    // Count agent rows by looking for data-agent attributes
-    const agentRows = html.match(/data-agent="[^"]+"/g);
+    // Should have at least 18 agents listed (based on current manifest).
+    // Crawl p10: rows now Inspect via the shared /agents modal endpoint
+    // (one source of truth; the old per-row data-agent modal ids and
+    // fabricated metric columns are gone).
+    const agentRows = html.match(/hx-get="\/agents\/[^"]+\/inspect-modal"/g);
     expect(agentRows).not.toBeNull();
     expect(agentRows!.length).toBeGreaterThanOrEqual(18);
 });
@@ -44,12 +46,10 @@ test("settings Agents tab inspect modal links use real agent names", async () =>
 
     const html = await response.text();
 
-    // Inspect modal links should point to real agent names
-    expect(html).toMatch(/inspect-agent-modal-(accessibility-reviewer|code-executor|architecture-reviewer)/);
+    // Inspect links should hit the shared modal endpoint with real names
+    expect(html).toMatch(/\/agents\/(accessibility-reviewer|code-executor|architecture-reviewer)\/inspect-modal/);
 
-    // Should NOT have modal links for stale stub names. Use end-anchored
-    // matchers so we don't false-positive on real agents whose names start
-    // with these prefixes (e.g. `architect` would otherwise match
-    // `architecture-reviewer`).
-    expect(html).not.toMatch(/inspect-agent-modal-(?:architect|coder|gate-keeper)(?=["\-/\s>])/);
+    // Should NOT have links for stale stub names (end-anchored so
+    // `architect` doesn't false-positive on `architecture-reviewer`).
+    expect(html).not.toMatch(/\/agents\/(?:architect|coder|gate-keeper)\/inspect-modal/);
 });

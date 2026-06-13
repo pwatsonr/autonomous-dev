@@ -134,7 +134,6 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                     >
                         follow tail
                     </button>
-                    <span class="spacer"></span>
                     <button
                         type="button"
                         class="btn sm ghost logs-clear-btn"
@@ -142,6 +141,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                     >
                         Clear
                     </button>
+                    <span class="spacer"></span>
                 </div>
 
                 {/* Polled log body — section wraps the persistent live-region.

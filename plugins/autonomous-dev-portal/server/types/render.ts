@@ -469,6 +469,16 @@ export interface CurrentSpend {
 // for the rebuilt General tab + Variants/Backends "Set default" actions.
 // All new fields are optional; the General panel falls back to
 // `costCaps.daily` / the first variant / the first available backend.
+/** Real request type from the daemon's config/request-types.json
+ *  (crawl p9/p10: replaces the kit-fixture "pipeline variants"). */
+export interface RequestTypeInfo {
+    id: string;
+    description: string;
+    defaultCostCapUsd: number | null;
+    defaultTrustThreshold: number | null;
+    defaultReviewers: string[];
+}
+
 export interface SettingsData {
     activeTab: TabId;
     trustLevel: "L0" | "L1" | "L2" | "L3";
@@ -480,9 +490,19 @@ export interface SettingsData {
     currentSpend: CurrentSpend;
     notifications: NotificationsConfig;
     variants: PipelineVariant[];
+    /** Real request types (daemon config) — renders the Variants tab. */
+    requestTypes?: RequestTypeInfo[];
     standards: StandardRule[];
     backends: DeployBackend[];
     agents: AgentRecord[];
+    /** Real agent rows (same reader as /agents) — renders the Agents tab.
+     *  Typed loosely here to avoid a cross-module type cycle; the shape
+     *  is AgentStateRow from wiring/agent-states-reader. */
+    agentRows?: Array<{
+        name: string;
+        version: string;
+        status: string;
+    }>;
     /** SPEC-037-5-02 — flat numeric cap rendered in `.input-row`. */
     dailyCap?: number;
     /** SPEC-037-5-02 / 037-5-03 — currently-default variant id. */

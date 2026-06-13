@@ -22,7 +22,6 @@ import { Topbar } from "../../components/topbar";
 
 import { Btn, Card, Chip } from "../../components/primitives";
 import type { RenderProps, SettingsData, TabId } from "../../types/render";
-import { AgentInspectModal, AgentTable } from "../fragments/agent-table";
 import { AllowlistTable } from "../fragments/allowlist-table";
 import { FieldError } from "../fragments/field-error";
 import { NotificationsCard } from "../fragments/notifications-card";
@@ -463,22 +462,62 @@ export const SettingsView: FC<RenderProps["settings"]> = ({ data }) => {
                     <p class="dim">
                         Reviewers and executors that participate in the
                         pipeline. Inspect any row to promote, shadow, or
-                        freeze the agent.
+                        freeze the agent. Same live data as the Agents
+                        page — dispatch history, run counts, and quality
+                        metrics are not yet recorded by the daemon.
                     </p>
-                    <AgentTable agents={data.agents} />
+                    {/* Crawl p10: the old AgentTable rendered FABRICATED
+                        approval/precision/recall percentages and a
+                        last-trained timestamp stamped AT RENDER TIME,
+                        with its own broken modal. One source of truth
+                        now: the /agents reader + the shared (CSP-fixed)
+                        inspect modal. */}
+                    <table class="tbl">
+                        <thead>
+                            <tr>
+                                <th>Agent</th>
+                                <th>Version</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(data.agentRows ?? []).map((a) => (
+                                <tr key={a.name}>
+                                    <td class="agent-name">{a.name}</td>
+                                    <td class="mono">{a.version}</td>
+                                    <td>
+                                        <span class={`chip status ${
+                                            a.status === "frozen"
+                                                ? "warn"
+                                                : a.status === "shadow"
+                                                  ? "info"
+                                                  : "muted"
+                                        }`}>
+                                            {a.status.toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button
+                                            type="button"
+                                            class="btn ghost sm"
+                                            hx-get={`/agents/${a.name}/inspect-modal`}
+                                            hx-target="#modal-slot"
+                                            hx-swap="innerHTML"
+                                        >
+                                            Inspect
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </section>
             </Panel>
-
-            {/* Top-level dialogs — hoisted out of [hidden] panels per
-                SPEC-036-4-01 AC-05. */}
-            {data.agents.map((agent) => (
-                <AgentInspectModal agent={agent} />
-            ))}
 
             <script type="module" src={asset("/static/js/settings-tabs.js")}></script>
             <script src={asset("/static/js/settings-autosave.js")} defer></script>
             <script type="module" src={asset("/static/js/form-validation.js")}></script>
-            <script type="module" src={asset("/static/js/settings-modals.js")}></script>
         </div>
         </div>
     );
