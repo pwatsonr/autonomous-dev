@@ -29,7 +29,9 @@ export function renderSparkline(
     const ySpan = maxV - minV;
     const yToPx = (v: number): number => {
         if (ySpan === 0) return height / 2;
-        return height - 2 - ((v - minV) / ySpan) * (height - 4);
+        // #416: reserve 6px headroom at the top (was 2) so the peak +
+        // 1.5px stroke never reaches the KPI card's clipped top edge.
+        return height - 2 - ((v - minV) / ySpan) * (height - 8);
     };
     const xToPx = (i: number): number => {
         if (values.length === 1) return width / 2;

@@ -731,3 +731,48 @@ select[name="trust-level"] {
 .audit .seg-tabs {
     margin-bottom: var(--s-5);
 }
+
+/* ============================================================
+   Dashboard 14-day cost bars (#416): the markup sets --bar-h / --seg-h
+   custom properties but NO rule consumed them as height, so every bar
+   collapsed to the 2px floor; and the segments share the .seg class
+   with the segmented CONTROL (app.css: inline-flex + border), so they
+   rendered as bordered boxes, not stacked colored blocks. Scope + size.
+   ============================================================ */
+.cost-bar {
+    height: var(--bar-h, 0%);
+    min-height: 3px; /* tiny days stay visible */
+}
+
+.cost-bar .seg {
+    display: block;
+    width: 100%;
+    height: var(--seg-h, 0%);
+    min-height: 0;
+    background: var(--bg-3);
+    border: 0;
+    border-radius: 0;
+}
+
+.cost-bar .seg.seg-prd     { background: var(--phase-prd); }
+.cost-bar .seg.seg-tdd     { background: var(--phase-tdd); }
+.cost-bar .seg.seg-plan    { background: var(--phase-plan); }
+.cost-bar .seg.seg-spec    { background: var(--phase-spec); }
+.cost-bar .seg.seg-code    { background: var(--phase-code); }
+.cost-bar .seg.seg-review  { background: var(--phase-review); }
+.cost-bar .seg.seg-deploy  { background: var(--phase-deploy); }
+.cost-bar .seg.seg-observe { background: var(--phase-observe); }
+.cost-bar .seg.seg-unattributed { background: var(--brand); }
+
+/* Idle swimlane body: centered message, no 480px void (#416). */
+.pipeline-body.is-idle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+}
+
+.pipeline-idle {
+    font-size: var(--t-meta);
+    margin: 0;
+}
