@@ -95,7 +95,18 @@ describe("PORTAL-AUDIT-2026-05-16 — auto-refresh polling contract", () => {
             // or a narrower inner node (e.g. /logs targets #log-tail to keep
             // the role=log live-region alive across polls — WCAG 4.1.3).
             const swapId = page.swapTargetId ?? page.bodyId;
-            expect(html).toContain(`hx-select="#${swapId}"`);
+            // Crawl p11 round 2: /logs selects the CHILDREN of the swap
+            // target ("#log-tail > *", HTML-escaped in the served page) —
+            // selecting the container into its own innerHTML nested the
+            // terminal inside itself on every poll. Other pages still
+            // select the container (they swap outerHTML).
+            if (swapId === "log-tail") {
+                expect(html).toContain(
+                    `hx-select="#${swapId} &gt; *"`,
+                );
+            } else {
+                expect(html).toContain(`hx-select="#${swapId}"`);
+            }
 
             // Polling interval with visibility guard — pinned so changes are explicit.
             // Using double quotes inside the JS expression to avoid entity encoding issues.
