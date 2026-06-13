@@ -480,3 +480,58 @@
 .main {
     scrollbar-gutter: stable;
 }
+
+/* ============================================================
+   Settings real-estate pass (crawl p9 round 4): desktop cards use
+   COLUMNS — no more single phone-column floating in a 1900px card.
+   ============================================================ */
+
+/* Cost caps: three fields across; rings + actions share the row below. */
+.caps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-4);
+}
+
+.caps-grid .field {
+    min-width: 0;
+}
+
+.caps-grid .input-money {
+    width: 100%;
+}
+
+/* Notifications: Discord | Slack side-by-side; method | DND below. */
+.notif-grid,
+.notif-row2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4) var(--s-6);
+    align-items: start;
+}
+
+.notif-grid .field,
+.notif-row2 .field {
+    min-width: 0;
+}
+
+.notif-row2 select.input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+    .caps-grid {
+        grid-template-columns: 1fr;
+    }
+    .notif-grid,
+    .notif-row2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Comfortable max for lone full-width selects (trust level). */
+#trust-level-select,
+select[name="trust-level"] {
+    max-width: 560px;
+}

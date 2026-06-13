@@ -128,6 +128,7 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
 {data.csrfToken && data.csrfToken.length > 0 && (
                 <input type="hidden" name="_csrf" value={data.csrfToken} />
             )}
+            <div class="caps-grid">
             <div class="field" data-cost-cap-group>
                 <label for="cost-cap-per-request">Per-request cap</label>
                 <div class="input-money">
@@ -181,6 +182,7 @@ const CostCapsCard: FC<{ data: SettingsData }> = ({ data }) => (
                 />
                 </div>
                 <FieldError field="monthly" message={undefined} />
+            </div>
             </div>
 
             <div class="form-actions">

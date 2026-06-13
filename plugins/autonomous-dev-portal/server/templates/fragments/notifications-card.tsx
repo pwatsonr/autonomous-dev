@@ -67,6 +67,7 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                 <input type="hidden" name="_csrf" value={csrfToken} />
             )}
 
+            <div class="notif-grid">
             {/* Discord webhook --------------------------------------- */}
             <div class="field stacked-field" data-channel="discord">
                 <div class="field-label-row">
@@ -177,6 +178,9 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
             </div>
 
             {/* Default method --------------------------------------- */}
+            </div>
+
+            <div class="notif-row2">
             <div class="field stacked-field" data-field="notify-default">
                 <label class="sub-label">Default notification method</label>
                 <select
@@ -232,6 +236,8 @@ export const NotificationsCard: FC<Props> = ({ config, canSendTest, csrfToken })
                         DND has no effect when notifications are off.
                     </p>
                 ) : null}
+            </div>
+
             </div>
 
             <div class="form-actions">
