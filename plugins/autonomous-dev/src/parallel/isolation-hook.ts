@@ -26,11 +26,32 @@ export interface IsolationHookContext {
 // ---------------------------------------------------------------------------
 
 export class FilesystemIsolationHook {
-  private resolvedWorktreePath: string;
+  private _resolvedWorktreePath: string | null = null;
 
   constructor(private context: IsolationHookContext) {
-    // Pre-resolve the worktree path to its real path (follow symlinks)
-    this.resolvedWorktreePath = fs.realpathSync(context.worktreePath);
+    // NOTE: worktree resolution is LAZY (see getter). It used to run
+    // `fs.realpathSync` eagerly here, which threw when the worktree did
+    // not exist yet at construction time. The hook is constructed in
+    // AgentSpawner.spawnAgent() (#355) where, in practice, the worktree
+    // already exists — but constructing must never throw, and the only
+    // place resolution actually matters is `validate()`, which runs
+    // while the agent (and thus its worktree) is live.
+  }
+
+  /**
+   * The worktree path resolved through symlinks (realpath). Resolved
+   * once, on first use. Falls back to a normalized absolute path if the
+   * worktree does not exist yet, so the prefix check still functions.
+   */
+  private get resolvedWorktreePath(): string {
+    if (this._resolvedWorktreePath === null) {
+      try {
+        this._resolvedWorktreePath = fs.realpathSync(this.context.worktreePath);
+      } catch {
+        this._resolvedWorktreePath = path.resolve(this.context.worktreePath);
+      }
+    }
+    return this._resolvedWorktreePath;
   }
 
   /**
