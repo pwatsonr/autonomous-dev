@@ -170,8 +170,15 @@
 .audit-pagination {
     display: flex;
     align-items: center;
-    gap: var(--s-3);
+    gap: var(--s-2);
     margin-top: var(--s-3);
+}
+
+/* Disabled prev/next at the ends of the range — present for layout
+   stability but visibly inert (crawl p11 round 6). */
+.audit-pagination .btn[aria-disabled="true"] {
+    opacity: 0.4;
+    pointer-events: none;
 }
 
 .audit-config-changes {
