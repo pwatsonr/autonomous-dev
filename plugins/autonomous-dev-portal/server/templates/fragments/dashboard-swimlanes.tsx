@@ -137,7 +137,9 @@ export interface DashboardSwimlanesProps {
  * Each lane is role=list; cards are role=listitem (implicit on <a> inside
  * a list, but we wrap explicitly for clarity).
  */
-export const DashboardSwimlanes: FC<DashboardSwimlanesProps> = ({ groups }) => (
+export const DashboardSwimlanes: FC<DashboardSwimlanesProps> = ({ groups }) => {
+    const allEmpty = groups.every((g) => g.cards.length === 0);
+    return (
     <div class="pipeline-shell" role="region" aria-label="Pipeline swimlanes">
         {/* Column headers — presentational, no grid/row roles */}
         <div class="pipeline-header" aria-hidden="true">
@@ -149,9 +151,16 @@ export const DashboardSwimlanes: FC<DashboardSwimlanesProps> = ({ groups }) => (
                 </div>
             ))}
         </div>
-        {/* Lane body — each lane is a list of cards */}
-        <div class="pipeline-body">
-            {groups.map((g) => (
+        {/* Lane body — each lane is a list of cards. Crawl p1/#416:
+            when nothing is in flight, a centered idle message replaces
+            the 8 floating "—" dashes (the header above still shows the
+            phase columns + zero counts). */}
+        <div class={`pipeline-body${allEmpty ? " is-idle" : ""}`}>
+            {allEmpty ? (
+                <p class="pipeline-idle dim">
+                    Pipeline idle · no active requests
+                </p>
+            ) : groups.map((g) => (
                 <div
                     class="lane"
                     key={g.phase}
@@ -171,4 +180,5 @@ export const DashboardSwimlanes: FC<DashboardSwimlanesProps> = ({ groups }) => (
             ))}
         </div>
     </div>
-);
+    );
+};
