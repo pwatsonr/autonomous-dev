@@ -146,6 +146,13 @@ body { background: var(--bg-0); color: var(--fg-0); overflow: hidden; }
   padding: var(--pad-section) var(--s-8);
   max-width: 1480px;
   margin: 0 auto;
+  /* Crawl p9 final width fix: inside a FLEX parent (settings root is a
+     flex column), auto cross-axis margins disable stretch — the column
+     shrank to each tab's content width and re-centered, so switching
+     tabs changed the page width (operator, three reports). width:100%
+     restores identical behavior in block AND flex contexts. */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* FR-026-01: Topbar — sticky frosted header */
