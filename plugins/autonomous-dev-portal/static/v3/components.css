@@ -663,13 +663,19 @@ select[name="trust-level"] {
     overflow-wrap: anywhere;
 }
 
-/* Audit filter strip: kit inputs at sane widths inside the flex row. */
+/* Audit filter strip (crawl p11 round 5, operator: "filter looks odd"):
+   a labeled-input row that READS as a filter bar — uppercase mono
+   labels, sane input widths, the Apply button matched to input height
+   and bottom-aligned, and a clear separator from the table below. */
 .audit-filters label {
     display: flex;
     flex-direction: column;
     gap: var(--s-1);
+    font-family: var(--font-mono);
     font-size: var(--t-label);
-    color: var(--fg-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-3);
 }
 
 .audit-filters .input {
@@ -680,18 +686,29 @@ select[name="trust-level"] {
     width: 160px;
 }
 
-
-/* Filters row sits inside the Operator-log card (crawl p11 round 3). */
-.audit-chain-table {
-    margin-top: var(--s-2);
+/* Apply button: full input height so it lines up with the field boxes,
+   not the small chip height it had (operator screenshot). */
+.audit-filters .btn {
+    height: 32px;
 }
 
+
+/* Filters sit inside the Operator-log card as a bordered band, clearly
+   separated from the table header below (crawl p11 round 5 — they were
+   crammed flush against SEQ/TIMESTAMP with no gap). */
 .card > .audit-filters {
-    padding: var(--s-3) var(--s-3) 0;
+    padding: var(--s-4);
+    border-bottom: 1px solid var(--border-thin);
+    background: var(--bg-2);
+}
+
+.card > .audit-chain-table {
+    margin-top: 0;
 }
 
 .card > .audit-pagination {
-    padding: 0 var(--s-3) var(--s-3);
+    padding: var(--s-3);
+    border-top: 1px solid var(--border-thin);
 }
 
 .audit-stub-table {
