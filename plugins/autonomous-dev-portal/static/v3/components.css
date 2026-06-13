@@ -101,28 +101,27 @@
     gap: var(--s-4);
 }
 
+/* Crawl p11 round 2: audit tables ride the kit .tbl (density token,
+   hover, sticky header) — this class now only distributes columns so
+   the timestamp column stops hogging a third of the card. */
 .audit-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--t-meta);
+    table-layout: fixed;
 }
 
-.audit-table th {
-    text-align: left;
-    font-family: var(--font-mono);
-    font-size: var(--t-label);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--fg-3);
-    padding: var(--s-2) var(--s-3);
-    border-bottom: 1px solid var(--border-strong);
+.audit-table th:nth-child(1),
+.audit-table td:nth-child(1) {
+    width: 7ch;
 }
 
-.audit-table td {
-    padding: var(--s-2) var(--s-3);
-    border-bottom: 1px solid var(--border-thin);
-    color: var(--fg-1);
+.audit-table th:nth-child(2),
+.audit-table td:nth-child(2) {
+    width: 26ch;
+    white-space: nowrap;
+}
+
+.audit-table th:nth-child(3),
+.audit-table td:nth-child(3) {
+    width: 16ch;
 }
 
 .audit-filters {

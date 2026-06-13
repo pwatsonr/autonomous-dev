@@ -14,12 +14,20 @@ import type {
 } from "../../types/render";
 import { AuditRowFragment } from "../fragments/audit-row";
 
-/** Format an ISO-8601 timestamp as compact `YYYY-MM-DD HH:mm:ssZ` for
- *  table cells (TDD-034 §5.6 — table timestamps use compact ISO form). */
+/** Local compact timestamp for table cells — "Jun 12 · 3:38:57 PM"
+ *  (crawl p11 round 2: matches the logs page; the portal runs on the
+ *  operator's machine so server-local == operator-local; the full UTC
+ *  ISO survives on the <time datetime>/title attributes). */
 function formatTimestampCompact(iso: string): string {
     const ts = Date.parse(iso);
     if (Number.isNaN(ts)) return iso;
-    return new Date(ts).toISOString().replace("T", " ").slice(0, 19) + "Z";
+    const d = new Date(ts);
+    const date = d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+    });
+    const time = d.toLocaleTimeString("en-US", { hour12: true });
+    return `${date} · ${time}`;
 }
 
 const integrityLabel: Record<AuditPageResultProp["integrityStatus"], string> = {
@@ -202,7 +210,7 @@ const ConfigChangesSection: FC<{
             Applied by the daemon from portal-submitted markers — recorded
             here from the marker archive, outside the HMAC chain below.
         </p>
-        <table class="audit-table">
+        <table class="tbl audit-table">
             <thead>
                 <tr>
                     <th>Timestamp</th>
@@ -214,7 +222,9 @@ const ConfigChangesSection: FC<{
             <tbody>
                 {changes.map((m) => (
                     <tr key={m.id}>
-                        <td class="mono">{m.ts}</td>
+                        <td class="mono" title={m.ts}>
+                            {formatTimestampCompact(m.ts)}
+                        </td>
                         <td>{m.actor}</td>
                         <td>{m.summary}</td>
                         <td class="mono">{m.id.slice(0, 8)}</td>
@@ -234,7 +244,7 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                 {configChanges !== undefined && configChanges.length > 0 && (
                     <ConfigChangesSection changes={configChanges} />
                 )}
-                <table class="audit-table">
+                <table class="tbl audit-table">
                     <thead>
                         <tr>
                             <th>Timestamp</th>
@@ -277,10 +287,10 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                 </span>
             </div>
             <div id="audit-content">
-                <table class="audit-table">
+                <table class="tbl audit-table">
                     <thead>
                         <tr>
-                            <th>Sequence</th>
+                            <th>Seq</th>
                             <th>Timestamp</th>
                             <th>Operator</th>
                             <th>Action</th>
