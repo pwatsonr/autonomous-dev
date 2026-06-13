@@ -151,14 +151,19 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                     hx-get is updated by logs-view.js to thread the active level
                     filter so every 5 s refresh carries the current state.
                     hx-target="#log-tail" + hx-swap="innerHTML" preserves the
-                    role=log/aria-live node so AT announcements fire correctly. */}
+                    role=log/aria-live node so AT announcements fire correctly.
+                    CRITICAL: hx-select must be "#log-tail > *" (the line
+                    rows), NOT "#log-tail" — selecting the container into
+                    its own innerHTML NESTED the terminal inside itself on
+                    every poll (the operator's box-inside-a-box, crawl
+                    p11). */}
                 <section
                     id="logs-body"
                     hx-get="/logs"
                     hx-trigger={LOGS_POLLING_TRIGGER}
                     hx-target="#log-tail"
                     hx-swap="innerHTML"
-                    hx-select="#log-tail"
+                    hx-select="#log-tail > *"
                     aria-label="Log stream"
                 >
                     <LiveLog entries={entries} readError={readError} />

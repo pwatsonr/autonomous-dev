@@ -125,11 +125,10 @@
   white-space: nowrap;
 }
 
-/* Crawl p11 (operator): the terminal rendered a box INSIDE a box — the
-   .log border sat inside the section card's border. One box now. */
-#logs-root .log {
-    border: none;
-}
+/* Crawl p11 round 2: the box-inside-a-box was the terminal NESTING
+   INSIDE ITSELF (hx-select selected #log-tail into its own innerHTML on
+   every poll — fixed in logs.tsx with "#log-tail > *"). The terminal's
+   own border is the page's single block. */
 
 /* 12-hour times ("12:59:59 PM") need a wider, non-wrapping column. */
 .log .l-time {
