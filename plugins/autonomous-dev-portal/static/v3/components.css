@@ -639,3 +639,20 @@ select[name="trust-level"] {
 .rt-kv dd {
     overflow-wrap: anywhere;
 }
+
+/* Audit filter strip: kit inputs at sane widths inside the flex row. */
+.audit-filters label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    font-size: var(--t-label);
+    color: var(--fg-2);
+}
+
+.audit-filters .input {
+    width: 180px;
+}
+
+.audit-filters input[type="date"].input {
+    width: 160px;
+}

@@ -50,7 +50,9 @@ describe("LiveLog — SPEC-037-6-02", () => {
         // splitting every entry across two lines. Time-only now; full
         // ISO survives on title=.
         expect(html).toContain('class="l-time"');
-        expect(html).toContain(">14:32:04<");
+        // Crawl p11 (operator): 12-hour local display; bare fixtures
+        // convert arithmetically (14:32 -> 2:32 PM).
+        expect(html).toContain(">2:32:04 PM<");
         expect(html).toContain('title="');
         expect(html).not.toContain('class="ts"');
     });

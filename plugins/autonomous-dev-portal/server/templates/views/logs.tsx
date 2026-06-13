@@ -61,7 +61,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                             aria-pressed is managed client-side on click so it
                             reflects state immediately (before the next swap). */}
                         <button
-                            class="active"
+                            class="seg-btn active"
                             type="button"
                             data-level-value="all"
                             hx-get="/logs"
@@ -73,6 +73,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                             All
                         </button>
                         <button
+                            class="seg-btn"
                             type="button"
                             data-level-value="error"
                             hx-get="/logs?level=error"
@@ -84,6 +85,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                             Errors
                         </button>
                         <button
+                            class="seg-btn"
                             type="button"
                             data-level-value="warn"
                             hx-get="/logs?level=warn"
@@ -95,6 +97,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                             Warn
                         </button>
                         <button
+                            class="seg-btn"
                             type="button"
                             data-level-value="info"
                             hx-get="/logs?level=info"

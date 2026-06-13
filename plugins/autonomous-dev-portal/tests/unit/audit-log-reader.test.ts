@@ -306,14 +306,21 @@ describe("AuditLogReader — HMAC chain integrity", () => {
         expect(r.integrityStatus).toBe("unknown");
     });
 
-    test("filtered slice (non-contiguous sequence range): integrity 'unknown'", async () => {
-        // Filtering by operator punches holes in the sequence range, so the
-        // verifier cannot prove the chain link between non-adjacent entries.
-        writeAuditLog(buildEntries(30));
+    test("filtered slice (non-contiguous range): WARNING with gap detail, not unknown", async () => {
+        // Crawl p11: the old contiguity bail rendered the whole page
+        // "unknown" — the live log's historical chain restart made the
+        // indicator permanently useless. Filtered slices now verify
+        // what they can and report gaps honestly.
+        writeAuditLog(buildEntries(40));
         const reader = makeReader();
-        const r = await reader.getPage(1, 50, { operatorId: "alice" });
-        expect(r.entries.length).toBeGreaterThan(1);
-        expect(r.integrityStatus).toBe("unknown");
+        // Filter to every-other entries via operator (fixtures alternate)
+        // is fixture-specific; filter on action keeps only a sparse set.
+        const page = await reader.getPage(1, 10, {
+            action: "kill-switch",
+        });
+        expect(page.integrityStatus).toBe("warning");
+        expect(page.integrityDetail?.hmacFailures).toBe(0);
+        expect((page.integrityDetail?.sequenceGaps ?? 0)).toBeGreaterThan(0);
     });
 
     test("clean chain on a contiguous sub-page (page 3 of 3)", async () => {
