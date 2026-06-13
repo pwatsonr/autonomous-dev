@@ -124,3 +124,14 @@
 .log .l-time {
   white-space: nowrap;
 }
+
+/* Crawl p11 (operator): the terminal rendered a box INSIDE a box — the
+   .log border sat inside the section card's border. One box now. */
+#logs-root .log {
+    border: none;
+}
+
+/* 12-hour times ("12:59:59 PM") need a wider, non-wrapping column. */
+.log .l-time {
+    min-width: 12ch;
+}

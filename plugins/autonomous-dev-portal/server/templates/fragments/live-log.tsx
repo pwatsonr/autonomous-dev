@@ -90,12 +90,20 @@ export interface LiveLogProps {
  *
  * @param props - {@link LiveLogProps}
  */
-/** "2026-06-12T20:40:34Z" -> "20:40:34" (full ISO stays on title=). The
- *  raw ISO wrapped at the T inside the narrow time column, splitting
- *  every entry across two lines (crawl p10). */
+/** Local 12-hour time (operator request, crawl p11): the portal runs on
+ *  the operator's own machine, so server-local == operator-local. Full
+ *  ISO (UTC) survives on title=. Bare "HH:MM:SSZ" fixtures (no date)
+ *  convert arithmetically without a timezone shift. */
 function timeOnly(ts: string): string {
-    const m = ts.match(/(?:^|T)(\d{2}:\d{2}:\d{2})/);
-    return m?.[1] ?? ts;
+    const t = Date.parse(ts);
+    if (!Number.isNaN(t)) {
+        return new Date(t).toLocaleTimeString("en-US", { hour12: true });
+    }
+    const m = ts.match(/(?:^|T)(\d{2}):(\d{2}:\d{2})/);
+    if (!m) return ts;
+    const h = Number(m[1]);
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${String(h12)}:${m[2] ?? ""} ${h >= 12 ? "PM" : "AM"}`;
 }
 
 export const LiveLog: FC<LiveLogProps> = ({ entries, offline = false, readError = false }) => {

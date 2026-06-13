@@ -37,6 +37,11 @@ export interface IntegrityDetail {
     hmacFailures: number;
     /** First sequence whose HMAC failed validation, when known. */
     firstFailingSequence?: number;
+    /** Linkage breaks whose entries still self-verify — chain RESTARTS
+     *  (e.g. an early-version boot re-issued sequences), not tampering. */
+    chainRestarts?: number;
+    /** Sequence at the first detected restart. */
+    restartAtSequence?: number;
 }
 
 export interface AuditPageResult {

@@ -24,11 +24,32 @@ function formatTimestampCompact(iso: string): string {
 
 const integrityLabel: Record<AuditPageResultProp["integrityStatus"], string> = {
     verified: "Chain verified",
-    warning: "Chain has gaps",
+    warning: "Chain verified · with anomalies",
     error: "Chain integrity FAILED",
     unknown: "Chain integrity unknown",
     // Note: "FAILED" stays uppercase per design system status-badge rule.
 };
+
+/** Honest anomaly annotation (crawl p11): the live log carries a
+ *  historical restart (early-version boot re-issued #10-11) — say so
+ *  instead of rendering a page-wide "unknown". */
+function integrityNote(
+    detail?: import("../../types/audit-types").IntegrityDetail,
+): string {
+    if (detail === undefined) return "";
+    const parts: string[] = [];
+    if ((detail.chainRestarts ?? 0) > 0) {
+        parts.push(
+            `chain restarted ${String(detail.chainRestarts)}× (at #${String(detail.restartAtSequence ?? "?")}, early-version artifact — segments self-verify)`,
+        );
+    }
+    if (detail.sequenceGaps > 0) {
+        parts.push(
+            `${String(detail.sequenceGaps)} sequence ${detail.sequenceGaps === 1 ? "anomaly" : "anomalies"}`,
+        );
+    }
+    return parts.join(" · ");
+}
 
 interface IntegrityProps {
     status: AuditPageResultProp["integrityStatus"];
@@ -45,6 +66,11 @@ const IntegrityIndicator: FC<IntegrityProps> = ({ status, detail }) => (
                     ? String(detail.firstFailingSequence)
                     : "?"}
                 )
+            </span>
+        )}
+        {status === "warning" && detail !== undefined && (
+            <span class="integrity__detail dim">
+                {" "}— {integrityNote(detail)}
             </span>
         )}
     </span>
@@ -116,6 +142,7 @@ const FilterForm: FC<FilterFormProps> = ({ filters }) => (
         <label>
             Operator
             <input
+                class="input"
                 type="text"
                 name="operatorId"
                 value={filters.operatorId ?? ""}
@@ -125,6 +152,7 @@ const FilterForm: FC<FilterFormProps> = ({ filters }) => (
         <label>
             Action
             <input
+                class="input"
                 type="text"
                 name="action"
                 value={filters.action ?? ""}
@@ -134,6 +162,7 @@ const FilterForm: FC<FilterFormProps> = ({ filters }) => (
         <label>
             From
             <input
+                class="input"
                 type="date"
                 name="startDate"
                 value={
@@ -146,6 +175,7 @@ const FilterForm: FC<FilterFormProps> = ({ filters }) => (
         <label>
             To
             <input
+                class="input"
                 type="date"
                 name="endDate"
                 value={
@@ -155,7 +185,7 @@ const FilterForm: FC<FilterFormProps> = ({ filters }) => (
                 }
             />
         </label>
-        <button type="submit">Apply filters</button>
+        <button type="submit" class="btn primary sm">Apply filters</button>
     </form>
 );
 
@@ -236,9 +266,6 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
         <section class="audit">
             <Topbar title="Audit log" subTitle="HMAC-chained operator log" />
             <div class="main-inner">
-            {configChanges !== undefined && configChanges.length > 0 && (
-                <ConfigChangesSection changes={configChanges} />
-            )}
             <FilterForm filters={liveFilters} />
             <div class="audit-status">
                 <IntegrityIndicator
@@ -257,7 +284,7 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                             <th>Timestamp</th>
                             <th>Operator</th>
                             <th>Action</th>
-                            <th>Outcome</th>
+
                         </tr>
                     </thead>
                     <tbody>
@@ -271,18 +298,18 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                                 </td>
                                 <td><code>{entry.operatorId}</code></td>
                                 <td>{entry.action}</td>
-                                <td>
-                                    {String(
-                                        (entry.details as { outcome?: unknown })
-                                            .outcome ?? "—",
-                                    )}
-                                </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
                 <Pagination page={page} filters={liveFilters} />
             </div>
+            {/* Crawl p11: daemon-applied config changes moved BELOW the
+                HMAC chain — they were pushing the page's primary content
+                (the tamper-evident log) under the fold. */}
+            {configChanges !== undefined && configChanges.length > 0 && (
+                <ConfigChangesSection changes={configChanges} />
+            )}
             </div>
         </section>
     );

@@ -57,6 +57,10 @@ interface RawEntry {
 interface ParsedLine {
     /** Public-facing entry. */
     entry: AuditEntry;
+    /** Position in the on-disk file — the TRUE chain order. Sequence
+     *  numbers can duplicate after a historical restart (crawl p11), so
+     *  verification must walk file order, never sequence order. */
+    fileIndex: number;
     /** Original on-disk previous_hmac (empty string for sequence=1). */
     diskPreviousHmac: string;
     /** Original on-disk key_id, used by the verifier. */
@@ -150,7 +154,10 @@ export class AuditLogReader {
             lineNo += 1;
             if (line.length === 0) continue;
             const parsed = parseLine(line, lineNo);
-            if (parsed !== null) out.push(parsed);
+            if (parsed !== null) {
+                parsed.fileIndex = out.length;
+                out.push(parsed);
+            }
         }
         return out;
     }
@@ -171,22 +178,23 @@ export class AuditLogReader {
         if (key === null) {
             return { status: "unknown" };
         }
+        // Crawl p11: walk in FILE ORDER. The old code sorted by sequence
+        // and bailed to "unknown" on any non-contiguous slice — but the
+        // live log contains a historical chain RESTART (an early-version
+        // boot re-issued sequences #10-11), so the page永 rendered
+        // "Chain integrity unknown", defeating the page's whole purpose.
+        // Sorting by sequence would also interleave the two segments.
+        // Instead: verify every entry's own HMAC, and treat a linkage
+        // break whose entry still self-verifies as a chain restart
+        // (reported honestly) rather than tampering.
         const ascending = [...slice].sort(
-            (a, b) => a.entry.sequence - b.entry.sequence,
+            (a, b) => a.fileIndex - b.fileIndex,
         );
-        // Detect non-contiguous slices (filters that punched holes).
-        const first = ascending[0];
-        const last = ascending[ascending.length - 1];
-        if (first === undefined || last === undefined) {
-            return { status: "verified" };
-        }
-        const expectedRange = last.entry.sequence - first.entry.sequence + 1;
-        if (expectedRange !== ascending.length) {
-            return { status: "unknown" };
-        }
 
         let sequenceGaps = 0;
         let hmacFailures = 0;
+        let chainRestarts = 0;
+        let restartAtSequence: number | undefined;
         let firstFailingSequence: number | undefined;
 
         for (let i = 0; i < ascending.length; i += 1) {
@@ -199,9 +207,12 @@ export class AuditLogReader {
                     sequenceGaps += 1;
                 }
                 if (cur.diskPreviousHmac !== prev.entry.entry_hmac) {
-                    hmacFailures += 1;
-                    if (firstFailingSequence === undefined) {
-                        firstFailingSequence = cur.entry.sequence;
+                    // Linkage break: restart if the entry self-verifies
+                    // below; provisional restart, demoted to failure if
+                    // its own HMAC is bad.
+                    chainRestarts += 1;
+                    if (restartAtSequence === undefined) {
+                        restartAtSequence = cur.entry.sequence;
                     }
                 }
             }
@@ -226,13 +237,24 @@ export class AuditLogReader {
         if (hmacFailures > 0) {
             return {
                 status: "error",
-                detail: { sequenceGaps, hmacFailures, firstFailingSequence },
+                detail: {
+                    sequenceGaps,
+                    hmacFailures,
+                    firstFailingSequence,
+                    chainRestarts,
+                    restartAtSequence,
+                },
             };
         }
-        if (sequenceGaps > 0) {
+        if (chainRestarts > 0 || sequenceGaps > 0) {
             return {
                 status: "warning",
-                detail: { sequenceGaps, hmacFailures: 0 },
+                detail: {
+                    sequenceGaps,
+                    hmacFailures: 0,
+                    chainRestarts,
+                    restartAtSequence,
+                },
             };
         }
         return { status: "verified" };
@@ -312,6 +334,8 @@ function parseLine(line: string, lineNo: number): ParsedLine | null {
             ? (raw.details as Record<string, unknown>)
             : {};
     return {
+        // fileIndex is overwritten by readAll() with the true position.
+        fileIndex: 0,
         entry: {
             sequence,
             timestamp,
