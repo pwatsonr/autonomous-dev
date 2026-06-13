@@ -621,6 +621,13 @@ select[name="trust-level"] {
 .rt-kv {
     padding-top: var(--s-2);
     border-top: 1px solid var(--border-thin);
+    /* The base .kv grid uses max-content columns — the value track
+       grew past the card edge for long reviewer lists (operator
+       screenshot: "refactor" card). Bound the value column so it
+       wraps inside the card. */
+    grid-template-columns: max-content minmax(0, 1fr);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 @media (max-width: 1280px) {
