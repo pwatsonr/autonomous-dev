@@ -6,6 +6,7 @@
 
 import type { FC } from "hono/jsx";
 import { Topbar } from "../../components/topbar";
+import { asset } from "../../lib/plugin-version";
 
 import type {
     AuditFiltersProp,
@@ -240,7 +241,48 @@ const ConfigChangesSection: FC<{
     </section>
 );
 
-export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, configChanges }) => {
+/** Audit tabs (crawl p11 round 4, operator request): the two datasets
+ *  answer different questions — "what did the operator do?" (HMAC
+ *  chain) vs "what did the daemon apply?" (marker archive) — and
+ *  stacked they made the page feel endless. Counts stay visible on the
+ *  labels so the second tab is never forgotten. Reuses the settings tab
+ *  mechanics (settings-tabs.js, deep-linkable ?tab=). */
+const AuditTabs: FC<{
+    active: string;
+    chainCount: number;
+    configCount: number;
+}> = ({ active, chainCount, configCount }) => (
+    <nav
+        class="seg seg-tabs"
+        role="tablist"
+        aria-label="Audit datasets"
+        data-active-tab={active}
+        data-default-tab="chain"
+    >
+        <button
+            type="button"
+            class={active === "chain" ? "seg-btn on" : "seg-btn"}
+            data-tab="chain"
+            role="tab"
+            aria-selected={active === "chain" ? "true" : "false"}
+        >
+            Operator log · {String(chainCount)}
+        </button>
+        <button
+            type="button"
+            class={active === "config" ? "seg-btn on" : "seg-btn"}
+            data-tab="config"
+            role="tab"
+            aria-selected={active === "config" ? "true" : "false"}
+        >
+            Config changes · {String(configCount)}
+        </button>
+    </nav>
+);
+
+export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, configChanges, activeTab }) => {
+    const tab = activeTab === "config" ? "config" : "chain";
+    const ccCount = configChanges?.length ?? 0;
     if (page === undefined) {
         return (
             <section class="audit">
@@ -281,7 +323,18 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
         <section class="audit">
             <Topbar title="Audit log" subTitle="HMAC-chained operator log" />
             <div class="main-inner">
-            <section class="sec">
+            {ccCount > 0 ? (
+                <AuditTabs
+                    active={tab}
+                    chainCount={page.totalCount}
+                    configCount={ccCount}
+                />
+            ) : null}
+            <section
+                class="sec"
+                data-tab-panel="chain"
+                {...(tab !== "chain" ? { hidden: true } : {})}
+            >
                 <div class="sec-head">
                     <h2>Operator log</h2>
                     <div class="head-actions audit-status">
@@ -324,12 +377,18 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                 <Pagination page={page} filters={liveFilters} />
                 </div>
             </section>
-            {/* Crawl p11: daemon-applied config changes moved BELOW the
-                HMAC chain — they were pushing the page's primary content
-                (the tamper-evident log) under the fold. */}
             {configChanges !== undefined && configChanges.length > 0 && (
-                <ConfigChangesSection changes={configChanges} />
+                <div
+                    data-tab-panel="config"
+                    {...(tab !== "config" ? { hidden: true } : {})}
+                >
+                    <ConfigChangesSection changes={configChanges} />
+                </div>
             )}
+            <script
+                src={asset("/static/js/settings-tabs.js")}
+                type="module"
+            ></script>
             </div>
         </section>
     );
