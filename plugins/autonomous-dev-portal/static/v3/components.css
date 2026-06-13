@@ -101,27 +101,49 @@
     gap: var(--s-4);
 }
 
-/* Crawl p11 round 2: audit tables ride the kit .tbl (density token,
-   hover, sticky header) — this class now only distributes columns so
-   the timestamp column stops hogging a third of the card. */
-.audit-table {
+/* Crawl p11 round 3: ONE width-rule set per table SCHEMA. The previous
+   generic .audit-table nth-child widths were built for the chain table
+   (Seq/Timestamp/Operator/Action) but also hit the config-changes table
+   (Timestamp/Actor/Summary/Marker) — cramming its timestamp into 7ch and
+   wrapping it vertically (operator screenshot). */
+.audit-chain-table {
     table-layout: fixed;
 }
 
-.audit-table th:nth-child(1),
-.audit-table td:nth-child(1) {
+.audit-chain-table th:nth-child(1),
+.audit-chain-table td:nth-child(1) {
     width: 7ch;
 }
 
-.audit-table th:nth-child(2),
-.audit-table td:nth-child(2) {
+.audit-chain-table th:nth-child(2),
+.audit-chain-table td:nth-child(2) {
+    width: 29ch;
+    white-space: nowrap;
+}
+
+.audit-chain-table th:nth-child(3),
+.audit-chain-table td:nth-child(3) {
+    width: 14ch;
+}
+
+.audit-cc-table {
+    table-layout: fixed;
+}
+
+.audit-cc-table th:nth-child(1),
+.audit-cc-table td:nth-child(1) {
     width: 26ch;
     white-space: nowrap;
 }
 
-.audit-table th:nth-child(3),
-.audit-table td:nth-child(3) {
-    width: 16ch;
+.audit-cc-table th:nth-child(2),
+.audit-cc-table td:nth-child(2) {
+    width: 12ch;
+}
+
+.audit-cc-table th:nth-child(4),
+.audit-cc-table td:nth-child(4) {
+    width: 12ch;
 }
 
 .audit-filters {
@@ -133,8 +155,10 @@
 
 .audit-status {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: var(--s-3);
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .audit-totals {
@@ -654,4 +678,22 @@ select[name="trust-level"] {
 
 .audit-filters input[type="date"].input {
     width: 160px;
+}
+
+
+/* Filters row sits inside the Operator-log card (crawl p11 round 3). */
+.audit-chain-table {
+    margin-top: var(--s-2);
+}
+
+.card > .audit-filters {
+    padding: var(--s-3) var(--s-3) 0;
+}
+
+.card > .audit-pagination {
+    padding: 0 var(--s-3) var(--s-3);
+}
+
+.audit-stub-table {
+    table-layout: auto;
 }

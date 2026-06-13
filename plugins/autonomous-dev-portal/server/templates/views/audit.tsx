@@ -114,11 +114,15 @@ const Pagination: FC<PaginationProps> = ({ page, filters }) => {
     const totalPages = Math.max(1, Math.ceil(page.totalCount / page.pageSize));
     return (
         <nav class="audit-pagination" aria-label="Audit log pagination">
+            {/* Crawl p11 round 3 — operator: "what is even going on".
+                These links carried hx-get into #audit-content with NO
+                hx-select: clicking Next injected the ENTIRE PAGE
+                (Topbar, filters, everything) inside the table container.
+                Plain navigation is bulletproof here — the page has no
+                live state to preserve. */}
             {page.hasPrevious && (
                 <a
                     class="audit-pagination__prev"
-                    hx-get={`/audit?${buildQuery(page.currentPage - 1, filters)}`}
-                    hx-target="#audit-content"
                     href={`/audit?${buildQuery(page.currentPage - 1, filters)}`}
                 >
                     ← Previous
@@ -130,8 +134,6 @@ const Pagination: FC<PaginationProps> = ({ page, filters }) => {
             {page.hasNext && (
                 <a
                     class="audit-pagination__next"
-                    hx-get={`/audit?${buildQuery(page.currentPage + 1, filters)}`}
-                    hx-target="#audit-content"
                     href={`/audit?${buildQuery(page.currentPage + 1, filters)}`}
                 >
                     Next →
@@ -204,13 +206,15 @@ const FilterForm: FC<FilterFormProps> = ({ filters }) => (
 const ConfigChangesSection: FC<{
     changes: NonNullable<RenderProps["audit"]["configChanges"]>;
 }> = ({ changes }) => (
-    <div class="audit-config-changes">
-        <h2>Config changes (daemon-applied)</h2>
-        <p class="dim">
-            Applied by the daemon from portal-submitted markers — recorded
-            here from the marker archive, outside the HMAC chain below.
-        </p>
-        <table class="tbl audit-table">
+    <section class="sec audit-config-changes">
+        <div class="sec-head">
+            <h2>Config changes</h2>
+            <span class="meta-mono dim">
+                daemon-applied · outside the HMAC chain
+            </span>
+        </div>
+        <div class="card">
+        <table class="tbl audit-cc-table">
             <thead>
                 <tr>
                     <th>Timestamp</th>
@@ -232,7 +236,8 @@ const ConfigChangesSection: FC<{
                 ))}
             </tbody>
         </table>
-    </div>
+        </div>
+    </section>
 );
 
 export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, configChanges }) => {
@@ -241,10 +246,7 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
             <section class="audit">
                 <Topbar title="Audit log" subTitle="HMAC-chained operator log" />
                 <div class="main-inner">
-                {configChanges !== undefined && configChanges.length > 0 && (
-                    <ConfigChangesSection changes={configChanges} />
-                )}
-                <table class="tbl audit-table">
+                <table class="tbl audit-stub-table">
                     <thead>
                         <tr>
                             <th>Timestamp</th>
@@ -266,6 +268,9 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                         ))}
                     </tbody>
                 </table>
+                {configChanges !== undefined && configChanges.length > 0 && (
+                    <ConfigChangesSection changes={configChanges} />
+                )}
                 </div>
             </section>
         );
@@ -276,18 +281,22 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
         <section class="audit">
             <Topbar title="Audit log" subTitle="HMAC-chained operator log" />
             <div class="main-inner">
-            <FilterForm filters={liveFilters} />
-            <div class="audit-status">
-                <IntegrityIndicator
-                    status={page.integrityStatus}
-                    detail={page.integrityDetail}
-                />
-                <span class="audit-totals">
-                    {String(page.totalCount)} total entries
-                </span>
-            </div>
-            <div id="audit-content">
-                <table class="tbl audit-table">
+            <section class="sec">
+                <div class="sec-head">
+                    <h2>Operator log</h2>
+                    <div class="head-actions audit-status">
+                        <IntegrityIndicator
+                            status={page.integrityStatus}
+                            detail={page.integrityDetail}
+                        />
+                        <span class="audit-totals">
+                            {String(page.totalCount)} total entries
+                        </span>
+                    </div>
+                </div>
+                <div class="card">
+                <FilterForm filters={liveFilters} />
+                <table class="tbl audit-chain-table">
                     <thead>
                         <tr>
                             <th>Seq</th>
@@ -313,7 +322,8 @@ export const AuditView: FC<RenderProps["audit"]> = ({ rows, page, filters, confi
                     </tbody>
                 </table>
                 <Pagination page={page} filters={liveFilters} />
-            </div>
+                </div>
+            </section>
             {/* Crawl p11: daemon-applied config changes moved BELOW the
                 HMAC chain — they were pushing the page's primary content
                 (the tamper-evident log) under the fold. */}

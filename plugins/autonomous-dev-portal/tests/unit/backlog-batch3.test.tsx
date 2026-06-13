@@ -72,12 +72,13 @@ describe("audit config-changes section (#396)", () => {
             rows: [],
             configChanges: [{ id: "verify-386-x", actor: "verify", ts: "t", summary: "s" }],
         } as any));
-        expect(html).toContain("Config changes (daemon-applied)");
+        expect(html).toContain("Config changes");
+        expect(html).toContain("daemon-applied · outside the HMAC chain");
         expect(html).toContain("verify-3");
     });
 
     test("AuditView omits the section when empty", async () => {
         const html = await render(AuditView({ rows: [], configChanges: [] } as any));
-        expect(html).not.toContain("Config changes (daemon-applied)");
+        expect(html).not.toContain("Config changes");
     });
 });
