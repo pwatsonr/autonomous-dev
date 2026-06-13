@@ -115,30 +115,41 @@ const Pagination: FC<PaginationProps> = ({ page, filters }) => {
     const totalPages = Math.max(1, Math.ceil(page.totalCount / page.pageSize));
     return (
         <nav class="audit-pagination" aria-label="Audit log pagination">
-            {/* Crawl p11 round 3 — operator: "what is even going on".
-                These links carried hx-get into #audit-content with NO
-                hx-select: clicking Next injected the ENTIRE PAGE
-                (Topbar, filters, everything) inside the table container.
-                Plain navigation is bulletproof here — the page has no
-                live state to preserve. */}
-            {page.hasPrevious && (
-                <a
-                    class="audit-pagination__prev"
-                    href={`/audit?${buildQuery(page.currentPage - 1, filters)}`}
-                >
-                    ← Previous
-                </a>
-            )}
-            <span class="audit-pagination__current">
+            {/* Crawl p11 round 6 — operator: "pagination doesn't match
+                our look and feel". The prev/next links had NO css (raw
+                browser blue underlines) and "Page X of Y" was unstyled.
+                Now: muted mono indicator + kit ghost buttons, matching
+                every other nav control on the site (e.g. dashboard's
+                "All agents →"). Plain navigation — the page holds no
+                live state (round 3: hx-get with no select ate the
+                page). */}
+            <span class="meta-mono dim">
                 Page {String(page.currentPage)} of {String(totalPages)}
             </span>
-            {page.hasNext && (
+            <span class="spacer"></span>
+            {page.hasPrevious ? (
                 <a
-                    class="audit-pagination__next"
+                    class="btn ghost sm"
+                    href={`/audit?${buildQuery(page.currentPage - 1, filters)}`}
+                >
+                    ← Prev
+                </a>
+            ) : (
+                <span class="btn ghost sm" aria-disabled="true">
+                    ← Prev
+                </span>
+            )}
+            {page.hasNext ? (
+                <a
+                    class="btn ghost sm"
                     href={`/audit?${buildQuery(page.currentPage + 1, filters)}`}
                 >
                     Next →
                 </a>
+            ) : (
+                <span class="btn ghost sm" aria-disabled="true">
+                    Next →
+                </span>
             )}
         </nav>
     );
