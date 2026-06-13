@@ -67,7 +67,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                             hx-get="/logs"
                             hx-target="#log-tail"
                             hx-swap="innerHTML"
-                            hx-select="#log-tail"
+                            hx-select="#log-tail > *"
                             aria-pressed="true"
                         >
                             All
@@ -79,7 +79,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                             hx-get="/logs?level=error"
                             hx-target="#log-tail"
                             hx-swap="innerHTML"
-                            hx-select="#log-tail"
+                            hx-select="#log-tail > *"
                             aria-pressed="false"
                         >
                             Errors
@@ -91,7 +91,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                             hx-get="/logs?level=warn"
                             hx-target="#log-tail"
                             hx-swap="innerHTML"
-                            hx-select="#log-tail"
+                            hx-select="#log-tail > *"
                             aria-pressed="false"
                         >
                             Warn
@@ -103,7 +103,7 @@ export const LogsView: FC<RenderProps["logs"]> = ({ lines, readError }) => {
                             hx-get="/logs?level=info"
                             hx-target="#log-tail"
                             hx-swap="innerHTML"
-                            hx-select="#log-tail"
+                            hx-select="#log-tail > *"
                             aria-pressed="false"
                         >
                             Info
