@@ -116,3 +116,21 @@ _envelope() {  # _envelope <command> <exit_code> <output_tail>
         "${REQ_DIR}/verification-report.jsonl"
     [[ "${output}" == *"command_not_in_audit_log"* ]]
 }
+
+# ── presence-match robustness: tolerate cosmetic command differences ──
+# The agent's self-reported evidence command rarely byte-matches the audited
+# command (trailing redirections, quote style). Exact matching refused whole
+# phases; normalization fixes that while still rejecting fabrications.
+@test "presence: tolerant to trailing redirection and quote style; rejects fabrication" {
+    source "${PLUGIN_DIR}/lib/verification/audit-log-reader.sh"
+    local d="${BATS_TEST_TMPDIR}/al"; mkdir -p "${d}"
+    printf '%s\n' '{"phase":"deploy","command":"git push origin br 2>&1","exit_code":0}'  >  "${d}/command-audit.jsonl"
+    printf '%s\n' '{"phase":"deploy","command":"echo \"hi\"","exit_code":0}'              >> "${d}/command-audit.jsonl"
+
+    run audit_log_has_command "${d}" "git push origin br"   # audited had trailing 2>&1
+    [ "$status" -eq 0 ]
+    run audit_log_has_command "${d}" "echo 'hi'"            # audited used double quotes
+    [ "$status" -eq 0 ]
+    run audit_log_has_command "${d}" "pytest -k smoke"      # never ran → still rejected
+    [ "$status" -ne 0 ]
+}

@@ -1110,6 +1110,27 @@ resolve_agent() {
 # Phase Session Dispatch (TASK-009, TASK-026)
 ###############################################################################
 
+# repo_has_deploy_target(project) -> 0 if the repo has a deployable target, 1 if not.
+#   Used to skip the deploy phase for docs/no-infra changes: a repo with nothing to
+#   deploy makes the deploy agent improvise git ops that then fail verification.
+#   Conservative — deploy still runs whenever ANY marker is present; it is skipped
+#   only when NONE are. Operators can force it via .autonomous-dev/deploy.{yaml,yml,json}.
+repo_has_deploy_target() {
+    local project="$1"
+    [[ -f "${project}/Dockerfile" || -f "${project}/Containerfile" ]] && return 0
+    [[ -f "${project}/Procfile" || -f "${project}/fly.toml" || -f "${project}/app.yaml" || -f "${project}/Chart.yaml" ]] && return 0
+    [[ -f "${project}/.autonomous-dev/deploy.yaml" || -f "${project}/.autonomous-dev/deploy.yml" || -f "${project}/.autonomous-dev/deploy.json" ]] && return 0
+    local f
+    for f in "${project}"/docker-compose*.y*ml "${project}"/serverless*.y*ml "${project}"/*.tf \
+             "${project}"/k8s/*.y*ml "${project}"/kubernetes/*.y*ml "${project}"/deploy/*.y*ml; do
+        [[ -e "${f}" ]] && return 0
+    done
+    if [[ -d "${project}/.github/workflows" ]]; then
+        grep -liE "deploy|release|publish" "${project}"/.github/workflows/*.y*ml >/dev/null 2>&1 && return 0
+    fi
+    return 1
+}
+
 # dispatch_phase_session(request_id: string, project: string) -> string
 #   Validates request, resolves agent for current phase, and dispatches session
 #   via spawn_session_typed with 30-minute timeout. Handles errors gracefully.
@@ -1146,6 +1167,25 @@ dispatch_phase_session() {
     # Read current phase
     local phase
     phase=$(jq -r '.current_phase // .status' "${state_file}")
+
+    # Skip the deploy phase when the repo has no deploy target. A docs/no-infra
+    # change has nothing to deploy; dispatching the deploy agent makes it
+    # improvise git operations that then fail verification. Write a clean pass
+    # result and let the pipeline advance (to monitor).
+    if [[ "${phase}" == "deploy" ]] && ! repo_has_deploy_target "${project}"; then
+        local skip_req_dir="${project}/.autonomous-dev/requests/${request_id}"
+        jq -n '{
+            status: "pass",
+            phase: "deploy",
+            feedback: "No deploy target detected (no Dockerfile/compose/terraform/k8s/serverless/CI deploy config); deploy phase skipped.",
+            artifacts: [],
+            evidence: [],
+            skipped: true
+        }' > "${skip_req_dir}/phase-result-deploy.json"
+        log_info "deploy phase skipped for ${request_id}: no deploy target in ${project}"
+        echo "0|0|"
+        return 0
+    fi
 
     # Resolve agent for this phase
     local agent

@@ -73,3 +73,29 @@ setup() {
     [ "$status" -eq 1 ]
     [[ "$output" == 1\|0\|* ]]
 }
+
+@test "repo_has_deploy_target: false for docs-only, true for Dockerfile/workflow/terraform" {
+    local d1="${BATS_TEST_TMPDIR}/dt-none"; mkdir -p "${d1}"; echo "# x" > "${d1}/README.md"
+    run repo_has_deploy_target "${d1}"; [ "$status" -ne 0 ]
+    local d2="${BATS_TEST_TMPDIR}/dt-docker"; mkdir -p "${d2}"; : > "${d2}/Dockerfile"
+    run repo_has_deploy_target "${d2}"; [ "$status" -eq 0 ]
+    local d3="${BATS_TEST_TMPDIR}/dt-wf"; mkdir -p "${d3}/.github/workflows"
+    printf 'jobs:\n  deploy:\n' > "${d3}/.github/workflows/cd.yml"
+    run repo_has_deploy_target "${d3}"; [ "$status" -eq 0 ]
+    local d4="${BATS_TEST_TMPDIR}/dt-tf"; mkdir -p "${d4}"; : > "${d4}/main.tf"
+    run repo_has_deploy_target "${d4}"; [ "$status" -eq 0 ]
+}
+
+@test "dispatch_phase_session skips deploy (pass+skipped) when repo has no deploy target" {
+    local proj="${BATS_TEST_TMPDIR}/proj-nodeploy"
+    local rd="${proj}/.autonomous-dev/requests/REQ-000001"
+    mkdir -p "${rd}"
+    echo "# docs only" > "${proj}/README.md"
+    jq -n '{request_id:"REQ-000001",status:"active",current_phase:"deploy",current_phase_metadata:{}}' \
+        > "${rd}/state.json"
+    run dispatch_phase_session "REQ-000001" "${proj}"
+    [ "$status" -eq 0 ]
+    [[ "$output" == 0\|0\|* ]]
+    [ "$(jq -r .status  "${rd}/phase-result-deploy.json")" = "pass" ]
+    [ "$(jq -r .skipped "${rd}/phase-result-deploy.json")" = "true" ]
+}

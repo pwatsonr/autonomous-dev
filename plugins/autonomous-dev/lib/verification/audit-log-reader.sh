@@ -94,13 +94,31 @@ audit_log_has_command() {
     if [[ ! -f "${path}" ]]; then
         return 1
     fi
+    # Tolerant match: normalize both the claimed command and each audit-logged
+    # command before comparing, so cosmetic differences — trailing redirections
+    # (2>&1, 2>/dev/null, >file), quote style, and collapsed whitespace/newlines
+    # — do not produce a false command_not_in_audit_log. Exact byte-matching
+    # previously refused whole phases over a stray `2>&1` or a `'`/`"` swap.
+    # Normalization is applied symmetrically, so a fabricated command still
+    # cannot match a real one.
+    local norm_def='def norm:
+        gsub("\\s*&>\\s*[^\\s]+";"")
+        | gsub("\\s*2>&1";"")
+        | gsub("\\s*2>\\s*[^\\s]+";"")
+        | gsub("\\s*1?>\\s*[^\\s]+";"")
+        | gsub("\"";"")
+        | gsub($sq;"")
+        | gsub("\\s+";" ")
+        | gsub("^\\s+|\\s+$";"");'
     local hit
     if [[ "${want_exit}" == "any" ]]; then
-        hit=$(jq -r --arg c "${needle}" \
-            'select(.command == $c) | .command' "${path}" 2>/dev/null | head -n1)
+        hit=$(jq -r --arg c "${needle}" --arg sq "'" "${norm_def}"'
+            ($c|norm) as $n | select((.command|norm) == $n) | .command' \
+            "${path}" 2>/dev/null | head -n1)
     else
-        hit=$(jq -r --arg c "${needle}" --argjson e "${want_exit}" \
-            'select(.command == $c and .exit_code == $e) | .command' \
+        hit=$(jq -r --arg c "${needle}" --argjson e "${want_exit}" --arg sq "'" "${norm_def}"'
+            ($c|norm) as $n
+            | select((.command|norm) == $n and .exit_code == $e) | .command' \
             "${path}" 2>/dev/null | head -n1)
     fi
     [[ -n "${hit}" ]]
