@@ -55,14 +55,22 @@ describe("ApprovalsView — FR-026-30 Topbar", () => {
         expect(html).toContain("2 pending");
     });
 
-    test("topbar has NO dead status tabs (removed until gate history exists)", async () => {
+    test("#429 — Pending/Approved/Rejected tabs are present and HTMX-wired", async () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        // Operator-reported dead controls: no JS binding + no data source.
-        expect(html).not.toContain(">Pending<");
-        expect(html).not.toContain(">Approved<");
-        expect(html).not.toContain(">Rejected<");
+        // #429: tabs are now REAL filters over gate-decision history (no
+        // longer dead controls). Each is an HTMX link that re-fetches the
+        // body with ?tab=<id>.
+        expect(html).toContain('class="approvals-tabs"');
+        expect(html).toContain("Pending");
+        expect(html).toContain("Approved");
+        expect(html).toContain("Rejected");
+        expect(html).toContain('href="/approvals?tab=approved"');
+        expect(html).toContain('href="/approvals?tab=rejected"');
+        expect(html).toContain('hx-get="/approvals?tab=rejected"');
+        // Pending tab is active by default.
+        expect(html).toMatch(/class="approvals-tab active"[^>]*aria-selected="true"/);
         // Bulk approve stays.
         expect(html).toContain("Bulk approve");
     });
@@ -197,12 +205,17 @@ describe("ApprovalsView — FR-026-30 6-column approval-row grid", () => {
         expect(html).toContain('data-approval-id="REQ-42"');
     });
 
-    test("row shows request id in .approval-row-id span", async () => {
+    test("#504 — row id is a link to the detail page (.approval-row-id anchor)", async () => {
         const html = await render(
-            <ApprovalsView items={[baseItem({ id: "REQ-99" })]} costCapDailyUsd={25} />,
+            <ApprovalsView
+                items={[baseItem({ id: "REQ-99", repo: "acme" })]}
+                costCapDailyUsd={25}
+            />,
         );
+        // #504: the id is now an <a> (covers the dropped INSPECT button) so
+        // clicking it navigates to the REQ-XXXXXX detail page.
         expect(html).toContain(
-            '<span class="approval-row-id">REQ-99</span>',
+            '<a class="approval-row-id" href="/repo/acme/request/REQ-99">REQ-99</a>',
         );
     });
 
@@ -267,14 +280,59 @@ describe("ApprovalsView — FR-026-30 6-column approval-row grid", () => {
         expect(html).toContain('hx-confirm=');
     });
 
-    test("Inspect link href points to /repo/{repo}/request/{id}", async () => {
+    test("#504 — title link points to /repo/{repo}/request/{id} (INSPECT dropped)", async () => {
         const html = await render(
             <ApprovalsView
                 items={[baseItem({ id: "REQ-C", repo: "acme-repo" })]}
                 costCapDailyUsd={10}
             />,
         );
-        expect(html).toContain('href="/repo/acme-repo/request/REQ-C"');
+        // The id/title links cover navigation to detail, so the standalone
+        // INSPECT button is removed.
+        expect(html).toContain(
+            '<a class="approval-row-title" href="/repo/acme-repo/request/REQ-C">',
+        );
+        expect(html).not.toContain("Inspect");
+    });
+
+    // #504 regression — the row MUST be a <div>, not a <button>. The old
+    // <button> row wrapped nested <button>/<a> action elements, which is
+    // invalid HTML: the parser hoisted them out of the grid cell and they
+    // rendered stranded below the table. Per-row actions must live INSIDE
+    // the .approval-row-actions cell, with no inline onclick (strict CSP).
+    test("#504 — row is a div with Approve/Reject INSIDE .approval-row-actions; no nested button-in-button; no inline onclick", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[baseItem({ id: "REQ-D" })]}
+                costCapDailyUsd={10}
+            />,
+        );
+        // Row container is a div.
+        expect(html).toMatch(/<div class="approval-row[^"]*" data-approval-id="REQ-D"/);
+        // No <button class="approval-row ...> wrapper (the old bug).
+        expect(html).not.toMatch(/<button[^>]*class="approval-row/);
+        // The actions cell contains both buttons, in order, before its close.
+        const cell =
+            html.match(
+                /<span class="approval-row-actions">([\s\S]*?)<\/span><\/div>/,
+            )?.[1] ?? "";
+        expect(cell).toContain('hx-post="/api/approvals/REQ-D/approve"');
+        expect(cell).toContain('hx-post="/api/approvals/REQ-D/reject"');
+        // No inline event handlers anywhere (strict CSP).
+        expect(html).not.toMatch(/onclick=|onClick=|hx-on/i);
+    });
+
+    // #504 — rows participate in the segmented filter (segmented-filter.js
+    // targets [data-gate-type]); the old <button> rows omitted this so the
+    // gate-type filter was a no-op on the approvals table.
+    test("#504 — pending rows carry data-gate-type for the segmented filter", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[baseItem({ id: "REQ-E", gateType: "reviewer-chain" })]}
+                costCapDailyUsd={10}
+            />,
+        );
+        expect(html).toContain('data-gate-type="reviewer-chain"');
     });
 });
 
@@ -329,12 +387,145 @@ describe("ApprovalsView — FR-026-30 gate-stats-7d card", () => {
         const html = await render(
             <ApprovalsView items={[]} costCapDailyUsd={25} />,
         );
-        // #389-class honesty: no 7d decision ledger exists — the old card
-        // posed constants (Auto-approved 68, median 48m) as live telemetry.
+        // #389-class honesty: with no decided gates the card stays empty —
+        // the old card posed constants (Auto-approved 68, median 48m) as
+        // live telemetry.
         expect(html).toContain("No gate history yet");
         expect(html).not.toContain("Auto-approved");
-        expect(html).not.toContain("Median time-to-approve");
         expect(html).not.toContain("48m");
+    });
+
+    test("#429 — empty stats object (zero decided) still renders honest empty state", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[]}
+                costCapDailyUsd={25}
+                gateStats={{
+                    windowDays: 7,
+                    total: 0,
+                    approved: 0,
+                    rejected: 0,
+                    requestChanges: 0,
+                    approveRate: 0,
+                    rejectRate: 0,
+                }}
+            />,
+        );
+        // total === 0 must NOT render fabricated bars; honest empty card.
+        expect(html).toContain("No gate history yet");
+    });
+
+    test("#429 — real stats render live counts + approve rate (no fabrication)", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[]}
+                costCapDailyUsd={25}
+                gateStats={{
+                    windowDays: 7,
+                    total: 5,
+                    approved: 3,
+                    rejected: 1,
+                    requestChanges: 1,
+                    approveRate: 0.6,
+                    rejectRate: 0.2,
+                }}
+            />,
+        );
+        expect(html).not.toContain("No gate history yet");
+        // Live summary line: total decided + approve rate.
+        expect(html).toContain("5 decided");
+        expect(html).toContain("60% approved");
+        // Stat rows present (apostrophe is HTML-escaped in the output).
+        expect(html).toContain(">Approved<");
+        expect(html).toContain(">Rejected<");
+        expect(html).toContain("Re-spec");
+    });
+});
+
+// ---- #429 history tabs ------------------------------------------------------
+
+describe("ApprovalsView — #429 Approved/Rejected history tabs", () => {
+    const hist = (
+        overrides: Partial<import("../../server/types/render").GateHistoryItem> = {},
+    ): import("../../server/types/render").GateHistoryItem => ({
+        id: "REQ-100",
+        repo: "acme",
+        phase: "review",
+        decision: "approved",
+        decidedAt: "2026-06-17T10:30:00Z",
+        decidedBy: "alice",
+        ...overrides,
+    });
+
+    test("approved tab lists decided=approved gates from history", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[]}
+                costCapDailyUsd={25}
+                tab="approved"
+                history={[
+                    hist({ id: "REQ-A1", decision: "approved" }),
+                    hist({ id: "REQ-R1", decision: "rejected" }),
+                ]}
+            />,
+        );
+        expect(html).toContain("approvals-history-row");
+        expect(html).toContain("REQ-A1");
+        // The rejected row must not appear on the approved tab.
+        expect(html).not.toContain("REQ-R1");
+        // Decided-by + timestamp surfaced.
+        expect(html).toContain("alice");
+        expect(html).toContain("2026-06-17 10:30");
+    });
+
+    test("rejected tab lists decided=rejected gates from history", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[]}
+                costCapDailyUsd={25}
+                tab="rejected"
+                history={[
+                    hist({ id: "REQ-A2", decision: "approved" }),
+                    hist({ id: "REQ-R2", decision: "rejected" }),
+                ]}
+            />,
+        );
+        expect(html).toContain("REQ-R2");
+        expect(html).not.toContain("REQ-A2");
+    });
+
+    test("approved tab with no decided gates shows honest empty row", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[]}
+                costCapDailyUsd={25}
+                tab="approved"
+                history={[]}
+            />,
+        );
+        expect(html).toContain("No approved gates yet");
+    });
+
+    test("tab counts reflect the supplied history", async () => {
+        const html = await render(
+            <ApprovalsView
+                items={[baseItem()]}
+                costCapDailyUsd={25}
+                tab="pending"
+                history={[
+                    hist({ id: "A", decision: "approved" }),
+                    hist({ id: "B", decision: "approved" }),
+                    hist({ id: "C", decision: "rejected" }),
+                ]}
+            />,
+        );
+        // Pending count = 1 item, approved = 2, rejected = 1.
+        expect(html).toMatch(
+            /Approved<span class="approvals-tab-count">2<\/span>/,
+        );
+        expect(html).toMatch(
+            /Rejected<span class="approvals-tab-count">1<\/span>/,
+        );
     });
 });
 

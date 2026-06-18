@@ -1,31 +1,43 @@
 // FR-026-30 §Approvals view — v3 redesign.
 //
-// Layout (matches /tmp/design_extract/autonomous-dev-v3/project/views.jsx
-// ApprovalsView):
-//   1. <Topbar title="Approvals" subTitle="N pending" rightSlot=seg+bulk />
-//   2. .filter-strip — search + gate seg + spacer + SLA meta
+// Layout:
+//   1. <Topbar title="Approvals" subTitle="N pending" rightSlot=tabs+bulk />
+//   2. .filter-strip — search + gate seg + spacer + oldest meta
 //   3. .card .approvals-table — 6-column approval-row grid
 //      columns: request | title | gate | reviewer-checks | waiting | actions
-//      Each row has .cdot per-reviewer checks (pass/warn/fail/pending)
-//      Selected row highlighted via class="selected" driven by HTMX
-//   4. .approvals-lower-grid — 2 cards:
-//      a. Preview card — reviewer verdicts for selected request
-//      b. Gate-stats-7d card — auto-approved/operator/rejected/re-spec'd
-//         with StatRow bars + median time-to-approve
+//   4. .approvals-lower-grid — preview card + gate-stats-7d card
 //
-// Preserves existing HTMX approve/reject endpoints + double-confirm.
-// CSP-clean: no inline style=""; no raw hex; tokens only.
+// #504 fix (operator bug): the ACTIONS column was empty and the
+// Approve/Reject/Inspect buttons rendered stranded BELOW the table. Root
+// cause: the row was a <button> wrapping nested <button>/<a> elements —
+// invalid HTML, so the parser hoisted the inner interactive elements out
+// of the row. Fix:
+//   - the row is now a <div> (no nested-interactive violation),
+//   - Approve/Reject render per-row INSIDE the .approval-row-actions cell,
+//   - the request id + title is a real <a> link to the REQ-XXXXXX detail
+//     page (covers the old INSPECT button, which is dropped),
+//   - the inline `onClick="event.stopPropagation()"` (dead under strict
+//     CSP) is gone — no whole-row click handler remains to stop.
 //
-// Punch-list remediation (reviewer findings):
-//   Finding 1 — row selection threaded from ?selected= query param.
-//   Finding 2 — ApprovalRow uses <button> for keyboard accessibility.
-//   Finding 3 — broken ARIA table/row semantics removed (div layout only).
-//   Inline style — StatRow bar width uses CSS custom property on the track.
+// #429 feature: the Pending/Approved/Rejected tabs and the "Gate stats ·
+// 7d" card are now backed by REAL gate-decision history (the route reads
+// wiring/gate-history-reader.ts over the gate-decisions store). Approved
+// and Rejected tabs list decided gates; the stats card shows live counts
+// + approve/reject rate. When nothing is decided yet the tabs/card render
+// honest empty/zero states — no fabricated constants (#389 precedent).
+//
+// CSP-clean: no inline style="" (except the data-driven --bar-w custom
+// property on the stats track); no inline onclick/hx-on; tokens only.
 
 import type { FC } from "hono/jsx";
 
 import type { RenderProps } from "../../types/render";
-import type { ApprovalItem } from "../../types/render";
+import type {
+    ApprovalItem,
+    ApprovalsTab,
+    GateHistoryItem,
+    GateStats7d,
+} from "../../types/render";
 import { Topbar } from "../../components/topbar";
 import { ApprovalsKpiStrip } from "../fragments/approvals-kpi-strip";
 
@@ -39,16 +51,9 @@ type CdotStatus = "pass" | "warn" | "fail" | "pending";
 
 /**
  * Extended approval item that adds v3-specific reviewer check dots.
- * Declared locally so we do NOT widen `ApprovalItem` in types/render.ts
- * (per FR-026-30 ownership contract). The route casts `ApprovalItem` to
- * this shape; missing fields default to empty checks.
+ * Declared locally so we do NOT widen `ApprovalItem` in types/render.ts.
  */
 interface ApprovalsRowItem extends ApprovalItem {
-    /**
-     * Per-reviewer check-dot statuses in display order. Derived from the
-     * existing `reviewers` data or populated by the reader; when absent
-     * the row renders an empty checks column.
-     */
     checks?: CdotStatus[];
 }
 
@@ -58,14 +63,10 @@ const APPROVALS_POLLING_TRIGGER =
 
 // ---- StatRow sub-component --------------------------------------------------
 
-/**
- * A single labeled bar row for the gate-stats-7d card. Renders a label,
- * numeric value, percentage, and a filled progress bar.
- */
 interface StatRowProps {
     label: string;
     value: number;
-    /** CSS custom-property token for the bar fill (e.g. `var(--ok)`). */
+    /** CSS token suffix for the bar fill modifier (`ok`/`info`/`err`/`warn`). */
     colorToken: string;
     pct: number;
 }
@@ -78,12 +79,11 @@ const StatRow: FC<StatRowProps> = ({ label, value, colorToken, pct }) => (
             <span class="stat-row-value">{value}</span>
             <span class="stat-row-pct">{pct}%</span>
         </div>
-        {/* Bar width is data-derived and cannot be expressed as a static token.
-            Setting only a CSS custom property (not a layout/color style) on the
-            track lets the CSS consume `var(--bar-w)` without a full inline style
-            declaration — the CSP `style-src` restriction targets presentation
-            properties; a single custom-property assignment is the accepted
-            pattern for server-driven data dimensions. */}
+        {/* Bar width is data-derived and cannot be a static token. Setting
+            only a CSS custom property (not a layout/color style) on the track
+            lets the CSS consume var(--bar-w); the CSP style-src restriction
+            targets presentation properties, and a single custom-property
+            assignment is the accepted server-driven-dimension pattern. */}
         <div
             class="stat-row-track"
             role="progressbar"
@@ -98,13 +98,64 @@ const StatRow: FC<StatRowProps> = ({ label, value, colorToken, pct }) => (
     </div>
 );
 
-// ---- Table header -----------------------------------------------------------
-// Finding 3 fix: aria-hidden="true" was stripping all column-label context
-// from screen readers while role="table"/role="row" promised a table
-// structure. Fix: remove both the broken ARIA table/row roles (see the
-// approvals-card div below) and the aria-hidden on the header so column
-// labels are readable by AT. The layout is a CSS-grid visual table, not a
-// semantic HTML table, so no ARIA table pattern is applied.
+// ---- Tabs (#429) ------------------------------------------------------------
+//
+// Real Pending/Approved/Rejected tabs. Each is an HTMX-driven link that
+// re-fetches the page body with `?tab=<id>` (and preserves the selected
+// row). They are NO LONGER dead controls: the route reads gate-decision
+// history so Approved/Rejected render actual decided gates, and Pending
+// shows the live queue.
+
+interface ApprovalsTabsProps {
+    active: ApprovalsTab;
+    pendingCount: number;
+    approvedCount: number;
+    rejectedCount: number;
+}
+
+const TAB_DEFS: { id: ApprovalsTab; label: string }[] = [
+    { id: "pending", label: "Pending" },
+    { id: "approved", label: "Approved" },
+    { id: "rejected", label: "Rejected" },
+];
+
+const ApprovalsTabs: FC<ApprovalsTabsProps> = ({
+    active,
+    pendingCount,
+    approvedCount,
+    rejectedCount,
+}) => {
+    const countFor = (id: ApprovalsTab): number =>
+        id === "pending"
+            ? pendingCount
+            : id === "approved"
+              ? approvedCount
+              : rejectedCount;
+    return (
+        <div class="approvals-tabs" role="tablist" aria-label="Approvals filter">
+            {TAB_DEFS.map((t) => {
+                const isActive = t.id === active;
+                return (
+                    <a
+                        class={`approvals-tab${isActive ? " active" : ""}`}
+                        role="tab"
+                        aria-selected={isActive ? "true" : "false"}
+                        href={`/approvals?tab=${t.id}`}
+                        hx-get={`/approvals?tab=${t.id}`}
+                        hx-target="#approvals-body"
+                        hx-swap="outerHTML"
+                        hx-select="#approvals-body"
+                    >
+                        {t.label}
+                        <span class="approvals-tab-count">{countFor(t.id)}</span>
+                    </a>
+                );
+            })}
+        </div>
+    );
+};
+
+// ---- Table header (pending) -------------------------------------------------
 
 const ApprovalsTableHead: FC = () => (
     <div class="approvals-table-head">
@@ -117,16 +168,13 @@ const ApprovalsTableHead: FC = () => (
     </div>
 );
 
-// ---- Approval row -----------------------------------------------------------
-// Finding 2 fix: replaced <div> with <button type="button"> so the row is
-// natively keyboard-activatable (Enter/Space) without any synthetic key
-// handler. The button element provides free focusability and activation
-// semantics — no hx-trigger override is needed.
+// ---- Approval row (pending) -------------------------------------------------
 //
-// Finding 3 fix: removed role="row" / aria-selected; the outer card div
-// no longer carries role="table" either (see approvals-card below), so
-// attaching row/selected would produce half-applied table semantics.
-// aria-pressed models the toggle-selection intent correctly for a button.
+// #504 fix: the row is a <div>, NOT a <button>. Nested interactive elements
+// (the Approve/Reject buttons and the detail link) are valid inside a div
+// but were invalid inside the old <button>, which is why the actions were
+// hoisted out of the grid and stranded below the table. `data-gate-type`
+// makes the row participate in the segmented filter (segmented-filter.js).
 
 interface ApprovalRowProps {
     item: ApprovalsRowItem;
@@ -135,22 +183,24 @@ interface ApprovalRowProps {
 
 const ApprovalRow: FC<ApprovalRowProps> = ({ item, selected }) => {
     const checks: CdotStatus[] = item.checks ?? [];
+    const detailHref = `/repo/${item.repo}/request/${item.id}`;
 
     return (
-        <button
-            type="button"
+        <div
             class={`approval-row${selected ? " selected" : ""}`}
             data-approval-id={item.id}
-            hx-get={`/approvals?selected=${encodeURIComponent(item.id)}`}
-            hx-target="#approvals-body"
-            hx-swap="outerHTML"
-            hx-select="#approvals-body"
-            aria-label={`Select ${item.id}: ${item.summary}`}
-            aria-pressed={selected ? "true" : "false"}
+            data-gate-type={item.gateType}
         >
-            <span class="approval-row-id">{item.id}</span>
-            <span>
-                <span class="approval-row-title">{item.summary}</span>
+            {/* #504: request id is a real link to the detail page (covers
+                the dropped INSPECT button). */}
+            <a class="approval-row-id" href={detailHref}>
+                {item.id}
+            </a>
+            <span class="approval-row-titlewrap">
+                {/* #504: title is also a link to the same detail page. */}
+                <a class="approval-row-title" href={detailHref}>
+                    {item.summary}
+                </a>
                 <span class="approval-row-sub">{item.detail}</span>
             </span>
             <span>
@@ -166,6 +216,7 @@ const ApprovalRow: FC<ApprovalRowProps> = ({ item, selected }) => {
                 ))}
             </span>
             <span class="approval-row-age">{item.waitedMin}m</span>
+            {/* #504: per-row ACTIONS, rendered INSIDE the grid cell. */}
             <span class="approval-row-actions">
                 <button
                     type="button"
@@ -176,7 +227,6 @@ const ApprovalRow: FC<ApprovalRowProps> = ({ item, selected }) => {
                     hx-target={`[data-approval-id="${item.id}"]`}
                     hx-swap="outerHTML"
                     aria-label={`Approve ${item.id}`}
-                    onClick="event.stopPropagation()"
                 >
                     Approve
                 </button>
@@ -189,21 +239,74 @@ const ApprovalRow: FC<ApprovalRowProps> = ({ item, selected }) => {
                     hx-target={`[data-approval-id="${item.id}"]`}
                     hx-swap="outerHTML"
                     aria-label={`Reject ${item.id}`}
-                    onClick="event.stopPropagation()"
                 >
                     Reject
                 </button>
-                <a
-                    class="btn xs ghost"
-                    href={`/repo/${item.repo}/request/${item.id}`}
-                    aria-label={`Inspect ${item.id} in detail`}
-                >
-                    Inspect →
-                </a>
             </span>
-        </button>
+        </div>
     );
 };
+
+// ---- History row (#429, approved/rejected tabs) -----------------------------
+
+const decisionTone = (d: GateHistoryItem["decision"]): string =>
+    d === "approved" ? "ok" : d === "rejected" ? "err" : "warn";
+
+/** Format an ISO-8601 timestamp for the history table; "—" when absent. */
+function fmtDecidedAt(iso: string | undefined): string {
+    if (iso === undefined) return "—";
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return "—";
+    // Compact, locale-independent UTC stamp (YYYY-MM-DD HH:MM).
+    return new Date(t).toISOString().slice(0, 16).replace("T", " ");
+}
+
+const HistoryTable: FC<{ items: GateHistoryItem[]; emptyNoun: string }> = ({
+    items,
+    emptyNoun,
+}) => (
+    <div class="card approvals-card" aria-label={`${emptyNoun} gates`}>
+        <div class="approvals-history-head">
+            <span>Request</span>
+            <span>Repo</span>
+            <span>Gate</span>
+            <span>Decision</span>
+            <span>By</span>
+            <span class="approvals-th-right">Decided</span>
+        </div>
+        <div class="approvals-table-rows">
+            {items.length === 0 ? (
+                <div class="approvals-empty">No {emptyNoun} gates yet</div>
+            ) : (
+                items.map((h) => (
+                    <div class="approvals-history-row">
+                        <a
+                            class="approval-row-id"
+                            href={`/repo/${h.repo}/request/${h.id}`}
+                        >
+                            {h.id}
+                        </a>
+                        <span class="approval-row-sub">{h.repo}</span>
+                        <span>
+                            <span class={`chip-phase ${h.phase}`}>{h.phase}</span>
+                        </span>
+                        <span>
+                            <span class={`chip ${decisionTone(h.decision)}`}>
+                                {h.decision}
+                            </span>
+                        </span>
+                        <span class="approval-row-sub">
+                            {h.decidedBy ?? "—"}
+                        </span>
+                        <span class="approval-row-age">
+                            {fmtDecidedAt(h.decidedAt)}
+                        </span>
+                    </div>
+                ))
+            )}
+        </div>
+    </div>
+);
 
 // ---- Preview card -----------------------------------------------------------
 
@@ -255,28 +358,18 @@ const PreviewCard: FC<PreviewCardProps> = ({ selected, onOpenPath }) => (
     </div>
 );
 
-// ---- Gate stats card --------------------------------------------------------
+// ---- Gate stats card (#429) -------------------------------------------------
+//
+// Now backed by the REAL 7-day gate-decision history (route reads
+// gate-history-reader.ts). `null` (or absent) means the history reader
+// produced nothing — render an honest empty card. A live stats object with
+// total === 0 also renders the empty card (zero decided gates in window),
+// never the old design-reference constants.
 
-interface GateStats {
-    autoApproved: number;
-    operatorApproved: number;
-    rejected: number;
-    reSpecd: number;
-    medianMinutes: number;
-}
-
-/**
- * Derive gate stats. #389-class honesty: no 7-day decision ledger exists
- * yet, so there is NOTHING to derive — returning null renders an honest
- * empty card instead of the old design-reference constants (68/9/3/1,
- * median 48m) that posed as live telemetry on an ops surface.
- */
-function deriveGateStats(_items: ApprovalsRowItem[]): GateStats | null {
-    return null;
-}
-
-const GateStatsCard: FC<{ stats: GateStats | null }> = ({ stats }) => {
-    if (stats === null) {
+const GateStatsCard: FC<{ stats: GateStats7d | null | undefined }> = ({
+    stats,
+}) => {
+    if (stats === null || stats === undefined || stats.total === 0) {
         return (
             <div class="card">
                 <div class="card-h">
@@ -289,41 +382,27 @@ const GateStatsCard: FC<{ stats: GateStats | null }> = ({ stats }) => {
             </div>
         );
     }
-    const total =
-        stats.autoApproved +
-        stats.operatorApproved +
-        stats.rejected +
-        stats.reSpecd;
+
+    const total = stats.total;
     const pct = (n: number) =>
         total > 0 ? Math.round((n / total) * 100) : 0;
-
-    const median =
-        stats.medianMinutes >= 60
-            ? `${Math.floor(stats.medianMinutes / 60)}h ${stats.medianMinutes % 60}m`
-            : `${stats.medianMinutes}m`;
+    const ratePct = Math.round(stats.approveRate * 100);
 
     return (
         <div class="card">
             <div class="card-h">
                 <h3>Gate stats · 7d</h3>
-                {/* Honesty rule: stats are not yet backed by a live query.
-                    Label them as example/placeholder so operators are not
-                    misled. Remove this span once a real 7d ledger reader
-                    is wired. */}
-                <span class="meta approvals-stats-placeholder-label" title="These figures are example data — live 7-day query not yet wired">example data</span>
+                <span class="spacer" />
+                <span class="meta-mono dim">
+                    {total} decided · {ratePct}% approved
+                </span>
             </div>
             <div class="card-b approvals-stats-body">
                 <StatRow
-                    label="Auto-approved"
-                    value={stats.autoApproved}
+                    label="Approved"
+                    value={stats.approved}
                     colorToken="ok"
-                    pct={pct(stats.autoApproved)}
-                />
-                <StatRow
-                    label="Operator approved"
-                    value={stats.operatorApproved}
-                    colorToken="info"
-                    pct={pct(stats.operatorApproved)}
+                    pct={pct(stats.approved)}
                 />
                 <StatRow
                     label="Rejected"
@@ -333,13 +412,13 @@ const GateStatsCard: FC<{ stats: GateStats | null }> = ({ stats }) => {
                 />
                 <StatRow
                     label="Re-spec'd"
-                    value={stats.reSpecd}
+                    value={stats.requestChanges}
                     colorToken="warn"
-                    pct={pct(stats.reSpecd)}
+                    pct={pct(stats.requestChanges)}
                 />
                 <div class="approvals-stats-median">
-                    <span>Median time-to-approve</span>
-                    <span class="approvals-stats-median-val">{median}</span>
+                    <span>Approve rate ({stats.windowDays}d)</span>
+                    <span class="approvals-stats-median-val">{ratePct}%</span>
                 </div>
             </div>
         </div>
@@ -351,15 +430,11 @@ const GateStatsCard: FC<{ stats: GateStats | null }> = ({ stats }) => {
 /**
  * FR-026-30 — Approvals v3 view.
  *
- * Renders the sticky Topbar (with Pending/Approved/Rejected seg +
- * Bulk approve), filter strip, 6-column approval-row grid with cdot
- * reviewer checks, selected-row preview card, and gate-stats-7d card.
- *
- * Preserves HTMX approve/reject endpoints and double-confirm behavior.
- *
- * Finding 1 fix: accepts `selectedId` from the route so HTMX row clicks
- * survive the polling swap — the poll URL includes `?selected=<id>` so the
- * chosen row stays highlighted after the 10-second refresh.
+ * Renders the sticky Topbar (Pending/Approved/Rejected tabs + Bulk
+ * approve), filter strip, the 6-column pending grid (with per-row actions,
+ * #504), the decided-gate history tables for the Approved/Rejected tabs
+ * (#429), the selected-row preview card, and the live 7-day gate-stats
+ * card (#429).
  *
  * @param props - RenderProps["approvals"] from the route handler.
  */
@@ -368,13 +443,26 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
     costCapDailyUsd,
     selectedId: selectedIdProp,
     csrfToken,
+    tab,
+    history,
+    gateStats,
 }) => {
-    // Cast to view-local extended shape; checks will be undefined on most
-    // items until the reader populates them.
     const rows = items as ApprovalsRowItem[];
+    const activeTab: ApprovalsTab = tab ?? "pending";
+    const historyItems = history ?? [];
 
-    // Use the route-provided selectedId when available; fall back to the
-    // first row so the preview card is never blank on initial page load.
+    // Poll URL: canonical "/approvals" on the default (pending) tab so the
+    // auto-refresh contract matches the other surfaces; non-default tabs
+    // carry ?tab=<tab> so the poll preserves the active history view.
+    const pollUrl =
+        activeTab === "pending" ? "/approvals" : `/approvals?tab=${activeTab}`;
+
+    // History counts come from the (already-filtered) reader data; total
+    // counts for the tab badges are derived from the supplied history.
+    const approvedItems = historyItems.filter((h) => h.decision === "approved");
+    const rejectedItems = historyItems.filter((h) => h.decision === "rejected");
+
+    // Selected-row resolution for the preview card (pending tab only).
     const firstRow = rows[0];
     const selectedId =
         selectedIdProp !== undefined
@@ -384,16 +472,14 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
               : undefined;
     const selectedItem = rows.find((r) => r.id === selectedId);
 
-    const stats = deriveGateStats(rows);
-
     const topbarRight = (
         <>
-            {/* Pending/Approved/Rejected tabs removed (operator-reported
-                dead controls): they had no JS binding (no
-                data-segmented-filter hook) AND no data to show — decided
-                gates leave the queue and no gate-history reader exists.
-                They return with the gate-history feature (sourced from
-                the HMAC audit log), which also powers the stats card. */}
+            <ApprovalsTabs
+                active={activeTab}
+                pendingCount={rows.length}
+                approvedCount={approvedItems.length}
+                rejectedCount={rejectedItems.length}
+            />
             <button
                 type="button"
                 class="btn primary sm bulk-approve"
@@ -419,16 +505,14 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
         <div
             id="approvals-body"
             data-filter-root
-            hx-get="/approvals"
+            hx-get={pollUrl}
             hx-trigger={APPROVALS_POLLING_TRIGGER}
             hx-target="this"
             hx-swap="outerHTML"
             hx-select="#approvals-body"
             hx-vals='js:{selected: document.querySelector("[data-approval-id].selected")?.dataset.approvalId ?? ""}'
         >
-            {/* #391: CSRF token for the approve/reject/bulk actions. The
-                enforcer's form-field fallback reads `_csrf`; each action
-                button pulls this in via hx-include="#approvals-csrf". */}
+            {/* #391: CSRF token for the approve/reject/bulk actions. */}
             <input
                 type="hidden"
                 id="approvals-csrf"
@@ -448,7 +532,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                     costCapDailyUsd={costCapDailyUsd}
                 />
 
-                {/* Filter strip */}
+                {/* Filter strip (gate-type segmented filter; pending tab). */}
                 <div class="filter-strip">
                     <input
                         type="search"
@@ -504,29 +588,33 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                     </span>
                 </div>
 
-                {/* 6-column approvals table.
-                     Finding 3 fix: removed role="table" and role="row" from the
-                     grid divs. The header was aria-hidden which removed all
-                     column context while the table role promised it — half-applied
-                     ARIA table semantics are worse than none. This is a CSS-grid
-                     visual layout, not a semantic HTML table. */}
-                <div class="card approvals-card" aria-label="Pending approvals">
-                    <ApprovalsTableHead />
-                    <div class="approvals-table-rows">
-                        {rows.length === 0 ? (
-                            <div class="approvals-empty">
-                                No pending approvals
-                            </div>
-                        ) : (
-                            rows.map((item) => (
-                                <ApprovalRow
-                                    item={item}
-                                    selected={item.id === selectedId}
-                                />
-                            ))
-                        )}
+                {/* Tab body: pending grid OR decided-gate history table. */}
+                {activeTab === "pending" ? (
+                    <div
+                        class="card approvals-card"
+                        aria-label="Pending approvals"
+                    >
+                        <ApprovalsTableHead />
+                        <div class="approvals-table-rows">
+                            {rows.length === 0 ? (
+                                <div class="approvals-empty">
+                                    No pending approvals
+                                </div>
+                            ) : (
+                                rows.map((item) => (
+                                    <ApprovalRow
+                                        item={item}
+                                        selected={item.id === selectedId}
+                                    />
+                                ))
+                            )}
+                        </div>
                     </div>
-                </div>
+                ) : activeTab === "approved" ? (
+                    <HistoryTable items={approvedItems} emptyNoun="approved" />
+                ) : (
+                    <HistoryTable items={rejectedItems} emptyNoun="rejected" />
+                )}
 
                 {/* Lower grid: preview card + gate stats */}
                 <div class="approvals-lower-grid">
@@ -538,7 +626,7 @@ export const ApprovalsView: FC<RenderProps["approvals"]> = ({
                                 : "#"
                         }
                     />
-                    <GateStatsCard stats={stats} />
+                    <GateStatsCard stats={gateStats} />
                 </div>
             </div>
         </div>
