@@ -2983,11 +2983,17 @@ handle_phase_failure() {
 #   PRD-025 FR-025-05 / #353. Applies portal-originated config-change markers.
 #   The portal writes a marker {id, source:"portal", actor, ts, summary,
 #   proposed:<partial user config>} into CONFIG_CHANGES_DIR rather than mutating
-#   CONFIG_FILE directly (FR-925). This validates each marker, then SHALLOW-
-#   MERGES `.proposed` over the existing CONFIG_FILE (proposed wins per top-level
-#   key; keys absent from proposed are preserved), logs an audit line, and
-#   archives the marker. A partial proposal (e.g. notifications-only) must never
-#   destroy unmentioned keys such as repositories.allowlist (#386). Invalid
+#   CONFIG_FILE directly (FR-925). This validates each marker, then DEEP-
+#   MERGES `.proposed` over the existing CONFIG_FILE (proposed scalars/arrays
+#   win; nested objects merge recursively; keys absent from proposed are
+#   preserved at every level), logs an audit line, and archives the marker.
+#   A partial proposal must never destroy unmentioned keys -- not just at the
+#   top level (repositories.allowlist, #386) but also NESTED ones: e.g. a
+#   trust-level-only change `{trust:{system_default_level:2}}` must keep the
+#   sibling `trust.per_repo_overrides` (#507). The earlier shallow `+` merge
+#   preserved only top-level keys and silently dropped such nested siblings.
+#   Arrays are still REPLACED wholesale (jq `*` semantics), so a proposed
+#   `repositories.allowlist` overwrites the old list as before (#386). Invalid
 #   markers are moved to a `rejected/` subdir (never applied, never retried
 #   forever). Runs during reconcile. Safe under `set -e`.
 consume_config_changes() {
@@ -3036,15 +3042,19 @@ consume_config_changes() {
         actor=$(jq -r '.actor // "unknown"' "${marker}" 2>/dev/null || echo "unknown")
         summary=$(jq -r '.summary // ""' "${marker}" 2>/dev/null || echo "")
 
-        # 2. Apply: shallow-merge `.proposed` OVER the existing config, then write
-        # atomically. Proposed wins per top-level key; keys absent from proposed
-        # (e.g. repositories.allowlist) are preserved -- a partial proposal must
-        # not destroy unmentioned config (#386). Merge from files (not a shell
-        # arg) so config values can't be interpolated by the shell.
+        # 2. Apply: DEEP-merge `.proposed` OVER the existing config, then write
+        # atomically. jq's `*` recurses into nested objects so a partial
+        # proposal preserves unmentioned keys at EVERY level -- not just the
+        # top (repositories.allowlist, #386) but also nested siblings like
+        # trust.per_repo_overrides when only trust.system_default_level changed
+        # (#507). Arrays and scalars from proposed still REPLACE the old value
+        # (so a proposed allowlist overwrites the old one, per #386). Merge from
+        # files (not a shell arg) so config values can't be interpolated by the
+        # shell.
         local cfg_tmp="${CONFIG_FILE}.tmp.$$"
         mkdir -p "$(dirname "${CONFIG_FILE}")" 2>/dev/null || true
         [[ -f "${CONFIG_FILE}" ]] || echo '{}' > "${CONFIG_FILE}"
-        if jq -s '.[0] + .[1].proposed' "${CONFIG_FILE}" "${marker}" > "${cfg_tmp}" 2>/dev/null && mv "${cfg_tmp}" "${CONFIG_FILE}"; then
+        if jq -s '.[0] * .[1].proposed' "${CONFIG_FILE}" "${marker}" > "${cfg_tmp}" 2>/dev/null && mv "${cfg_tmp}" "${CONFIG_FILE}"; then
             # 3. Audit (structured log line is the daemon's audit trail) + archive.
             log_info "Applied portal config change ${id} by '${actor}': ${summary}"
             mkdir -p "${applied_dir}"; mv "${marker}" "${applied_dir}/" 2>/dev/null || rm -f "${marker}"
