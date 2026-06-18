@@ -110,17 +110,27 @@ audit_log_has_command() {
         | gsub("\"";"")
         | gsub($sq;"")
         | gsub("\\s+";" ")
-        | gsub("^\\s+|\\s+$";"");'
-    local hit
+        | gsub("^\\s+|\\s+$";"");
+    def atoms: [splits("(&&|\\|\\||;)")] | map(norm) | map(select(length>0));'
     if [[ "${want_exit}" == "any" ]]; then
-        hit=$(jq -r --arg c "${needle}" --arg sq "'" "${norm_def}"'
-            ($c|norm) as $n | select((.command|norm) == $n) | .command' \
-            "${path}" 2>/dev/null | head -n1)
+        # Atoms-subset match (#496): split BOTH the claim and every audit command
+        # on top-level sequential separators (&& || ;). Agents report compound
+        # chains, exit-capture wrappers, and prose as a single evidence entry
+        # while running the parts separately, so each atomic sub-command of the
+        # claim must appear as an atomic sub-command somewhere in the audit log.
+        # Strict (every real sub-command must have run), so a fabricated
+        # never-run command has no matching atom and is still refused.
+        jq -s -e --arg c "${needle}" --arg sq "'" "${norm_def}"'
+            ([ .[].command | atoms[] ] | unique) as $ap
+            | ($c | atoms) as $cp
+            | ($cp | length) > 0 and (($cp - $ap) | length) == 0' \
+            "${path}" >/dev/null 2>&1
     else
+        local hit
         hit=$(jq -r --arg c "${needle}" --argjson e "${want_exit}" --arg sq "'" "${norm_def}"'
             ($c|norm) as $n
             | select((.command|norm) == $n and .exit_code == $e) | .command' \
             "${path}" 2>/dev/null | head -n1)
+        [[ -n "${hit}" ]]
     fi
-    [[ -n "${hit}" ]]
 }
