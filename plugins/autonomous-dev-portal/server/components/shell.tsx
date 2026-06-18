@@ -345,6 +345,14 @@ export const ShellLayout: FC<ShellProps> = ({
                     defer
                     nonce={nonce}
                 ></script>
+                {/* #499 — Request Detail artifact-index selection highlight.
+                    Delegated, presentational only (the pane swap is HTMX);
+                    fails open if it does not load. */}
+                <script
+                    src={asset("/static/js/rd-artifact-select.js")}
+                    defer
+                    nonce={nonce}
+                ></script>
             </head>
             <body>
                 <div class="app">

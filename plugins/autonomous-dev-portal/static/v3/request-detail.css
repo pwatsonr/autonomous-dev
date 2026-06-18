@@ -478,3 +478,223 @@
 .artifact-empty {
     padding: var(--s-6);
 }
+
+/* ============================================================
+   #503 — Live phase pipeline state styling.
+
+   The phase-track fragment emits the state class `now` for the
+   request's CURRENT phase and `selected` for the phase whose artifact
+   is shown in the pane. Before #503 the CSS only styled `.done` and
+   `.active`, so the live current phase was visually indistinguishable
+   from a pending one — the pipeline "looked static" (the bug). These
+   rules light up the current phase (brand fill + pulsing dot, matching
+   the dashboard swimlane's live cards) and outline the selected phase.
+   ============================================================ */
+
+/* Current ("now") phase — brand fill + pulsing dot, like .dot.live. */
+.phase-step.now .dot-big {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+    box-shadow: 0 0 0 3px var(--brand-tint);
+    animation: pulse 1.6s infinite;
+}
+
+.phase-step.now .phase-name {
+    color: var(--fg-0);
+    font-weight: 700;
+}
+
+.phase-step.now .phase-meta {
+    color: var(--brand);
+}
+
+/* Selected phase (artifact pane focus) — subtle outline so the operator
+   can see which phase's artifact is currently open, distinct from the
+   live "now" cue above (a phase can be both now AND selected). */
+.phase-step.selected {
+    background: var(--bg-2);
+    box-shadow: inset 0 0 0 1px var(--brand-line);
+}
+
+.phase-step.selected .phase-name {
+    color: var(--fg-0);
+}
+
+/* Respect reduced-motion: drop the pulse, keep the brand fill. */
+@media (prefers-reduced-motion: reduce) {
+    .phase-step.now .dot-big {
+        animation: none;
+    }
+}
+
+/* ============================================================
+   #502 — Plain-language summary card
+   ============================================================ */
+.rd-summary {
+    margin-bottom: var(--pad-section);
+}
+
+.rd-summary-chip {
+    font-size: var(--t-badge);
+    max-width: 60ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rd-summary-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+
+.rd-summary-line {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: var(--s-3);
+    align-items: baseline;
+    margin: 0;
+    line-height: 1.55;
+}
+
+.rd-summary-key {
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+}
+
+.rd-summary-val {
+    color: var(--fg-1);
+    font-size: var(--t-meta);
+    min-width: 0;
+}
+
+.rd-summary-empty {
+    font-size: var(--t-meta);
+}
+
+/* ============================================================
+   #501 — PR link button in the topbar right slot
+   ============================================================ */
+.rd-prlink {
+    white-space: nowrap;
+}
+
+/* ============================================================
+   #499 — Artifact index (list of produced artifacts)
+   ============================================================ */
+.rd-artifacts {
+    margin-bottom: var(--pad-section);
+}
+
+.rd-artifacts-count {
+    font-size: var(--t-meta);
+}
+
+.rd-artifacts-body {
+    padding-top: var(--s-2);
+    padding-bottom: var(--s-2);
+}
+
+.rd-artifacts-empty {
+    font-size: var(--t-meta);
+}
+
+.rd-artifact-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+}
+
+/* A single artifact row. Shared base for the readable (button), link
+   (anchor), and inert (div) variants so they align as one list. */
+.rd-artifact-row {
+    display: grid;
+    grid-template-columns: 96px 1fr auto;
+    gap: var(--s-3);
+    align-items: center;
+    width: 100%;
+    text-align: left;
+    padding: var(--s-2) var(--s-3);
+    border: 1px solid transparent;
+    border-radius: var(--r-3);
+    background: transparent;
+    color: var(--fg-1);
+    font-family: inherit;
+    font-size: var(--t-meta);
+    text-decoration: none;
+}
+
+/* Interactive rows (readable docs + the PR link) get hover + pointer. */
+button.rd-artifact-row,
+a.rd-artifact-row {
+    cursor: pointer;
+}
+
+button.rd-artifact-row:hover,
+a.rd-artifact-row:hover {
+    background: var(--bg-2);
+    border-color: var(--line-1);
+}
+
+button.rd-artifact-row:focus-visible,
+a.rd-artifact-row:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: var(--r-1);
+}
+
+.rd-artifact-row.selected {
+    background: var(--brand-tint);
+    border-color: var(--brand-line);
+}
+
+.rd-artifact-kind {
+    font-family: var(--font-mono);
+    font-size: var(--t-nano);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--brand);
+}
+
+.rd-artifact-row-inert .rd-artifact-kind {
+    color: var(--fg-2);
+}
+
+.rd-artifact-title {
+    color: var(--fg-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.rd-artifact-phase {
+    font-size: var(--t-nano);
+    text-transform: uppercase;
+}
+
+/* External PR-link row gets a trailing affordance. */
+.rd-artifact-row-link .rd-artifact-title::after {
+    content: " ↗";
+    color: var(--fg-3);
+}
+
+@media (max-width: 640px) {
+    .rd-summary-line {
+        grid-template-columns: 1fr;
+        gap: var(--s-1);
+    }
+
+    .rd-artifact-row {
+        grid-template-columns: 1fr auto;
+    }
+
+    .rd-artifact-kind {
+        grid-column: 1 / -1;
+    }
+}
