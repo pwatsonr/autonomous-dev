@@ -2463,6 +2463,73 @@ SQL
 # Phase Advancement (SPEC-039-2-05)
 ###############################################################################
 
+# record_phase_history(state_file, completed_phase, next_phase, ts) -> void
+#   Records a completed phase in state.json's phase_history[] (issue #489).
+#   advance_phase historically only mutated current_phase/status and never
+#   appended to phase_history, so it was stuck at its seed entry. This closes
+#   the completed phase's open entry (or appends a closed one if absent) and,
+#   when next_phase is non-empty, opens a new entry for the phase being
+#   entered. Entry shape matches lib/state/lifecycle_engine.sh so existing
+#   readers and the cost tracker stay compatible. Atomic via tmp + mv.
+record_phase_history() {
+    local state_file="$1"
+    local completed_phase="$2"
+    local next_phase="$3"
+    local ts="$4"
+
+    local tmp="${state_file}.hist.$$"
+    jq --arg completed "$completed_phase" \
+       --arg next "$next_phase" \
+       --arg ts "$ts" \
+       '
+       # Normalize: ensure phase_history is an array.
+       .phase_history = (.phase_history // []) |
+
+       # Close out the completed phase. If the last entry is still open and
+       # matches the completed phase, stamp its exit; otherwise append a
+       # closed entry so every completed phase is recorded even when the
+       # daemon never seeded an open one.
+       (if (.phase_history | length) > 0
+             and (.phase_history[-1] | type) == "object"
+             and .phase_history[-1].state == $completed
+             and (.phase_history[-1].exited_at == null)
+        then
+          .phase_history[-1].exited_at = $ts |
+          .phase_history[-1].exit_reason = "completed"
+        else
+          .phase_history += [{
+            state: $completed,
+            entered_at: null,
+            exited_at: $ts,
+            session_id: null,
+            turns_used: 0,
+            cost_usd: 0,
+            retry_count: 0,
+            exit_reason: "completed"
+          }]
+        end) |
+
+       # Open an entry for the phase being entered (skip on terminal).
+       (if $next != "" then
+          .phase_history += [{
+            state: $next,
+            entered_at: $ts,
+            exited_at: null,
+            session_id: null,
+            turns_used: 0,
+            cost_usd: 0,
+            retry_count: 0,
+            exit_reason: null
+          }]
+        else . end)
+       ' \
+       "$state_file" > "$tmp" && mv "$tmp" "$state_file" || {
+        rm -f "$tmp" 2>/dev/null || true
+        log_warn "record_phase_history: failed to update phase_history for $state_file"
+        return 1
+    }
+}
+
 # advance_phase(request_id, project) -> void
 #   Reads phase-result-<phase>.json, decides the next phase per TDD §7.1
 #   transition table, atomically updates state.json (current_phase, status,
@@ -2532,6 +2599,9 @@ advance_phase() {
                    "$state_file" > "$tmp"
                 mv "$tmp" "$state_file"
 
+                # Record the completed final phase in phase_history (issue #489)
+                record_phase_history "$state_file" "$current_phase" "" "$ts"
+
                 # Append completed event
                 local event
                 event=$(jq -n \
@@ -2587,6 +2657,10 @@ advance_phase() {
                        "$state_file" > "$tmp"
                 fi
                 mv "$tmp" "$state_file"
+
+                # Record the completed phase and open the next one in
+                # phase_history (issue #489)
+                record_phase_history "$state_file" "$current_phase" "$next_phase" "$ts"
 
                 # Append phase_advance event
                 local event

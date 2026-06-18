@@ -46,6 +46,44 @@ resolve_phase_budget() {
     echo "${budget}"
 }
 
+# detect_default_branch(project: string) -> string
+#   Detects the repo's default branch so the code-phase PR targets the right
+#   base (issue #489). Repos whose default branch is not `main` (e.g. `master`)
+#   previously got a broken `gh pr create --base main`. Resolution order:
+#     1. gh repo view --json defaultBranchRef (authoritative; needs a remote)
+#     2. git symbolic-ref refs/remotes/origin/HEAD (local mirror of the remote)
+#     3. fall back to `main`.
+#
+# Arguments:
+#   $1 -- project: Absolute path to the project/repository root.
+#
+# Stdout:
+#   The default branch name (never empty; defaults to "main").
+detect_default_branch() {
+    local project="${1:-}"
+    local branch=""
+
+    if [[ -n "${project}" && -d "${project}" ]]; then
+        # 1) Ask GitHub directly (most reliable when a remote exists).
+        #    gh resolves the repo from its cwd, so run it inside the project.
+        if command -v gh >/dev/null 2>&1; then
+            branch=$( (cd "${project}" && gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null < /dev/null) || true)
+        fi
+
+        # 2) Fall back to the locally-tracked origin HEAD ref.
+        if [[ -z "${branch}" ]] && command -v git >/dev/null 2>&1; then
+            branch=$(git -C "${project}" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@' || true)
+        fi
+    fi
+
+    # 3) Default.
+    if [[ -z "${branch}" ]]; then
+        branch="main"
+    fi
+
+    echo "${branch}"
+}
+
 # resolve_phase_prompt(phase: string, request_id: string, project: string) -> string
 #   Looks up the phase-specific prompt template and performs variable
 #   substitution. Falls back to a generic prompt when no template exists.
@@ -250,6 +288,11 @@ When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\
             fi
         fi
 
+        # Detect the repo's default branch so the PR targets the right base
+        # instead of assuming 'main' (issue #489).
+        local default_branch
+        default_branch="$(detect_default_branch "${project}")"
+
         local code_instructions="
 
 ## Branch and PR Instructions
@@ -260,7 +303,7 @@ When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\
 2. Make commits using Conventional Commits format (feat:, fix:, docs:, etc.).
 
 3. When implementation is done, create a PR:
-   gh pr create --base main --head 'autonomous/${request_id}' --title <conventional-title> --body <summary>
+   gh pr create --base ${default_branch} --head 'autonomous/${request_id}' --title <conventional-title> --body <summary>
 
 4. Write the resulting PR URL into phase-result-code.json artifacts[] with kind: 'github_pr'."
 
