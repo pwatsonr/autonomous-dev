@@ -102,7 +102,8 @@ audit_log_has_command() {
     # Normalization is applied symmetrically, so a fabricated command still
     # cannot match a real one.
     local norm_def='def norm:
-        gsub("\\s*&>\\s*[^\\s]+";"")
+        gsub("\\s*(&&|;)\\s*echo\\s+[^;&|]*EXIT[^;&|]*";"")
+        | gsub("\\s*&>\\s*[^\\s]+";"")
         | gsub("\\s*2>&1";"")
         | gsub("\\s*2>\\s*[^\\s]+";"")
         | gsub("\\s*1?>\\s*[^\\s]+";"")
