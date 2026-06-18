@@ -363,9 +363,18 @@ verify_envelope() {
             verdict="verified"
             reason="audit_log_absent"
         else
-            # Presence check is always done when the audit log exists.
+            # Presence check. Only a CLASSIFIABLE claimed command (a real,
+            # runnable command — test/build/git/gh/etc.) is expected to appear
+            # in the audit log; its absence is a fabrication signal and is how
+            # f01–f10 are caught. An `unclassifiable` claim is typically a prose
+            # description the agent wrote into evidence (e.g. "consolidated TC-1
+            # through TC-9 test run"), not a verbatim command, so a presence
+            # miss there is NOT a refusal (#494). The unclassifiable branch
+            # below records the reason.
             if audit_log_has_command "${req_dir}" "${cmd}"; then
                 presence_check="pass"
+            elif [[ "${classification}" == "unclassifiable" ]]; then
+                presence_check="skipped"
             else
                 presence_check="fail"
                 verdict="would_have_failed"

@@ -99,10 +99,13 @@ _envelope() {  # _envelope <command> <exit_code> <output_tail>
     [[ "${output}" == "verified unclassifiable_presence_only" ]]
 }
 
-# ── guard: an unclassifiable command the agent never ran is STILL refused ──
-@test "486-guard: fabricated unclassifiable command (absent from audit log) is still refused" {
-    _envelope "file /definitely/not/run" 0 "nope"
-    _audit "ls"                       # audit log has a DIFFERENT command
+# ── guard: a fabricated CLASSIFIABLE command (absent from audit log) is STILL
+# refused. This is the core anti-fabrication property — claiming a real,
+# runnable command (test/build/git/gh) that was never run is caught. Per #494
+# an *unclassifiable* prose claim is NOT the refusal mechanism (next test).
+@test "486-guard: fabricated CLASSIFIABLE command (absent from audit log) is still refused" {
+    _envelope "git push origin smoke" 0 "pushed"   # classifiable (non-idempotent) claim
+    _audit "ls"                                     # but only ls actually ran
 
     # shellcheck source=/dev/null
     source "${VERIFIER}"
@@ -115,6 +118,24 @@ _envelope() {  # _envelope <command> <exit_code> <output_tail>
     run jq -r 'select(.verdict=="would_have_failed") | .reason' \
         "${REQ_DIR}/verification-report.jsonl"
     [[ "${output}" == *"command_not_in_audit_log"* ]]
+}
+
+# ── #494: an unclassifiable/prose claim absent from the audit log does NOT
+# refuse. Agents write prose into evidence (e.g. "consolidated TC-1 … test
+# run"); that is not a verbatim command, so a presence miss there is not a
+# fabrication signal. The agent's real, classifiable work carries verification.
+@test "494: unclassifiable prose claim absent from audit log does NOT refuse" {
+    _envelope "consolidated TC-1 through TC-9 test run" 0 "all pass"
+    _audit "ls"
+
+    # shellcheck source=/dev/null
+    source "${VERIFIER}"
+    set +e
+    verify_envelope "${REQ_DIR}" "integration" "refuse" 2>/dev/null
+    local rc=$?
+    set -e
+
+    [[ "${rc}" -eq 0 ]]
 }
 
 # ── presence-match robustness: tolerate cosmetic command differences ──
@@ -133,4 +154,19 @@ _envelope() {  # _envelope <command> <exit_code> <output_tail>
     [ "$status" -eq 0 ]
     run audit_log_has_command "${d}" "pytest -k smoke"      # never ran → still rejected
     [ "$status" -ne 0 ]
+}
+
+# ── #494: tolerate the exit-code-capture wrapper the agent appends when running
+# but omits when reporting (e.g. `&& echo "EXIT:$?"`, `2>&1; echo "EXIT:$?"`) —
+# the dominant claim/audit mismatch observed in REQ-000020.
+@test "494: presence tolerant to exit-capture wrapper" {
+    source "${PLUGIN_DIR}/lib/verification/audit-log-reader.sh"
+    local d="${BATS_TEST_TMPDIR}/al2"; mkdir -p "${d}"
+    printf '%s\n' '{"phase":"integration","command":"wc -l < README.md && echo \"EXIT:$?\"","exit_code":0}' >  "${d}/command-audit.jsonl"
+    printf '%s\n' '{"phase":"integration","command":"git diff --numstat HEAD~1 HEAD -- README.md 2>&1; echo \"EXIT:$?\"","exit_code":0}' >> "${d}/command-audit.jsonl"
+
+    run audit_log_has_command "${d}" "wc -l < README.md"
+    [ "$status" -eq 0 ]
+    run audit_log_has_command "${d}" "git diff --numstat HEAD~1 HEAD -- README.md"
+    [ "$status" -eq 0 ]
 }
