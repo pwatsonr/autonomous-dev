@@ -170,3 +170,21 @@ _envelope() {  # _envelope <command> <exit_code> <output_tail>
     run audit_log_has_command "${d}" "git diff --numstat HEAD~1 HEAD -- README.md"
     [ "$status" -eq 0 ]
 }
+
+# ── #496: a compound &&-chained claim verifies when its parts actually ran —
+# even when the audit grouped them into different compounds. Atoms-subset:
+# both sides are split on &&/||/; and every claim atom must be an audit atom.
+@test "496: compound claim verifies via atoms-subset; chain with a fake part refused" {
+    source "${PLUGIN_DIR}/lib/verification/audit-log-reader.sh"
+    local d="${BATS_TEST_TMPDIR}/alc"; mkdir -p "${d}"
+    # the agent ran the parts grouped its own way (different compounds)
+    printf '%s\n' '{"phase":"integration","command":"cd /r && git status && git log --oneline -5","exit_code":0}' >  "${d}/command-audit.jsonl"
+    printf '%s\n' '{"phase":"integration","command":"cat -n README.md && echo \"---\"","exit_code":0}'              >> "${d}/command-audit.jsonl"
+
+    # claim chains them in yet another grouping — all parts ran → PRESENT
+    run audit_log_has_command "${d}" "git log --oneline -5 && git status && cat -n README.md"
+    [ "$status" -eq 0 ]
+    # a chain containing a never-run command is still refused (fabrication)
+    run audit_log_has_command "${d}" "git status && bun test"
+    [ "$status" -ne 0 ]
+}
