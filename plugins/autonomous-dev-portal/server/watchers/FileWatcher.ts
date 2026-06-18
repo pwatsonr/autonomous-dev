@@ -7,7 +7,12 @@
 // downstream wiring.
 
 import { EventEmitter } from "node:events";
-import { promises as fs, watch as fsWatch, type FSWatcher } from "node:fs";
+import {
+    promises as fs,
+    statSync,
+    watch as fsWatch,
+    type FSWatcher,
+} from "node:fs";
 
 import { resolvePatterns } from "./glob-resolver";
 import type {
@@ -190,10 +195,30 @@ export class FileWatcher extends EventEmitter {
     }
 
     private attachPolling(filePath: string): void {
-        // Mark the baseline-not-yet-set sentinel so the first poll is
-        // suppressed (no synthetic events on start()).
-        this.pollingMtimes.set(filePath, null);
-        this.pollingExisted.set(filePath, false);
+        // Establish the baseline SYNCHRONOUSLY, before start() returns.
+        //
+        // Previously the baseline was seeded lazily by the first async
+        // tick (`void tick()` below). That left a race window: a caller
+        // that writes immediately after `await start()` resolves could
+        // land its write *between* start() returning and the first tick's
+        // `fs.stat` — the baseline then captured the post-write mtime and
+        // no subsequent poll ever saw a change, so the very first
+        // modification was silently lost (observed as LogPipeline test
+        // hangs under load; see #451). Stat-ing here pins the baseline to
+        // the file's state at start() time, so any later write has a
+        // strictly newer mtime and is detected. No event is emitted for
+        // the pre-existing state — only the baseline is recorded.
+        try {
+            const st = statSync(filePath);
+            this.pollingMtimes.set(filePath, st.mtimeMs);
+            this.pollingExisted.set(filePath, true);
+        } catch {
+            // File absent at start: keep the not-existed/baseline-unset
+            // state so a later create is reported (and nothing is emitted
+            // for a file that never existed).
+            this.pollingMtimes.set(filePath, null);
+            this.pollingExisted.set(filePath, false);
+        }
 
         const tick = async (): Promise<void> => {
             if (this.disposed) return;
