@@ -16,6 +16,33 @@ import { LogPipeline } from "../log-pipeline";
 import type { LogPayload } from "../log-pipeline";
 import type { PipelineErrorPayload } from "../pipeline-types";
 
+// Generous, uniform bound for every single watcher-driven event wait.
+//
+// These tests are deterministic — each one awaits the *actual* event
+// (never a fixed sleep) and isolates its own temp dir. The historical
+// flake (#451) was NOT primarily a too-tight timeout: the polling
+// FileWatcher seeded its mtime baseline on its first *async* tick, so a
+// write landing in the window between `await start()` resolving and that
+// tick was absorbed into the baseline and the first change was lost
+// forever — a true hang, not a slow path. That race is fixed at the
+// source (FileWatcher.attachPolling now seeds the baseline synchronously)
+// and the debounce is disabled below to drop a second starvable timer
+// hop. With those in place, detection is bounded by roughly one polling
+// interval plus, under heavy parallel load, one event-loop starvation
+// window (~1.5s observed worst case). 5s gives ~3x headroom while still
+// failing fast when something is genuinely broken (the happy path
+// resolves in well under 1s).
+const EVENT_TIMEOUT_MS = 5000;
+
+// Per-`it` wall-clock budget. Must exceed the sum of the EVENT_TIMEOUT_MS
+// waits a test performs *sequentially* (concurrent waits only cost the
+// max, not the sum) so that a genuine hang surfaces as the descriptive
+// `TimeoutError` below rather than Bun's bare per-test timeout. Tests
+// with multiple sequential phases (truncation / rotation / unlink) get
+// MULTI_PHASE_TEST_TIMEOUT_MS instead.
+const SINGLE_PHASE_TEST_TIMEOUT_MS = 15_000;
+const MULTI_PHASE_TEST_TIMEOUT_MS = 30_000;
+
 const VALID = (sec = 0, message = "hello"): string =>
     JSON.stringify({
         ts: `2026-05-02T00:00:0${String(sec)}.000Z`,
@@ -95,7 +122,15 @@ describe("LogPipeline", () => {
             filePath,
             ...(startAt !== undefined ? { startAt } : {}),
             pollingIntervalMs: 100,
-            debounceMs: 10,
+            // Debounce disabled (flush synchronously). In polling mode the
+            // poll itself already coalesces writes (one event per interval
+            // when mtime advances), so a debounce window adds no value here
+            // — it only stacks a SECOND starvable `setTimeout` hop on top
+            // of the poll's `setInterval`. Under full-suite load each hop
+            // can be deferred by a saturated event loop; removing it
+            // roughly halved the worst-case detection latency in load
+            // testing (~3.2s → ~1.6s). See #451.
+            debounceMs: 0,
         });
     }
 
@@ -104,21 +139,16 @@ describe("LogPipeline", () => {
         appendFileSync(filePath, VALID(0) + "\n" + VALID(1) + "\n" + VALID(2) + "\n");
         pipeline = newPipeline();
         await pipeline.start();
-        // Bumped from 1500ms to 5000ms — file-watcher events on
-        // macOS FSEvents + the 10ms debounce occasionally take >1.5s
-        // when the full test suite runs concurrently. The happy path
-        // is unaffected; the longer timeout only changes the failure
-        // wall-clock when something is genuinely broken.
         const got = waitFor<LogPayload>(
             (cb) => pipeline!.on("data", cb),
-            5000,
+            EVENT_TIMEOUT_MS,
             "data",
         );
         appendFileSync(filePath, VALID(3, "new line") + "\n");
         const payload = await got;
         expect(payload.message).toBe("new line");
         expect(payload.level).toBe("info");
-    });
+    }, SINGLE_PHASE_TEST_TIMEOUT_MS);
 
     it("emits all historical lines when startAt=beginning", async () => {
         appendFileSync(filePath, VALID(0) + "\n" + VALID(1) + "\n" + VALID(2) + "\n");
@@ -126,7 +156,7 @@ describe("LogPipeline", () => {
         const datas = collectN<LogPayload>(
             (cb) => pipeline!.on("data", cb),
             3,
-            1500,
+            EVENT_TIMEOUT_MS,
             "data x3",
         );
         await pipeline.start();
@@ -134,7 +164,7 @@ describe("LogPipeline", () => {
         expect(arr).toHaveLength(3);
         expect(arr[0]?.ts).toBe("2026-05-02T00:00:00.000Z");
         expect(arr[2]?.ts).toBe("2026-05-02T00:00:02.000Z");
-    });
+    }, SINGLE_PHASE_TEST_TIMEOUT_MS);
 
     it("emits exactly 100 'data' events for 10 batches of 10 appends", async () => {
         pipeline = newPipeline();
@@ -142,7 +172,7 @@ describe("LogPipeline", () => {
         const datas = collectN<LogPayload>(
             (cb) => pipeline!.on("data", cb),
             100,
-            10_000,
+            EVENT_TIMEOUT_MS,
             "data x100",
         );
         for (let batch = 0; batch < 10; batch += 1) {
@@ -151,7 +181,7 @@ describe("LogPipeline", () => {
                 lines.push(VALID(0, `b${String(batch)}i${String(i)}`));
             }
             appendFileSync(filePath, lines.join("\n") + "\n");
-            // Tiny delay to let the watcher debounce flush each batch.
+            // Tiny delay to let each batch flush as its own watcher event.
             await new Promise((r) => setTimeout(r, 30));
         }
         const arr = await datas;
@@ -159,19 +189,19 @@ describe("LogPipeline", () => {
         // Spot-check first and last
         expect(arr[0]?.message).toBe("b0i0");
         expect(arr[99]?.message).toBe("b9i9");
-    }, 15000);
+    }, SINGLE_PHASE_TEST_TIMEOUT_MS);
 
     it("emits 'error' (JSON_PARSE) for malformed line; pipeline keeps running", async () => {
         pipeline = newPipeline();
         await pipeline.start();
         const errP = waitFor<PipelineErrorPayload>(
             (cb) => pipeline!.on("error", cb),
-            1500,
+            EVENT_TIMEOUT_MS,
             "error",
         );
         const dataP = waitFor<LogPayload>(
             (cb) => pipeline!.on("data", cb),
-            1500,
+            EVENT_TIMEOUT_MS,
             "data",
         );
         appendFileSync(filePath, "{ this is not json\n" + VALID(0, "after-bad") + "\n");
@@ -179,27 +209,27 @@ describe("LogPipeline", () => {
         expect(err.code).toBe("JSON_PARSE");
         const data = await dataP;
         expect(data.message).toBe("after-bad");
-    });
+    }, SINGLE_PHASE_TEST_TIMEOUT_MS);
 
     it("emits 'error' (SCHEMA_VALIDATION) for parses-but-invalid line", async () => {
         pipeline = newPipeline();
         await pipeline.start();
         const errP = waitFor<PipelineErrorPayload>(
             (cb) => pipeline!.on("error", cb),
-            1500,
+            EVENT_TIMEOUT_MS,
             "error",
         );
         appendFileSync(filePath, "{}\n");
         const err = await errP;
         expect(err.code).toBe("SCHEMA_VALIDATION");
-    });
+    }, SINGLE_PHASE_TEST_TIMEOUT_MS);
 
     it("redacts PII before emission (alice@example.test → [REDACTED]@example.test)", async () => {
         pipeline = newPipeline();
         await pipeline.start();
         const dataP = waitFor<LogPayload>(
             (cb) => pipeline!.on("data", cb),
-            1500,
+            EVENT_TIMEOUT_MS,
             "data",
         );
         const piiLine = JSON.stringify({
@@ -214,7 +244,7 @@ describe("LogPipeline", () => {
         expect(payload.message).not.toContain("alice@example.test");
         // The domain is preserved by the redactor's contract.
         expect(payload.message).toContain("[REDACTED]@example.test");
-    });
+    }, SINGLE_PHASE_TEST_TIMEOUT_MS);
 
     it("handles in-place truncation (TRUNCATION_DETECTED + recovered)", async () => {
         pipeline = newPipeline();
@@ -223,7 +253,7 @@ describe("LogPipeline", () => {
         const fivePromise = collectN<LogPayload>(
             (cb) => pipeline!.on("data", cb),
             5,
-            2000,
+            EVENT_TIMEOUT_MS,
             "first 5 datas",
         );
         for (let i = 0; i < 5; i += 1) {
@@ -234,12 +264,12 @@ describe("LogPipeline", () => {
 
         const errP = waitFor<PipelineErrorPayload>(
             (cb) => pipeline!.on("error", cb),
-            2000,
+            EVENT_TIMEOUT_MS,
             "truncation error",
         );
         const recoveredP = waitFor<void>(
             (cb) => pipeline!.on("recovered", () => cb(undefined)),
-            2000,
+            EVENT_TIMEOUT_MS,
             "recovered",
         );
         truncateSync(filePath, 0);
@@ -250,13 +280,13 @@ describe("LogPipeline", () => {
         const post = collectN<LogPayload>(
             (cb) => pipeline!.on("data", cb),
             2,
-            2000,
+            EVENT_TIMEOUT_MS,
             "post-truncation datas",
         );
         appendFileSync(filePath, VALID(0, "post-0") + "\n" + VALID(0, "post-1") + "\n");
         const arr = await post;
         expect(arr.map((p) => p.message)).toEqual(["post-0", "post-1"]);
-    }, 10000);
+    }, MULTI_PHASE_TEST_TIMEOUT_MS);
 
     it("handles rotation (rename + recreate → ROTATION_DETECTED + recovered)", async () => {
         pipeline = newPipeline();
@@ -265,7 +295,7 @@ describe("LogPipeline", () => {
         const preP = collectN<LogPayload>(
             (cb) => pipeline!.on("data", cb),
             3,
-            2000,
+            EVENT_TIMEOUT_MS,
             "pre datas",
         );
         appendFileSync(
@@ -280,12 +310,12 @@ describe("LogPipeline", () => {
 
         const errP = waitFor<PipelineErrorPayload>(
             (cb) => pipeline!.on("error", cb),
-            3000,
+            EVENT_TIMEOUT_MS,
             "rotation error",
         );
         const recoveredP = waitFor<void>(
             (cb) => pipeline!.on("recovered", () => cb(undefined)),
-            3000,
+            EVENT_TIMEOUT_MS,
             "recovered",
         );
         // Append a line on the new file to trigger a watcher event.
@@ -301,7 +331,7 @@ describe("LogPipeline", () => {
 
         const dataP = waitFor<LogPayload>(
             (cb) => pipeline!.on("data", cb),
-            3000,
+            EVENT_TIMEOUT_MS,
             "post-rotate data",
         );
         // If the after-rotate write happened before the rotation was
@@ -309,7 +339,7 @@ describe("LogPipeline", () => {
         appendFileSync(filePath, VALID(0, "after-rotate-2") + "\n");
         const post = await dataP;
         expect(["after-rotate", "after-rotate-2"]).toContain(post.message);
-    }, 10000);
+    }, MULTI_PHASE_TEST_TIMEOUT_MS);
 
     it("handles partial-line writes (no JSON_PARSE for the partial bytes)", async () => {
         pipeline = newPipeline();
@@ -322,7 +352,7 @@ describe("LogPipeline", () => {
         });
         const dataP = waitFor<LogPayload>(
             (cb) => pipeline!.on("data", cb),
-            2000,
+            EVENT_TIMEOUT_MS,
             "data",
         );
 
@@ -337,19 +367,19 @@ describe("LogPipeline", () => {
         expect(payload.message).toBe("split-line");
         const parseErrors = errors.filter((e) => e.code === "JSON_PARSE");
         expect(parseErrors).toHaveLength(0);
-    });
+    }, SINGLE_PHASE_TEST_TIMEOUT_MS);
 
     it("emits WATCHER_ENOENT and 'recovered' on unlink + recreate", async () => {
         pipeline = newPipeline();
         await pipeline.start();
         const errP = waitFor<PipelineErrorPayload>(
             (cb) => pipeline!.on("error", cb),
-            5000,
+            EVENT_TIMEOUT_MS,
             "error",
         );
         const recoveredP = waitFor<void>(
             (cb) => pipeline!.on("recovered", () => cb(undefined)),
-            5000,
+            EVENT_TIMEOUT_MS,
             "recovered",
         );
         unlinkSync(filePath);
@@ -366,7 +396,7 @@ describe("LogPipeline", () => {
 
         const dataP = waitFor<LogPayload>(
             (cb) => pipeline!.on("data", cb),
-            5000,
+            EVENT_TIMEOUT_MS,
             "data after recovery",
         );
         // Either the previous write already produced a 'data' event or a
@@ -374,7 +404,7 @@ describe("LogPipeline", () => {
         appendFileSync(filePath, VALID(0, "after-recover-2") + "\n");
         const data = await dataP;
         expect(["after-recover", "after-recover-2"]).toContain(data.message);
-    }, 10000);
+    }, MULTI_PHASE_TEST_TIMEOUT_MS);
 
     it("start() and stop() are idempotent", async () => {
         pipeline = newPipeline();
@@ -389,7 +419,7 @@ describe("LogPipeline", () => {
         await pipeline.start();
         const errP = waitFor<PipelineErrorPayload>(
             (cb) => pipeline!.on("error", cb),
-            1500,
+            EVENT_TIMEOUT_MS,
             "error",
         );
         appendFileSync(filePath, "not-json\n");
@@ -397,5 +427,5 @@ describe("LogPipeline", () => {
         expect(err.code).toBe("JSON_PARSE");
         // `message` is for logs only; downstream MUST branch on `code`.
         expect(typeof err.code).toBe("string");
-    });
+    }, SINGLE_PHASE_TEST_TIMEOUT_MS);
 });
