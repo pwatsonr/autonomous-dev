@@ -104,3 +104,54 @@ _marker() { # $1=file $2=json
     [ -f "$CC_DIR/applied/aaa-newer.json" ]
     [ -f "$CC_DIR/applied/zzz-older.json" ]
 }
+
+# --- #507: a partial proposal must preserve NESTED sibling keys --------------
+# The earlier shallow `+` merge only protected TOP-LEVEL keys, so a trust-level
+# change that proposed `{trust:{system_default_level:N}}` silently dropped the
+# sibling `trust.per_repo_overrides`. The deep `*` merge keeps it.
+
+@test "trust-level-only change preserves trust.per_repo_overrides (#507)" {
+    echo '{"trust":{"system_default_level":1,"per_repo_overrides":{"repoA":"L3"}},"governance":{"daily_cost_cap_usd":100}}' > "$CFG"
+    _marker "t1.json" '{"id":"t1","source":"portal","actor":"op","ts":"2026-06-18T00:00:00Z","summary":"trust level","proposed":{"trust":{"system_default_level":2}}}'
+    consume_config_changes
+    # the trust level IS applied...
+    run jq -r '.trust.system_default_level' "$CFG"
+    [ "$output" = "2" ]
+    # ...and the sibling per-repo overrides survive (the shallow `+` wiped them)
+    run jq -c '.trust.per_repo_overrides' "$CFG"
+    [ "$output" = '{"repoA":"L3"}' ]
+    # ...and an unrelated top-level key is still preserved
+    run jq -r '.governance.daily_cost_cap_usd' "$CFG"
+    [ "$output" = "100" ]
+    [ -f "$CC_DIR/applied/t1.json" ]
+}
+
+@test "trust round-trips: full-document trust proposal applies both fields (#507)" {
+    # Mirrors what the portal's FileSettingsStore actually emits: it spreads the
+    # current config, so proposed.trust carries both the new level and the
+    # existing overrides. Either way (partial or full), both must survive.
+    echo '{"trust":{"system_default_level":1,"per_repo_overrides":{"repoA":"L3"}}}' > "$CFG"
+    _marker "t2.json" '{"id":"t2","source":"portal","actor":"op","ts":"2026-06-18T00:00:00Z","summary":"settings: trust level","proposed":{"trust":{"system_default_level":3,"per_repo_overrides":{"repoA":"L3"}}}}'
+    consume_config_changes
+    run jq -r '.trust.system_default_level' "$CFG"
+    [ "$output" = "3" ]
+    run jq -c '.trust.per_repo_overrides' "$CFG"
+    [ "$output" = '{"repoA":"L3"}' ]
+    [ -f "$CC_DIR/applied/t2.json" ]
+}
+
+@test "deep merge preserves a nested notifications sibling while clearing a webhook (#507)" {
+    # A webhook CLEAR (scalar -> "") must still replace the secret, while a
+    # sibling nested key the proposal didn't mention (default_method) survives.
+    echo '{"notifications":{"delivery":{"discord":{"webhook_url":"https://discord.com/api/webhooks/1/SECRET"},"default_method":"discord"}}}' > "$CFG"
+    _marker "t3.json" '{"id":"t3","source":"portal","actor":"op","ts":"2026-06-18T00:00:00Z","summary":"clear discord","proposed":{"notifications":{"delivery":{"discord":{"webhook_url":""}}}}}'
+    consume_config_changes
+    # scalar replace: the secret is cleared
+    run jq -r '.notifications.delivery.discord.webhook_url' "$CFG"
+    [ "$output" = "" ]
+    # nested sibling under delivery is preserved (shallow `+` on delivery would
+    # have dropped default_method)
+    run jq -r '.notifications.delivery.default_method' "$CFG"
+    [ "$output" = "discord" ]
+    [ -f "$CC_DIR/applied/t3.json" ]
+}
