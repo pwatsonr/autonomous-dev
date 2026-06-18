@@ -323,3 +323,102 @@ EOF
     [[ "$(ledger current_phase)" == "tdd" ]]
     [[ "$(ledger status)" == "failed" ]]
 }
+
+# ===========================================================================
+# Issue #489: advance_phase must accumulate phase_history (was stuck at seed)
+# ===========================================================================
+
+@test "advance_phase: pass appends completed phase to phase_history" {
+    cat > "$TEST_REQ_DIR/state.json" << EOF
+{
+  "id": "$TEST_REQUEST_ID",
+  "status": "running",
+  "current_phase": "prd",
+  "priority": 1,
+  "created_at": "2026-05-12T10:00:00Z",
+  "updated_at": "2026-05-12T10:00:00Z",
+  "escalation_count": 0,
+  "phase_history": [],
+  "phase_overrides": ["prd", "prd_review", "tdd"]
+}
+EOF
+    cat > "$TEST_REQ_DIR/phase-result-prd.json" << EOF
+{ "status": "pass" }
+EOF
+
+    advance_phase "$TEST_REQUEST_ID" "$TEST_PROJECT"
+
+    # The completed phase (prd) must now be recorded and closed, and the
+    # phase being entered (prd_review) must be open.
+    local hist_len completed_state completed_exit next_state next_exit
+    hist_len=$(jq -r '.phase_history | length' "$TEST_REQ_DIR/state.json")
+    [[ "$hist_len" == "2" ]]
+    completed_state=$(jq -r '.phase_history[0].state' "$TEST_REQ_DIR/state.json")
+    completed_exit=$(jq -r '.phase_history[0].exited_at' "$TEST_REQ_DIR/state.json")
+    next_state=$(jq -r '.phase_history[1].state' "$TEST_REQ_DIR/state.json")
+    next_exit=$(jq -r '.phase_history[1].exited_at' "$TEST_REQ_DIR/state.json")
+    [[ "$completed_state" == "prd" ]]
+    [[ "$completed_exit" != "null" && -n "$completed_exit" ]]
+    [[ "$next_state" == "prd_review" ]]
+    [[ "$next_exit" == "null" ]]
+}
+
+@test "advance_phase: phase_history accumulates across multiple advances" {
+    cat > "$TEST_REQ_DIR/state.json" << EOF
+{
+  "id": "$TEST_REQUEST_ID",
+  "status": "running",
+  "current_phase": "prd",
+  "priority": 1,
+  "created_at": "2026-05-12T10:00:00Z",
+  "updated_at": "2026-05-12T10:00:00Z",
+  "escalation_count": 0,
+  "phase_history": [],
+  "phase_overrides": ["prd", "tdd", "plan"]
+}
+EOF
+    # Advance prd -> tdd
+    echo '{ "status": "pass" }' > "$TEST_REQ_DIR/phase-result-prd.json"
+    advance_phase "$TEST_REQUEST_ID" "$TEST_PROJECT"
+    # Advance tdd -> plan
+    echo '{ "status": "pass" }' > "$TEST_REQ_DIR/phase-result-tdd.json"
+    advance_phase "$TEST_REQUEST_ID" "$TEST_PROJECT"
+
+    # Every completed phase must appear, not just the first (the bug was
+    # phase_history staying at its seed value).
+    local states
+    states=$(jq -r '[.phase_history[].state] | join(",")' "$TEST_REQ_DIR/state.json")
+    [[ "$states" == "prd,tdd,plan" ]]
+
+    # prd and tdd should be closed; plan (current) still open.
+    [[ "$(jq -r '.phase_history[0].exited_at' "$TEST_REQ_DIR/state.json")" != "null" ]]
+    [[ "$(jq -r '.phase_history[1].exited_at' "$TEST_REQ_DIR/state.json")" != "null" ]]
+    [[ "$(jq -r '.phase_history[2].exited_at' "$TEST_REQ_DIR/state.json")" == "null" ]]
+}
+
+@test "advance_phase: terminal completion records final phase in phase_history" {
+    cat > "$TEST_REQ_DIR/state.json" << EOF
+{
+  "id": "$TEST_REQUEST_ID",
+  "status": "running",
+  "current_phase": "deploy",
+  "priority": 1,
+  "created_at": "2026-05-12T10:00:00Z",
+  "updated_at": "2026-05-12T10:00:00Z",
+  "escalation_count": 0,
+  "phase_history": [
+    {"state":"deploy","entered_at":"2026-05-12T10:00:00Z","exited_at":null,"session_id":null,"turns_used":0,"cost_usd":0,"retry_count":0,"exit_reason":null}
+  ],
+  "phase_overrides": ["deploy"]
+}
+EOF
+    echo '{ "status": "pass" }' > "$TEST_REQ_DIR/phase-result-deploy.json"
+
+    advance_phase "$TEST_REQUEST_ID" "$TEST_PROJECT"
+
+    # Request is terminal/done and the final phase entry is closed.
+    [[ "$(jq -r '.status' "$TEST_REQ_DIR/state.json")" == "done" ]]
+    [[ "$(jq -r '.phase_history | length' "$TEST_REQ_DIR/state.json")" == "1" ]]
+    [[ "$(jq -r '.phase_history[-1].state' "$TEST_REQ_DIR/state.json")" == "deploy" ]]
+    [[ "$(jq -r '.phase_history[-1].exited_at' "$TEST_REQ_DIR/state.json")" != "null" ]]
+}

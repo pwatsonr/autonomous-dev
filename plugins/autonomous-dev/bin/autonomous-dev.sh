@@ -10,7 +10,7 @@ set -euo pipefail
 #
 # Commands:
 #   install-daemon           Install the daemon as an OS service
-#   daemon start|stop|status Manage the daemon service
+#   daemon start|stop|restart|status Manage the daemon service
 #   kill-switch              Engage the kill switch (stop all processing)
 #   kill-switch reset        Disengage the kill switch
 #   circuit-breaker reset    Reset the circuit breaker
@@ -43,8 +43,9 @@ Usage: autonomous-dev <command> [options]
 
 Commands:
   install-daemon       Install the daemon as an OS service
-  daemon start         Start the daemon service
-  daemon stop          Stop the daemon service
+  daemon start         Start the daemon service (ensure-running; idempotent)
+  daemon stop          Stop the daemon service (waits for confirmed-down)
+  daemon restart       Restart the daemon service (stop, confirm-down, start)
   daemon status        Show daemon status
   kill-switch          Engage the kill switch (stop all processing)
   kill-switch reset    Disengage the kill switch
@@ -482,8 +483,60 @@ detect_os() {
 }
 
 # ---------------------------------------------------------------------------
+# daemon_lock_alive() -> int
+#   Returns 0 if the daemon lock file names a live process, 1 otherwise.
+#   This is the ground truth for "is the daemon actually running", independent
+#   of the OS service manager's registration state (which lags behind an async
+#   launchd bootout — see issue #488).
+# ---------------------------------------------------------------------------
+daemon_lock_alive() {
+    local lock_file="${DAEMON_HOME}/daemon.lock"
+    [[ -f "${lock_file}" ]] || return 1
+    local lock_pid
+    lock_pid=$(cat "${lock_file}" 2>/dev/null || echo "")
+    [[ "${lock_pid}" =~ ^[0-9]+$ ]] || return 1
+    kill -0 "${lock_pid}" 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# launchd_registered() -> int
+#   Returns 0 if the launchd label is currently bootstrapped (loaded).
+# ---------------------------------------------------------------------------
+launchd_registered() {
+    launchctl print "gui/$(id -u)/com.autonomous-dev.daemon" >/dev/null 2>&1
+}
+
+# ---------------------------------------------------------------------------
+# wait_for_daemon_down(timeout_ms?) -> int
+#   Polls until the daemon is confirmed down (launchd unregistered AND no live
+#   lock PID) or the timeout elapses. Returns 0 if confirmed down, 1 on
+#   timeout. Bounded so callers never hang. Used by stop/restart so a following
+#   start does not observe a still-present process from an async bootout.
+# ---------------------------------------------------------------------------
+wait_for_daemon_down() {
+    local timeout_ms="${1:-3000}"
+    local waited=0
+    local step=100
+    while (( waited < timeout_ms )); do
+        if ! launchd_registered && ! daemon_lock_alive; then
+            return 0
+        fi
+        perl -e 'select(undef,undef,undef,0.1)' 2>/dev/null || sleep 0.1
+        waited=$(( waited + step ))
+    done
+    # Final check after the loop.
+    if ! launchd_registered && ! daemon_lock_alive; then
+        return 0
+    fi
+    return 1
+}
+
+# ---------------------------------------------------------------------------
 # cmd_daemon_start() -> void
-#   Starts the daemon service via the OS service manager.
+#   Ensures the daemon is running via the OS service manager. Idempotent: if
+#   the service is registered but not actually alive (e.g. a preceding stop's
+#   async bootout is mid-flight, or the process died), it boots it out and
+#   re-bootstraps instead of falsely reporting "already running" (issue #488).
 # ---------------------------------------------------------------------------
 cmd_daemon_start() {
     local os
@@ -495,19 +548,45 @@ cmd_daemon_start() {
                 echo "ERROR: Daemon not installed. Run 'autonomous-dev install-daemon' first." >&2
                 exit 1
             fi
-            # Bootstrap if not already loaded
-            if ! launchctl print "gui/$(id -u)/com.autonomous-dev.daemon" >/dev/null 2>&1; then
-                launchctl bootstrap "gui/$(id -u)" "${plist}"
-                echo "Daemon started (macOS/launchd)."
-            else
-                echo "Daemon is already running."
+            local label="gui/$(id -u)/com.autonomous-dev.daemon"
+
+            # If already registered, confirm it is actually alive before
+            # concluding "already running". A preceding 'daemon stop' issues an
+            # async bootout, so the label/process can linger briefly.
+            if launchd_registered; then
+                # Give an in-flight bootout a brief window to settle, and a
+                # freshly-bootstrapped daemon a moment to write its lock.
+                local waited=0
+                while (( waited < 3000 )); do
+                    if ! launchd_registered; then
+                        break  # bootout finished; fall through to bootstrap
+                    fi
+                    if daemon_lock_alive; then
+                        echo "Daemon is already running."
+                        return 0
+                    fi
+                    perl -e 'select(undef,undef,undef,0.1)' 2>/dev/null || sleep 0.1
+                    waited=$(( waited + 100 ))
+                done
+
+                # Still registered but no live lock => stale/dying registration.
+                # Boot it out and confirm-down so the bootstrap below succeeds.
+                if launchd_registered; then
+                    launchctl bootout "${label}" 2>/dev/null || true
+                    wait_for_daemon_down 3000 || true
+                fi
             fi
+
+            launchctl bootstrap "gui/$(id -u)" "${plist}"
+            echo "Daemon started (macOS/launchd)."
             ;;
         linux)
             if ! systemctl --user is-enabled autonomous-dev.service >/dev/null 2>&1; then
                 echo "ERROR: Daemon not installed. Run 'autonomous-dev install-daemon' first." >&2
                 exit 1
             fi
+            # systemctl start is synchronous and idempotent; safe to call
+            # unconditionally even right after a stop.
             systemctl --user start autonomous-dev.service
             echo "Daemon started (Linux/systemd)."
             ;;
@@ -527,9 +606,16 @@ cmd_daemon_stop() {
     os=$(detect_os)
     case "${os}" in
         macos)
-            if launchctl print "gui/$(id -u)/com.autonomous-dev.daemon" >/dev/null 2>&1; then
+            if launchd_registered; then
                 launchctl bootout "gui/$(id -u)/com.autonomous-dev.daemon" 2>/dev/null || true
-                echo "Daemon stopped (macOS/launchd)."
+                # bootout is async; wait for confirmed-down so a following
+                # 'daemon start' does not observe the lingering process and
+                # no-op (issue #488).
+                if wait_for_daemon_down 5000; then
+                    echo "Daemon stopped (macOS/launchd)."
+                else
+                    echo "Daemon stop requested (macOS/launchd); shutdown still settling." >&2
+                fi
             else
                 echo "Daemon is not running."
             fi
@@ -543,6 +629,17 @@ cmd_daemon_stop() {
             exit 1
             ;;
     esac
+}
+
+# ---------------------------------------------------------------------------
+# cmd_daemon_restart() -> void
+#   Sequences a confirmed-down stop followed by a start so restart-based
+#   operations are reliable (issue #488). Safe to run when the daemon is
+#   already stopped (acts as a plain start).
+# ---------------------------------------------------------------------------
+cmd_daemon_restart() {
+    cmd_daemon_stop "$@"
+    cmd_daemon_start "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -912,7 +1009,7 @@ case "${COMMAND}" in
         ;;
     daemon)
         if [[ $# -eq 0 ]]; then
-            echo "ERROR: daemon requires a subcommand (start, stop, status)" >&2
+            echo "ERROR: daemon requires a subcommand (start, stop, restart, status)" >&2
             exit 1
         fi
         SUBCOMMAND="$1"
@@ -920,6 +1017,7 @@ case "${COMMAND}" in
         case "${SUBCOMMAND}" in
             start)   cmd_daemon_start "$@" ;;
             stop)    cmd_daemon_stop "$@" ;;
+            restart) cmd_daemon_restart "$@" ;;
             status)  cmd_daemon_status "$@" ;;
             *)
                 echo "ERROR: Unknown daemon subcommand: ${SUBCOMMAND}" >&2
