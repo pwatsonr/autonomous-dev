@@ -417,6 +417,41 @@ export interface ApprovalItem {
     actions: { id: string; label: string; confirm: string | null }[];
 }
 
+// #429 — gate-decision history surfaced on the Approvals page.
+//
+// Powers the Approved / Rejected tabs and the "Gate stats · 7d" card from
+// the REAL gate-decisions store (see wiring/gate-history-reader.ts). These
+// shapes are the view-facing projection of `GateHistoryEntry` /
+// `GateHistoryStats` so route handlers stay decoupled from the reader.
+
+/** Approvals topbar tab — which slice of gate state the page shows. */
+export type ApprovalsTab = "pending" | "approved" | "rejected";
+
+/** One decided gate, rendered in the Approved / Rejected tab tables. */
+export interface GateHistoryItem {
+    id: string;
+    repo: string;
+    phase: string;
+    decision: "approved" | "rejected" | "request-changes";
+    /** ISO-8601 decision timestamp (undefined when the source omitted it). */
+    decidedAt?: string;
+    /** Operator/actor that decided, when recorded. */
+    decidedBy?: string;
+}
+
+/** 7-day gate-stats summary for the Approvals stats card (#429). */
+export interface GateStats7d {
+    windowDays: number;
+    total: number;
+    approved: number;
+    rejected: number;
+    requestChanges: number;
+    /** approved / total, 0..1. */
+    approveRate: number;
+    /** rejected / total, 0..1. */
+    rejectRate: number;
+}
+
 export interface SettingsView {
     auth_mode: string;
     port: number;
@@ -814,6 +849,13 @@ export interface RenderProps {
         selectedId?: string;
         /** CSRF token for the approve/reject/bulk actions (#391). */
         csrfToken?: string;
+        /** #429 — active tab (pending/approved/rejected). Default "pending". */
+        tab?: ApprovalsTab;
+        /** #429 — decided gates for the Approved/Rejected tabs. Real data
+         *  from the gate-decisions store; empty when none decided yet. */
+        history?: GateHistoryItem[];
+        /** #429 — 7-day gate-stats summary. `null`/absent = honest empty. */
+        gateStats?: GateStats7d | null;
     };
     settings: { config: SettingsView; data?: SettingsData };
     costs: {

@@ -304,10 +304,112 @@
 }
 
 /* ============================================================
-   Gate-stats placeholder label (honesty rule: data not yet live)
+   #429 — Pending / Approved / Rejected tabs (topbar rightSlot)
    ============================================================ */
-.approvals-stats-placeholder-label {
-    color: var(--warn);
+.approvals-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    margin-right: var(--s-2);
+}
+
+.approvals-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1h);
+    height: 24px;
+    padding: 0 var(--s-2h);
+    border-radius: var(--r-2);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--fg-2);
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+        background var(--dur-fast) var(--ease-std),
+        color var(--dur-fast) var(--ease-std);
+}
+
+.approvals-tab:hover {
+    background: var(--bg-2);
+    color: var(--fg-0);
+}
+
+.approvals-tab.active {
+    background: var(--bg-2);
+    border-color: var(--line-2);
+    color: var(--fg-0);
+}
+
+.approvals-tab-count {
+    font-size: var(--t-nano);
+    color: var(--fg-3);
+    background: var(--bg-3);
+    border-radius: var(--r-pill);
+    padding: 0 var(--s-1h);
+    min-width: 16px;
+    text-align: center;
+}
+
+.approvals-tab.active .approvals-tab-count {
+    color: var(--fg-1);
+}
+
+/* ============================================================
+   #504 — pending-row title wrapper (id + title links + sub line)
+   ============================================================ */
+.approval-row-titlewrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-width: 0;
+}
+
+/* The id + title cells are now links; keep them visually identical to the
+   prior text rendering (no underline until hover) so the table reads the
+   same — only the navigation behavior is added (#504). */
+a.approval-row-id,
+a.approval-row-title {
+    text-decoration: none;
+    color: inherit;
+}
+
+a.approval-row-id:hover,
+a.approval-row-title:hover {
+    text-decoration: underline;
+    color: var(--brand);
+}
+
+/* ============================================================
+   #429 — decided-gate history table (Approved / Rejected tabs)
+   ============================================================ */
+.approvals-history-head,
+.approvals-history-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 110px 120px 1fr 140px;
+    gap: var(--s-3h);
+    padding: var(--s-2h) var(--s-4);
+    align-items: center;
+}
+
+.approvals-history-head {
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--line-2);
     font-family: var(--font-mono);
     font-size: var(--t-nano);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-2);
+}
+
+.approvals-history-row {
+    border-bottom: 1px solid var(--line-1);
+    background: var(--bg-1);
+}
+
+.approvals-history-row:last-child {
+    border-bottom: 0;
 }
