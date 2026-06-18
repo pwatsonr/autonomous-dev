@@ -210,10 +210,13 @@ report_row() {
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# Case 7: classification — unclassifiable → would-deny log line
-# (in log mode this is a would_have_failed row, NOT a phase-result change)
+# Case 7: classification — an unclassifiable command that IS in the audit
+# log is verified by presence alone (no re-exec). Per #486 we no longer
+# deny-by-default on `unclassifiable`: that produced a 100% false-positive
+# rate that refused every integration. Presence still guards fabrication —
+# an unclassifiable command absent from the audit log is would_have_failed.
 # ─────────────────────────────────────────────────────────────────────
-@test "phase-b: unclassifiable command logs would_have_failed (no envelope change)" {
+@test "phase-b: unclassifiable command in audit log → verified by presence (no re-exec)" {
     write_envelope "integration" "pass" \
         '[{"command":"some-bespoke-tool --check","exit_code":0,"output_tail":"ok"}]'
     write_audit_log "integration" "some-bespoke-tool --check"
@@ -222,8 +225,10 @@ report_row() {
     [[ "${status}" -eq 0 ]]
     local row; row=$(report_row 0)
     [[ "$(printf '%s' "${row}" | jq -r .classification)" == "unclassifiable" ]]
-    [[ "$(printf '%s' "${row}" | jq -r .verdict)" == "would_have_failed" ]]
-    [[ "$(printf '%s' "${row}" | jq -r .reason)" =~ unclassifiable ]]
+    [[ "$(printf '%s' "${row}" | jq -r .checks.presence)" == "pass" ]]
+    [[ "$(printf '%s' "${row}" | jq -r .checks.re_execution)" == "skipped" ]]
+    [[ "$(printf '%s' "${row}" | jq -r .verdict)" == "verified" ]]
+    [[ "$(printf '%s' "${row}" | jq -r .reason)" == "unclassifiable_presence_only" ]]
     # Envelope unchanged.
     [[ "$(jq -r .status "${REQ_DIR}/phase-result-integration.json")" == "pass" ]]
 }
