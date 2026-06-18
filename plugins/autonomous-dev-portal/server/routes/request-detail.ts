@@ -22,7 +22,10 @@ import type { Context } from "hono";
 import { jsx } from "hono/jsx";
 
 import { notFound, renderPage } from "../lib/response-utils";
-import { loadRequestRecord } from "../wiring/request-record-reader";
+import {
+    loadRequestRecord,
+    loadArtifactForPhase,
+} from "../wiring/request-record-reader";
 import { RdV3ArtifactPane } from "../templates/fragments/rd-v3-artifact-pane";
 
 const REPO_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -101,7 +104,14 @@ export const artifactFragmentHandler = async (
         return notFound(c);
     }
 
-    const request = await loadRequestRecord(repo, id);
+    // #499 — resolve the requested phase's REAL artifact (reads that phase's
+    // document body, not just the current phase). Falls back to the record's
+    // currentArtifact / undefined when the phase produced no readable doc.
+    const { record: request, artifact } = await loadArtifactForPhase(
+        repo,
+        id,
+        phase,
+    );
     if (request === null) {
         return notFound(c);
     }
@@ -126,11 +136,12 @@ export const artifactFragmentHandler = async (
         state = "pending";
     }
 
-    // Resolve artifact: use currentArtifact when the requested phase matches
-    // the current phase; otherwise treat as no artifact (the stub does not
-    // carry per-phase artifact history in the v1 shape).
-    const artifact =
-        phase === currentPhase ? request.currentArtifact : undefined;
+    // #499 — when a completed/earlier phase has a readable artifact, show it
+    // as "done" prose (not the pending placeholder) even though the pipeline
+    // has advanced past it.
+    if (artifact !== undefined && state === "pending" && phaseIndex >= 0) {
+        state = "done";
+    }
 
     const branch = `auto/${id.toLowerCase()}`;
 

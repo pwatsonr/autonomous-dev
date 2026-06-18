@@ -35,6 +35,31 @@ import { RdV3ArtifactPane } from "../fragments/rd-v3-artifact-pane";
 import { RdV3GatePanel } from "../fragments/rd-v3-gate-panel";
 import type { GateReviewer } from "../fragments/rd-v3-gate-panel";
 import { RdV3TopbarRight } from "../fragments/rd-v3-request-header";
+import {
+    RdV3SummaryCard,
+    RdV3PrLink,
+    RdV3ArtifactIndex,
+} from "../fragments/rd-v3-summary";
+
+/**
+ * #503 — HTMX polling trigger for the live phase pipeline. Mirrors the
+ * dashboard swimlane's live-data mechanism (see views/dashboard.tsx): the
+ * `#rd-live` region re-fetches the detail page every 5s and self-selects,
+ * so the phase pipeline / summary / artifact index reflect the daemon's
+ * current phase without a manual reload.
+ *
+ * Predicate guards (kept narrow on purpose):
+ *   - only when the tab is visible (no background polling)
+ *   - only when the live region is NOT marked terminal (`[data-terminal]`):
+ *     a done/cancelled/failed request is frozen, so polling it is wasted
+ *     work and would re-assert a "frozen" view every 5s.
+ *
+ * The artifact pane and gate panel deliberately live OUTSIDE `#rd-live`, so
+ * a poll never clobbers the artifact the operator has selected or a gate
+ * note they are typing.
+ */
+const RD_LIVE_POLL_TRIGGER =
+    'every 5s [document.visibilityState === "visible" && !document.querySelector("#rd-live[data-terminal]")]';
 
 /** Default 8-phase pipeline order. */
 const DEFAULT_PIPELINE = [
@@ -192,41 +217,78 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
         status === "done" || status === "cancelled" || status === "failed";
     const terminalLabel = status.toUpperCase();
 
+    // #503 — the live region URL: the detail page re-fetches itself and
+    // self-selects #rd-live. The route returns a bare fragment on HX
+    // requests (response-utils.isHtmxRequest), so HTMX can hx-select the
+    // refreshed #rd-live out of it.
+    const liveUrl = `/repo/${request.repo}/request/${request.id}`;
+
     return (
         <>
             <Topbar
                 title={request.id}
                 subTitle={subTitle}
+                liveIndicator={!isTerminal}
                 rightSlot={
-                    <RdV3TopbarRight
-                        priority={priority}
-                        repo={request.repo}
-                    />
+                    <>
+                        <RdV3PrLink prUrl={request.prUrl} />
+                        <RdV3TopbarRight
+                            priority={priority}
+                            repo={request.repo}
+                        />
+                    </>
                 }
             />
             <div class="main-inner">
-                {/* Phase pipeline strip */}
-                <RdV3PhaseTrack
-                    repo={request.repo}
-                    requestId={request.id}
-                    opened={fmtOpened(request.startedAt)}
-                    branch={branch}
-                    cost={fmt(request.cost)}
-                    budget={fmt(undefined)}
-                    steps={steps}
-                    selectedPhase={currentPhase}
-                />
+                {/* #503 — Live region: phase pipeline + summary + artifact
+                    index re-poll every 5s (same mechanism as the dashboard
+                    swimlane). The artifact pane + gate panel are OUTSIDE this
+                    region so a poll never clobbers a selected artifact or an
+                    in-progress gate note. `data-terminal` freezes polling for
+                    done/cancelled/failed requests (predicate guard). */}
+                <div
+                    id="rd-live"
+                    hx-get={liveUrl}
+                    hx-trigger={isTerminal ? undefined : RD_LIVE_POLL_TRIGGER}
+                    hx-target="this"
+                    hx-swap="outerHTML"
+                    hx-select="#rd-live"
+                    data-terminal={isTerminal ? "" : undefined}
+                >
+                    {/* #502 — plain-language summary near the top. */}
+                    <RdV3SummaryCard summary={request.outcomeSummary} />
 
-                {isTerminal ? (
-                    <div
-                        class={`rd-terminal-banner rd-terminal-${status}`}
-                        role="status"
-                    >
-                        <span class="rd-terminal-chip">{terminalLabel}</span>
-                        This request is terminal — phases are frozen and
-                        gate actions are disabled.
-                    </div>
-                ) : null}
+                    {/* Phase pipeline strip — now reflects current_phase LIVE. */}
+                    <RdV3PhaseTrack
+                        repo={request.repo}
+                        requestId={request.id}
+                        opened={fmtOpened(request.startedAt)}
+                        branch={branch}
+                        cost={fmt(request.cost)}
+                        budget={fmt(undefined)}
+                        steps={steps}
+                        selectedPhase={currentPhase}
+                    />
+
+                    {isTerminal ? (
+                        <div
+                            class={`rd-terminal-banner rd-terminal-${status}`}
+                            role="status"
+                        >
+                            <span class="rd-terminal-chip">{terminalLabel}</span>
+                            This request is terminal — phases are frozen and
+                            gate actions are disabled.
+                        </div>
+                    ) : null}
+
+                    {/* #499 — artifact index: everything the request produced. */}
+                    <RdV3ArtifactIndex
+                        repo={request.repo}
+                        requestId={request.id}
+                        artifacts={request.artifactList ?? []}
+                        selectedPhase={request.currentArtifact?.phase ?? currentPhase}
+                    />
+                </div>
 
                 {/* Two-column layout: artifact pane + gate panel */}
                 <div class="rdetail">

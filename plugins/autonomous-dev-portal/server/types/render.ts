@@ -211,6 +211,22 @@ export interface RequestRecord {
     /** SPEC-036-3-05 — past daemon iterations against this request. */
     runs?: RequestRunRef[];
 
+    /**
+     * #499 — every artifact the request produced, aggregated from each
+     * phase's `phase-result-<phase>.json` `artifacts[]`. Drives the
+     * artifact index in the detail view. Empty array = none recorded.
+     */
+    artifactList?: RequestArtifactRef[];
+    /**
+     * #501 — the `github_pr` artifact URL (the PR the request opened), if
+     * any. Surfaced as a clickable link in the detail view.
+     */
+    prUrl?: string;
+    /**
+     * #502 — synthesized plain-language summary of what the request did.
+     */
+    outcomeSummary?: RequestSummary;
+
     // SPEC-037-7-01 §`.rd-stat` block — three mono numeric cells in the
     // request-header right column. All optional for back-compat; renderers
     // default missing fields to `0`.
@@ -290,6 +306,56 @@ export interface RequestArtifact {
     content: string;
     /** Optional artifact identifier shown `meta-mono dim` next to the head. */
     artifactId?: string;
+}
+
+/**
+ * #499 — a single artifact the request produced, as recorded in a phase's
+ * `phase-result-<phase>.json` `artifacts[]` entry. This is the *listing*
+ * shape (what's shown in the artifact index); the readable body for a
+ * document artifact is loaded on demand into a {@link RequestArtifact}.
+ *
+ * `kind` is the daemon-authored artifact kind ("prd" | "tdd" | "plan" |
+ * "spec" | "doc" | "github_pr" | "test-output" | …). `url` is populated
+ * only for link-style artifacts (notably `github_pr` — #501). `phase` is
+ * the pipeline phase whose result emitted the artifact; the detail view
+ * uses it to key the on-demand body fetch.
+ */
+export interface RequestArtifactRef {
+    /** Pipeline phase that emitted the artifact (e.g. "prd", "code"). */
+    phase: string;
+    /** Daemon-authored artifact kind ("prd" | "tdd" | "github_pr" | …). */
+    kind: string;
+    /** Repo-relative path to the artifact file (absent for pure links). */
+    path?: string;
+    /** One-line human title from the phase-result entry. */
+    title?: string;
+    /** Absolute URL for link-style artifacts (e.g. the github_pr URL). */
+    url?: string;
+    /**
+     * True when the artifact is a Markdown document the portal can render
+     * inline (prd/tdd/plan/spec/doc with a readable `path`). Drives whether
+     * the artifact row is a clickable phase tab vs. an external link or an
+     * inert evidence row.
+     */
+    readable?: boolean;
+}
+
+/**
+ * #502 — synthesized plain-language summary of what a request did. Built
+ * from real phase-result feedback + the artifact list + the lifecycle
+ * status; never hand-written. All fields optional so the view can render a
+ * partial summary (e.g. outcome line only) when the daemon has emitted
+ * little.
+ */
+export interface RequestSummary {
+    /** What was requested — the request title/description. */
+    requested?: string;
+    /** What was produced — short phrase, e.g. "PRD, TDD, plan + a PR". */
+    produced?: string;
+    /** Outcome line synthesized from the latest phase feedback + status. */
+    outcome?: string;
+    /** Tone for the outcome chip. */
+    outcomeTone?: "ok" | "warn" | "err" | "muted";
 }
 
 /**
