@@ -236,7 +236,7 @@ reexecute_command() {
     # `env | cut`. Both are safe under `set -u`.
     while IFS= read -r v; do
         case "${v}" in
-            CLAUDE_*|ANTHROPIC_*) env_unset+=(--unset="${v}") ;;
+            CLAUDE_*|ANTHROPIC_*) env_unset+=("${v}") ;;
         esac
     done < <(compgen -e 2>/dev/null || env | awk -F= '{print $1}')
 
@@ -252,16 +252,21 @@ reexecute_command() {
     local timeout_bin
     timeout_bin="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || true)"
 
+    # Strip CLAUDE_*/ANTHROPIC_* via an in-shell `unset` inside the subshell
+    # (portable; `env --unset=` is GNU-only and, placed before `env`, the
+    # shell would try to exec `--unset=…` as a command → exit 127). env_unset
+    # now holds bare NAMEs.
     if [[ -n "${timeout_bin}" ]]; then
-        ( cd "${cwd}" && \
-            ${env_unset[@]+"${env_unset[@]}"} env "${timeout_bin}" "${timeout_s}" \
-                bash -c "${cmd}" </dev/null \
+        ( cd "${cwd}" \
+            && { [[ ${#env_unset[@]} -gt 0 ]] && unset "${env_unset[@]}" || true; } \
+            && "${timeout_bin}" "${timeout_s}" bash -c "${cmd}" </dev/null \
         ) > "${tmp_out}" 2>&1 || rc=$?
     else
         # Fallback: best-effort, no timeout enforcement. Rare on macOS
         # without coreutils — production paths should install coreutils.
-        ( cd "${cwd}" && \
-            ${env_unset[@]+"${env_unset[@]}"} env bash -c "${cmd}" </dev/null \
+        ( cd "${cwd}" \
+            && { [[ ${#env_unset[@]} -gt 0 ]] && unset "${env_unset[@]}" || true; } \
+            && bash -c "${cmd}" </dev/null \
         ) > "${tmp_out}" 2>&1 || rc=$?
     fi
 
@@ -377,7 +382,18 @@ verify_envelope() {
                 if [[ "${VERIFICATION_REEXEC:-1}" == "1" ]]; then
                     local worktree="${req_dir}/worktree"
                     if [[ ! -d "${worktree}" ]]; then
-                        worktree="${req_dir}"
+                        # No isolation worktree (single-track loop): re-execute
+                        # in the PROJECT REPO ROOT, not req_dir. req_dir is
+                        # <project>/.autonomous-dev/requests/<id> — never a git
+                        # repo root — so repo-relative `git`/`gh` commands fail
+                        # there with exit 128, guaranteeing a false mismatch (#486).
+                        local project_root
+                        project_root="$(cd "${req_dir}/../../.." 2>/dev/null && pwd)"
+                        if [[ -n "${project_root}" && -d "${project_root}" ]]; then
+                            worktree="${project_root}"
+                        else
+                            worktree="${req_dir}"
+                        fi
                     fi
                     local reexec_json
                     reexec_json=$(reexecute_command \
@@ -431,12 +447,17 @@ verify_envelope() {
                 :
                 ;;
             unclassifiable)
-                # Per ADR-041-02: deny-by-default in refuse mode. In
-                # log mode, log as would_have_failed if not already
-                # failing for another reason.
+                # ADR-041-02 originally denied-by-default here, but in refuse
+                # mode that refuses EVERY phase whose agent ran any unlisted
+                # read-only command (file, diff <(..), VAR=$(..)) — an observed
+                # 100% false-positive rate that blocked all integrations (#486).
+                # We cannot safely re-execute an unclassifiable command, so we
+                # fall back to the presence check alone (consistent with the
+                # audit_log_absent fail-open above) rather than forcing a
+                # refusal. Presence still catches a command the agent claimed
+                # but never actually ran.
                 if [[ "${verdict}" != "would_have_failed" ]]; then
-                    verdict="would_have_failed"
-                    reason="unclassifiable_command"
+                    reason="unclassifiable_presence_only"
                 fi
                 ;;
         esac
