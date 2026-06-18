@@ -55,7 +55,13 @@ describe("request artifacts reader (#499/#501/#502)", () => {
             process.env.AUTONOMOUS_DEV_USER_CONFIG,
             JSON.stringify({
                 repositories: {
-                    allowlist: [{ id: repoBasename, path: tmpRepo }],
+                    // The REAL daemon config stores the allowlist as path
+                    // STRINGS. Using the object {id,path} form here previously
+                    // masked a resolveRepoPath bug (string entries → null →
+                    // whole request-detail view empty). Primary entry is a
+                    // string (real format); a legacy object entry covers the
+                    // tolerated fallback path.
+                    allowlist: [tmpRepo, { id: "legacy", path: "/legacy/repo" }],
                 },
             }),
         );

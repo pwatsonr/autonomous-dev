@@ -114,10 +114,9 @@ interface DaemonStateFile {
 // Daemon config shape (subset for repositories.allowlist)
 interface DaemonConfigFile {
     repositories?: {
-        allowlist?: Array<{
-            id?: string;
-            path?: string;
-        }>;
+        // The real daemon config stores the allowlist as an array of path
+        // STRINGS; the legacy {id?,path?} object form is tolerated too.
+        allowlist?: Array<string | { id?: string; path?: string }>;
     };
 }
 
@@ -129,8 +128,13 @@ async function resolveRepoPath(repoSlug: string): Promise<string | null> {
     const config = await readJsonOrNull<DaemonConfigFile>(userConfigPath());
     if (config?.repositories?.allowlist) {
         for (const entry of config.repositories.allowlist) {
-            if (typeof entry.path === "string" && basename(entry.path) === repoSlug) {
-                return entry.path;
+            // Allowlist entries are path strings in the real config; tolerate
+            // the legacy {path} object form too. (Treating a string entry as
+            // {path} silently returned null for every request → the whole
+            // request-detail view showed "no artifacts" / dim pipeline.)
+            const p = typeof entry === "string" ? entry : entry?.path;
+            if (typeof p === "string" && basename(p) === repoSlug) {
+                return p;
             }
         }
     }
