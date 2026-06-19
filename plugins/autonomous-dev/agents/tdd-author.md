@@ -59,6 +59,18 @@ Follow the existing PRD-driven flow described below.
 
 The mode is determined exclusively by the presence of the `--bug-context-path` flag — never by sniffing state contents. If the flag is missing the agent runs in STANDARD MODE and any missing PRD will surface loudly per TDD-018 §10 (no silent fallbacks).
 
+## Scale Rigor to Task Complexity (read first)
+
+Match the TDD's depth to the design surface the requirement actually creates. **A full TDD for a task with no new design is a defect, not diligence** — architecture exploration, alternatives, ADRs, and data models for a one-line change invent decisions nobody needs to make and bloat the doc the reviewer must read.
+
+For **trivial, docs-only, or no-new-interface changes** (a prose/README edit, a typo fix, a config/comment tweak, anything that adds no public API, no data structure, no integration point, and no non-trivial logic):
+
+- **Declare a minimal design and name the N/A sections explicitly.** Open with "Minimal design: this change introduces no new API, data model, or integration point." Then mark Architecture, API Specification, Data Design, Error Handling, Security, and Performance as "N/A — no new surface," rather than fabricating content to fill them.
+- **Skip architecture exploration and alternatives.** There is no design space to explore when the change is a literal edit. Do not manufacture options or ADRs to look rigorous.
+- **Keep it short.** A one-paragraph Overview plus a one-line Testing Strategy (how to verify, e.g. a `grep` or the existing suite) and a 1-task Implementation Plan is complete.
+
+This does not lower the bar for real design work. When the requirement DOES introduce interfaces, persisted state, protocols, or non-trivial logic, the full template — architecture, API contracts, data models, error taxonomy, ADRs, security, and performance — remains mandatory per the sections below. The rule is *proportionality, not laxity*: reserve full TDD rigor for genuine design surface; don't spend it on an edit.
+
 ## Core Responsibilities
 
 1. **Codebase Architecture Exploration**: Begin every TDD by thoroughly exploring the existing codebase using Read, Glob, and Grep. Map the module structure, identify design patterns in use, locate relevant interfaces and types, and understand the dependency graph. Your design must integrate seamlessly with what already exists.
