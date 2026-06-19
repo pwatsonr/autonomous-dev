@@ -176,6 +176,31 @@ function test_weakness_report_query_by_agent(): void {
   }
 }
 
+function test_get_by_id(): void {
+  // getById is the method the validation orchestrator depends on
+  // (IWeaknessReportStore) — pin both the hit and the miss.
+  const tmpDir = makeTempDir();
+  const filePath = path.join(tmpDir, 'reports.jsonl');
+  const store = new WeaknessReportStore(filePath, silentLogger);
+  try {
+    store.append(makeReport({ report_id: 'find-me', agent_name: 'spec-author' }));
+    store.append(makeReport({ report_id: 'other', agent_name: 'tdd-author' }));
+
+    const found = store.getById('find-me');
+    assert(found !== null, 'getById should find an existing report');
+    assert(found?.report_id === 'find-me', 'getById returns the matching report');
+    assert(found?.agent_name === 'spec-author', 'getById returns the full report body');
+
+    const missing = store.getById('does-not-exist');
+    assert(missing === null, 'getById returns null for a missing id');
+
+    console.log('PASS: test_get_by_id');
+  } finally {
+    store.close();
+    cleanupDir(tmpDir);
+  }
+}
+
 function test_weakness_report_all_fields_present(): void {
   const report = makeReport();
   const json = JSON.stringify(report);
@@ -393,19 +418,15 @@ function test_example_from_spec(): void {
 // ---------------------------------------------------------------------------
 describe('weakness report store', () => {
   it('test_weakness_report_serialization', test_weakness_report_serialization);
-  // SKIP: requires WeaknessReportStore class export from src/agent-factory/improvement/types.ts (PRD-016 triage: SKIP-WITH-NOTE)
-  it.skip('test_weakness_report_append_to_jsonl', test_weakness_report_append_to_jsonl);
-  // SKIP: requires WeaknessReportStore class export from src/agent-factory/improvement/types.ts (PRD-016 triage: SKIP-WITH-NOTE)
-  it.skip('test_weakness_report_query_by_agent', test_weakness_report_query_by_agent);
+  it('test_weakness_report_append_to_jsonl', test_weakness_report_append_to_jsonl);
+  it('test_weakness_report_query_by_agent', test_weakness_report_query_by_agent);
+  it('test_get_by_id', test_get_by_id);
   it('test_weakness_report_all_fields_present', test_weakness_report_all_fields_present);
   it('test_weakness_severity_enum', test_weakness_severity_enum);
   it('test_overall_assessment_enum', test_overall_assessment_enum);
   it('test_recommendation_enum', test_recommendation_enum);
-  // SKIP: requires WeaknessReportStore class export from src/agent-factory/improvement/types.ts (PRD-016 triage: SKIP-WITH-NOTE)
-  it.skip('test_malformed_lines_skipped', test_malformed_lines_skipped);
-  // SKIP: requires WeaknessReportStore class export from src/agent-factory/improvement/types.ts (PRD-016 triage: SKIP-WITH-NOTE)
-  it.skip('test_nonexistent_file_returns_empty', test_nonexistent_file_returns_empty);
-  // SKIP: requires WeaknessReportStore class export from src/agent-factory/improvement/types.ts (PRD-016 triage: SKIP-WITH-NOTE)
-  it.skip('test_creates_parent_directory_on_write', test_creates_parent_directory_on_write);
+  it('test_malformed_lines_skipped', test_malformed_lines_skipped);
+  it('test_nonexistent_file_returns_empty', test_nonexistent_file_returns_empty);
+  it('test_creates_parent_directory_on_write', test_creates_parent_directory_on_write);
   it('test_example_from_spec', test_example_from_spec);
 });
