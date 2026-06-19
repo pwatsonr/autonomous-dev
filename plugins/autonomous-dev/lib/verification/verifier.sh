@@ -115,11 +115,12 @@ __VERIFIER_IDEMPOTENT_TOKENS__=(
     prettier  # prettier --check .
 
     # Python
-    pytest  # pytest -k …
-    ruff    # ruff check src/
-    mypy    # mypy src/
-    black   # black --check .
-    flake8  # flake8 src/
+    pytest   # pytest -k …  /  python -m pytest (unwrapped, #523)
+    unittest # python -m unittest (test runner; #523)
+    ruff     # ruff check src/
+    mypy     # mypy src/
+    black    # black --check .
+    flake8   # flake8 src/
 
     # Rust
     cargo   # cargo test, cargo check, cargo build, cargo clippy
@@ -182,6 +183,25 @@ classify_command() {
     done
     local first_token
     first_token="$(printf '%s' "${stripped}" | awk '{print $1}')"
+
+    # #523: unwrap a `python[3] -m <module>` launcher so classification keys off
+    # the MODULE, not the interpreter. `python3 -m pytest` is the idiomatic form
+    # in many repos; keying off `python3` (not in the allowlist) made it
+    # `unclassifiable` → no idempotent re-exec (mismatched/stale detection) AND
+    # no substantive_verified credit (which weakened the #521 ground-truth
+    # rescue for module-runner repos). After the env-prefix strip above, if the
+    # first token is a python launcher and the second is `-m`, treat the third
+    # token (the module) as the effective first token. A bare `python foo.py`
+    # is left untouched → still unclassifiable (arbitrary script, not a known
+    # idempotent runner).
+    if [[ "${first_token}" =~ ^python[0-9.]*$ ]]; then
+        local _py_second _py_module
+        _py_second="$(printf '%s' "${stripped}" | awk '{print $2}')"
+        if [[ "${_py_second}" == "-m" ]]; then
+            _py_module="$(printf '%s' "${stripped}" | awk '{print $3}')"
+            [[ -n "${_py_module}" ]] && first_token="${_py_module}"
+        fi
+    fi
 
     # Non-idempotent heuristic regex check FIRST. A `git push` is
     # non-idempotent even though `git` itself isn't on the deny list.
