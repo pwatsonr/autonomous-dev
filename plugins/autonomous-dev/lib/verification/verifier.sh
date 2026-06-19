@@ -214,6 +214,112 @@ classify_command() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────
+# Command role — #521 (PRD-024 follow-up to #494/#496).
+#
+# Orthogonal to classify_command's idempotent/non_idempotent/unclassifiable
+# axis. `command_role` answers a different question: is this claim a
+# SUBSTANTIVE verification / state change (a test/build/lint/type runner, a
+# `git push`, a `gh pr create`) or an AUXILIARY read-only inspection the agent
+# ran just to look at state (`grep`, `head`, `git diff`, `git log`,
+# `gh pr view`)?
+#
+# Why it matters: the dominant refuse-mode false positive (#521) is the agent
+# paraphrasing AUXILIARY commands in its evidence — `grep -ic x` vs
+# `grep -c -i x`, `git diff a..b` with different refs, `head -n3` vs `head -3`.
+# Those are not the verification itself; the test/build runners are. So
+# verify_envelope keeps the STRICT refuse-on-miss for substantive claims (the
+# anti-fabrication floor — every red-team fabricated fixture is substantive
+# except f10, which the no-ground-truth branch still catches), but treats an
+# auxiliary miss as fatal only when there is no GROUND TRUTH that the phase did
+# real work.
+#
+# Role is computed per top-level atom (split on && || ;). A claim is auxiliary
+# only if EVERY atom is auxiliary; any substantive atom (e.g. the `bun test` in
+# `cd /r && bun test`) makes the whole claim substantive — so a fabricated
+# compound that smuggles in a never-run test still refuses.
+# ─────────────────────────────────────────────────────────────────────────
+
+# First-token read-only / navigation tokens → auxiliary.
+__VERIFIER_AUXILIARY_TOKENS__=(
+    cat head tail grep rg egrep fgrep wc find ls ll tree stat file
+    diff sort uniq cut awk sed tr nl column tee xargs
+    jq yq echo printf basename dirname realpath readlink
+    which type pwd env date hostname whoami
+    cd pushd popd : true false export set source .
+)
+# Read-only git subcommands → auxiliary (everything else under git is
+# substantive: push/commit/merge/reset/checkout/rebase/tag/fetch/pull/…).
+__VERIFIER_AUXILIARY_GIT_SUB__=(
+    diff log show status rev-parse rev-list branch remote config
+    ls-files ls-tree cat-file describe blame shortlog reflog
+    whatchanged grep symbolic-ref for-each-ref
+)
+
+# _command_atom_role CMD -> stdout: auxiliary|substantive  (single atom)
+_command_atom_role() {
+    local cmd="$1"
+    local stripped="${cmd}"
+    # Strip leading env-var prefixes (FOO=bar cmd), same as classify_command.
+    while [[ "${stripped}" =~ ^([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)(.*)$ ]]; do
+        stripped="${BASH_REMATCH[2]}"
+    done
+    local ft sub
+    ft="$(printf '%s' "${stripped}" | awk '{print $1}')"
+    case "${ft}" in
+        git)
+            sub="$(printf '%s' "${stripped}" | awk '{print $2}')"
+            local g
+            for g in "${__VERIFIER_AUXILIARY_GIT_SUB__[@]}"; do
+                [[ "${sub}" == "${g}" ]] && { printf 'auxiliary\n'; return 0; }
+            done
+            printf 'substantive\n'; return 0
+            ;;
+        gh)
+            # Read-only gh subcommand actions are auxiliary; write actions
+            # (create/merge/edit/…) are substantive. Scan the action tokens.
+            local tok aux=0
+            for tok in ${stripped}; do
+                case "${tok}" in
+                    create|merge|close|edit|comment|delete|reopen|ready|review|sync)
+                        printf 'substantive\n'; return 0 ;;
+                    view|list|checks|status|diff|api)
+                        aux=1 ;;
+                esac
+            done
+            [[ "${aux}" -eq 1 ]] && { printf 'auxiliary\n'; return 0; }
+            printf 'substantive\n'; return 0
+            ;;
+        *)
+            local t
+            for t in "${__VERIFIER_AUXILIARY_TOKENS__[@]}"; do
+                [[ "${ft}" == "${t}" ]] && { printf 'auxiliary\n'; return 0; }
+            done
+            printf 'substantive\n'; return 0
+            ;;
+    esac
+}
+
+# command_role CMD -> stdout: auxiliary|substantive  (whole, possibly compound)
+command_role() {
+    local cmd="$1"
+    local atomized any=0 any_sub=0 line
+    # Split on top-level sequential separators. awk interprets "\n" in the
+    # replacement as a real newline on both GNU and BSD awk (BSD sed does NOT,
+    # which is why this uses awk rather than sed).
+    atomized="$(printf '%s' "${cmd}" | awk '{gsub(/&&|\|\||;/, "\n"); print}')"
+    while IFS= read -r line; do
+        [[ -z "${line//[[:space:]]/}" ]] && continue
+        any=1
+        [[ "$(_command_atom_role "${line}")" == "substantive" ]] && any_sub=1
+    done <<< "${atomized}"
+    if [[ "${any}" -eq 0 || "${any_sub}" -eq 1 ]]; then
+        printf 'substantive\n'
+    else
+        printf 'auxiliary\n'
+    fi
+}
+
+# ─────────────────────────────────────────────────────────────────────────
 # Re-execution — TDD-041 §D-03.
 #
 # Runs CMD with CLAUDE_* / ANTHROPIC_* env stripped, stdin /dev/null,
@@ -292,6 +398,63 @@ reexecute_command() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────
+# Ground-truth artifact check — #521.
+#
+# Confirm-only. Returns 0 ONLY when there is a real, OPEN+mergeable (or already
+# MERGED) PR for the project's current branch; returns 1 (unavailable) on ANY
+# doubt — no git work tree, no `gh`, no PR, UNKNOWN/DIRTY merge state, timeout,
+# or error. Because it can only CONFIRM and never DENY, it cannot add a new
+# false positive or a new flake: worst case it is unavailable and the decision
+# falls back to the audit-log substantive-ran signal.
+#
+# Network is touched only inside a real git work tree with gh present, so it is
+# inert in unit tests (whose req_dir lives under mktemp, not a repo) and in the
+# red-team fixtures. Gated behind a short timeout (VERIFICATION_PR_TIMEOUT_S).
+# ─────────────────────────────────────────────────────────────────────────
+verification_ground_truth_pr_ok() {
+    local req_dir="$1" phase="$2"
+    case "${phase}" in integration|deploy) ;; *) return 1 ;; esac
+    command -v gh  >/dev/null 2>&1 || return 1
+    command -v git >/dev/null 2>&1 || return 1
+    local root
+    root="$(cd "${req_dir}/../../.." 2>/dev/null && pwd)" || return 1
+    [[ -n "${root}" && -d "${root}" ]] || return 1
+    git -C "${root}" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
+    local branch
+    branch="$(git -C "${root}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    [[ -n "${branch}" && "${branch}" != "HEAD" ]] || return 1
+
+    local to_bin to_pfx=""
+    to_bin="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || true)"
+    [[ -n "${to_bin}" ]] && to_pfx="${to_bin} ${VERIFICATION_PR_TIMEOUT_S:-15}"
+
+    local json
+    json="$( ( cd "${root}" && ${to_pfx} gh pr view "${branch}" \
+        --json state,mergeable,mergeStateStatus ) 2>/dev/null || true )"
+    [[ -n "${json}" ]] || return 1
+
+    local state mergeable
+    state="$(printf '%s' "${json}"     | jq -r '.state // ""'     2>/dev/null || echo "")"
+    mergeable="$(printf '%s' "${json}" | jq -r '.mergeable // ""' 2>/dev/null || echo "")"
+    [[ "${state}" == "MERGED" ]] && return 0
+    [[ "${state}" == "OPEN" && "${mergeable}" == "MERGEABLE" ]] && return 0
+    return 1
+}
+
+# verification_ground_truth_confirms REQ_DIR PHASE SUBSTANTIVE_VERIFIED -> 0|1
+#
+# Returns 0 when the phase's real work is independently confirmed:
+#   • substantive_verified>0 — a real test/build/lint/state-change command from
+#     the audit log verified (pure-local, no network); OR
+#   • a mergeable PR artifact exists (best-effort, confirm-only).
+verification_ground_truth_confirms() {
+    local req_dir="$1" phase="$2" substantive_verified="$3"
+    (( substantive_verified > 0 )) && return 0
+    verification_ground_truth_pr_ok "${req_dir}" "${phase}" && return 0
+    return 1
+}
+
+# ─────────────────────────────────────────────────────────────────────────
 # verify_envelope REQ_DIR PHASE [MODE]
 #
 # Read ${req_dir}/phase-result-<phase>.json, iterate evidence[], run all
@@ -331,6 +494,9 @@ verify_envelope() {
     chmod 0600 "${report}" 2>/dev/null || true
 
     local verified=0 would_have_failed=0
+    # #521 ground-truth counters: partition failures by command role and track
+    # how many SUBSTANTIVE (real verification) commands actually verified.
+    local substantive_failures=0 auxiliary_failures=0 substantive_verified=0
     local audit_present=0
     if audit_log_exists "${req_dir}"; then
         audit_present=1
@@ -471,10 +637,29 @@ verify_envelope() {
                 ;;
         esac
 
+        # #521: tag the verdict by command role so the phase-refusal decision
+        # (below) can treat substantive vs auxiliary failures differently.
+        local role
+        role="$(command_role "${cmd}")"
         if [[ "${verdict}" == "verified" ]]; then
             verified=$((verified + 1))
+            # A substantive command that actually verified (presence for a
+            # non_idempotent action, or a clean re-exec for an idempotent one)
+            # is ground truth that the phase did real work. Unclassifiable
+            # prose claims are presence-skipped, never real verification — so
+            # they do not count here.
+            if [[ "${role}" == "substantive" \
+                  && ( "${classification}" == "idempotent" \
+                       || "${classification}" == "non_idempotent" ) ]]; then
+                substantive_verified=$((substantive_verified + 1))
+            fi
         else
             would_have_failed=$((would_have_failed + 1))
+            if [[ "${role}" == "substantive" ]]; then
+                substantive_failures=$((substantive_failures + 1))
+            else
+                auxiliary_failures=$((auxiliary_failures + 1))
+            fi
         fi
 
         local ts
@@ -484,6 +669,7 @@ verify_envelope() {
             --arg phase "${phase}" \
             --arg cmd "${cmd}" \
             --arg cls "${classification}" \
+            --arg role "${role}" \
             --arg pres "${presence_check}" \
             --arg ec "${exit_code_check}" \
             --arg ot "${output_tail_check}" \
@@ -495,6 +681,7 @@ verify_envelope() {
                 phase: $phase,
                 command: $cmd,
                 classification: $cls,
+                role: $role,
                 checks: {
                     presence: $pres,
                     exit_code: $ec,
@@ -506,14 +693,46 @@ verify_envelope() {
             }' >> "${report}" 2>/dev/null || true
     done
 
-    # Calibration summary to stderr (the daemon log).
-    printf 'verification_summary: phase=%s verified=%d would_have_failed=%d\n' \
-        "${phase}" "${verified}" "${would_have_failed}" >&2
+    # ── #521: ground-truth-first refusal decision ──
+    # Per-row verdicts (written above) are unchanged — operators still see
+    # exactly which claims failed and why, and every red-team fixture row keeps
+    # its verdict/reason. What changes is whether the PHASE is refused:
+    #
+    #   • A SUBSTANTIVE failure (a claimed test/build/lint/type run, or a
+    #     state-changing git/gh action, that is absent from the audit log or
+    #     whose re-exec disagrees) is ALWAYS fatal. This is the real
+    #     anti-fabrication signal and preserves every red-team fixture
+    #     (fabricated f01–f09, all mismatched, all stale).
+    #
+    #   • An AUXILIARY failure alone (read-only inspection drift — `grep`/
+    #     `head`/`git diff`/`gh pr view` phrased differently than the audit
+    #     log: the #521 false-positive class) is fatal ONLY when there is no
+    #     GROUND TRUTH that the phase did real work: no substantive command
+    #     verified AND no mergeable PR artifact. When a real verification
+    #     command actually ran (or a PR is mergeable), auxiliary claim-string
+    #     drift no longer refuses the phase. In the synthetic fixtures there is
+    #     no repo/PR and no substantive command, so f10 (`gh pr view`) still
+    #     refuses via the no-ground-truth branch.
+    local ground_truth="none"
+    local should_refuse=0
+    if (( substantive_failures > 0 )); then
+        should_refuse=1
+    elif (( auxiliary_failures > 0 )); then
+        if verification_ground_truth_confirms "${req_dir}" "${phase}" "${substantive_verified}"; then
+            ground_truth="confirmed"
+        else
+            should_refuse=1
+        fi
+    fi
 
-    # Phase B is log-only: always return 0. Phase C will branch on `mode`.
-    if [[ "${mode}" == "refuse" && "${would_have_failed}" -gt 0 ]]; then
-        # Phase C will translate this to an envelope-override. For now,
-        # report it via the exit code only.
+    # Calibration summary to stderr (the daemon log).
+    printf 'verification_summary: phase=%s verified=%d would_have_failed=%d substantive_fail=%d aux_fail=%d ground_truth=%s\n' \
+        "${phase}" "${verified}" "${would_have_failed}" \
+        "${substantive_failures}" "${auxiliary_failures}" "${ground_truth}" >&2
+
+    # Phase B (log mode) is non-enforcing: always return 0. Phase C (refuse)
+    # translates a should_refuse into an envelope-override via the exit code.
+    if [[ "${mode}" == "refuse" && "${should_refuse}" -eq 1 ]]; then
         return 2
     fi
     return 0
