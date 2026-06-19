@@ -35,6 +35,7 @@ import {
     commandShadow,
     commandUnfreeze,
     commandUnshadow,
+    dispatchCommand,
 } from "../src/agent-factory/cli";
 import { AgentRegistry } from "../src/agent-factory/registry";
 
@@ -187,7 +188,7 @@ async function main(): Promise<number> {
 
     if (!verb || verb === "--help" || verb === "-h") {
         console.error(
-            "Usage: autonomous-dev agent <inspect|freeze|unfreeze|shadow|unshadow|promote|list> <name> [version] [--json]",
+            "Usage: autonomous-dev agent <inspect|freeze|unfreeze|shadow|unshadow|improve|promote|list> <name> [version] [--json]",
         );
         return verb && verb !== "--help" && verb !== "-h" ? 1 : 0;
     }
@@ -296,6 +297,24 @@ async function main(): Promise<number> {
                     );
                 }
                 break;
+            case "improve": {
+                // End-to-end, human-gated self-improvement (issue #529):
+                // analyze -> propose -> meta-review -> park for human approval.
+                // Routed through the in-process command router. The full
+                // improvement subsystem (analyzer/proposer/meta-review) is
+                // injected by the daemon's CliContext; when absent (as in this
+                // thin process wrapper), dispatchCommand returns a clear
+                // "Improvement subsystem not available" guard rather than a
+                // silent no-op. NEVER promotes — promotion stays behind the
+                // separate `promote`/`accept` verb (the human gate).
+                output = await dispatchCommand(
+                    registry,
+                    ["improve", name, ...rest],
+                    agentsDir,
+                    {},
+                );
+                break;
+            }
             case "promote": {
                 const version = rest[0];
                 if (!version) {

@@ -14,6 +14,8 @@
  *   - agent dashboard  -- Summary table sorted by approval rate with trends
  *   - agent rollback   -- Rollback an agent to a previous version
  *   - agent analyze    -- Trigger improvement analysis for an agent
+ *   - agent improve    -- End-to-end human-gated self-improvement (analyze ->
+ *                         propose -> meta-review -> park for human approval)
  *   - agent compare    -- Manual A/B comparison between two agent versions
  *   - agent promote    -- Promote an agent to a validated version
  *   - agent reject     -- Reject a proposed agent version
@@ -694,6 +696,7 @@ export interface CliContext {
  *   agent dashboard
  *   agent rollback <name> [--force]
  *   agent analyze <name> [--force]
+ *   agent improve <name> [--force]
  *   agent compare <name> --version-a X --version-b Y [--inputs N]
  *   agent promote <name> <version>
  *   agent reject <name> <version> --reason "<reason>"
@@ -805,6 +808,15 @@ export async function dispatchCommand(
       }
       const force = args.includes('--force');
       return commandAnalyze(registry, name, force, ctx ?? {});
+    }
+
+    case 'improve': {
+      const name = args[1];
+      if (!name) {
+        return 'Error: agent improve requires a name argument.\nUsage: agent improve <name> [--force]';
+      }
+      const force = args.includes('--force');
+      return commandImprove(registry, name, ctx ?? {}, { force });
     }
 
     // ----- Phase 2 commands (SPEC-005-4-5) -----
@@ -1211,6 +1223,319 @@ export async function commandAnalyze(
   return output.join('\n');
 }
 
+// ---------------------------------------------------------------------------
+// Command: agent improve <name>
+// ---------------------------------------------------------------------------
+
+/**
+ * Options for {@link commandImprove}.
+ */
+export interface ImproveOptions {
+  /**
+   * Bypass the observation-threshold check inside the analyzer's upstream
+   * caller. The analyzer's `analyze()` itself does not gate on the threshold,
+   * so this flag is reserved for parity with `commandAnalyze` and currently
+   * affects only the audit trail. Defaults to false.
+   */
+  force?: boolean;
+}
+
+/**
+ * Execute the `agent improve <name>` command: the single, human-gated,
+ * end-to-end self-improvement entry point (issue #529).
+ *
+ * This orchestrates the EXISTING self-improvement modules in sequence and
+ * STOPS at the human-approval gate. It NEVER promotes — promotion stays
+ * behind the separate `agent accept` / `agent promote` command, which is the
+ * human gate.
+ *
+ * Pipeline:
+ *   a. analyze (PerformanceAnalyzer.analyze) -> WeaknessReport.
+ *        If the analyzer's decision is anything other than
+ *        `propose_modification` (i.e. `no_action` / `log_domain_gap` from a
+ *        `propose_specialist` recommendation, or an error), STOP and return a
+ *        human-readable summary. No proposal is created.
+ *   b. propose (ProposalGenerator.generateProposal). The proposer runs the
+ *        mechanical `enforceConstraints` gate internally BEFORE returning. If
+ *        it reports constraint violations, STOP and surface them. The proposal
+ *        is NOT parked.
+ *   c. meta-review (the EXISTING injected `invokeMetaReview`, which drives the
+ *        `agent-meta-reviewer` 6-point checklist). If the verdict is rejected
+ *        (BLOCK), set the proposal status to `meta_rejected` (a TERMINAL,
+ *        non-promotable state) and surface the blocking findings. STOP.
+ *   d. on approval-from-both-gates, PARK the proposal at the human-review gate
+ *        as `meta_approved` (the status the Promoter recognizes as
+ *        bypass-park; the agent is left `UNDER_REVIEW` by the analyzer) and
+ *        return a summary containing the unified diff, the meta-review
+ *        verdict + findings, and the EXACT next-step commands. The Promoter is
+ *        NOT called.
+ *
+ * Note on the park status: `meta_approved` (not `pending_human_review`) is the
+ * correct park status here because `pending_human_review` is a TERMINAL state
+ * in the proposal state machine (no outgoing transitions), whereas
+ * `meta_approved` + agent state `UNDER_REVIEW` is exactly the gate the existing
+ * `Promoter.validatePrerequisites` accepts for human-approved promotion. This
+ * keeps the human gate intact: nothing is committed until the operator runs
+ * `agent accept` / `agent promote`.
+ *
+ * @param registry  The agent registry.
+ * @param name      The agent name to improve.
+ * @param ctx       Extended CLI context with improvement dependencies.
+ * @param opts      Optional flags (see {@link ImproveOptions}).
+ * @returns         Formatted, human-readable summary string.
+ */
+export async function commandImprove(
+  registry: IAgentRegistry,
+  name: string,
+  ctx: Partial<CliContext>,
+  opts: ImproveOptions = {},
+): Promise<string> {
+  const output: string[] = [];
+
+  // ------ Validate dependencies ------
+  const performanceAnalyzer = ctx.performanceAnalyzer;
+  const proposalGenerator = ctx.proposalGenerator;
+  const proposalStore = ctx.proposalStore;
+  const auditLogger = ctx.auditLogger;
+  const invokeMetaReview = ctx.invokeMetaReview;
+
+  if (!performanceAnalyzer || !proposalGenerator || !proposalStore || !auditLogger) {
+    return 'Error: Improvement subsystem not available. Ensure the performance analyzer, proposal generator, proposal store, and audit logger are initialised.';
+  }
+
+  // ------ Look up the agent ------
+  const record = registry.get(name);
+  if (!record) {
+    return `Error: Agent '${name}' not found`;
+  }
+
+  // ------ Guard: FROZEN agents cannot be improved ------
+  if (record.state === 'FROZEN') {
+    return `Error: Agent '${name}' is FROZEN. Cannot improve frozen agents.`;
+  }
+
+  // ------ Guard: already UNDER_REVIEW ------
+  if (record.state === 'UNDER_REVIEW') {
+    return `Error: Agent '${name}' is already UNDER_REVIEW. Resolve the pending proposal (agent accept/reject) before improving again.`;
+  }
+
+  output.push(`Improving agent '${name}' (v${record.agent.version})...`);
+  if (opts.force) {
+    output.push('(force: bypassing observation threshold)');
+  }
+  output.push('');
+
+  // ------ Step a: analyze ------
+  output.push('[1/3] Analyzing performance (performance-analyst)...');
+  const analysisResult: AnalysisResult = await performanceAnalyzer.analyze(name);
+
+  if (!analysisResult.success || !analysisResult.report) {
+    return output.join('\n') + `\nAnalysis failed: ${analysisResult.error ?? 'unknown error'}`;
+  }
+
+  const report = analysisResult.report;
+  output.push('');
+  output.push(formatWeaknessReport(report));
+  output.push('');
+
+  // Route on the analyzer's decision. Only `propose_modification` proceeds.
+  if (analysisResult.nextAction !== 'propose_modification') {
+    if (analysisResult.nextAction === 'no_action') {
+      output.push('Decision: no_action. Agent is healthy — no proposal created.');
+    } else if (analysisResult.nextAction === 'log_domain_gap') {
+      output.push(
+        'Decision: propose_specialist (domain gap logged) — no modification proposal created.',
+      );
+    } else {
+      output.push(`Decision: ${analysisResult.nextAction} — no modification proposal created.`);
+    }
+    output.push('');
+    output.push(`No human approval required. Nothing parked for '${name}'.`);
+    return output.join('\n');
+  }
+
+  // ------ Step b: generate proposal (enforceConstraints runs inside) ------
+  output.push('[2/3] Generating proposal (constraint enforcement runs first)...');
+  const proposalResult: ProposalResult = await proposalGenerator.generateProposal(name, report);
+
+  if (!proposalResult.success || !proposalResult.proposal) {
+    // Mechanical constraint gate (enforceConstraints) rejected the proposal.
+    if (proposalResult.constraintViolations && proposalResult.constraintViolations.length > 0) {
+      auditLogger.log({
+        timestamp: new Date().toISOString(),
+        event_type: 'proposal_rejected_constraint_violation',
+        agent_name: name,
+        details: {
+          agent_name: name,
+          proposal_id: 'n/a',
+          violations: proposalResult.constraintViolations.map((v) => ({
+            field: v.field,
+            rule: v.rule,
+            current_value: v.current_value,
+            proposed_value: v.proposed_value,
+          })),
+        },
+      });
+
+      output.push('');
+      output.push('BLOCKED by constraint enforcement. Proposal NOT parked.');
+      output.push('Constraint violations:');
+      for (const v of proposalResult.constraintViolations) {
+        output.push(`  - ${v.field} (${v.rule}): ${v.current_value} -> ${v.proposed_value}`);
+      }
+      return output.join('\n');
+    }
+
+    return output.join('\n') + `\nProposal generation failed: ${proposalResult.error ?? 'unknown error'}`;
+  }
+
+  const proposal = proposalResult.proposal;
+
+  // Persist the proposal (status: pending_meta_review).
+  proposalStore.append(proposal);
+
+  auditLogger.log({
+    timestamp: new Date().toISOString(),
+    event_type: 'proposal_generated',
+    agent_name: name,
+    details: {
+      agent_name: name,
+      proposal_id: proposal.proposal_id,
+      current_version: proposal.current_version,
+      proposed_version: proposal.proposed_version,
+      version_bump: proposal.version_bump,
+    },
+  });
+
+  output.push('');
+  output.push(`  Proposal ID:  ${proposal.proposal_id}`);
+  output.push(
+    `  Version bump: ${proposal.version_bump} (${proposal.current_version} -> ${proposal.proposed_version})`,
+  );
+  output.push('');
+
+  // ------ Self-referential guard (defense-in-depth, #529 security review) ------
+  // Never route a change to the meta-reviewer itself through the (frozen)
+  // meta-review gate. Park it TERMINALLY at pending_human_review — modifying the
+  // gate requires out-of-band human governance, never the promotable
+  // `meta_approved` bypass. The FROZEN guard above already blocks this for the
+  // shipped (frozen) meta-reviewer; this covers a hypothetical unfreeze and
+  // mirrors commandAnalyze's self-referential branch.
+  if (name === 'agent-meta-reviewer') {
+    auditLogger.log({
+      timestamp: new Date().toISOString(),
+      event_type: 'meta_review_bypassed_self_referential',
+      agent_name: name,
+      details: { agent_name: name, proposal_id: proposal.proposal_id },
+    });
+    proposalStore.updateStatus(proposal.proposal_id, 'pending_human_review');
+    output.push(
+      'Self-referential agent (meta-reviewer): meta-review bypassed; parked at ' +
+        'pending_human_review (TERMINAL, not auto-promotable) — requires out-of-band human governance.',
+    );
+    return output.join('\n');
+  }
+
+  // ------ Step c: meta-review (the EXISTING 6-point checklist gate) ------
+  output.push('[3/3] Running meta-review (agent-meta-reviewer, 6-point checklist)...');
+
+  if (!invokeMetaReview) {
+    return (
+      output.join('\n') +
+      '\nError: Meta-review gate not available. Proposal remains pending_meta_review and is NOT promotable.'
+    );
+  }
+
+  let metaReviewResult: MetaReviewResult;
+  try {
+    metaReviewResult = await invokeMetaReview(proposal);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return (
+      output.join('\n') +
+      `\nMeta-review failed: ${message}\nProposal remains pending_meta_review and is NOT promotable.`
+    );
+  }
+
+  const blockers = metaReviewResult.findings.filter((f) => f.severity === 'blocker');
+  const approved = metaReviewResult.verdict === 'approved';
+
+  const reviewId = metaReviewResult.review_id ?? `mr-${proposal.proposal_id.substring(0, 8)}`;
+  proposalStore.setMetaReviewId(proposal.proposal_id, reviewId);
+
+  auditLogger.log({
+    timestamp: new Date().toISOString(),
+    event_type: 'meta_review_completed',
+    agent_name: name,
+    details: {
+      agent_name: name,
+      proposal_id: proposal.proposal_id,
+      review_id: reviewId,
+      verdict: metaReviewResult.verdict,
+      findings_count: metaReviewResult.findings.length,
+      blockers_count: blockers.length,
+    },
+  });
+
+  output.push('');
+  output.push(formatMetaReview(metaReviewResult));
+  output.push('');
+
+  if (!approved) {
+    // Meta-review BLOCK. meta_rejected is a TERMINAL state -> NOT promotable.
+    proposalStore.updateStatus(proposal.proposal_id, 'meta_rejected');
+    output.push('BLOCKED by meta-review. Proposal status: meta_rejected (NOT promotable).');
+    const summary =
+      blockers.length > 0
+        ? blockers.map((f) => `checklist ${f.checklist_item}: ${f.description}`).join('; ')
+        : 'See findings above.';
+    output.push(`Blocking findings: ${summary}`);
+    return output.join('\n');
+  }
+
+  // ------ Step d: PARK at the human-approval gate (do NOT promote) ------
+  // The analyzer already moved the agent to UNDER_REVIEW for a
+  // propose_modification decision. Park the proposal at `meta_approved`, the
+  // status + state pair the Promoter accepts for human-approved promotion.
+  proposalStore.updateStatus(proposal.proposal_id, 'meta_approved');
+
+  output.push('Both gates PASSED (constraint enforcement + meta-review).');
+  output.push('Proposal parked for HUMAN APPROVAL. Status: meta_approved (NOT yet promoted).');
+  output.push('');
+  output.push('Unified diff:');
+  output.push(proposal.diff);
+  output.push('');
+  output.push('Next steps (require explicit human action — nothing is committed until then):');
+  output.push(`  Promote: autonomous-dev agent accept ${proposal.proposal_id}`);
+  output.push(`  Discard: autonomous-dev agent reject ${proposal.proposal_id}`);
+
+  return output.join('\n');
+}
+
+/**
+ * Format a meta-review result (verdict + findings) for CLI display.
+ */
+function formatMetaReview(result: MetaReviewResult): string {
+  const blockers = result.findings.filter((f) => f.severity === 'blocker');
+  const warnings = result.findings.filter((f) => f.severity === 'warning');
+
+  const lines: string[] = [];
+  lines.push('Meta-Review:');
+  lines.push(`  Verdict:  ${result.verdict}`);
+  if (result.bypassed) {
+    lines.push(`  Bypassed: yes${result.bypass_reason ? ` (${result.bypass_reason})` : ''}`);
+  }
+  lines.push(
+    `  Findings: ${result.findings.length} (${blockers.length} blockers, ${warnings.length} warnings)`,
+  );
+  if (result.findings.length > 0) {
+    for (const f of result.findings) {
+      lines.push(`    - [${f.severity}] checklist ${f.checklist_item}: ${f.description}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 /**
  * Return a usage help message listing all available commands.
  */
@@ -1228,6 +1553,7 @@ function usageMessage(): string {
     '  agent dashboard          Show summary dashboard for all agents',
     '  agent rollback <name>    Rollback an agent to a previous version',
     '  agent analyze <name>     Trigger improvement analysis for an agent',
+    '  agent improve <name>     Run analyze->propose->meta-review, park for human approval',
     '  agent compare <name>     Manual A/B comparison between two versions',
     '  agent promote <name>     Promote an agent to a validated version',
     '  agent reject <name>      Reject a proposed agent version',
