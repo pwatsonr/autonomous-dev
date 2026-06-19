@@ -69,7 +69,10 @@ CREATE INDEX IF NOT EXISTS idx_proposals_created ON proposals(created_at);
  */
 const VALID_TRANSITIONS: ReadonlyMap<ProposalStatus, ReadonlySet<ProposalStatus>> = new Map([
   ['pending_meta_review', new Set<ProposalStatus>(['meta_approved', 'meta_rejected', 'pending_human_review'])],
-  ['meta_approved', new Set<ProposalStatus>(['validating'])],
+  // meta_approved → validating (normal path) OR → promoted (#539: the
+  // self-review-bypass path the Promoter accepts, where meta-approval alone
+  // authorizes promotion without the separate validation gate).
+  ['meta_approved', new Set<ProposalStatus>(['validating', 'promoted'])],
   ['validating', new Set<ProposalStatus>(['validated_positive', 'validated_negative'])],
   ['validated_positive', new Set<ProposalStatus>(['promoted', 'rejected'])],
   ['validated_negative', new Set<ProposalStatus>(['rejected'])],
