@@ -131,9 +131,13 @@ const CHECKS = [
     run() {
       const s = read('plugins/autonomous-dev/bin/supervisor-loop.sh');
       if (s === null) return fail('supervisor-loop.sh not found');
-      // Must shallow-merge proposed over the existing config so a partial
-      // proposal cannot destroy unmentioned keys like repositories.allowlist.
-      const merges = /\.\[0\]\s*\+\s*\.\[1\]\.proposed/.test(s);
+      // Must merge proposed over the existing config so a partial proposal
+      // cannot destroy unmentioned keys like repositories.allowlist. The
+      // supervisor uses jq `*` deep-merge since #507 (was `+` shallow-merge in
+      // #386); accept either operator — both preserve the no-destructive-
+      // overwrite invariant this check guards. A true regression would be the
+      // `destructive` path below.
+      const merges = /\.\[0\]\s*[*+]\s*\.\[1\]\.proposed/.test(s);
       // The old destructive path wrote `.proposed` straight over CONFIG_FILE.
       const destructive = /jq '\.proposed' "\$\{marker\}"\s*>\s*"\$\{cfg_tmp\}"/.test(s);
       if (!merges) return fail('config-change apply no longer merges proposed over existing config');
