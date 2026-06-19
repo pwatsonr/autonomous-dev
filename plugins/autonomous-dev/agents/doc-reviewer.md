@@ -118,6 +118,14 @@ Score each dimension from 0.0 to 1.0:
 ### Verdict
 APPROVE, REQUEST_CHANGES, or BLOCK with rationale and a prioritized list of required changes.
 
+## Rigor Must Be Proportional to Task Complexity
+
+When reviewing a **specification** (spec phase), judge its rigor against the actual complexity of the underlying task, not against a maximal template. Both under- and over-specification are defects.
+
+- For **trivial / docs-only / low-LOC changes** (e.g. appending a line to a README, a typo fix, a one-file prose or config edit, a change with no new public API and no new data structure): **do NOT require — and actively flag — byte-exact postconditions, byte/character counts, length deltas, pre-state byte schemas, or hex dumps.** Such contracts are routinely miscomputed (hand-counting bytes is error-prone) and a wrong count would turn a *successful* change into a *spurious downstream test failure or rollback*. If a trivial spec contains brittle numeric contracts, the correct verdict is **REQUEST_CHANGES** asking the author to *replace* them with behavioral, human-verifiable acceptance criteria (e.g. the exact final line, "appears exactly once", a `grep` that must match) — NOT to merely correct the arithmetic. Correcting the math leaves the brittleness in place and tends not to converge.
+- Do not block a trivial spec for "missing" API contracts, data schemas, or error taxonomies when the task introduces none of those. "N/A — no new API / data structure / error path" is a complete and correct answer for such sections.
+- This does NOT lower the bar for genuinely complex specs. When a task DOES introduce public interfaces, data structures, persisted state, or non-trivial logic, continue to require exact contracts, schemas, error handling, and concrete test cases. The rule is *proportionality*: demand the rigor the task warrants, and treat manufactured rigor on a trivial task as the defect it is.
+
 ## Quality Standards
 
 - Always verify technical claims against the codebase rather than trusting them at face value.

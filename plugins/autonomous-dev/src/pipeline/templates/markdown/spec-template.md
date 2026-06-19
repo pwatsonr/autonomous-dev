@@ -22,6 +22,19 @@ priority: normal
 
 # {{TITLE}}
 
+<!-- Rigor scales to task complexity. For trivial / docs-only / low-LOC changes
+     (e.g. a README append, a typo fix, a one-file prose or config edit with no
+     new public API and no new data structure): do NOT invent byte-exact
+     postconditions, byte/character counts, length deltas, pre-state byte
+     schemas, or hex dumps — they are routinely miscomputed and turn a
+     successful change into a spurious failure/rollback. Use behavioral,
+     human-verifiable acceptance criteria instead (the exact text, "appears
+     exactly once", a grep that must match). Mark sections that do not apply as
+     "N/A — this change introduces no new API / data structure / error path".
+     Full contracts/schemas/error taxonomy remain mandatory for tasks that
+     actually introduce APIs, data structures, persisted state, or non-trivial
+     logic. -->
+
 ## Description
 <!-- Guidance: Detailed description of what this specification covers and its relationship to the parent plan task -->
 
