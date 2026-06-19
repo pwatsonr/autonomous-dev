@@ -157,6 +157,10 @@ export const artifactFragmentHandler = async (
             request.cost !== undefined
                 ? `$${request.cost.toFixed(2)}`
                 : "$—",
+        // #500 — pass repo + id so the pane appends the lazily-loaded comment
+        // panel for readable Markdown artifacts (phase-swap reloads comments).
+        repo,
+        requestId: id,
     });
 
     // Hono JSX returns a string-like HtmlEscapedString.

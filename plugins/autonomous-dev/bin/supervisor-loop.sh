@@ -36,6 +36,14 @@ readonly GATE_DECISIONS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev
 # writes proposed config edits here instead of mutating CONFIG_FILE directly;
 # consume_config_changes() validates + applies them during reconcile.
 readonly CONFIG_CHANGES_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/config-changes"
+# #500: portal-originated artifact-revise markers. When the operator leaves
+# comments on a rendered artifact and clicks "revise", the portal writes a
+# feedback artifact into the request's repo dir AND a marker here. The daemon's
+# consume_revise_markers() validates each marker and resets state.json's
+# current_phase back to the author phase so the supervisor re-dispatches it
+# (the same loopback the daemon uses on a *_review fail). The re-run injects
+# the operator feedback (resolve_phase_prompt, phase-helpers.sh).
+readonly REVISE_REQUESTS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-dev}/revise-requests"
 
 # --- Runtime State Variables -------------------------------------------------
 
@@ -3421,6 +3429,142 @@ consume_config_changes() {
     return 0
 }
 
+# consume_revise_markers() -> void
+#   #500. Applies portal-originated artifact-revise markers. When the operator
+#   leaves comments on a rendered artifact and clicks "revise", the portal
+#   writes:
+#     1. a feedback artifact at
+#        <repo>/.autonomous-dev/requests/<id>/artifact-feedback/<phase>.json
+#     2. a marker here: <REVISE_REQUESTS_DIR>/<repo>__<id>.json
+#        = { v, id, repo, phase, source:"portal", actor, ts }
+#
+#   For each marker this:
+#     - validates parseable JSON + source=="portal" + a phase field,
+#     - locates the request's canonical state.json in an allowlisted repo,
+#     - SKIPS (leaves for next poll) requests that are mid-phase (status
+#       "running" with a different current_phase) so we never yank a phase out
+#       from under a live agent; only acts when the request is settled at a
+#       gate / done-with-this-phase boundary OR already on the target phase,
+#     - refuses terminal requests (done/cancelled/failed) — archives the
+#       marker as obsolete,
+#     - confirms the feedback artifact exists (don't reset a phase with no
+#       feedback to inject),
+#     - resets current_phase to the marker's phase + status=running (the same
+#       jq reset the *_review-fail loopback performs) so the supervisor
+#       re-dispatches the author; the re-run injects the feedback via
+#       resolve_phase_prompt.
+#
+#   Tolerant: missing dirs/files/jq are skipped; failures are logged, not
+#   fatal. Safe under `set -e`. Valid-but-not-yet-actionable markers are left
+#   in place (retried next poll); applied/obsolete/invalid markers are moved
+#   to applied/ or rejected/ so they never loop forever.
+consume_revise_markers() {
+    [[ -d "${REVISE_REQUESTS_DIR}" ]] || return 0
+    command -v jq >/dev/null 2>&1 || return 0
+
+    local repos
+    repos=$(jq -r '.repositories.allowlist[]?' "${EFFECTIVE_CONFIG}" 2>/dev/null)
+    [[ -z "${repos}" ]] && return 0
+
+    local applied_dir="${REVISE_REQUESTS_DIR}/applied"
+    local rejected_dir="${REVISE_REQUESTS_DIR}/rejected"
+
+    local marker
+    for marker in "${REVISE_REQUESTS_DIR}"/*.json; do
+        [[ -f "${marker}" ]] || continue
+
+        # 1. Validate JSON + source + required fields.
+        if ! jq empty "${marker}" 2>/dev/null; then
+            log_warn "Revise marker is corrupt JSON; rejecting: ${marker}"
+            mkdir -p "${rejected_dir}"; mv "${marker}" "${rejected_dir}/" 2>/dev/null || rm -f "${marker}"
+            continue
+        fi
+        local src req_id phase actor
+        src=$(jq -r '.source // ""' "${marker}" 2>/dev/null || echo "")
+        req_id=$(jq -r '.id // ""' "${marker}" 2>/dev/null || echo "")
+        phase=$(jq -r '.phase // ""' "${marker}" 2>/dev/null || echo "")
+        actor=$(jq -r '.actor // "operator"' "${marker}" 2>/dev/null || echo "operator")
+        if [[ "${src}" != "portal" || -z "${req_id}" || -z "${phase}" ]]; then
+            log_warn "Revise marker failed validation (source='${src}', id='${req_id}', phase='${phase}'); rejecting: ${marker}"
+            mkdir -p "${rejected_dir}"; mv "${marker}" "${rejected_dir}/" 2>/dev/null || rm -f "${marker}"
+            continue
+        fi
+        # Defense-in-depth: the phase becomes a filename component below.
+        if [[ ! "${phase}" =~ ^[a-z][a-z0-9_-]{0,63}$ ]]; then
+            log_warn "Revise marker phase '${phase}' is malformed; rejecting: ${marker}"
+            mkdir -p "${rejected_dir}"; mv "${marker}" "${rejected_dir}/" 2>/dev/null || rm -f "${marker}"
+            continue
+        fi
+
+        # 2. Locate the canonical state.json in an allowlisted repo.
+        local repo state_file found_repo=""
+        while IFS= read -r repo; do
+            [[ -z "${repo}" ]] && continue
+            state_file="${repo}/.autonomous-dev/requests/${req_id}/state.json"
+            if [[ -f "${state_file}" ]]; then
+                found_repo="${repo}"
+                break
+            fi
+        done <<< "${repos}"
+
+        if [[ -z "${found_repo}" ]]; then
+            # The request isn't in any allowlisted repo (yet?). Leave the
+            # marker for a later poll rather than rejecting — the request may
+            # be created shortly. (reconcile cadence bounds the retry.)
+            log_info "consume_revise_markers: no state.json for ${req_id} yet; leaving marker"
+            continue
+        fi
+        state_file="${found_repo}/.autonomous-dev/requests/${req_id}/state.json"
+
+        local s_status s_phase
+        s_status=$(jq -r '.status // ""' "${state_file}" 2>/dev/null || echo "")
+        s_phase=$(jq -r '.current_phase // ""' "${state_file}" 2>/dev/null || echo "")
+
+        # 3. Terminal requests can't be revised — archive as obsolete.
+        case "${s_status}" in
+            done|cancelled|failed)
+                log_info "consume_revise_markers: ${req_id} is terminal (${s_status}); discarding revise marker"
+                mkdir -p "${applied_dir}"; mv "${marker}" "${applied_dir}/" 2>/dev/null || rm -f "${marker}"
+                continue
+                ;;
+        esac
+
+        # 4. Don't yank a phase out from under a live agent: if the request is
+        #    actively running a DIFFERENT phase, defer until it settles.
+        if [[ "${s_status}" == "running" && -n "${s_phase}" && "${s_phase}" != "${phase}" ]]; then
+            log_info "consume_revise_markers: ${req_id} running ${s_phase}; deferring revise to ${phase}"
+            continue
+        fi
+
+        # 5. Require the feedback artifact (nothing to inject otherwise).
+        local feedback_file="${found_repo}/.autonomous-dev/requests/${req_id}/artifact-feedback/${phase}.json"
+        if [[ ! -f "${feedback_file}" ]]; then
+            log_warn "consume_revise_markers: feedback artifact missing for ${req_id} ${phase}; rejecting marker"
+            mkdir -p "${rejected_dir}"; mv "${marker}" "${rejected_dir}/" 2>/dev/null || rm -f "${marker}"
+            continue
+        fi
+
+        # 6. Reset current_phase to the author phase + status=running (mirrors
+        #    the *_review-fail loopback). The supervisor re-dispatches it next
+        #    selection; resolve_phase_prompt injects the feedback.
+        local ts
+        ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        local tmp="${state_file}.tmp.$$"
+        if jq --arg phase "${phase}" --arg ts "${ts}" \
+              '.current_phase = $phase | .status = "running" | .updated_at = $ts' \
+              "${state_file}" > "${tmp}" 2>/dev/null && mv "${tmp}" "${state_file}"; then
+            sync_intake_db_row "${req_id}" "${phase}" "running" "${ts}" 2>/dev/null || true
+            write_portal_request_action "${req_id}" "${found_repo}" 2>/dev/null || true
+            log_info "Applied operator revise for ${req_id} by '${actor}': reset to author phase ${phase}"
+            mkdir -p "${applied_dir}"; mv "${marker}" "${applied_dir}/" 2>/dev/null || rm -f "${marker}"
+        else
+            rm -f "${tmp}" 2>/dev/null || true
+            log_warn "consume_revise_markers: failed to reset ${req_id} to ${phase}; leaving marker for retry"
+        fi
+    done
+    return 0
+}
+
 # reconcile_orphans() -> void
 #   Reconcile orphan SQLite rows and state.json files per SPEC-039-1-04.
 #   Runs at startup and every RECONCILE_EVERY_N_POLLS iterations.
@@ -3944,6 +4088,10 @@ main_loop() {
 
         # Apply any portal-originated config-change markers (PRD-025 FR-025-05).
         consume_config_changes || log_error "Config-change consumption failed"
+
+        # #500 — apply any portal-originated artifact-revise markers (reset the
+        # author phase so the supervisor re-runs it with operator feedback).
+        consume_revise_markers || log_error "Revise-marker consumption failed"
 
         # Marketplace auto-update.
         if [[ $(( POLL_COUNT % UPGRADE_CHECK_EVERY_N_POLLS )) -eq 1 ]]; then

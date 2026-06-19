@@ -698,3 +698,182 @@ a.rd-artifact-row:focus-visible {
         grid-column: 1 / -1;
     }
 }
+
+/* ============================================================
+   #500 — Operator comment panel (inline + doc-level) on artifacts
+   ============================================================ */
+
+/* Lazy-load mount inside the artifact pane (HTMX fills it on load). */
+.rd-comment-mount {
+    margin-top: var(--pad-section);
+}
+
+.rd-comment-loading {
+    font-size: var(--t-meta);
+    padding: var(--s-3) 0;
+}
+
+/* The panel card itself (swap target #rd-comment-panel). */
+.rd-comments {
+    margin-top: var(--pad-section);
+}
+
+.rd-comments-count {
+    font-size: var(--t-meta);
+}
+
+.rd-comments-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+}
+
+.rd-comments-empty {
+    font-size: var(--t-meta);
+    line-height: 1.5;
+}
+
+/* The list of existing comments. */
+.rd-comment-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+}
+
+.rd-comment {
+    border: 1px solid var(--line-1);
+    border-left-width: 3px;
+    border-radius: var(--r-2);
+    padding: var(--s-3) var(--s-4);
+    background: var(--bg-1);
+}
+
+.rd-comment-resolved {
+    opacity: 0.6;
+}
+
+.rd-comment-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--s-2);
+}
+
+.rd-comment-kind {
+    text-transform: uppercase;
+    font-size: var(--t-micro, var(--t-meta));
+}
+
+.rd-comment-author {
+    font-size: var(--t-meta);
+    color: var(--fg-1);
+}
+
+.rd-comment-time {
+    font-size: var(--t-meta);
+}
+
+.rd-comment-status {
+    margin-left: auto;
+}
+
+/* Quoted anchored passage (also reused for the live selection preview). */
+.rd-comment-quote {
+    margin: 0 0 var(--s-2) 0;
+    padding: var(--s-2) var(--s-3);
+    border-left: 2px solid var(--brand);
+    background: var(--bg-2);
+    color: var(--fg-2);
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.rd-comment-selected-preview:empty {
+    display: none;
+}
+
+.rd-comment-body {
+    margin: 0;
+    color: var(--fg-1);
+    font-size: var(--t-body, var(--t-meta));
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.rd-comment-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--s-2);
+}
+
+/* Add-comment forms (inline + doc-level). */
+.rd-comment-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-2);
+    background: var(--bg-1);
+}
+
+.rd-comment-inline-form {
+    border-left: 3px solid var(--brand);
+}
+
+.rd-comment-doc-form {
+    border-left: 3px solid var(--line-1);
+}
+
+/* Hidden CSRF mirror inputs carry no layout. */
+.rd-comment-csrf {
+    display: none;
+}
+
+.rd-comment-label {
+    font-size: var(--t-meta);
+    color: var(--fg-2);
+    font-weight: 600;
+}
+
+.rd-comment-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 48px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-thin);
+    border-radius: 3px;
+    color: var(--fg-1);
+    font-family: var(--font-mono);
+    font-size: var(--t-meta);
+    padding: var(--s-2);
+    resize: vertical;
+}
+
+.rd-comment-form-actions {
+    display: flex;
+    gap: var(--s-2);
+}
+
+/* Revise hand-off. */
+.rd-comment-revise {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    padding-top: var(--s-3);
+    border-top: 1px solid var(--line-1);
+}
+
+.rd-revise-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.rd-revise-note {
+    font-size: var(--t-meta);
+    line-height: 1.4;
+}

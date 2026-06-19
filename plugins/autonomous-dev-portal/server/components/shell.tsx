@@ -353,6 +353,15 @@ export const ShellLayout: FC<ShellProps> = ({
                     defer
                     nonce={nonce}
                 ></script>
+                {/* #500 — Request Detail inline-comment selection helper:
+                    select text in the rendered doc → reveal + fill the inline
+                    comment form. Delegated, additive (doc-level/resolve/revise
+                    are plain HTMX); fails open if it does not load. */}
+                <script
+                    src={asset("/static/js/rd-artifact-comments.js")}
+                    defer
+                    nonce={nonce}
+                ></script>
             </head>
             <body>
                 <div class="app">

@@ -49,6 +49,7 @@ import {
 } from "./wiring/daemon-readers";
 import { buildGateAndRequestDeps } from "./wiring/gate-store";
 import { writeOverrideToDisk } from "./wiring/override-store";
+import { defaultArtifactCommentStore } from "./routes/artifact-comments";
 import { buildFileWebhookDispatcher } from "./wiring/notification-dispatcher";
 import { FileSettingsStore } from "./wiring/settings-store";
 import { portalAuditPath } from "./wiring/state-paths";
@@ -235,6 +236,15 @@ export async function startServer(): Promise<Server<unknown>> {
         // PLAN-042 Phase D — operator verification-override route.
         overrideAction: {
             writeOverride: writeOverrideToDisk,
+            audit,
+            logger: log,
+        },
+        // #500 — operator artifact-comment routes (capture + persist +
+        // revise hand-off). Filesystem-backed stores under the request's
+        // state dir; the revise action writes a daemon-consumed feedback
+        // artifact + marker (see wiring/artifact-revise-store.ts).
+        artifactComments: {
+            ...defaultArtifactCommentStore(),
             audit,
             logger: log,
         },

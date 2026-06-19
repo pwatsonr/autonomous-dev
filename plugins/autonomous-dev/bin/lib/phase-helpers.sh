@@ -310,5 +310,41 @@ When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\
         base_prompt="${base_prompt}${code_instructions}"
     fi
 
+    # #500 — operator artifact-comment feedback injection.
+    #
+    # When the operator leaves comments on this phase's rendered artifact in
+    # the portal and clicks "revise", the portal writes a feedback artifact to
+    #   ${project}/.autonomous-dev/requests/${request_id}/artifact-feedback/${phase}.json
+    # AND a revise marker the daemon's consume_revise_markers() acts on by
+    # resetting current_phase back to this (author) phase — the same loopback
+    # the daemon uses when a *_review phase fails. On that re-run we inject the
+    # operator's feedback here so the author addresses it (the review-gate
+    # author re-run reads phase_history; the operator path is explicit).
+    #
+    # Read with jq when available (the daemon environment always has it); fall
+    # back to skipping injection if jq is missing or the file is absent/corrupt
+    # (fail open — never block a re-run because feedback couldn't be read).
+    local feedback_file="${project}/.autonomous-dev/requests/${request_id}/artifact-feedback/${phase}.json"
+    if [[ -f "${feedback_file}" ]] && command -v jq >/dev/null 2>&1; then
+        local operator_feedback
+        operator_feedback=$(jq -r '.feedback // empty' "${feedback_file}" 2>/dev/null || echo "")
+        if [[ -n "${operator_feedback}" ]]; then
+            base_prompt="${base_prompt}
+
+═══════════════════════════════════════════════════════════════
+**OPERATOR REVISION REQUEST — ADDRESS THESE COMMENTS**
+
+A human operator reviewed your previous '${phase}' artifact and asked for
+revisions. You MUST address every comment below in this revision, then
+re-emit \`phase-result-${phase}.json\` as usual.
+
+${operator_feedback}
+═══════════════════════════════════════════════════════════════"
+            if declare -F log_info >/dev/null 2>&1; then
+                log_info "Injected operator artifact-comment feedback for ${request_id} phase ${phase}"
+            fi
+        fi
+    fi
+
     echo "${base_prompt}"
 }
