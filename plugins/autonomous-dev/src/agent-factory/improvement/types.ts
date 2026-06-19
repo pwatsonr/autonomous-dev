@@ -7,6 +7,9 @@
  * and rate limit tracking.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 import type {
   AggregateMetrics,
   InvocationMetric,
@@ -15,6 +18,44 @@ import type {
   DomainStats,
 } from '../metrics/types';
 import type { QualityDimension } from '../types';
+
+// ---------------------------------------------------------------------------
+// Optional better-sqlite3 import (same pattern as proposal-store / sqlite-store)
+// ---------------------------------------------------------------------------
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Database = any;
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+let BetterSqlite3: ((...args: unknown[]) => Database) | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  BetterSqlite3 = require('better-sqlite3');
+} catch {
+  // Module not available; SQLite operations are skipped.
+}
+
+/**
+ * SQLite index table for weakness reports. Mirrors the `proposals` table in
+ * proposal-store.ts: metadata only (full reports live in the JSONL primary
+ * store). Shares the `data/agent-metrics.db` database file with metrics and
+ * proposals.
+ */
+const CREATE_WEAKNESS_REPORTS_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS weakness_reports (
+  report_id TEXT PRIMARY KEY,
+  agent_name TEXT NOT NULL,
+  agent_version TEXT NOT NULL,
+  analysis_date TEXT NOT NULL,
+  overall_assessment TEXT NOT NULL,
+  recommendation TEXT NOT NULL,
+  weakness_count INTEGER NOT NULL,
+  strength_count INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_weakness_reports_agent ON weakness_reports(agent_name);
+CREATE INDEX IF NOT EXISTS idx_weakness_reports_date ON weakness_reports(analysis_date);
+CREATE INDEX IF NOT EXISTS idx_weakness_reports_assessment ON weakness_reports(overall_assessment);
+`;
 
 // ---------------------------------------------------------------------------
 // Weakness Report types (SPEC-005-3-1)
@@ -62,11 +103,8 @@ export interface WeaknessReport {
 
 /**
  * Logger contract consumed by WeaknessReportStore. Kept separate from the
- * broader runtime logger so the store can be exercised in isolation.
- *
- * NOTE: This interface and the WeaknessReportStore stub below are placeholders
- * carried forward from PRD-016 (SKIP-WITH-NOTE). The full implementation is
- * pending; the stub exists only so importers/typechecking succeed.
+ * broader runtime logger so the store can be exercised in isolation. All
+ * methods are optional; callers may pass a partial logger.
  */
 export interface ReportStoreLogger {
   info?(msg: string, ctx?: Record<string, unknown>): void;
@@ -75,24 +113,212 @@ export interface ReportStoreLogger {
 }
 
 /**
- * Stub for the persistence-layer class introduced in PRD-016. The real
- * implementation reads/writes JSONL files; this stub exists so the rest of
- * the type system compiles. Tests that exercise behavior are marked SKIP.
+ * Weakness Report Store with JSONL persistence and SQLite indexing
+ * (SPEC-005-3-1, Task 2).
+ *
+ * Dual storage (same pattern as ProposalStore / metrics):
+ *   - JSONL primary: full `WeaknessReport` per line (source of truth).
+ *   - SQLite secondary: `weakness_reports` index table in the sibling
+ *     `agent-metrics.db` (metadata for querying; reports themselves stay
+ *     in JSONL only). The SQLite index is best-effort: when better-sqlite3
+ *     is unavailable or initialization fails, the store still functions
+ *     fully against JSONL.
+ *
+ * The constructor takes only the JSONL path (plus an optional logger) to
+ * match the call sites in the analyzer and tests; the SQLite database path
+ * is derived as `agent-metrics.db` alongside the JSONL file, matching the
+ * shared-database convention used by ProposalStore and the metrics layer.
  */
 export class WeaknessReportStore {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  constructor(private readonly _filePath: string, private readonly _logger?: ReportStoreLogger) {}
+  private readonly jsonlPath: string;
+  private readonly logger?: ReportStoreLogger;
+  private db: Database | null = null;
 
-  /** Append a new report. Stub — real impl pending PRD-016. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async append(_report: WeaknessReport): Promise<void> {
-    throw new Error('WeaknessReportStore.append: stub (PRD-016 SKIP)');
+  /**
+   * @param filePath Path to the weakness-reports JSONL file.
+   * @param logger   Optional logger for non-fatal warnings.
+   */
+  constructor(filePath: string, logger?: ReportStoreLogger) {
+    this.jsonlPath = path.resolve(filePath);
+    this.logger = logger;
+
+    // Initialize SQLite if available. Derive the DB path from the JSONL
+    // directory so the index lives alongside the other agent-factory stores
+    // (data/agent-metrics.db in production).
+    if (BetterSqlite3) {
+      try {
+        const dir = path.dirname(this.jsonlPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        const sqliteDbPath = path.join(dir, 'agent-metrics.db');
+        this.db = new (BetterSqlite3 as any)(sqliteDbPath);
+        this.db.pragma('journal_mode = WAL');
+        this.db.exec(CREATE_WEAKNESS_REPORTS_TABLE_SQL);
+      } catch (err) {
+        // The optional SQLite index failed to initialize; disable it and
+        // operate fully against the JSONL primary store (no data loss — JSONL
+        // is the source of truth). Under the Bun runtime better-sqlite3 is a
+        // known-unsupported native module that throws on construction (the
+        // daemon's `agent` CLI itself runs under `bun run`), so a warning there
+        // would be pure noise and would fire on every construction. Under Node,
+        // an init failure is a real, actionable signal (permissions, disk-full,
+        // a corrupt db), so surface it.
+        this.db = null;
+        const isBun = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined';
+        if (!isBun) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger?.warn?.(
+            `Failed to initialize SQLite index for weakness reports: ${message}`,
+          );
+        }
+      }
+    }
   }
 
-  /** Return previously stored reports. Stub — real impl pending PRD-016. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getReports(_agentName?: string): WeaknessReport[] {
-    return [];
+  // -----------------------------------------------------------------------
+  // Create
+  // -----------------------------------------------------------------------
+
+  /**
+   * Append a new report to both JSONL and the SQLite index.
+   *
+   * The full `WeaknessReport` is written to JSONL; only metadata is written
+   * to SQLite. Synchronous: the JSONL line is flushed before returning so
+   * callers can read it back immediately.
+   */
+  append(report: WeaknessReport): void {
+    // JSONL: append full report (primary store).
+    this.appendToJsonl(report);
+
+    // SQLite: insert metadata (secondary index, best-effort).
+    if (this.db) {
+      try {
+        this.db.prepare(`
+          INSERT INTO weakness_reports (
+            report_id, agent_name, agent_version, analysis_date,
+            overall_assessment, recommendation, weakness_count, strength_count
+          ) VALUES (
+            @report_id, @agent_name, @agent_version, @analysis_date,
+            @overall_assessment, @recommendation, @weakness_count, @strength_count
+          )
+        `).run({
+          report_id: report.report_id,
+          agent_name: report.agent_name,
+          agent_version: report.agent_version,
+          analysis_date: report.analysis_date,
+          overall_assessment: report.overall_assessment,
+          recommendation: report.recommendation,
+          weakness_count: report.weaknesses.length,
+          strength_count: report.strengths.length,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger?.warn?.(`Failed to insert weakness report into SQLite: ${message}`);
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Read
+  // -----------------------------------------------------------------------
+
+  /**
+   * Return stored reports, optionally filtered by agent name.
+   *
+   * Reads from the JSONL primary store (full reports). Malformed lines are
+   * skipped with a warning.
+   */
+  getReports(agentName?: string): WeaknessReport[] {
+    const reports = this.readAllFromJsonl();
+    if (agentName === undefined) {
+      return reports;
+    }
+    return reports.filter((r) => r.agent_name === agentName);
+  }
+
+  /**
+   * Retrieve a single report by its ID, or null if not found.
+   *
+   * Satisfies the `IWeaknessReportStore` contract consumed by the validation
+   * orchestrator.
+   */
+  getById(reportId: string): WeaknessReport | null {
+    const reports = this.readAllFromJsonl();
+    return reports.find((r) => r.report_id === reportId) ?? null;
+  }
+
+  // -----------------------------------------------------------------------
+  // Lifecycle
+  // -----------------------------------------------------------------------
+
+  /**
+   * Close the SQLite database connection if open.
+   */
+  close(): void {
+    if (this.db) {
+      try {
+        this.db.close();
+      } catch {
+        // Ignore close errors during shutdown.
+      }
+      this.db = null;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // JSONL helpers
+  // -----------------------------------------------------------------------
+
+  /**
+   * Append a single report to the JSONL file.
+   */
+  private appendToJsonl(report: WeaknessReport): void {
+    this.ensureJsonlDirectory();
+    const line = JSON.stringify(report) + '\n';
+    fs.appendFileSync(this.jsonlPath, line, { encoding: 'utf-8' });
+  }
+
+  /**
+   * Read all reports from the JSONL file.
+   *
+   * Returns an empty array when the file does not exist. Malformed lines are
+   * skipped (with a warning) so a single corrupt line cannot poison reads.
+   */
+  private readAllFromJsonl(): WeaknessReport[] {
+    if (!fs.existsSync(this.jsonlPath)) {
+      return [];
+    }
+
+    const content = fs.readFileSync(this.jsonlPath, 'utf-8');
+    const lines = content.split('\n');
+    const reports: WeaknessReport[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === '') continue;
+
+      try {
+        const parsed = JSON.parse(line) as WeaknessReport;
+        reports.push(parsed);
+      } catch {
+        this.logger?.warn?.(
+          `Skipping malformed line ${i + 1} in ${this.jsonlPath}: ${line.substring(0, 80)}...`,
+        );
+      }
+    }
+
+    return reports;
+  }
+
+  /**
+   * Ensure the parent directory for the JSONL file exists.
+   */
+  private ensureJsonlDirectory(): void {
+    const dir = path.dirname(this.jsonlPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
   }
 }
 
