@@ -33,6 +33,7 @@ let root: string;
 let repoPath: string;
 let cfgPath: string;
 let audit: AuditCapture;
+let appInstance: Hono;
 const prevState = process.env["AUTONOMOUS_DEV_STATE_DIR"];
 const prevCfg = process.env["AUTONOMOUS_DEV_USER_CONFIG"];
 
@@ -75,8 +76,7 @@ beforeEach(async () => {
     );
     const built = buildApp();
     audit = built.audit;
-    // attach for individual tests
-    (globalThis as Record<string, unknown>).__app = built.app;
+    appInstance = built.app;
 });
 
 afterEach(async () => {
@@ -88,7 +88,7 @@ afterEach(async () => {
 });
 
 function app(): Hono {
-    return (globalThis as Record<string, unknown>).__app as Hono;
+    return appInstance;
 }
 
 async function postForm(
