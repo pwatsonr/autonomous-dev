@@ -10,7 +10,7 @@
 // missing/corrupt files — degrades gracefully rather than throwing.
 
 import { readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, isAbsolute, resolve, sep } from "node:path";
 import { homedir } from "node:os";
 
 import type {
@@ -348,11 +348,15 @@ export async function readArtifactBody(
     artifact: RequestArtifactRef,
 ): Promise<string | null> {
     if (!artifact.readable || artifact.path === undefined) return null;
-    // Guard against path traversal: the recorded path must stay inside the
-    // repo. Reject absolute paths and any `..` segment.
-    const rel = artifact.path;
-    if (rel.startsWith("/") || rel.split(/[\\/]/).includes("..")) return null;
-    const full = join(repoPath, rel);
+    // The daemon records artifact paths as ABSOLUTE; older/relative paths are
+    // joined to the repo. Resolve the path (collapsing any `..`) and confirm it
+    // stays INSIDE the repo — that is the real traversal guard (#519). The old
+    // "reject any leading /" rule rejected every real (absolute) artifact, so
+    // nothing ever rendered in the portal.
+    const p = artifact.path;
+    const repoRoot = resolve(repoPath);
+    const full = isAbsolute(p) ? resolve(p) : resolve(repoRoot, p);
+    if (!full.startsWith(repoRoot + sep)) return null;
     try {
         const content = await readFile(full, "utf-8");
         return content.length > ARTIFACT_MAX_SIZE

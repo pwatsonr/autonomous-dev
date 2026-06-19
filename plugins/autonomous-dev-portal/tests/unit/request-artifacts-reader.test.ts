@@ -294,6 +294,33 @@ describe("request artifacts reader (#499/#501/#502)", () => {
         expect(artifact).toBeUndefined();
     });
 
+    // #519: the daemon records artifact paths as ABSOLUTE; the old guard
+    // rejected every leading-"/" path, so nothing ever rendered in prod.
+    test("#519: renders an artifact recorded with an ABSOLUTE path inside the repo", async () => {
+        await seedRichRequest();
+        const absPath = join(tmpRepo, "docs", "prd", "abs-req.md");
+        await writeFile(absPath, "# Absolute PRD\n\nRendered from an absolute path.");
+        await writePhaseResult("plan", {
+            status: "pass",
+            phase: "plan",
+            artifacts: [{ kind: "plan", path: absPath, title: "Abs plan" }],
+        });
+        const { artifact } = await loadArtifactForPhase(repoBasename, id, "plan");
+        expect(artifact).toBeDefined();
+        expect(artifact!.content).toContain("Rendered from an absolute path");
+    });
+
+    test("#519: rejects an ABSOLUTE artifact path OUTSIDE the repo (guard intact)", async () => {
+        await seedRichRequest();
+        await writePhaseResult("spec", {
+            status: "pass",
+            phase: "spec",
+            artifacts: [{ kind: "spec", path: "/etc/passwd", title: "evil-abs" }],
+        });
+        const { artifact } = await loadArtifactForPhase(repoBasename, id, "spec");
+        expect(artifact).toBeUndefined();
+    });
+
     test("no phase-result files → empty artifactList, no crash", async () => {
         // state.json with no phase-result envelopes on disk
         const dir = join(tmpRepo, ".autonomous-dev", "requests", id);
