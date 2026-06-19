@@ -301,6 +301,8 @@ export const RequestDetailView: FC<RenderProps["request-detail"]> = ({
                             agent={request.currentArtifact?.phase ?? ""}
                             dur=""
                             cost={fmt(request.cost)}
+                            repo={request.repo}
+                            requestId={request.id}
                         />
                     </div>
 

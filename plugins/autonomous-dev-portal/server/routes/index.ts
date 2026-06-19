@@ -70,6 +70,10 @@ import {
     buildOverrideRoutes,
     type OverrideRouteDeps,
 } from "./override";
+import {
+    buildArtifactCommentRoutes,
+    type ArtifactCommentDeps,
+} from "./artifact-comments";
 import { healthHandler } from "./health";
 import { buildKillSwitchRoutes } from "./kill-switch";
 import { logsHandler } from "./logs";
@@ -151,6 +155,13 @@ export interface RegisterRoutesOptions {
      * when omitted, that path returns 503 `override-disabled`.
      */
     overrideAction?: OverrideRouteDeps;
+    /**
+     * #500 — when present, mounts the operator artifact-comment routes
+     * (GET/POST .../artifact/:phase/comments[/resolve], POST
+     * .../artifact/:phase/revise); when omitted, each returns 503
+     * `artifact-comments-disabled`.
+     */
+    artifactComments?: ArtifactCommentDeps;
 }
 
 function disabledHandler(error: string) {
@@ -315,6 +326,32 @@ export function registerRoutes(
         app.post(
             "/repo/:repo/request/:id/override",
             disabledHandler("override-disabled"),
+        );
+    }
+
+    // -----------------------------------------------------------------
+    // #500 — operator artifact-comment routes (capture + persist + revise).
+    // Mounted before the GET page routes; the comment paths are deeper than
+    // the artifact-pane fragment path so there is no overlap.
+    // -----------------------------------------------------------------
+    if (options.artifactComments !== undefined) {
+        app.route("/", buildArtifactCommentRoutes(options.artifactComments));
+    } else {
+        app.get(
+            "/repo/:repo/request/:id/artifact/:phase/comments",
+            disabledHandler("artifact-comments-disabled"),
+        );
+        app.post(
+            "/repo/:repo/request/:id/artifact/:phase/comments",
+            disabledHandler("artifact-comments-disabled"),
+        );
+        app.post(
+            "/repo/:repo/request/:id/artifact/:phase/comments/resolve",
+            disabledHandler("artifact-comments-disabled"),
+        );
+        app.post(
+            "/repo/:repo/request/:id/artifact/:phase/revise",
+            disabledHandler("artifact-comments-disabled"),
         );
     }
 

@@ -47,7 +47,41 @@ interface Props {
     cost: string;
     /** Duration for the active (now) phase displayed as "running X". */
     activeLabel?: string;
+    /**
+     * #500 — repo slug + request id. When both are present AND the artifact
+     * is a readable Markdown doc, the pane appends a lazily-loaded operator
+     * comment panel (select-text → inline comment, doc-level box, revise).
+     * The panel HTML is fetched by HTMX on load from the comments endpoint
+     * so the pane renderer stays a pure function of the artifact.
+     */
+    repo?: string;
+    requestId?: string;
 }
+
+/**
+ * #500 — lazy-loaded comment panel mount. Renders an empty container that
+ * HTMX fills from the comments endpoint on load (hx-trigger="load"). Kept
+ * separate so the pane renderer does not need the comments or the CSRF token
+ * — both live on the full page already and the fragment fetch carries the
+ * global CSRF header via csrf-htmx.js.
+ *
+ * Only rendered for readable Markdown artifacts (the only thing worth
+ * commenting on inline); diff/text/pending panes omit it.
+ */
+const CommentPanelMount: FC<{ repo: string; requestId: string; phase: string }> = ({
+    repo,
+    requestId,
+    phase,
+}) => (
+    <div
+        class="rd-comment-mount"
+        hx-get={`/repo/${repo}/request/${requestId}/artifact/${phase}/comments`}
+        hx-trigger="load"
+        hx-swap="innerHTML"
+    >
+        <p class="dim rd-comment-loading">Loading comments…</p>
+    </div>
+);
 
 const PendingCard: FC<{ phase: string }> = ({ phase }) => (
     <div class="card" id="rd-artifact-pane">
@@ -92,8 +126,22 @@ export const RdV3ArtifactPane: FC<Props> = ({
     dur,
     cost,
     activeLabel,
+    repo,
+    requestId,
 }) => {
     const phaseLabel = phase.toUpperCase();
+
+    // #500 — the comment panel attaches to readable Markdown artifacts only,
+    // and only when the pane was given the repo + request id (the full page
+    // and the fragment endpoint both pass them; legacy callers that omit them
+    // simply get no comment panel — fail safe).
+    const showComments =
+        repo !== undefined &&
+        repo !== "" &&
+        requestId !== undefined &&
+        requestId !== "" &&
+        artifact !== undefined &&
+        artifact.format === "markdown";
 
     if (state === "pending") {
         return <PendingCard phase={phase} />;
@@ -186,6 +234,13 @@ export const RdV3ArtifactPane: FC<Props> = ({
                     )}
                 </div>
             </div>
+            {showComments ? (
+                <CommentPanelMount
+                    repo={repo!}
+                    requestId={requestId!}
+                    phase={phase}
+                />
+            ) : null}
         </div>
     );
 };
