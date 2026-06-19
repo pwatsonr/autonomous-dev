@@ -60,6 +60,9 @@ _envelope() {  # _envelope <evidence_json>
     [ "$(classify_command 'python hello.py')" = "unclassifiable" ]
     # python -m pip is not an idempotent runner
     [ "$(classify_command 'python3 -m pip install x')" = "unclassifiable" ]
+    # guard branches: bare `-m` (no module) and non-`-m` python invocations
+    [ "$(classify_command 'python3 -m')" = "unclassifiable" ]
+    [ "$(classify_command 'python3 --version')" = "unclassifiable" ]
 }
 
 # ─────────────────────────────────────────────────────────────────────
