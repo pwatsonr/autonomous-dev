@@ -293,7 +293,55 @@ When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\
         local default_branch
         default_branch="$(detect_default_branch "${project}")"
 
-        local code_instructions="
+        # Issue #501: if the daemon re-entered this request to address operator
+        # PR review comments, current_phase_metadata.pr_comment_feedback holds
+        # the new comments and pr_comment_url holds the existing PR. In that
+        # case the branch + PR ALREADY EXIST: the agent must check out the same
+        # branch, revise, and push (which updates the PR) — NOT open a new one.
+        local pr_comment_feedback="" pr_comment_url=""
+        if [[ -f "${state_file}" ]]; then
+            pr_comment_feedback=$(jq -r '.current_phase_metadata.pr_comment_feedback // ""' "${state_file}" 2>/dev/null || echo "")
+            pr_comment_url=$(jq -r '.current_phase_metadata.pr_comment_url // ""' "${state_file}" 2>/dev/null || echo "")
+        fi
+
+        local code_instructions
+        if [[ -n "${pr_comment_feedback}" ]]; then
+            # Revision pass driven by PR review comments.
+            code_instructions="
+
+## Address PR Review Comments (revision pass — issue #501)
+
+The operator left review comments on the EXISTING pull request for this
+request. Your job is to revise the code to address them and push the update.
+**Do NOT open a new PR and do NOT force-push.**
+
+Existing PR: ${pr_comment_url}
+
+Operator review comments to address:
+${pr_comment_feedback}
+
+Steps:
+1. Check out the EXISTING branch (do not create a new one):
+   git checkout 'autonomous/${request_id}'
+   (If it only exists on the remote: git fetch origin 'autonomous/${request_id}' && git checkout 'autonomous/${request_id}')
+
+2. Make the revisions that address each comment above. Use Conventional
+   Commits format (fix:, refactor:, etc.).
+
+3. Push to the SAME branch to update the existing PR (a normal fast-forward
+   push — never --force / --force-with-lease):
+   git push origin 'autonomous/${request_id}'
+
+4. Re-write phase-result-code.json. Keep the SAME github_pr artifact URL
+   (${pr_comment_url}) in artifacts[] with kind: 'github_pr' so the daemon
+   continues to track the same PR. In 'feedback', briefly note which comments
+   you addressed.
+
+If a comment is out of scope or you disagree, still write phase-result-code.json
+and explain your reasoning in 'feedback' rather than silently ignoring it."
+        else
+            # First code pass: create the branch + PR as before.
+            code_instructions="
 
 ## Branch and PR Instructions
 
@@ -306,6 +354,7 @@ When you finish, write \`${req_dir}/phase-result-${phase}.json\` = \`{ \"status\
    gh pr create --base ${default_branch} --head 'autonomous/${request_id}' --title <conventional-title> --body <summary>
 
 4. Write the resulting PR URL into phase-result-code.json artifacts[] with kind: 'github_pr'."
+        fi
 
         base_prompt="${base_prompt}${code_instructions}"
     fi
