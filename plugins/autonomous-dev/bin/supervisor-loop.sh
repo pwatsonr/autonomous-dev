@@ -2460,6 +2460,270 @@ SQL
 }
 
 ###############################################################################
+# Trust-Gated PR Merge (#487)
+###############################################################################
+
+# resolve_effective_trust(repo_path) -> echoes integer 0..3 (always exit 0)
+#   Resolves the effective trust level for a repository from CONFIG_FILE
+#   (~/.claude/autonomous-dev.json), mirroring the precedence of the TS
+#   resolver in src/trust/trust-resolver.ts but using the live config schema
+#   exercised by consume_config_changes (#507):
+#
+#     1. trust.per_repo_overrides[<repo_path>]   (per-repo override)
+#     2. trust.system_default_level              (system default)
+#     3. 0                                        (hardcoded fallback)
+#
+#   The per-repo value may be either a bare integer (e.g. 3) or an object with
+#   a `default_level` field (the shape the TS RepositoryTrustConfig uses); both
+#   are accepted. Any value outside 0..3, a missing config, or unparseable JSON
+#   falls through to the next tier and ultimately to 0.
+#
+#   This is replicated in bash (no `node` shell-out) because the daemon loop is
+#   bash and runs this on the hot path. The fallback is 0 — the most restrictive
+#   level — so that a missing/corrupt config NEVER yields auto-merge authority.
+#
+#   Pure read; never mutates config or state.
+resolve_effective_trust() {
+    local repo_path="${1:-}"
+
+    # Validate an integer is in 0..3; echo it and succeed, else fail.
+    _trust_is_valid_level() {
+        local v="$1"
+        [[ "$v" =~ ^[0-3]$ ]]
+    }
+
+    # No config file -> conservative fallback.
+    if [[ -z "${CONFIG_FILE:-}" || ! -f "${CONFIG_FILE}" ]]; then
+        echo "0"
+        return 0
+    fi
+
+    # Tier 1: per-repo override. Accept either a bare integer or {default_level}.
+    # jq returns "null" when the key/path is absent or the file is unparseable
+    # (2>/dev/null + `// empty` collapse both to empty).
+    local per_repo
+    per_repo=$(jq -r --arg p "${repo_path}" '
+        (.trust.per_repo_overrides[$p]) as $o
+        | if   ($o | type) == "number" then ($o | tostring)
+          elif ($o | type) == "object" and (($o.default_level | type) == "number")
+               then ($o.default_level | tostring)
+          else empty end
+        ' "${CONFIG_FILE}" 2>/dev/null || echo "")
+    if _trust_is_valid_level "${per_repo}"; then
+        echo "${per_repo}"
+        return 0
+    fi
+
+    # Tier 2: system default.
+    local sys_default
+    sys_default=$(jq -r '
+        (.trust.system_default_level) as $s
+        | if ($s | type) == "number" then ($s | tostring) else empty end
+        ' "${CONFIG_FILE}" 2>/dev/null || echo "")
+    if _trust_is_valid_level "${sys_default}"; then
+        echo "${sys_default}"
+        return 0
+    fi
+
+    # Tier 3: hardcoded conservative fallback.
+    echo "0"
+    return 0
+}
+
+# read_request_pr_url(project, request_id) -> echoes PR URL or empty (always 0)
+#   The PR URL is recorded by the `code` phase in phase-result-code.json's
+#   artifacts[] with kind == "github_pr" (.url preferred, else .path). The
+#   `integration` phase has no artifact of its own, so the merge gate reads the
+#   code phase's result. Returns the FIRST github_pr artifact's URL. Empty when
+#   the file is missing, has no such artifact, or is unparseable.
+read_request_pr_url() {
+    local project="$1" request_id="$2"
+    local result_code="${project}/.autonomous-dev/requests/${request_id}/phase-result-code.json"
+    [[ -f "${result_code}" ]] || { echo ""; return 0; }
+    jq -r '
+        ([.artifacts[]? | select((.kind // "") == "github_pr")]
+         | .[0] // {}) as $a
+        | ($a.url // $a.path // "")
+        ' "${result_code}" 2>/dev/null || echo ""
+}
+
+# maybe_merge_integration_pr(request_id, project, state_file, events_file, ts) -> 0
+#   Trust-gated merge decision, invoked from advance_phase() when the
+#   `integration` phase PASSES verification (#487). Records an audit line and a
+#   merge_decision event on EVERY path (merge, skip-below-L3, skip-not-mergeable,
+#   skip-already-merged, skip-no-pr) including the effective trust level + reason.
+#
+#   SAFETY (this auto-merges to the default branch — read carefully):
+#     * Only effective trust L3 (==3) may auto-merge. Any lower level leaves the
+#       PR OPEN and marks the request "PR ready for human merge".
+#     * A merge is attempted ONLY when `gh pr view` reports the PR is
+#       state==OPEN AND mergeable==MERGEABLE AND mergeStateStatus==CLEAN. Any
+#       other combination (CONFLICTING, BLOCKED by required checks/reviews,
+#       UNKNOWN, DRAFT, etc.) is skipped — the daemon never forces a merge.
+#     * Idempotent: an already-MERGED (or non-OPEN) PR is never re-merged.
+#     * `gh pr merge --squash` only. NEVER --admin / --force — branch protection
+#       is respected. If protection blocks the merge, gh fails and we record the
+#       failure rather than bypassing it.
+#
+#   This function never aborts advance_phase: it returns 0 on every path. A
+#   merge that fails the `gh` call is logged as an error and the PR is left open
+#   (the request still reaches `done`); it is never retried with elevated flags.
+#
+#   The actual git/gh work is delegated to `gh`; tests stub `gh` on PATH so this
+#   performs no real merges and never touches GitHub.
+maybe_merge_integration_pr() {
+    local request_id="$1" project="$2" state_file="$3" events_file="$4" ts="$5"
+
+    local trust
+    trust=$(resolve_effective_trust "${project}")
+
+    local pr_url
+    pr_url=$(read_request_pr_url "${project}" "${request_id}")
+
+    # _record_merge_decision(decision, reason, [merged_bool], [pr_url_override])
+    #   Writes a merge_decision event + an audit log line. merged defaults false.
+    _record_merge_decision() {
+        local decision="$1" reason="$2" merged="${3:-false}" url="${4:-${pr_url}}"
+        local ev
+        ev=$(jq -n \
+            --arg ts "${ts}" \
+            --arg req "${request_id}" \
+            --arg decision "${decision}" \
+            --arg reason "${reason}" \
+            --argjson trust "${trust}" \
+            --argjson merged "${merged}" \
+            --arg url "${url}" \
+            '{
+                event: "merge_decision",
+                timestamp: $ts,
+                request_id: $req,
+                decision: $decision,
+                reason: $reason,
+                effective_trust: $trust,
+                merged: $merged,
+                pr_url: $url
+            }')
+        echo "${ev}" >> "${events_file}"
+        log_info "merge_decision ${request_id}: decision=${decision} trust=${trust} merged=${merged} reason='${reason}' pr='${url}'"
+    }
+
+    # _mark_pr_ready_for_human()
+    #   Idempotently stamp state.json so the operator knows a merge is pending
+    #   human action. Used for every non-merge terminal-ish outcome that left an
+    #   OPEN PR behind.
+    _mark_pr_ready_for_human() {
+        local reason="$1"
+        local tmp="${state_file}.merge.$$"
+        if jq --arg reason "${reason}" \
+              --arg url "${pr_url}" \
+              --argjson trust "${trust}" \
+              --arg ts "${ts}" \
+              '.status_reason = $reason |
+               .merge_status = "pr_ready_for_human" |
+               .pr_ready_for_human = true |
+               .pr_url = $url |
+               .effective_trust = $trust |
+               .updated_at = $ts' \
+              "${state_file}" > "${tmp}" 2>/dev/null; then
+            mv "${tmp}" "${state_file}"
+        else
+            rm -f "${tmp}" 2>/dev/null || true
+            log_warn "maybe_merge_integration_pr: failed to mark ${request_id} PR-ready"
+        fi
+    }
+
+    # No PR URL recorded -> nothing to merge. Not a failure (the change may not
+    # have produced a PR), but record it so the trail is complete.
+    if [[ -z "${pr_url}" ]]; then
+        _record_merge_decision "skip_no_pr" "no github_pr artifact in phase-result-code.json"
+        return 0
+    fi
+
+    # Below L3: human gate. Leave the PR OPEN, mark it ready for a human merge.
+    if [[ "${trust}" != "3" ]]; then
+        _mark_pr_ready_for_human "PR ready for human merge (trust L${trust} < L3; auto-merge disabled)"
+        _record_merge_decision "skip_below_l3" "effective trust L${trust} < L3; PR left open for human merge"
+        return 0
+    fi
+
+    # ---- L3 path: auto-merge, but only if genuinely mergeable. ----
+
+    # gh must be available; if not, do NOT merge — leave the PR for a human.
+    if ! command -v gh >/dev/null 2>&1; then
+        _mark_pr_ready_for_human "PR ready for human merge (gh CLI unavailable; auto-merge skipped)"
+        _record_merge_decision "skip_no_gh" "gh CLI not found; cannot verify/merge — left open"
+        return 0
+    fi
+
+    # Read PR status. Run inside the project dir so gh resolves the repo, and
+    # </dev/null so gh never blocks on a prompt. Failure here = do not merge.
+    local pr_json
+    pr_json=$( (cd "${project}" 2>/dev/null && gh pr view "${pr_url}" \
+                  --json state,mergeable,mergeStateStatus < /dev/null 2>/dev/null) || echo "")
+    if [[ -z "${pr_json}" ]] || ! echo "${pr_json}" | jq empty 2>/dev/null; then
+        _mark_pr_ready_for_human "PR ready for human merge (could not read PR status; auto-merge skipped)"
+        _record_merge_decision "skip_status_unreadable" "gh pr view returned no/invalid JSON — left open"
+        return 0
+    fi
+
+    local pr_state pr_mergeable pr_mergestate
+    pr_state=$(echo "${pr_json}" | jq -r '.state // ""' 2>/dev/null || echo "")
+    pr_mergeable=$(echo "${pr_json}" | jq -r '.mergeable // ""' 2>/dev/null || echo "")
+    pr_mergestate=$(echo "${pr_json}" | jq -r '.mergeStateStatus // ""' 2>/dev/null || echo "")
+
+    # Idempotency: an already-merged (or otherwise closed) PR is terminal. Do
+    # not attempt a merge; record success-shaped skip.
+    if [[ "${pr_state}" == "MERGED" ]]; then
+        local tmp="${state_file}.merge.$$"
+        jq --arg url "${pr_url}" --argjson trust "${trust}" --arg ts "${ts}" \
+           '.merge_status = "merged" | .pr_url = $url | .effective_trust = $trust | .updated_at = $ts' \
+           "${state_file}" > "${tmp}" 2>/dev/null && mv "${tmp}" "${state_file}" || rm -f "${tmp}" 2>/dev/null || true
+        _record_merge_decision "skip_already_merged" "PR already MERGED; idempotent no-op" "true"
+        return 0
+    fi
+    if [[ "${pr_state}" != "OPEN" ]]; then
+        _mark_pr_ready_for_human "PR ready for human merge (PR state=${pr_state}; auto-merge skipped)"
+        _record_merge_decision "skip_not_open" "PR state=${pr_state} (not OPEN); left as-is"
+        return 0
+    fi
+
+    # The hard safety gate: only MERGEABLE + CLEAN. Anything else (CONFLICTING,
+    # BLOCKED, UNKNOWN, DIRTY, DRAFT, BEHIND, ...) is left for a human.
+    if [[ "${pr_mergeable}" != "MERGEABLE" || "${pr_mergestate}" != "CLEAN" ]]; then
+        _mark_pr_ready_for_human "PR ready for human merge (not mergeable: mergeable=${pr_mergeable}, mergeStateStatus=${pr_mergestate})"
+        _record_merge_decision "skip_not_mergeable" "mergeable=${pr_mergeable} mergeStateStatus=${pr_mergestate} (need MERGEABLE+CLEAN)"
+        return 0
+    fi
+
+    # All checks passed. Squash-merge WITHOUT --admin/--force (branch protection
+    # is respected). On failure, leave the PR open and record an error — never
+    # retry with elevated privileges.
+    local merge_out merge_rc=0
+    merge_out=$( (cd "${project}" 2>/dev/null && gh pr merge "${pr_url}" --squash < /dev/null 2>&1) ) || merge_rc=$?
+    if [[ ${merge_rc} -eq 0 ]]; then
+        local tmp="${state_file}.merge.$$"
+        if jq --arg url "${pr_url}" --argjson trust "${trust}" --arg ts "${ts}" \
+              '.merge_status = "merged" |
+               .pr_ready_for_human = false |
+               .status_reason = "PR auto-merged (trust L3)" |
+               .pr_url = $url |
+               .effective_trust = $trust |
+               .updated_at = $ts' \
+              "${state_file}" > "${tmp}" 2>/dev/null; then
+            mv "${tmp}" "${state_file}"
+        else
+            rm -f "${tmp}" 2>/dev/null || true
+        fi
+        _record_merge_decision "merged" "auto-merged at trust L3 (--squash, no --admin); PR was OPEN+MERGEABLE+CLEAN" "true"
+    else
+        _mark_pr_ready_for_human "PR ready for human merge (auto-merge failed rc=${merge_rc}; branch protection respected)"
+        _record_merge_decision "merge_failed" "gh pr merge --squash failed rc=${merge_rc}: ${merge_out}"
+        log_error "maybe_merge_integration_pr: gh pr merge failed for ${request_id} (${pr_url}) rc=${merge_rc}: ${merge_out}"
+    fi
+    return 0
+}
+
+###############################################################################
 # Phase Advancement (SPEC-039-2-05)
 ###############################################################################
 
@@ -2584,6 +2848,17 @@ advance_phase() {
                '.current_phase = $phase' \
                "$state_file" > "$tmp_restore"
             mv "$tmp_restore" "$state_file"
+
+            # #487: trust-gated PR merge. When the `integration` phase passes
+            # verification, decide whether to auto-merge the PR based on the
+            # repo's effective trust level. L3 auto-merges a genuinely-mergeable
+            # PR; below L3 leaves it OPEN and marks the request "PR ready for
+            # human merge". This runs BEFORE the phase transition so the merge
+            # decision's state fields are recorded alongside the advance; the
+            # gate never aborts advancement (always returns 0).
+            if [[ "$current_phase" == "integration" ]]; then
+                maybe_merge_integration_pr "$request_id" "$project" "$state_file" "$events_file" "$ts" || true
+            fi
 
             # Determine next phase
             local next_phase
