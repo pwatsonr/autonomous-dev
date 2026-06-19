@@ -74,6 +74,16 @@ CONSECUTIVE_CRASHES=0
 CIRCUIT_BREAKER_TRIPPED=false
 POLL_COUNT=0
 RECONCILE_EVERY_N_POLLS=${RECONCILE_EVERY_N_POLLS:-60}
+# Issue #501: bound on how many times a single request may be re-entered into
+# the code phase to address operator PR review comments. A hard ceiling that
+# prevents a comment-driven feedback loop from re-running the code phase
+# indefinitely (e.g. an operator who keeps commenting, or an agent whose push
+# itself generates review events). Overridable via daemon.max_pr_comment_reentries.
+MAX_PR_COMMENT_REENTRIES=${MAX_PR_COMMENT_REENTRIES:-3}
+# Issue #501: how often (in poll iterations) to scan terminal/awaiting-human
+# requests for new PR review comments. Mirrors RECONCILE_EVERY_N_POLLS so the
+# extra `gh` calls stay infrequent and off the hot dispatch path.
+PR_COMMENT_SCAN_EVERY_N_POLLS=${PR_COMMENT_SCAN_EVERY_N_POLLS:-60}
 # Marketplace auto-update: detect newer cached versions and (Phase 2)
 # stage a self-upgrade when idle. See check_upgrade_available() and
 # stage_upgrade() for the mechanism.
@@ -746,6 +756,8 @@ load_config() {
     ERROR_BACKOFF_BASE=$(jq -r '.daemon.error_backoff_base_seconds // 30' "${EFFECTIVE_CONFIG}")
     ERROR_BACKOFF_MAX=$(jq -r '.daemon.error_backoff_max_seconds // 900' "${EFFECTIVE_CONFIG}")
     MAX_RETRIES_PER_PHASE=$(jq -r '.daemon.max_retries_per_phase // 3' "${EFFECTIVE_CONFIG}")
+    # Issue #501: bound on comment-driven code-phase re-entries (loop guard).
+    MAX_PR_COMMENT_REENTRIES=$(jq -r '.daemon.max_pr_comment_reentries // 3' "${EFFECTIVE_CONFIG}")
     LOG_MAX_SIZE_MB=$(jq -r '.daemon.log_max_size_mb // 50' "${EFFECTIVE_CONFIG}")
     LOG_RETENTION_DAYS=$(jq -r '.daemon.log_retention_days // 7' "${EFFECTIVE_CONFIG}")
     # Cost caps and concurrency live under `.governance` in config_defaults.json.
@@ -2732,6 +2744,343 @@ maybe_merge_integration_pr() {
 }
 
 ###############################################################################
+# PR Review-Comment Loopback (issue #501)
+#
+# When a request has produced a PR (github_pr artifact) and the operator leaves
+# review comments on it, the daemon re-enters that request into the `code` phase
+# so the author agent revises the change and pushes to the SAME branch (which
+# updates the existing PR — never a force-push, never a new PR).
+#
+# The trigger is intentionally SEPARATE from select_request(): a request that
+# reaches a terminal/awaiting-human state (status=done, or merge_status=
+# pr_ready_for_human) is normally skipped by select_request. reenter_pr_comment_
+# requests() scans exactly those requests, asks GitHub (via `gh`, stubbed in
+# tests) whether there are NEW unaddressed comments, and if so flips the request
+# back to running/code with the comments captured as feedback.
+#
+# SAFETY / LOOP BOUNDING (read before changing):
+#   * Never acts on a PR whose gh state != OPEN (MERGED / CLOSED are terminal).
+#   * Each re-entry increments a counter in pr-comment-seen.json; once it hits
+#     MAX_PR_COMMENT_REENTRIES the request is left alone (a stuck "pr_comment_
+#     loop_exhausted" marker is written so the trail is explicit). This bounds
+#     the loop even if comments keep arriving.
+#   * The IDs of the comments that drove a re-entry are recorded as "addressed"
+#     AT re-entry time, so the same comment can never re-trigger — only comments
+#     created AFTER the last re-entry count as new.
+#   * Re-uses the code-phase author/branch/push path verbatim (resolve_phase_
+#     prompt code instructions) — no new git operations are introduced here.
+###############################################################################
+
+# pr_comment_seen_file(project, request_id) -> echoes path (always 0)
+#   Per-request marker that tracks which review-comment IDs have already been
+#   routed to the agent and how many comment-driven re-entries have happened.
+pr_comment_seen_file() {
+    local project="$1" request_id="$2"
+    echo "${project}/.autonomous-dev/requests/${request_id}/pr-comment-seen.json"
+}
+
+# read_pr_comment_payload(project, request_id, pr_url) -> echoes JSON or empty
+#   Fetches the PR's state plus its review-thread comments and top-level
+#   (issue) comments via `gh`, normalizing them into:
+#     { "state": "OPEN|MERGED|CLOSED", "comments": [ {id, body, author, ts} ] }
+#   Runs `gh` inside the project dir with </dev/null so it never blocks on a
+#   prompt. Returns empty string on any failure (caller treats empty = skip).
+#
+#   `gh` is stubbed on PATH in tests — this performs no real network calls.
+read_pr_comment_payload() {
+    local project="$1" request_id="$2" pr_url="$3"
+
+    [[ -n "${pr_url}" ]] || { echo ""; return 0; }
+    command -v gh >/dev/null 2>&1 || { echo ""; return 0; }
+
+    # `gh pr view --json reviews,comments,state` returns:
+    #   .state                     -> OPEN|MERGED|CLOSED
+    #   .comments[]                -> top-level issue comments {id, body, author{login}, createdAt}
+    #   .reviews[]                 -> review submissions {id, body, author{login}, submittedAt}
+    # Review-thread (inline diff) comments are NOT in `gh pr view`; we fold in
+    # `gh api repos/{owner}/{repo}/pulls/{n}/comments` for those. Both are
+    # optional — a failure in either degrades to whatever we could read.
+    local view_json
+    view_json=$( (cd "${project}" 2>/dev/null && gh pr view "${pr_url}" \
+                    --json state,reviews,comments < /dev/null 2>/dev/null) || echo "")
+    if [[ -z "${view_json}" ]] || ! echo "${view_json}" | jq empty 2>/dev/null; then
+        echo ""
+        return 0
+    fi
+
+    local pr_state
+    pr_state=$(echo "${view_json}" | jq -r '.state // ""' 2>/dev/null || echo "")
+
+    # Inline review-thread comments (best-effort; empty on any failure).
+    local api_json
+    api_json=$( (cd "${project}" 2>/dev/null && gh api \
+                    "repos/{owner}/{repo}/pulls/comments" --paginate \
+                    < /dev/null 2>/dev/null) || echo "")
+    echo "${api_json}" | jq empty 2>/dev/null || api_json="[]"
+
+    # Normalize + merge both sources into a single comments[] array. Each entry
+    # carries a stable string id (prefixed by source so issue/review/thread ids
+    # can't collide), the body, the author login, and an ISO timestamp.
+    jq -n \
+        --arg state "${pr_state}" \
+        --argjson view "${view_json}" \
+        --argjson api "${api_json}" \
+        '
+        def norm_view_comments:
+            ([ ($view.comments // [])[]
+               | { id: ("issue:" + ((.id // .databaseId // "") | tostring)),
+                   body: (.body // ""),
+                   author: (.author.login // .user.login // ""),
+                   ts: (.createdAt // "") } ]);
+        def norm_reviews:
+            ([ ($view.reviews // [])[]
+               # Skip empty-body review submissions (e.g. a bare APPROVE) —
+               # they carry no actionable feedback.
+               | select((.body // "") != "")
+               | { id: ("review:" + ((.id // .databaseId // "") | tostring)),
+                   body: (.body // ""),
+                   author: (.author.login // .user.login // ""),
+                   ts: (.submittedAt // .createdAt // "") } ]);
+        def norm_thread:
+            ([ ($api // [])[]
+               | { id: ("thread:" + ((.id // .databaseId // "") | tostring)),
+                   body: (.body // ""),
+                   author: (.user.login // .author.login // ""),
+                   ts: (.created_at // .createdAt // "") } ]);
+        { state: $state,
+          comments: (norm_view_comments + norm_reviews + norm_thread) }
+        ' 2>/dev/null || echo ""
+}
+
+# pr_comment_new_ids(payload_json, seen_file) -> echoes newline-separated ids
+#   Given the normalized payload and the seen-marker file, returns the IDs of
+#   comments that have NOT yet been addressed. The seen file's .addressed_ids[]
+#   is the source of truth; anything not in it is new.
+pr_comment_new_ids() {
+    local payload_json="$1" seen_file="$2"
+    local seen_ids="[]"
+    if [[ -f "${seen_file}" ]]; then
+        seen_ids=$(jq -c '.addressed_ids // []' "${seen_file}" 2>/dev/null || echo "[]")
+    fi
+    echo "${payload_json}" | jq -r \
+        --argjson seen "${seen_ids}" \
+        '[ (.comments // [])[] | .id ] - $seen | .[]' 2>/dev/null || true
+}
+
+# reenter_pr_comment_requests() -> void
+#   Scans every allowlisted repo for requests sitting in a terminal/awaiting-
+#   human state that have an OPEN PR with NEW review comments, and re-enters
+#   them into the `code` phase with the comments captured as feedback. Runs on
+#   the reconcile cadence (every PR_COMMENT_SCAN_EVERY_N_POLLS polls), NOT on
+#   the hot dispatch path.
+#
+#   Never aborts the caller: every error path logs and continues.
+reenter_pr_comment_requests() {
+    # No gh -> cannot read comments at all; nothing to do.
+    command -v gh >/dev/null 2>&1 || return 0
+
+    local repos
+    repos=$(jq -r '.repositories.allowlist[]?' "${EFFECTIVE_CONFIG}" 2>/dev/null || echo "")
+    [[ -n "${repos}" ]] || return 0
+
+    while IFS= read -r repo; do
+        [[ -z "${repo}" || ! -d "${repo}" ]] && continue
+        local req_dir="${repo}/.autonomous-dev/requests"
+        [[ -d "${req_dir}" ]] || continue
+
+        for state_file in "${req_dir}"/*/state.json; do
+            [[ -f "${state_file}" ]] || continue
+            validate_state_file "${state_file}" || continue
+
+            local request_id status merge_status
+            request_id=$(jq -r '.id // ""' "${state_file}" 2>/dev/null || echo "")
+            status=$(jq -r '.status // ""' "${state_file}" 2>/dev/null || echo "")
+            merge_status=$(jq -r '.merge_status // ""' "${state_file}" 2>/dev/null || echo "")
+            [[ -n "${request_id}" ]] || continue
+
+            # Only consider requests the normal scheduler would NOT pick up and
+            # that left a PR behind: terminal `done`, or any state explicitly
+            # marked awaiting a human merge. An actively-running/gated request is
+            # left to the normal pipeline (avoids racing a live session).
+            local eligible="false"
+            if [[ "${status}" == "done" ]]; then
+                eligible="true"
+            elif [[ "${merge_status}" == "pr_ready_for_human" ]]; then
+                eligible="true"
+            fi
+            [[ "${eligible}" == "true" ]] || continue
+
+            maybe_reenter_for_pr_comments "${request_id}" "${repo}" "${state_file}" || true
+        done
+    done <<< "${repos}"
+}
+
+# maybe_reenter_for_pr_comments(request_id, project, state_file) -> void
+#   The per-request decision + action. Extracted from the scan loop so it is
+#   unit-testable in isolation. Reads the PR, computes new comments, enforces
+#   the re-entry bound, and (when warranted) flips the request to running/code
+#   with the comments captured as feedback.
+maybe_reenter_for_pr_comments() {
+    local request_id="$1" project="$2" state_file="$3"
+    local req_dir="${project}/.autonomous-dev/requests/${request_id}"
+    local events_file="${req_dir}/events.jsonl"
+    local seen_file
+    seen_file=$(pr_comment_seen_file "${project}" "${request_id}")
+
+    local pr_url
+    pr_url=$(read_request_pr_url "${project}" "${request_id}")
+    [[ -n "${pr_url}" ]] || return 0   # no PR -> nothing to address
+
+    # The pipeline must actually contain a `code` phase, or flipping to it would
+    # leave next_phase_for_state unable to find current_phase in the sequence
+    # (corrupting advancement). A request with a PR but no `code` phase in its
+    # phase_overrides (e.g. a doc-only artifact PR) is left for the operator.
+    local has_code_phase
+    has_code_phase=$(jq -r '(.phase_overrides // []) | index("code") // empty' "${state_file}" 2>/dev/null || echo "")
+    [[ -n "${has_code_phase}" ]] || return 0
+
+    local payload
+    payload=$(read_pr_comment_payload "${project}" "${request_id}" "${pr_url}")
+    # Empty payload = could not read PR (gh failed / no JSON). Skip silently;
+    # the next scan retries. Do NOT treat as "no comments".
+    [[ -n "${payload}" ]] || return 0
+
+    local pr_state
+    pr_state=$(echo "${payload}" | jq -r '.state // ""' 2>/dev/null || echo "")
+
+    # SAFETY: never act on a closed/merged PR. The change has landed (or been
+    # abandoned); re-running the code phase against it would be wrong.
+    if [[ "${pr_state}" != "OPEN" ]]; then
+        return 0
+    fi
+
+    # Which comments are new (not yet addressed)?
+    local -a new_ids=()
+    while IFS= read -r cid; do
+        [[ -n "${cid}" ]] && new_ids+=("${cid}")
+    done < <(pr_comment_new_ids "${payload}" "${seen_file}")
+
+    [[ ${#new_ids[@]} -gt 0 ]] || return 0   # nothing new -> done
+
+    # LOOP BOUND: how many comment-driven re-entries has this request had?
+    local reentries=0
+    if [[ -f "${seen_file}" ]]; then
+        reentries=$(jq -r '.reentries // 0' "${seen_file}" 2>/dev/null || echo "0")
+    fi
+    [[ "${reentries}" =~ ^[0-9]+$ ]] || reentries=0
+
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    if [[ "${reentries}" -ge "${MAX_PR_COMMENT_REENTRIES}" ]]; then
+        # Exhausted. Mark the new comments addressed so we don't log this every
+        # scan, and stamp an explicit exhaustion marker for the operator.
+        _pr_comment_mark_addressed "${seen_file}" "${payload}" "${reentries}"
+        local already
+        already=$(jq -r '.exhausted_logged // false' "${seen_file}" 2>/dev/null || echo "false")
+        if [[ "${already}" != "true" ]]; then
+            local tmp_seen="${seen_file}.tmp.$$"
+            jq '.exhausted_logged = true' "${seen_file}" > "${tmp_seen}" 2>/dev/null \
+                && mv "${tmp_seen}" "${seen_file}" || rm -f "${tmp_seen}" 2>/dev/null || true
+            local ev
+            ev=$(jq -n --arg ts "${ts}" --arg req "${request_id}" \
+                       --argjson max "${MAX_PR_COMMENT_REENTRIES}" --arg url "${pr_url}" \
+                '{ event: "pr_comment_loop_exhausted", timestamp: $ts,
+                   request_id: $req, max_reentries: $max, pr_url: $url }')
+            echo "${ev}" >> "${events_file}"
+            log_warn "pr_comment loop exhausted for ${request_id}: ${reentries} re-entries >= max ${MAX_PR_COMMENT_REENTRIES}; leaving for human (${pr_url})"
+        fi
+        return 0
+    fi
+
+    # ---- Re-entry: record feedback, mark comments addressed, flip to code. ----
+
+    # Compose human-readable feedback (the new comments' bodies, attributed).
+    local feedback_text
+    feedback_text=$(echo "${payload}" | jq -r \
+        --argjson ids "$(printf '%s\n' "${new_ids[@]}" | jq -R . | jq -s .)" \
+        '
+        [ (.comments // [])[] | select(.id as $i | $ids | index($i)) ]
+        | map("- @" + (.author // "operator") + ": " + (.body // "" | gsub("\\s+";" ")))
+        | join("\n")
+        ' 2>/dev/null || echo "")
+
+    local new_count="${#new_ids[@]}"
+
+    # Capture feedback into current_phase_metadata (mirrors the review_feedback
+    # convention) AND flip current_phase=code / status=running so the normal
+    # dispatcher picks it up next poll. Clear the awaiting-human markers.
+    local tmp="${state_file}.prc.$$"
+    if jq --arg ts "${ts}" \
+          --arg fb "${feedback_text}" \
+          --arg url "${pr_url}" \
+          '.current_phase = "code" |
+           .status = "running" |
+           .updated_at = $ts |
+           .pr_ready_for_human = false |
+           (.merge_status // empty) as $ms |
+           (if $ms == "pr_ready_for_human" then .merge_status = "pr_comment_revision" else . end) |
+           .current_phase_metadata.dispatched_phase = null |
+           .current_phase_metadata.pr_comment_feedback = $fb |
+           .current_phase_metadata.pr_comment_url = $url' \
+          "${state_file}" > "${tmp}" 2>/dev/null; then
+        mv "${tmp}" "${state_file}"
+    else
+        rm -f "${tmp}" 2>/dev/null || true
+        log_error "maybe_reenter_for_pr_comments: failed to flip ${request_id} to code phase"
+        return 0
+    fi
+
+    # Mark these comment IDs addressed and bump the re-entry counter BEFORE the
+    # session runs, so a crash mid-revision still consumes the re-entry (fail
+    # safe: we under-loop rather than risk an infinite loop).
+    _pr_comment_mark_addressed "${seen_file}" "${payload}" "$(( reentries + 1 ))"
+
+    # Mirror to the intake ledger so the portal reflects the resumed work.
+    sync_intake_db_row "${request_id}" "code" "running" "${ts}" || true
+
+    # Audit event.
+    local ev
+    ev=$(jq -n --arg ts "${ts}" --arg req "${request_id}" \
+               --argjson n "${new_count}" --argjson re "$(( reentries + 1 ))" \
+               --arg url "${pr_url}" \
+        '{ event: "pr_comment_reentry", timestamp: $ts, request_id: $req,
+           new_comments: $n, reentry: $re, pr_url: $url }')
+    echo "${ev}" >> "${events_file}"
+
+    write_portal_request_action "${request_id}" "${project}" || true
+
+    log_info "pr_comment_reentry ${request_id}: ${new_count} new comment(s) -> code phase (re-entry $(( reentries + 1 ))/${MAX_PR_COMMENT_REENTRIES}) pr=${pr_url}"
+}
+
+# _pr_comment_mark_addressed(seen_file, payload_json, reentries) -> void
+#   Idempotently records EVERY comment id currently visible on the PR as
+#   addressed and stores the re-entry counter. Recording all visible ids (not
+#   just the new ones) means a comment can never re-trigger after one pass.
+_pr_comment_mark_addressed() {
+    local seen_file="$1" payload_json="$2" reentries="$3"
+    local existing="[]"
+    if [[ -f "${seen_file}" ]]; then
+        existing=$(jq -c '.addressed_ids // []' "${seen_file}" 2>/dev/null || echo "[]")
+    fi
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    local tmp="${seen_file}.tmp.$$"
+    if echo "${payload_json}" | jq \
+          --argjson existing "${existing}" \
+          --argjson re "${reentries}" \
+          --arg ts "${ts}" \
+          '{ addressed_ids: (($existing + [ (.comments // [])[] | .id ]) | unique),
+             reentries: $re,
+             updated_at: $ts }' > "${tmp}" 2>/dev/null; then
+        mv "${tmp}" "${seen_file}"
+    else
+        rm -f "${tmp}" 2>/dev/null || true
+        log_warn "_pr_comment_mark_addressed: failed to update ${seen_file}"
+    fi
+}
+
+###############################################################################
 # Phase Advancement (SPEC-039-2-05)
 ###############################################################################
 
@@ -2856,6 +3205,17 @@ advance_phase() {
                '.current_phase = $phase' \
                "$state_file" > "$tmp_restore"
             mv "$tmp_restore" "$state_file"
+
+            # Issue #501: once the code phase completes, drop the one-shot
+            # PR-comment feedback so it can never leak into a later, unrelated
+            # code dispatch. (A fresh re-entry rewrites it.)
+            if [[ "$current_phase" == "code" ]]; then
+                local tmp_prc="${state_file}.prcclr.$$"
+                jq 'del(.current_phase_metadata.pr_comment_feedback) |
+                    del(.current_phase_metadata.pr_comment_url)' \
+                   "$state_file" > "$tmp_prc" 2>/dev/null \
+                    && mv "$tmp_prc" "$state_file" || rm -f "$tmp_prc" 2>/dev/null || true
+            fi
 
             # #487: trust-gated PR merge. When the `integration` phase passes
             # verification, decide whether to auto-merge the PR based on the
@@ -4084,6 +4444,14 @@ main_loop() {
         if [[ $(( POLL_COUNT % RECONCILE_EVERY_N_POLLS )) -eq 1 ]]; then
             reconcile_orphans || log_error "Orphan reconciliation failed"
             reconcile_portal_markers || log_error "Portal marker reconciliation failed"
+        fi
+
+        # Issue #501: scan terminal/awaiting-human requests for new PR review
+        # comments and re-enter them into the code phase to address them. Runs
+        # off the hot path (same cadence as reconcile) and is bounded per
+        # request by MAX_PR_COMMENT_REENTRIES. Never aborts the loop.
+        if [[ $(( POLL_COUNT % PR_COMMENT_SCAN_EVERY_N_POLLS )) -eq 1 ]]; then
+            reenter_pr_comment_requests || log_error "PR-comment re-entry scan failed"
         fi
 
         # Apply any portal-originated config-change markers (PRD-025 FR-025-05).

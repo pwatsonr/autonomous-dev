@@ -8,6 +8,7 @@
     "log_retention_days": 30,
     "idle_backoff_base_seconds": 30,
     "idle_backoff_max_seconds": 900,
+    "max_pr_comment_reentries": 3,
     "max_turns_by_phase": {
       "intake": 10,
       "prd": 50,
