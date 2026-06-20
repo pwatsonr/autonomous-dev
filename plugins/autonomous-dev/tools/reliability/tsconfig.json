@@ -1,0 +1,12 @@
+{
+  "//": "Isolated type-check config for the reliability harness (#524). The repo-wide tsconfig.json does not include tools/, and carries unrelated pre-existing errors; this config lets `npx tsc -p tools/reliability/tsconfig.json --noEmit` verify ONLY the harness files are clean. Extends the plugin's base for identical compiler semantics (CJS, strict, ES2022).",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "jest"],
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}
