@@ -23,7 +23,9 @@
  *   --repeats <N>     Repeats per task (default: 1). Determinism signal.
  *   --dry-run         Use a mocked CLI + state.json (no real daemon, $0).
  *   --out <file>      Write the machine-readable JSON report here.
- *   --timeout <ms>    Per-run poll timeout (default 1800000 = 30m live).
+ *   --timeout <ms>    Per-run poll timeout override; applies to ALL tasks
+ *                     (default fallback 3600000 = 60m; per-task timeoutMs in
+ *                     the suite is used when --timeout is not passed).
  *   --interval <ms>   Poll interval (default 15000 = 15s).
  *   --suite <file>    Override the task suite path.
  *
@@ -59,6 +61,8 @@ export interface CliOptions {
   dryRun: boolean;
   out?: string;
   timeoutMs: number;
+  /** True when --timeout was passed explicitly (overrides per-task timeouts). */
+  timeoutExplicit?: boolean;
   intervalMs: number;
   suitePath: string;
 }
@@ -70,7 +74,11 @@ export function parseArgs(argv: string[]): CliOptions {
     tasks: 'all',
     repeats: 1,
     dryRun: false,
-    timeoutMs: 30 * 60 * 1000,
+    // Fallback batch timeout (#552): raised 30→60min so the full standard
+    // pipeline (~42-47min) isn't falsely timed out. Per-task timeoutMs in the
+    // suite refines this; an explicit --timeout overrides both.
+    timeoutMs: 60 * 60 * 1000,
+    timeoutExplicit: false,
     intervalMs: 15 * 1000,
     suitePath: DEFAULT_SUITE_PATH,
   };
@@ -100,6 +108,7 @@ export function parseArgs(argv: string[]): CliOptions {
         break;
       case '--timeout':
         opts.timeoutMs = parsePositiveInt(next(), '--timeout');
+        opts.timeoutExplicit = true;
         break;
       case '--interval':
         opts.intervalMs = parsePositiveInt(next(), '--interval');
@@ -184,6 +193,7 @@ export async function execute(
     repo: opts.repo,
     repeats: opts.repeats,
     pollTimeoutMs: opts.timeoutMs,
+    timeoutExplicit: opts.timeoutExplicit,
     pollIntervalMs: opts.intervalMs,
     dryRun: opts.dryRun,
     log: deps.log,

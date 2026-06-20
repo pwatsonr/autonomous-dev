@@ -42,6 +42,13 @@ export interface Task {
   sizeClass: 'trivial-docs' | 'small' | 'standard' | 'large';
   /** The terminal phase a healthy run is expected to reach (always 'done'). */
   expectedTerminalPhase: 'done';
+  /**
+   * Per-task poll timeout in ms (#552). Should comfortably exceed the slowest
+   * expected wall-clock for this size class (full standard pipeline ≈ 42-47min;
+   * trivial-docs lighter pipeline ≈ 18min). Falls back to the batch default
+   * when unset; an explicit operator --timeout overrides it.
+   */
+  timeoutMs?: number;
 }
 
 /** Parsed shape of `task-suite.json`. */

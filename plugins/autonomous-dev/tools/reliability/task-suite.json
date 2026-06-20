@@ -7,18 +7,21 @@
       "id": "trivial-docs-readme",
       "sizeClass": "trivial-docs",
       "expectedTerminalPhase": "done",
+      "timeoutMs": 1800000,
       "description": "Append a single line 'Maintained by the autonomous-dev reliability harness.' to the end of README.md. Do not modify any other file. If README.md does not exist, create it with exactly that one line."
     },
     {
       "id": "small-fn-with-test",
       "sizeClass": "small",
       "expectedTerminalPhase": "done",
+      "timeoutMs": 3600000,
       "description": "Add a Python function add(a, b) that returns a + b in a module named calc.py (create it if absent), and add a pytest unit test in test_calc.py covering add(2, 3) == 5 and add(-1, 1) == 0. Keep any existing tests passing."
     },
     {
       "id": "standard-multifile-greet",
       "sizeClass": "standard",
       "expectedTerminalPhase": "done",
+      "timeoutMs": 3600000,
       "description": "Refactor hello.py to define a function greet(name='world') that returns the string 'hello <name>' (e.g. greet() -> 'hello world', greet('ada') -> 'hello ada'), and make the __main__ block print greet(). Preserve existing behavior: running 'python hello.py' must still print exactly 'hello world'. Add pytest unit tests in test_hello.py for greet() covering both the default and a custom name, keeping the existing script-output test passing."
     }
   ]
