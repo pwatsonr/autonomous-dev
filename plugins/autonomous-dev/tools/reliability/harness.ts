@@ -56,8 +56,17 @@ export interface Harness {
 export interface BatchConfig {
   repo: string;
   repeats: number;
-  /** Per-run cap on polling before recording 'timeout'. */
+  /**
+   * Per-run cap on polling before recording 'timeout'. Used as the fallback
+   * when a task has no `timeoutMs` of its own; when `timeoutExplicit` is set
+   * (operator passed --timeout), this value overrides per-task timeouts.
+   */
   pollTimeoutMs: number;
+  /**
+   * True when the operator explicitly passed --timeout: pollTimeoutMs then
+   * applies to every task, overriding any per-task `timeoutMs`. (#552)
+   */
+  timeoutExplicit?: boolean;
   /** Delay between status polls. */
   pollIntervalMs: number;
   dryRun?: boolean;
@@ -125,13 +134,36 @@ export async function runBatch(
       }
 
       // -- Poll to a terminal state (or give up at the timeout). -----------
+      // Effective timeout: a task's own timeoutMs unless the operator passed
+      // an explicit --timeout (which then overrides per-task). Falls back to
+      // the batch default. (#552: the full standard pipeline is ~42-47min, so
+      // a flat 30-min default produced false 'timeout' on successful runs.)
       let snapshot: StatusSnapshot | null = null;
-      const deadline = startedAt + cfg.pollTimeoutMs;
+      const effectiveTimeoutMs = cfg.timeoutExplicit
+        ? cfg.pollTimeoutMs
+        : (task.timeoutMs ?? cfg.pollTimeoutMs);
+      const deadline = startedAt + effectiveTimeoutMs;
       while (now() < deadline) {
         snapshot = await harness.status(cfg.repo, requestId);
         log(`[${task.id}] ${requestId}: status=${snapshot.status} phase=${snapshot.currentPhase}`);
         if (isTerminal(snapshot.status)) break;
         await sleep(cfg.pollIntervalMs);
+      }
+
+      // #552: one final status check after the deadline before recording a
+      // timeout — a request can settle between the last poll and the deadline
+      // (an off-by-one-poll false negative). If it has since reached a terminal
+      // state, count that, not 'timeout'.
+      if (!snapshot || !isTerminal(snapshot.status)) {
+        try {
+          const finalSnap = await harness.status(cfg.repo, requestId);
+          log(`[${task.id}] ${requestId}: final check status=${finalSnap.status} phase=${finalSnap.currentPhase}`);
+          if (isTerminal(finalSnap.status) || snapshot === null) {
+            snapshot = finalSnap;
+          }
+        } catch (err) {
+          log(`[${task.id}] ${requestId}: final status check failed: ${asMessage(err)}`);
+        }
       }
 
       const timedOut = !snapshot || !isTerminal(snapshot.status);

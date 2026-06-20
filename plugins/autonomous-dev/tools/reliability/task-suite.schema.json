@@ -22,7 +22,8 @@
             "type": "string",
             "enum": ["trivial-docs", "small", "standard", "large"]
           },
-          "expectedTerminalPhase": { "type": "string", "const": "done" }
+          "expectedTerminalPhase": { "type": "string", "const": "done" },
+          "timeoutMs": { "type": "integer", "minimum": 1, "description": "Per-task poll timeout in ms (#552); falls back to the batch default if unset." }
         }
       }
     }

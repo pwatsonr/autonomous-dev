@@ -162,6 +162,78 @@ describe('runBatch — mock orchestration', () => {
     expect(results[0].totalRetries).toBe(1);
   });
 
+  test('#552: final status check after the deadline rescues an off-by-one-poll done', async () => {
+    // First poll returns 'active'; the request settles to 'done' on the next
+    // status() call. With pollTimeoutMs tiny, the while-loop exits after one
+    // 'active' poll; the post-deadline final check then sees 'done'.
+    const scripts: Record<string, MockScript> = {
+      trivial: {
+        statusSequence: ['active', 'done'] as RequestStatus[],
+        terminalPhase: 'monitor',
+        phaseHistory: phaseHistory([{ state: 'monitor', retry_count: 0, cost_usd: 0 }]),
+      },
+    };
+    const harness = new MockHarness(scripts);
+    // Clock tuned so the while-loop runs exactly ONE poll ('active'), then the
+    // deadline passes, then the post-deadline final check sees 'done':
+    // startedAt=60, deadline=160; check1 t=120<160 (poll active); check2 t=180>=160 (exit).
+    let t = 0;
+    const cfg = fastCfg({ pollTimeoutMs: 100, pollIntervalMs: 1, now: () => (t += 60) });
+    const results = await runBatch(harness, [TASKS[0]], cfg);
+    expect(results[0].status).toBe('done'); // NOT 'timeout'
+    expect(results[0].terminalPhase).toBe('monitor');
+  });
+
+  test('#552: per-task timeoutMs is used when --timeout is not explicit', async () => {
+    // A task with a generous timeoutMs must not be timed out by a small batch
+    // default. The mock settles 'done' on the 2nd poll; the per-task timeout
+    // (large) keeps polling long enough, while the batch default (tiny) would not.
+    const taskWithTimeout: Task = {
+      id: 'trivial',
+      description: 'append a line',
+      sizeClass: 'trivial-docs',
+      expectedTerminalPhase: 'done',
+      timeoutMs: 10_000,
+    };
+    const scripts: Record<string, MockScript> = {
+      trivial: {
+        statusSequence: ['active', 'done'] as RequestStatus[],
+        terminalPhase: 'monitor',
+        phaseHistory: phaseHistory([{ state: 'monitor', retry_count: 0, cost_usd: 0 }]),
+      },
+    };
+    const harness = new MockHarness(scripts);
+    let t = 0;
+    // Batch default tiny (1ms) + NOT explicit → per-task 10s wins → reaches done.
+    const cfg = fastCfg({ pollTimeoutMs: 1, pollIntervalMs: 1, timeoutExplicit: false, now: () => (t += 2) });
+    const results = await runBatch(harness, [taskWithTimeout], cfg);
+    expect(results[0].status).toBe('done');
+  });
+
+  test('#552: explicit --timeout overrides a generous per-task timeoutMs', async () => {
+    // Same task, but timeoutExplicit=true with a tiny pollTimeoutMs → the
+    // per-task 10s is ignored and the run times out (never-terminal script).
+    const taskWithTimeout: Task = {
+      id: 'trivial',
+      description: 'append a line',
+      sizeClass: 'trivial-docs',
+      expectedTerminalPhase: 'done',
+      timeoutMs: 10_000,
+    };
+    const scripts: Record<string, MockScript> = {
+      trivial: {
+        statusSequence: ['active'] as RequestStatus[], // never terminal
+        terminalPhase: 'active',
+        phaseHistory: phaseHistory([{ state: 'code', retry_count: 0, cost_usd: 0 }]),
+      },
+    };
+    const harness = new MockHarness(scripts);
+    let t = 0;
+    const cfg = fastCfg({ pollTimeoutMs: 5, pollIntervalMs: 1, timeoutExplicit: true, now: () => (t += 2) });
+    const results = await runBatch(harness, [taskWithTimeout], cfg);
+    expect(results[0].status).toBe('timeout');
+  });
+
   test('a thrown submit is recorded as a failed run, not a crash', async () => {
     const harness: Harness = {
       submit: async () => {
@@ -296,7 +368,13 @@ describe('parseArgs', () => {
   test('parses flags and applies defaults', () => {
     const o = parseArgs(['--repo', '/tmp/x', '--tasks', 'a,b', '--repeats', '3', '--dry-run']);
     expect(o).toMatchObject({ repo: '/tmp/x', tasks: 'a,b', repeats: 3, dryRun: true });
-    expect(o.timeoutMs).toBe(30 * 60 * 1000);
+    expect(o.timeoutMs).toBe(60 * 60 * 1000); // #552: raised 30→60m
+    expect(o.timeoutExplicit).toBe(false);
+  });
+  test('#552: --timeout marks timeoutExplicit', () => {
+    const o = parseArgs(['--timeout', '900000']);
+    expect(o.timeoutMs).toBe(900000);
+    expect(o.timeoutExplicit).toBe(true);
   });
   test('rejects a non-positive --repeats', () => {
     expect(() => parseArgs(['--repeats', '0'])).toThrow(/positive integer/);
