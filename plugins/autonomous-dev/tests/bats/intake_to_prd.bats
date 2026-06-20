@@ -89,6 +89,36 @@ EOF
     [[ "$to_phase" == "prd" ]]
 }
 
+@test "#548: queued/intake trivial-docs request transitions to spec (honors phase_overrides, skips prd)" {
+    # A lighter-pipeline request (#526) whose override skips prd/prd_review/tdd/
+    # tdd_review/plan/plan_review. The first transition must go intake -> spec,
+    # NOT the hardcoded intake -> prd.
+    cat > "$TEST_REQ_DIR/state.json" << EOF
+{
+  "id": "$TEST_REQUEST_ID",
+  "status": "queued",
+  "current_phase": "intake",
+  "task_size": "trivial-docs",
+  "phase_overrides": ["intake","spec","spec_review","code","code_review","integration","deploy","monitor"],
+  "priority": 1,
+  "created_at": "2026-05-12T10:00:00Z",
+  "updated_at": "2026-05-12T10:00:00Z"
+}
+EOF
+
+    intake_to_prd_if_needed "$TEST_REQUEST_ID" "$TEST_PROJECT"
+    local result=$?
+    [[ $result -eq 0 ]]
+
+    local status current_phase to_phase
+    status=$(jq -r '.status' "$TEST_REQ_DIR/state.json")
+    current_phase=$(jq -r '.current_phase' "$TEST_REQ_DIR/state.json")
+    to_phase=$(jq -r '.to' "$TEST_REQ_DIR/events.jsonl")
+    [[ "$status" == "running" ]]
+    [[ "$current_phase" == "spec" ]]   # NOT prd — the override is honored
+    [[ "$to_phase" == "spec" ]]
+}
+
 @test "intake_to_prd_if_needed: already running/prd returns 1" {
     # Setup: already running/prd state
     cat > "$TEST_REQ_DIR/state.json" << EOF

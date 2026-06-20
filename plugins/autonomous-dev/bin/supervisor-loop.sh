@@ -3412,7 +3412,14 @@ advance_phase() {
 ###############################################################################
 
 # intake_to_prd_if_needed(request_id, project) -> int
-#   Checks if request is in queued/intake state and auto-transitions to running/prd.
+#   Checks if request is in queued/intake state and auto-transitions it to the
+#   running state at its FIRST real phase. That phase is whatever follows
+#   `intake` in the state's phase_overrides[] (via next_phase_for_state) — `prd`
+#   for a standard request, but `spec` for a trivial-docs request whose
+#   lighter pipeline (#526) skips prd/prd_review/tdd/tdd_review/plan/plan_review.
+#   (#548: this transition previously HARDCODED `prd`, which made size-based
+#   phase_overrides inert on the very first hop — the lighter pipeline still ran
+#   prd. HOTFIX was unaffected because it skips tdd, a later phase, not prd.)
 #   Returns 0 if transition happened, 1 if no transition needed.
 intake_to_prd_if_needed() {
     local request_id="$1"
@@ -3435,31 +3442,44 @@ intake_to_prd_if_needed() {
         local ts
         ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-        # Atomically transition to running/prd
+        # Honor phase_overrides for the first transition. next_phase_for_state
+        # reads current_phase (intake) and returns the next element of the
+        # state's phase sequence (overrides or legacy). Fall back to "prd" only
+        # if it cannot be resolved (unreadable / corrupt state), preserving the
+        # legacy behavior for safety.
+        local next_phase
+        next_phase=$(next_phase_for_state "$state_file" 2>/dev/null || true)
+        if [[ -z "$next_phase" ]]; then
+            next_phase="prd"
+        fi
+
+        # Atomically transition to running/<next_phase>
         local tmp="${state_file}.tmp.$$"
-        jq --arg ts "$ts" \
-           '.current_phase = "prd" | .status = "running" | .updated_at = $ts' \
+        jq --arg ts "$ts" --arg np "$next_phase" \
+           '.current_phase = $np | .status = "running" | .updated_at = $ts' \
            "$state_file" > "$tmp"
         mv "$tmp" "$state_file"
 
-        # Append intake_to_prd event
+        # Append the intake-transition event (event name kept as intake_to_prd
+        # for downstream-consumer compatibility; `to` reflects the actual phase).
         local event
         event=$(jq -n \
             --arg ts "$ts" \
             --arg req "$request_id" \
+            --arg np "$next_phase" \
             '{
                 event: "intake_to_prd",
                 timestamp: $ts,
                 request_id: $req,
                 from: "intake",
-                to: "prd"
+                to: $np
             }')
         echo "$event" >> "$events_file"
 
-        # Mirror intake->prd transition to the intake ledger (REQ-000013 Call site A)
-        sync_intake_db_row "$request_id" "prd" "running" "$ts"
+        # Mirror intake->next transition to the intake ledger (REQ-000013 Call site A)
+        sync_intake_db_row "$request_id" "$next_phase" "running" "$ts"
 
-        log_info "Auto-transitioned $request_id from intake to prd"
+        log_info "Auto-transitioned $request_id from intake to $next_phase"
 
         # Write portal request action after state transition
         write_portal_request_action "$request_id" "$project"
