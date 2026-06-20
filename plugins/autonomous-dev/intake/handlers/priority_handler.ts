@@ -95,8 +95,14 @@ export class PriorityHandler implements CommandHandler {
 
     const previousPriority = request.priority;
 
-    // Update priority
-    this.db.updateRequest(requestId, { priority: level as Priority });
+    // Update priority — sync BOTH the db row and the on-disk state.json (#551)
+    // so the persisted priority matches what the daemon reads from disk.
+    const { setPriority } = await import('../core/handoff_manager');
+    const { syncTransition } = await import('./state_sync');
+    await syncTransition(
+      () => setPriority(requestId, level as 'high' | 'normal' | 'low'),
+      () => this.db.updateRequest(requestId, { priority: level as Priority }),
+    );
 
     // Recalculate queue position
     const newPosition = this.db.getQueuePosition(requestId);

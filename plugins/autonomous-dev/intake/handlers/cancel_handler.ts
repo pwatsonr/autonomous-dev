@@ -83,8 +83,14 @@ export class CancelHandler implements CommandHandler {
       };
     }
 
-    // Perform cancellation
-    this.db.updateRequest(requestId, { status: 'cancelled' });
+    // Perform cancellation — sync BOTH the db row and the on-disk state.json
+    // (#551) so the daemon's select_request stops re-selecting this request.
+    const { cancelRequest } = await import('../core/handoff_manager');
+    const { syncTransition } = await import('./state_sync');
+    await syncTransition(
+      () => cancelRequest(requestId),
+      () => this.db.updateRequest(requestId, { status: 'cancelled' }),
+    );
 
     this.db.insertActivityLog({
       request_id: requestId,

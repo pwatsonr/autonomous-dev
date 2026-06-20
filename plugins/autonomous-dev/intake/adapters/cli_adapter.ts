@@ -907,12 +907,20 @@ export async function initRouter(): Promise<IntakeRouterLike> {
   const { AuditLogger } = await import('../authz/audit_logger');
   const { RateLimiter } = await import('../rate_limit/rate_limiter');
   const { IntakeRouter } = await import('../core/intake_router');
+  const { setHandoffDatabase } = await import('../core/handoff_manager');
   /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
 
   const dbPath = defaultDbPath();
   const migrationsDir = path.resolve(__dirname, '..', 'db', 'migrations');
   const { db } = initializeDatabase(dbPath, migrationsDir);
   const repo = new Repository(db);
+
+  // #551: wire the state-transition helpers (cancel/pause/resume/priority) to
+  // the SAME db+repo the CLI opened, so they write state.json AND the db row
+  // atomically. Without this they'd lazily open AUTONOMOUS_DEV_INTAKE_DB (or
+  // :memory: if unset) — a different handle — and the on-disk state.json would
+  // never get synced, leaving the daemon to re-select cancelled requests.
+  setHandoffDatabase({ db, repo });
 
   const auditLogRepo = AuditLogger.fromDatabase(db);
   const auditLogger = new AuditLogger(auditLogRepo, {
