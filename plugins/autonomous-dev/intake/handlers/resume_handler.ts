@@ -73,11 +73,19 @@ export class ResumeHandler implements CommandHandler {
     // Determine target status based on current state
     const newStatus = request.status === 'paused' ? 'active' : 'queued';
 
-    this.db.updateRequest(requestId, {
-      status: newStatus as 'active' | 'queued',
-      // Clear paused_at_phase when resuming from paused
-      ...(request.status === 'paused' ? { paused_at_phase: null } : {}),
-    });
+    // Resume — sync BOTH the db row and the on-disk state.json (#551) so the
+    // daemon sees the request as actionable again.
+    const { resumeRequest } = await import('../core/handoff_manager');
+    const { syncTransition } = await import('./state_sync');
+    await syncTransition(
+      () => resumeRequest(requestId),
+      () =>
+        this.db.updateRequest(requestId, {
+          status: newStatus as 'active' | 'queued',
+          // Clear paused_at_phase when resuming from paused
+          ...(request.status === 'paused' ? { paused_at_phase: null } : {}),
+        }),
+    );
 
     this.db.insertActivityLog({
       request_id: requestId,

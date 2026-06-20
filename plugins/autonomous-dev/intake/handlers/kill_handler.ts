@@ -69,11 +69,21 @@ export class KillHandler implements CommandHandler {
       .prepare("SELECT request_id, current_phase FROM requests WHERE status = 'active'")
       .all() as Array<{ request_id: string; current_phase: string }>;
 
+    // Pause each — sync BOTH the db row and the on-disk state.json (#551) so
+    // the daemon's select_request actually skips the killed (paused) requests
+    // instead of re-selecting them off a stale state.json.
+    const { pauseRequest } = await import('../core/handoff_manager');
+    const { syncTransition } = await import('./state_sync');
+
     for (const req of activeRequests) {
-      this.db.updateRequest(req.request_id, {
-        status: 'paused',
-        paused_at_phase: req.current_phase,
-      });
+      await syncTransition(
+        () => pauseRequest(req.request_id, 'kill_all'),
+        () =>
+          this.db.updateRequest(req.request_id, {
+            status: 'paused',
+            paused_at_phase: req.current_phase,
+          }),
+      );
 
       this.db.insertActivityLog({
         request_id: req.request_id,

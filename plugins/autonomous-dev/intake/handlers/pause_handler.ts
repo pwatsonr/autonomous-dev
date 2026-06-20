@@ -68,11 +68,18 @@ export class PauseHandler implements CommandHandler {
     // Validate state transition
     validateStateTransition(request.status, 'pause');
 
-    // Pause the request
-    this.db.updateRequest(requestId, {
-      status: 'paused',
-      paused_at_phase: request.current_phase,
-    });
+    // Pause the request — sync BOTH the db row and the on-disk state.json
+    // (#551) so the daemon's select_request skips the paused request.
+    const { pauseRequest } = await import('../core/handoff_manager');
+    const { syncTransition } = await import('./state_sync');
+    await syncTransition(
+      () => pauseRequest(requestId),
+      () =>
+        this.db.updateRequest(requestId, {
+          status: 'paused',
+          paused_at_phase: request.current_phase,
+        }),
+    );
 
     this.db.insertActivityLog({
       request_id: requestId,
