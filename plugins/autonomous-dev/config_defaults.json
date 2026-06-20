@@ -255,6 +255,9 @@
     "max_clarifying_rounds": 5,
     "response_timeout_minutes": 240,
     "response_timeout_action": "pause",
+    "auto_size_classification": {
+      "enabled": false
+    },
     "rate_limits": {
       "submissions_per_hour": 10,
       "queries_per_minute": 60

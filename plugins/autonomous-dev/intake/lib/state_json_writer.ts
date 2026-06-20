@@ -10,7 +10,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ALL_PIPELINE_PHASES, PHASE_OVERRIDE_MATRIX, type PipelinePhase } from '../types/phase-override';
+import {
+  ALL_PIPELINE_PHASES,
+  getSkippedPhases,
+  type TaskSize,
+} from '../types/phase-override';
 import { RequestType } from '../types/request-type';
 
 // ---------------------------------------------------------------------------
@@ -33,6 +37,12 @@ export interface RequestEntity {
   target_repo: string;
   source_channel: string;
   type: 'feature' | 'bug' | 'infra' | 'refactor' | 'hotfix' | string;
+  /**
+   * Classified task size (#526). Optional for backward compatibility: when
+   * absent, defaults to `standard` so the computed phase_overrides match the
+   * pre-#526 (type-only) behavior byte-for-byte.
+   */
+  task_size?: TaskSize | string;
 }
 
 /**
@@ -141,9 +151,13 @@ export function writeStateJson(request: RequestEntity, targetRepo: string): stri
   const priorityMap: Record<string, number> = { high: 0, normal: 1, low: 2 };
   const priorityValue = priorityMap[request.priority] ?? 1;
 
-  // Compute phase_overrides from the canonical matrix (FR-020-02)
+  // Compute phase_overrides as the canonical pipeline minus the UNION of the
+  // request type's skips and the task size's skips (FR-020-02 + #526).
+  // task_size defaults to 'standard' so absent-size states are byte-for-byte
+  // identical to the pre-#526 (type-only) behavior.
   const requestType = request.type as RequestType;
-  const skippedPhases = PHASE_OVERRIDE_MATRIX[requestType]?.skippedPhases ?? [];
+  const taskSize = (request.task_size as TaskSize) ?? 'standard';
+  const skippedPhases = getSkippedPhases(requestType, taskSize);
   const phaseOverrides = ALL_PIPELINE_PHASES.filter(phase => !skippedPhases.includes(phase));
 
   // Build state object with exactly the 19 fields from TDD §6.1
@@ -159,6 +173,7 @@ export function writeStateJson(request: RequestEntity, targetRepo: string): stri
     target_repo: targetRepo,
     source: request.source_channel,
     type: request.type,
+    task_size: taskSize,  // Classified size (#526); 'standard' = unchanged pipeline.
     blocked_by: [],
     phase_history: [],
     phase_overrides: phaseOverrides,  // Computed from canonical matrix (FR-020-02)

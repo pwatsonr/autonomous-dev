@@ -70,6 +70,12 @@ export interface IntakeRouterDeps {
   duplicateDetector?: DuplicateDetector;
   /** Required by SubmitHandler for prompt-injection sanitization. */
   injectionRules?: InjectionRule[];
+  /**
+   * #526: gate for the auto task-size classifier
+   * (`intake.auto_size_classification.enabled`). Defaults false; forwarded to
+   * the SubmitHandler. Explicit `--size` hints are honored regardless.
+   */
+  autoSizeClassificationEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +194,7 @@ export class IntakeRouter {
         claudeClient: this.deps.claudeClient,
         duplicateDetector: this.deps.duplicateDetector,
         injectionRules: this.deps.injectionRules,
+        autoSizeClassificationEnabled: this.deps.autoSizeClassificationEnabled,
       }),
     );
     this.handlers.set('status', new StatusHandler(db));

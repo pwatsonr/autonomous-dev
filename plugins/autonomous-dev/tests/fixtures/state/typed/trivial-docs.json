@@ -1,0 +1,23 @@
+{
+  "id": "test-trivial-docs-001",
+  "type": "feature",
+  "task_size": "trivial-docs",
+  "expedited_reviews": false,
+  "current_phase": "intake",
+  "phase_started_at": 1714435200,
+  "retry_count": 0,
+  "phase_overrides": [
+    "intake",
+    "spec", "spec_review",
+    "code", "code_review",
+    "integration", "deploy", "monitor"
+  ],
+  "type_config": {
+    "maxRetries": 3,
+    "phaseTimeouts": {},
+    "enhancedPhases": [],
+    "additionalGates": {}
+  },
+  "phase_history": [],
+  "status_reason": ""
+}
