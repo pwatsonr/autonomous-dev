@@ -231,11 +231,46 @@ describe('CliHarness — parses the real CLI JSON contract (no daemon)', () => {
       /expected JSON object|no requestId/,
     );
   });
+
+  test('#546: submit + status parse through the real preamble + migration line', async () => {
+    // The actual CLI stdout: a build notice, a single-line migration event, THEN
+    // the pretty payload — two JSON values, not one. Regression for #546.
+    const noisy = (payload: object): string =>
+      'Building CLI adapter...\n' +
+      '{"event":"migration.complete","applied":[],"schemaVersion":5}\n' +
+      JSON.stringify(payload, null, 2) +
+      '\n';
+    const submitH = new CliHarness('/fake/cli.sh', () =>
+      noisy({ requestId: 'REQ-000546', position: 2, estimatedWait: '46m' }),
+    );
+    expect(await submitH.submit('/tmp/scratch', TASKS[0])).toBe('REQ-000546');
+
+    const statusH = new CliHarness('/fake/cli.sh', () =>
+      noisy({ requestId: 'REQ-000546', status: 'done', currentPhase: 'monitor', blocker: null }),
+    );
+    expect(await statusH.status('/tmp/scratch', 'REQ-000546')).toEqual({
+      status: 'done',
+      currentPhase: 'monitor',
+      blocker: null,
+    });
+  });
 });
 
 describe('parseCliJson', () => {
   test('grabs the JSON object even with surrounding noise', () => {
     expect(parseCliJson('build notice\n{\n  "id": "REQ-1"\n}\n')).toEqual({ id: 'REQ-1' });
+  });
+  test('#546: returns the LAST object when a migration line precedes the payload', () => {
+    const out =
+      'Building CLI adapter...\n' +
+      '{"event":"migration.complete","applied":[],"schemaVersion":5}\n' +
+      '{\n  "requestId": "REQ-000546",\n  "position": 1\n}\n';
+    expect(parseCliJson(out)).toEqual({ requestId: 'REQ-000546', position: 1 });
+  });
+  test('#546: ignores braces inside string values', () => {
+    expect(
+      parseCliJson('note {x}\n{"msg":"a } brace { inside a string","id":"REQ-2"}'),
+    ).toEqual({ msg: 'a } brace { inside a string', id: 'REQ-2' });
   });
   test('throws when there is no object', () => {
     expect(() => parseCliJson('OK')).toThrow(/expected JSON object/);

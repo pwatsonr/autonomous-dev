@@ -239,12 +239,46 @@ export class CliHarness implements Harness {
  * balanced `{ … }` block to be defensive about trailing newlines.
  */
 export function parseCliJson(stdout: string): Record<string, any> {
-  const start = stdout.indexOf('{');
-  const end = stdout.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) {
-    throw new Error(`expected JSON object in CLI output; got: ${stdout.slice(0, 200)}`);
+  // The CLI prints a non-JSON preamble (e.g. "Building CLI adapter…") and MORE
+  // THAN ONE JSON value on stdout — a single-line `{"event":"migration.complete"}`
+  // followed by the pretty-printed command payload. Collect every top-level
+  // balanced `{ … }` group with a string-aware scan and return the LAST one that
+  // parses; that is the payload. (#546: the old first-`{`→last-`}` slice spanned
+  // both objects and produced invalid JSON, failing every live submit/status.)
+  const groups: string[] = [];
+  let depth = 0;
+  let startIdx = -1;
+  let inStr = false;
+  let escaped = false;
+  for (let i = 0; i < stdout.length; i++) {
+    const ch = stdout[i];
+    if (inStr) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = true;
+    } else if (ch === '{') {
+      if (depth === 0) startIdx = i;
+      depth++;
+    } else if (ch === '}' && depth > 0) {
+      depth--;
+      if (depth === 0 && startIdx >= 0) {
+        groups.push(stdout.slice(startIdx, i + 1));
+        startIdx = -1;
+      }
+    }
   }
-  return JSON.parse(stdout.slice(start, end + 1));
+  for (let i = groups.length - 1; i >= 0; i--) {
+    try {
+      return JSON.parse(groups[i]) as Record<string, any>;
+    } catch {
+      // Not valid JSON (e.g. a brace inside prose) — try the previous group.
+    }
+  }
+  throw new Error(`expected JSON object in CLI output; got: ${stdout.slice(0, 200)}`);
 }
 
 // ---------------------------------------------------------------------------
