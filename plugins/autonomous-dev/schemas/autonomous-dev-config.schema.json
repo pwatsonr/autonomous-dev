@@ -77,6 +77,26 @@
         "privileged_backends": []
       }
     },
+    "intake": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Intake-layer config. Only #526 size-routing keys are modeled here; other intake keys are passthrough (see config_defaults.json).",
+      "properties": {
+        "auto_size_classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Deterministic task-size classifier gate (#526).",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, opt every request into the auto task-size classifier (trivial-docs routing). DEFAULTS FALSE so the standard pipeline is unchanged. Explicit --size hints are honored regardless."
+            }
+          },
+          "default": { "enabled": false }
+        }
+      }
+    },
     "chains": {
       "type": "object",
       "additionalProperties": false,

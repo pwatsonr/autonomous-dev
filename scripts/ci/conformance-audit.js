@@ -98,6 +98,42 @@ const CHECKS = [
     },
   },
   {
+    id: 'trivial-docs-skips-design',
+    issue: 526,
+    fr: 'PRD-526',
+    desc: 'TASK_SIZE_SKIP_MATRIX[trivial-docs] skips prd/tdd/plan and the writer unions type+size skips',
+    run() {
+      const po = read('plugins/autonomous-dev/intake/types/phase-override.ts');
+      if (po === null) return fail('phase-override.ts not found');
+      // The trivial-docs skip set must drop all upfront design phases.
+      const m = po.match(/'trivial-docs':\s*\[([\s\S]*?)\]/);
+      if (!m) return fail("TASK_SIZE_SKIP_MATRIX['trivial-docs'] not found");
+      const list = m[1];
+      const skipsAll =
+        /'prd'/.test(list) &&
+        /'prd_review'/.test(list) &&
+        /'tdd'/.test(list) &&
+        /'tdd_review'/.test(list) &&
+        /'plan'/.test(list) &&
+        /'plan_review'/.test(list);
+      if (!skipsAll) {
+        return fail("trivial-docs does not skip all of prd/prd_review/tdd/tdd_review/plan/plan_review");
+      }
+      // getSkippedPhases must UNION the type's skips with the size's skips.
+      const unions =
+        /PHASE_OVERRIDE_MATRIX\[type\]\?\.skippedPhases[\s\S]*?TASK_SIZE_SKIP_MATRIX\[size\]/.test(po);
+      if (!unions) return fail('getSkippedPhases does not union type + size skip sets');
+      // The writer must compute phase_overrides via the unioning helper, not
+      // the type-only matrix path it used pre-#526.
+      const writer = read('plugins/autonomous-dev/intake/lib/state_json_writer.ts');
+      if (writer === null) return fail('state_json_writer.ts not found');
+      if (!/getSkippedPhases\(\s*requestType\s*,\s*taskSize\s*\)/.test(writer)) {
+        return fail('state_json_writer does not union type+size via getSkippedPhases(requestType, taskSize)');
+      }
+      return pass();
+    },
+  },
+  {
     id: 'portal-referrer-policy',
     issue: 356,
     fr: 'FR-S33',

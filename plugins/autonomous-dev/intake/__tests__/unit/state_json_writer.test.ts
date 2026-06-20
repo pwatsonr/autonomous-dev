@@ -89,11 +89,15 @@ describe('state_json_writer', () => {
       'cost_accrued_usd', 'turn_count', 'escalation_count', 'schema_version', 'error'
     ];
 
-    expect(Object.keys(state)).toHaveLength(20); // 19 + potentially more, but at least 19
+    // 20 canonical fields + task_size (#526) = 21.
+    expect(Object.keys(state)).toHaveLength(21);
 
     for (const field of expectedFields) {
       expect(state).toHaveProperty(field);
     }
+    // #526: top-level task_size present and defaults to 'standard' when absent.
+    expect(state).toHaveProperty('task_size');
+    expect(state.task_size).toBe('standard');
 
     // Check types
     expect(typeof state.id).toBe('string');
@@ -231,6 +235,83 @@ describe('state_json_writer', () => {
 
       expect(state.priority).toBe(expected);
     });
+  });
+
+  it('task_size_trivial_docs - phase_overrides length 8 excludes prd/tdd/plan', () => {
+    // #526: trivial-docs skips prd/prd_review/tdd/tdd_review/plan/plan_review,
+    // leaving 8 phases: intake, spec, spec_review, code, code_review,
+    // integration, deploy, monitor.
+    const request = {
+      ...createValidRequest(),
+      request_id: 'REQ-526001',
+      type: 'feature',
+      task_size: 'trivial-docs' as const,
+    };
+
+    writeStateJson(request, tempDir);
+
+    const stateFile = path.join(tempDir, '.autonomous-dev', 'requests', 'REQ-526001', 'state.json');
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+
+    expect(state.task_size).toBe('trivial-docs');
+    expect(state.phase_overrides).toEqual([
+      'intake',
+      'spec', 'spec_review',
+      'code', 'code_review',
+      'integration', 'deploy', 'monitor',
+    ]);
+    expect(state.phase_overrides).toHaveLength(8);
+    expect(state.phase_overrides).not.toContain('prd');
+    expect(state.phase_overrides).not.toContain('tdd');
+    expect(state.phase_overrides).not.toContain('plan');
+  });
+
+  it('task_size_union - bug + trivial-docs unions type and size skip sets', () => {
+    // #526: union semantics — bug already skips prd/prd_review; trivial-docs
+    // adds tdd/tdd_review/plan/plan_review. The union still yields the 8-phase
+    // sequence (no double-counting of prd/prd_review).
+    const request = {
+      ...createValidRequest(),
+      request_id: 'REQ-526002',
+      type: 'bug',
+      task_size: 'trivial-docs' as const,
+    };
+
+    writeStateJson(request, tempDir);
+
+    const stateFile = path.join(tempDir, '.autonomous-dev', 'requests', 'REQ-526002', 'state.json');
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+
+    expect(state.phase_overrides).toEqual([
+      'intake',
+      'spec', 'spec_review',
+      'code', 'code_review',
+      'integration', 'deploy', 'monitor',
+    ]);
+  });
+
+  it('task_size_standard_unchanged - standard size matches type-only behavior', () => {
+    // The default path must be byte-for-byte unchanged: a feature with size
+    // 'standard' (or absent) yields all 14 phases.
+    const withSize = { ...createValidRequest(), request_id: 'REQ-526003', task_size: 'standard' as const };
+    const withoutSize = { ...createValidRequest(), request_id: 'REQ-526004' };
+
+    writeStateJson(withSize, tempDir);
+    writeStateJson(withoutSize, tempDir);
+
+    const read = (id: string) =>
+      JSON.parse(
+        fs.readFileSync(
+          path.join(tempDir, '.autonomous-dev', 'requests', id, 'state.json'),
+          'utf-8',
+        ),
+      );
+
+    const a = read('REQ-526003');
+    const b = read('REQ-526004');
+    expect(a.phase_overrides).toHaveLength(14);
+    expect(a.phase_overrides).toEqual(b.phase_overrides);
+    expect(b.task_size).toBe('standard');
   });
 
   it('symlink_escape_rejected - directory configured as symlink outside repo rejected', () => {

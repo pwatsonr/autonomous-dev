@@ -25,6 +25,11 @@ import type { InjectionRule } from '../core/sanitizer';
 import { sanitize } from '../core/sanitizer';
 import { parseRequest } from '../core/request_parser';
 import { writeStateJson, StateJsonError } from '../lib/state_json_writer';
+import {
+  classifyTaskSize,
+  isValidTaskSize,
+  type TaskSize,
+} from '../core/task_size_classifier';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -44,6 +49,14 @@ export interface SubmitHandlerDeps {
   claudeClient?: ClaudeApiClient;
   duplicateDetector?: DuplicateDetector;
   injectionRules?: InjectionRule[];
+  /**
+   * Gate for the #526 auto task-size classifier
+   * (`intake.auto_size_classification.enabled`). DEFAULTS FALSE: when unset or
+   * false the auto-classifier never runs, so every request without an explicit
+   * `--size` hint is `standard` and the pipeline is byte-for-byte unchanged.
+   * An explicit `--size` hint is always honored regardless of this flag.
+   */
+  autoSizeClassificationEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +185,45 @@ export class SubmitHandler implements CommandHandler {
         ? flagType
         : 'feature';
 
+    // Stage 2b: Task-size classification (#526).
+    // Precedence (highest first):
+    //   1. --full-pipeline  -> force 'standard', bypass the classifier entirely.
+    //   2. --size <hint>     -> honored verbatim (per-request opt-in; ignores flag).
+    //   3. auto-classifier   -> only when intake.auto_size_classification.enabled.
+    //   4. else              -> 'standard' (default path, unchanged).
+    const fullPipeline =
+      command.flags['--full-pipeline'] === true ||
+      command.flags['full-pipeline'] === true ||
+      command.flags['--full-pipeline'] === 'true' ||
+      command.flags['full-pipeline'] === 'true';
+
+    const sizeHintRaw =
+      typeof command.flags['--size'] === 'string'
+        ? command.flags['--size']
+        : typeof command.flags['size'] === 'string'
+          ? command.flags['size']
+          : undefined;
+    const sizeHint =
+      sizeHintRaw !== undefined && isValidTaskSize(sizeHintRaw)
+        ? sizeHintRaw
+        : undefined;
+
+    let taskSize: TaskSize = 'standard';
+    let sizeSignals: string[] = [];
+    if (fullPipeline) {
+      taskSize = 'standard';
+      sizeSignals = ['full-pipeline-override'];
+    } else if (sizeHint) {
+      const classified = classifyTaskSize({ description, sizeHint });
+      taskSize = classified.size;
+      sizeSignals = classified.matchedSignals;
+    } else if (this.deps.autoSizeClassificationEnabled) {
+      const classified = classifyTaskSize({ description });
+      taskSize = classified.size;
+      sizeSignals = classified.matchedSignals;
+    }
+    // else: flag off and no hint -> taskSize stays 'standard' (default path).
+
     // Stage 3: Duplicate detection
     if (this.deps.duplicateDetector) {
       const duplicateResult = await this.deps.duplicateDetector.detectDuplicate(
@@ -260,6 +312,7 @@ export class SubmitHandler implements CommandHandler {
           target_repo: request.target_repo || '',
           source_channel: command.source.channelType, // Use original channel type for state.json
           type: request.type,
+          task_size: taskSize, // #526: drives the union skip set in the writer.
         }, targetRepo);
       } catch (err) {
         if (err instanceof StateJsonError) {
@@ -292,7 +345,13 @@ export class SubmitHandler implements CommandHandler {
       request_id: requestId,
       event: 'request_submitted',
       phase: 'intake',
-      details: JSON.stringify({ priority, position, estimatedWait }),
+      details: JSON.stringify({
+        priority,
+        position,
+        estimatedWait,
+        size: taskSize,
+        matchedSignals: sizeSignals,
+      }),
     });
 
     return {

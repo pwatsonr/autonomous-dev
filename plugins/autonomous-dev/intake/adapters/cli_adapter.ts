@@ -90,6 +90,14 @@ export const VALID_REQUEST_TYPES = [
   'hotfix',
 ] as const;
 
+/** All valid `--size` values for `request submit` (#526). */
+export const VALID_TASK_SIZES = [
+  'trivial-docs',
+  'small',
+  'standard',
+  'large',
+] as const;
+
 /** Strict ISO-8601 with timezone (Z or ±HH:MM). */
 const ISO_8601_REGEX =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
@@ -178,6 +186,20 @@ export function parseType(value: string): string {
   if (!(VALID_REQUEST_TYPES as readonly string[]).includes(value)) {
     throw new InvalidArgumentError(
       `type '${value}' invalid. Valid: ${VALID_REQUEST_TYPES.join(', ')}`,
+    );
+  }
+  return value;
+}
+
+/**
+ * Parse and validate a `--size` value against {@link VALID_TASK_SIZES} (#526).
+ *
+ * @throws {InvalidArgumentError} when the value is not in the allowlist.
+ */
+export function parseSize(value: string): string {
+  if (!(VALID_TASK_SIZES as readonly string[]).includes(value)) {
+    throw new InvalidArgumentError(
+      `size '${value}' invalid. Valid: ${VALID_TASK_SIZES.join(', ')}`,
     );
   }
   return value;
@@ -555,6 +577,18 @@ export function buildProgram(
       '--bug-context-path <file>',
       'Path to a JSON BugReport (required when --type bug, unless using submit-bug)',
     )
+    .addOption(
+      new Option(
+        '--size <size>',
+        `Task-size hint (one of: ${VALID_TASK_SIZES.join(', ')}). ` +
+          'Opts this request into size-based pipeline routing regardless of config.',
+      ).argParser(parseSize),
+    )
+    .option(
+      '--full-pipeline',
+      'Force the full standard pipeline, bypassing the task-size classifier',
+      false,
+    )
     .action(async (description: string, opts: Record<string, unknown>) => {
       // SPEC-018-3-02: bug-typed requests must carry a populated bug_context.
       // Either supply a pre-built JSON file via --bug-context-path or use
@@ -584,6 +618,10 @@ export function buildProgram(
         deadline: opts.deadline,
         type: opts.type,
         bug_context: bugContext ? JSON.stringify(bugContext) : undefined,
+        // #526: operator size controls. Key names match the snake/hyphen forms
+        // the SubmitHandler reads (`--size`/`size`, `--full-pipeline`/`full-pipeline`).
+        size: opts.size,
+        'full-pipeline': opts.fullPipeline === true ? true : undefined,
       });
     });
 

@@ -21,6 +21,12 @@
  */
 
 import { RequestType } from './request-type';
+import type { TaskSize } from '../core/task_size_classifier';
+
+// Re-export TaskSize so consumers can import the size vocabulary alongside the
+// phase matrices from a single module (#526). The canonical definition lives in
+// the pure classifier (`intake/core/task_size_classifier.ts`).
+export type { TaskSize } from '../core/task_size_classifier';
 
 /**
  * Ordered identifiers for the canonical autonomous-dev pipeline phases.
@@ -138,4 +144,53 @@ export function isEnhancedPhase(
  */
 export function getAdditionalGates(requestType: RequestType): string[] {
   return [...PHASE_OVERRIDE_MATRIX[requestType].additionalGates];
+}
+
+// ---------------------------------------------------------------------------
+// Task-size skip matrix (#526)
+// ---------------------------------------------------------------------------
+
+/**
+ * TASK_SIZE_SKIP_MATRIX — per-{@link TaskSize} phases to skip, UNIONed with the
+ * request type's own `skippedPhases` (see {@link getSkippedPhases}).
+ *
+ * Conservative first cut (#526):
+ *   - `trivial-docs` skips ALL upfront design phases (prd/tdd/plan + their
+ *     reviews), leaving intake → spec → spec_review → code → code_review →
+ *     integration → deploy → monitor.
+ *   - `small` reuses the SAME skip set HOTFIX uses (prd/prd_review/tdd/
+ *     tdd_review) so a small change still gets a plan + spec.
+ *   - `standard` / `large` skip nothing (no behavior change vs. type-only).
+ *
+ * This matrix is additive to {@link PHASE_OVERRIDE_MATRIX} and is NOT covered
+ * by the phase-matrix snapshot (which locks only the per-type matrix).
+ */
+export const TASK_SIZE_SKIP_MATRIX: Record<TaskSize, PipelinePhase[]> = {
+  'trivial-docs': ['prd', 'prd_review', 'tdd', 'tdd_review', 'plan', 'plan_review'],
+  // Mirror HOTFIX's skip set (see PHASE_OVERRIDE_MATRIX[RequestType.HOTFIX]).
+  small: ['prd', 'prd_review', 'tdd', 'tdd_review'],
+  standard: [],
+  large: [],
+};
+
+/**
+ * Resolve the full set of skipped phases for a (type, size) pair as the UNION
+ * of the request type's `skippedPhases` and the task size's skip set (#526).
+ *
+ * Returns phases in canonical {@link ALL_PIPELINE_PHASES} order, de-duplicated.
+ * A defensive new array is returned so callers cannot mutate either matrix.
+ *
+ * @param type - the request type whose skip set to include.
+ * @param size - the task size whose skip set to union in.
+ */
+export function getSkippedPhases(
+  type: RequestType,
+  size: TaskSize,
+): PipelinePhase[] {
+  const union = new Set<PipelinePhase>([
+    ...(PHASE_OVERRIDE_MATRIX[type]?.skippedPhases ?? []),
+    ...(TASK_SIZE_SKIP_MATRIX[size] ?? []),
+  ]);
+  // Canonical order, de-duplicated.
+  return ALL_PIPELINE_PHASES.filter((p) => union.has(p));
 }

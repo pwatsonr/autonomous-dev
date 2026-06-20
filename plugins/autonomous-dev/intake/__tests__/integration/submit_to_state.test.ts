@@ -196,6 +196,61 @@ users:
     }
   });
 
+  it('trivial_docs_size - --size trivial-docs writes 8-phase overrides + task_size', async () => {
+    // #526: a per-request --size hint opts into size routing regardless of the
+    // config flag (which is off here). trivial-docs skips all upfront design.
+    const description = 'append a release note to the README';
+    const testRepo = createTestRepo();
+    const command = {
+      commandName: 'submit',
+      args: [description],
+      flags: {
+        repo: testRepo,
+        type: 'feature',
+        size: 'trivial-docs',
+      },
+      rawText: `submit "${description}" --repo ${testRepo} --type feature --size trivial-docs`,
+      source: { channelType: 'cli' as const, userId: 'test-user' },
+    };
+
+    const result = await router.route(command);
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const requestId = result.data.requestId;
+      const stateFile = path.join(testRepo, '.autonomous-dev', 'requests', requestId, 'state.json');
+      const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+
+      expect(state.task_size).toBe('trivial-docs');
+      expect(state.phase_overrides).toEqual([
+        'intake',
+        'spec', 'spec_review',
+        'code', 'code_review',
+        'integration', 'deploy', 'monitor',
+      ]);
+      expect(state.phase_overrides).toHaveLength(8);
+    }
+  });
+
+  it('default_submit_unchanged - no --size yields standard + full 14-phase pipeline', async () => {
+    // The default path must be unchanged: without --size and with the config
+    // flag off, task_size is 'standard' and all 14 phases are present.
+    const description = 'append a release note to the README'; // would auto-trivial IF enabled
+    const testRepo = createTestRepo();
+    const command = createSubmitCommand(description, 'feature', testRepo);
+
+    const result = await router.route(command);
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const requestId = result.data.requestId;
+      const stateFile = path.join(testRepo, '.autonomous-dev', 'requests', requestId, 'state.json');
+      const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+      expect(state.task_size).toBe('standard');
+      expect(state.phase_overrides).toHaveLength(14);
+    }
+  });
+
   it('all_required_state_fields_present - state.json has all 20 TDD fields', async () => {
     const description = 'Comprehensive field test for infrastructure improvements';
     const testRepo = createTestRepo();
