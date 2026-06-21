@@ -77,18 +77,19 @@ jobs:
         run: bash scripts/ci/check-goldens-size.sh
 
       # AC-5 step 6: start the portal in the background, then wait for the
-      # loopback port. The portal logs to stdout — Playwright's `--reporter
-      # list` will surface its own readiness messages on top.
-      - name: Start portal (background)
-        run: bun run server/index.ts &
-
-      - name: Wait for portal port
-        run: bash scripts/ci/wait-for-port.sh "${PORT}" 30
-
       # AC-7: never pass `--project=golden-gen`; never set UPDATE_GOLDEN.
       # The default `chromium` project has `updateSnapshots: 'none'`.
+      #
+      # #361: the visual specs spawn their OWN portal (server/server.ts on the
+      # test port, in beforeAll) and wait for it themselves, so no separate
+      # server-start step is needed. The old "Start portal (background)" step
+      # was doubly broken: it ran `bun run server/index.ts` (a file that does
+      # not exist — the entrypoint is server/server.ts) AND, since it used the
+      # same PORT (19281) the spec spawns on, it would have collided with the
+      # spec's own server. The test filename was also stale
+      # (design-system.spec.ts → design-system.visual.ts).
       - name: Run Playwright visual regression suite
-        run: npx playwright test tests/visual-regression/design-system.spec.ts
+        run: npx playwright test tests/visual-regression/design-system.visual.ts
 
       # AC-5 step 8: on failure, upload the report + raw test results +
       # any diff PNGs Playwright wrote so reviewers can inspect drift.
