@@ -24,6 +24,13 @@ export interface DaemonStatus {
     pid: number | null;
     active_requests: number;
     kill_switch_active: boolean;
+    /** Seconds since the daemon instance started, derived from heartbeat
+     *  `start_time` (#356 / FR-404). null when the daemon predates the field. */
+    uptime_seconds: number | null;
+    /** The daemon's supervisor-loop iteration count (#356). */
+    iteration_count: number | null;
+    /** The request the daemon is currently processing, or null when idle (#356). */
+    active_request_id: string | null;
 }
 
 const FRESH_THRESHOLD_MS = 60_000;
@@ -35,6 +42,9 @@ const DEAD: DaemonStatus = {
     pid: null,
     active_requests: 0,
     kill_switch_active: false,
+    uptime_seconds: null,
+    iteration_count: null,
+    active_request_id: null,
 };
 
 /**
@@ -111,11 +121,38 @@ export async function readDaemonStatus(): Promise<DaemonStatus> {
     const ksVal = obj["kill_switch_active"];
     const killSwitchActive = ksVal === true;
 
+    // #356: derive uptime from start_time, surface iteration_count + the active
+    // request id. The daemon never writes `active_requests` (a count), so derive
+    // it from active_request_id (0 idle / 1 processing) for honesty.
+    const startVal = obj["start_time"];
+    let uptimeSeconds: number | null = null;
+    if (typeof startVal === "string" && startVal.length > 0) {
+        const startMs = Date.parse(startVal);
+        if (!Number.isNaN(startMs) && now >= startMs) {
+            uptimeSeconds = Math.floor((now - startMs) / 1000);
+        }
+    }
+
+    const iterVal = obj["iteration_count"];
+    const iterationCount =
+        typeof iterVal === "number" && Number.isInteger(iterVal) && iterVal >= 0
+            ? iterVal
+            : null;
+
+    const reqIdVal = obj["active_request_id"];
+    const activeRequestId =
+        typeof reqIdVal === "string" && reqIdVal.length > 0 ? reqIdVal : null;
+
     return {
         status,
         last_seen: timestamp,
         pid,
-        active_requests: activeRequests,
+        // Prefer the explicit count if a future daemon writes it; otherwise
+        // derive from the active request id (0/1).
+        active_requests: activeRequests || (activeRequestId !== null ? 1 : 0),
         kill_switch_active: killSwitchActive,
+        uptime_seconds: uptimeSeconds,
+        iteration_count: iterationCount,
+        active_request_id: activeRequestId,
     };
 }

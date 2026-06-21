@@ -34,6 +34,49 @@ export interface DaemonStatusBody {
     mtdSpend: number;
     approvalsCount: number;
     killSwitchEngaged: boolean;
+    /** Seconds since the daemon started, from heartbeat `start_time` (#356 / FR-404). */
+    uptimeSeconds: number | null;
+    /** Supervisor-loop iteration count from the heartbeat (#356). */
+    iterationCount: number | null;
+    /** Request the daemon is currently processing, or null when idle (#356). */
+    activeRequestId: string | null;
+}
+
+/** The heartbeat fields #356 surfaces (defensively parsed). */
+interface HeartbeatExtras {
+    uptimeSeconds: number | null;
+    iterationCount: number | null;
+    activeRequestId: string | null;
+}
+
+function parseHeartbeatExtras(raw: string, now: number): HeartbeatExtras {
+    const empty: HeartbeatExtras = {
+        uptimeSeconds: null,
+        iterationCount: null,
+        activeRequestId: null,
+    };
+    let obj: Record<string, unknown>;
+    try {
+        const parsed = JSON.parse(raw);
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return empty;
+        obj = parsed as Record<string, unknown>;
+    } catch {
+        return empty;
+    }
+    let uptimeSeconds: number | null = null;
+    const start = obj["start_time"];
+    if (typeof start === "string" && start.length > 0) {
+        const startMs = Date.parse(start);
+        if (!Number.isNaN(startMs) && now >= startMs) {
+            uptimeSeconds = Math.floor((now - startMs) / 1000);
+        }
+    }
+    const iter = obj["iteration_count"];
+    const iterationCount =
+        typeof iter === "number" && Number.isInteger(iter) && iter >= 0 ? iter : null;
+    const reqId = obj["active_request_id"];
+    const activeRequestId = typeof reqId === "string" && reqId.length > 0 ? reqId : null;
+    return { uptimeSeconds, iterationCount, activeRequestId };
 }
 
 export interface DaemonStatusDeps {
@@ -78,18 +121,26 @@ export function buildDaemonStatusHandler(
     return async (c: Context): Promise<Response> => {
         c.header("Cache-Control", "no-store");
 
-        const [hbR, spendR, apprR, ksR] = await Promise.allSettled([
+        const [hbR, hbBodyR, spendR, apprR, ksR] = await Promise.allSettled([
             fs.stat(heartbeatPath),
+            fs.readFile(heartbeatPath, "utf8"),
             deps.readMtdSpend(),
             deps.readApprovalsCount(),
             deps.readKillSwitchEngaged(),
         ]);
 
+        const now = Date.now();
         const heartbeatAgeMs =
             hbR.status === "fulfilled"
-                ? Math.max(0, Date.now() - hbR.value.mtimeMs)
+                ? Math.max(0, now - hbR.value.mtimeMs)
                 : HEARTBEAT_MISSING_AGE_MS;
         const status = classify(heartbeatAgeMs);
+
+        // #356: parse the heartbeat body for uptime/iteration/active-request.
+        const extras: HeartbeatExtras =
+            hbBodyR.status === "fulfilled"
+                ? parseHeartbeatExtras(hbBodyR.value, now)
+                : { uptimeSeconds: null, iterationCount: null, activeRequestId: null };
 
         if (spendR.status !== "fulfilled") {
             log.warn("daemon_status_cost_unavailable", {
@@ -114,6 +165,9 @@ export function buildDaemonStatusHandler(
             approvalsCount: apprR.status === "fulfilled" ? apprR.value : 0,
             killSwitchEngaged:
                 ksR.status === "fulfilled" ? ksR.value : false,
+            uptimeSeconds: extras.uptimeSeconds,
+            iterationCount: extras.iterationCount,
+            activeRequestId: extras.activeRequestId,
         };
         return c.json(body);
     };
