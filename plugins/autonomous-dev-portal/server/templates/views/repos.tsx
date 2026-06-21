@@ -13,6 +13,7 @@ import type { FC } from "hono/jsx";
 import { Topbar } from "../../components/topbar";
 
 import type { RenderProps } from "../../types/render";
+import { nowMs } from "../../lib/clock";
 
 // Pre-computed hx-trigger value - using double quotes inside bracket expression
 const REPOS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
@@ -25,7 +26,7 @@ function fmtRelative(iso: string | undefined): string {
     if (typeof iso !== "string" || iso.length === 0) return "—";
     const ts = Date.parse(iso);
     if (Number.isNaN(ts)) return "—";
-    const ageMs = Date.now() - ts;
+    const ageMs = nowMs() - ts;
     const ageMin = Math.floor(ageMs / 60_000);
     if (ageMin < 1) return "just now";
     if (ageMin < 60) return `${ageMin}m ago`;

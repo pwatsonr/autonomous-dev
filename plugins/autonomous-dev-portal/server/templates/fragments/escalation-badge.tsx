@@ -22,6 +22,7 @@
 //     (e.g., progressive enhancement disabled or script blocked by CSP).
 
 import type { FC } from "hono/jsx";
+import { nowMs } from "../../lib/clock";
 
 interface Props {
     /** ISO-8601 timestamp at which the request was escalated. */
@@ -36,7 +37,7 @@ interface Props {
 function formatRelative(iso: string): string {
     const ts = Date.parse(iso);
     if (Number.isNaN(ts)) return iso;
-    const ageMs = Date.now() - ts;
+    const ageMs = nowMs() - ts;
     const hours = Math.floor(ageMs / 3_600_000);
     if (hours < 1) return "just now";
     if (hours < 24) return `${hours}h ago`;

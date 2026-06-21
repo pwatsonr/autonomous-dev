@@ -32,6 +32,7 @@ import type {
 import { EmptyState } from "../fragments/empty-state";
 import { KpiStrip } from "../fragments/kpi-strip";
 import type { KpiItem } from "../fragments/kpi-strip";
+import { nowMs } from "../../lib/clock";
 
 // Pre-computed hx-trigger value - using double quotes inside bracket expression
 const REQUESTS_POLLING_TRIGGER = 'every 10s [document.visibilityState === "visible"]';
@@ -202,7 +203,7 @@ export const RequestsView: FC<RenderProps["requests"]> = ({
     items,
     aggregates,
 }) => {
-    const now = Date.now();
+    const now = nowMs();
     const kpiItems = buildRequestsKpiItems(items, aggregates);
 
     return (

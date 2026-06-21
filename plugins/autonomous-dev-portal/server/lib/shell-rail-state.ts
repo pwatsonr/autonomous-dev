@@ -27,6 +27,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 import { readDaemonStatus, type DaemonStatus } from "./daemon-status";
+import { nowMs as clockNowMs } from "./clock";
 
 /**
  * SPEC-037-3-05 AC-02 — flat state shape derived once per render.
@@ -235,7 +236,7 @@ async function readQueueCounts(): Promise<{
  *              to `Date.now()`.
  */
 export async function deriveShellRailState(
-    nowMs: number = Date.now(),
+    nowMs: number = clockNowMs(),
 ): Promise<ShellRailState> {
     const state: ShellRailState = {};
 

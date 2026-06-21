@@ -1,14 +1,244 @@
 {
   "daily": {
-    "2026-05-01": { "total_usd": 12.4 },
-    "2026-05-02": { "total_usd": 18.55 },
-    "2026-05-03": { "total_usd": 9.8 },
-    "2026-05-04": { "total_usd": 22.1 },
-    "2026-05-05": { "total_usd": 15.65 },
-    "2026-05-06": { "total_usd": 11.2 },
-    "2026-05-07": { "total_usd": 19.45 },
-    "2026-05-08": { "total_usd": 16.7 },
-    "2026-05-09": { "total_usd": 14.5 },
-    "2026-05-10": { "total_usd": 13.25 }
+    "2026-05-23": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M23"
+        }
+      ]
+    },
+    "2026-05-24": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M24"
+        }
+      ]
+    },
+    "2026-05-25": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M25"
+        }
+      ]
+    },
+    "2026-05-26": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M26"
+        }
+      ]
+    },
+    "2026-05-27": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M27"
+        }
+      ]
+    },
+    "2026-05-28": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M28"
+        }
+      ]
+    },
+    "2026-05-29": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M29"
+        }
+      ]
+    },
+    "2026-05-30": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M30"
+        }
+      ]
+    },
+    "2026-05-31": {
+      "total_usd": 8,
+      "sessions": [
+        {
+          "request_id": "REQ-M31"
+        }
+      ]
+    },
+    "2026-06-01": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J01"
+        }
+      ]
+    },
+    "2026-06-02": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J02"
+        }
+      ]
+    },
+    "2026-06-03": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J03"
+        }
+      ]
+    },
+    "2026-06-04": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J04"
+        }
+      ]
+    },
+    "2026-06-05": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J05"
+        }
+      ]
+    },
+    "2026-06-06": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J06"
+        }
+      ]
+    },
+    "2026-06-07": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J07"
+        }
+      ]
+    },
+    "2026-06-08": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J08"
+        }
+      ]
+    },
+    "2026-06-09": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J09"
+        }
+      ]
+    },
+    "2026-06-10": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J10"
+        }
+      ]
+    },
+    "2026-06-11": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J11"
+        }
+      ]
+    },
+    "2026-06-12": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J12"
+        }
+      ]
+    },
+    "2026-06-13": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J13"
+        }
+      ]
+    },
+    "2026-06-14": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J14"
+        }
+      ]
+    },
+    "2026-06-15": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J15"
+        }
+      ]
+    },
+    "2026-06-16": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J16"
+        }
+      ]
+    },
+    "2026-06-17": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J17"
+        }
+      ]
+    },
+    "2026-06-18": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J18"
+        }
+      ]
+    },
+    "2026-06-19": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J19"
+        }
+      ]
+    },
+    "2026-06-20": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J20"
+        }
+      ]
+    },
+    "2026-06-21": {
+      "total_usd": 10,
+      "sessions": [
+        {
+          "request_id": "REQ-J21"
+        }
+      ]
+    }
   }
 }

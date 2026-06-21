@@ -18,6 +18,7 @@ import type {
     DashboardRequest,
     RequestsAggregatesProp,
 } from "../types/render";
+import { nowMs } from "../lib/clock";
 
 /**
  * Twenty-four hours in milliseconds; used by the "Completed today" KPI
@@ -51,7 +52,7 @@ function isWithin24h(iso: string | undefined, now: number): boolean {
 export function computeRequestsAggregates(
     requests: DashboardRequest[],
     totalCostMtdUsd: number,
-    now: number = Date.now(),
+    now: number = nowMs(),
 ): RequestsAggregatesProp {
     let activeCount = 0;
     let inGateCount = 0;

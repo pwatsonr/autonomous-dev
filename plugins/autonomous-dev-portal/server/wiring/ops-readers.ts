@@ -23,6 +23,7 @@ import type {
 
 import { readDaemonStatus } from "../lib/daemon-status";
 import { stateDirRoot } from "./state-paths";
+import { nowMs, nowIso } from "../lib/clock";
 
 interface PluginManifestFile {
     name?: string;
@@ -105,7 +106,7 @@ async function readRecentLog(maxLines = 50): Promise<LogEntry[]> {
         } catch {
             // Plain text — surface as INFO.
         }
-        entries.push({ ts: new Date().toISOString(), level: "INFO", message: line });
+        entries.push({ ts: nowIso(), level: "INFO", message: line });
     }
     return entries;
 }
@@ -186,7 +187,7 @@ function relativeAgo(iso: string | null): string {
     if (iso === null) return "—";
     const t = Date.parse(iso);
     if (Number.isNaN(t)) return "—";
-    const s = Math.max(0, Math.floor((Date.now() - t) / 1000));
+    const s = Math.max(0, Math.floor((nowMs() - t) / 1000));
     if (s < 60) return `${s}s ago`;
     const m = Math.floor(s / 60);
     if (m < 60) return `${m}m ago`;

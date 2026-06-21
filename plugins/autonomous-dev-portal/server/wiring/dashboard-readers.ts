@@ -29,6 +29,7 @@ import {
     type SettingsReaderOptions,
 } from "./settings-reader";
 import { stateDirRoot } from "./state-paths";
+import { nowDate } from "../lib/clock";
 
 export interface DashboardReaderOptions
     extends RepoAggregationOptions,
@@ -226,7 +227,7 @@ export async function read14DayCostBars(ledgerPath?: string): Promise<DayCostBar
         // absent/corrupt ledger → all-zero series
     }
     const out: DayCostBar[] = [];
-    const now = new Date();
+    const now = nowDate();
     for (let i = 13; i >= 0; i--) {
         const d = new Date(Date.UTC(
             now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i,

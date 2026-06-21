@@ -11,6 +11,7 @@ import { renderPage } from "../lib/response-utils";
 import { projectMonthEnd } from "../lib/costs-projection";
 import { readCostsData } from "../wiring/costs-readers";
 import type { CostSeries } from "../types/render";
+import { nowDate } from "../lib/clock";
 
 export const costsHandler = async (c: Context): Promise<Response> => {
     const series: CostSeries = await readCostsData();
@@ -18,7 +19,7 @@ export const costsHandler = async (c: Context): Promise<Response> => {
         series: series.points,
         mtd: series.totalMtd ?? 0,
         cap: series.costCap ?? 0,
-        today: new Date(),
+        today: nowDate(),
     });
     return renderPage(c, "costs", { series, projection });
 };

@@ -10,10 +10,18 @@ import { readCostsData } from "../../server/wiring/costs-readers";
 import { kitParityFixtureRoot } from "../../server/wiring/state-paths";
 
 const ORIGINAL_STATE_DIR = process.env["AUTONOMOUS_DEV_STATE_DIR"];
+const ORIGINAL_NOW = process.env["AUTONOMOUS_DEV_NOW"];
+
+// #361: the kit-parity fixture is now dated relative to a frozen reference
+// clock so the windowed readers (30-day chart, MTD, month request count) are
+// deterministic. The ledger has late-May (9 days @ $8) + June 1–21 (21 days
+// @ $10) entries; under T the 30-day window is 2026-05-23..06-21 (all filled).
+const T = "2026-06-21T12:00:00Z";
 
 describe("readCostsData — kit-parity fixture", () => {
     beforeAll(() => {
         process.env["AUTONOMOUS_DEV_STATE_DIR"] = kitParityFixtureRoot();
+        process.env["AUTONOMOUS_DEV_NOW"] = T;
     });
     beforeEach(() => {
         __resetDaemonReaderCacheForTests();
@@ -24,17 +32,21 @@ describe("readCostsData — kit-parity fixture", () => {
         } else {
             process.env["AUTONOMOUS_DEV_STATE_DIR"] = ORIGINAL_STATE_DIR;
         }
+        if (ORIGINAL_NOW === undefined) {
+            delete process.env["AUTONOMOUS_DEV_NOW"];
+        } else {
+            process.env["AUTONOMOUS_DEV_NOW"] = ORIGINAL_NOW;
+        }
     });
 
     test("emits a daily chart series from cost-ledger.json", async () => {
         const series = await readCostsData();
-        // #396: the series is the last 30 CALENDAR days, zero-filled.
-        // The kit-parity fixture's static dates fall outside the live
-        // window, so values are zero — but the shape contract holds.
+        // #396/#361: the series is the last 30 CALENDAR days, zero-filled.
+        // Under the frozen clock the window captures the whole fixture:
+        // points[0] = 2026-05-23 ($8), points[29] = today 2026-06-21 ($10).
         expect(series.points.length).toBe(30);
-        for (const p of series.points) {
-            expect(p.value).toBeGreaterThanOrEqual(0);
-        }
+        expect(series.points[0]?.value).toBe(8);
+        expect(series.points[29]?.value).toBe(10);
     });
 
     test("reviewer / phase / deploy tables empty on real install (O.Q. #6)", async () => {
@@ -44,13 +56,13 @@ describe("readCostsData — kit-parity fixture", () => {
         expect(series.deploySpend).toEqual([]);
     });
 
-    test("requestCount is month-scoped from ledger sessions (#396)", async () => {
+    test("MTD + requestCount are month-scoped from ledger sessions (#396)", async () => {
         const series = await readCostsData();
-        // #396: the avg/request denominator counts DISTINCT request ids
-        // with sessions in the CURRENT month (the old all-time request
-        // count deflated the average). The kit-parity fixture's sessions
-        // carry static dates outside the current month → 0.
-        expect(series.requestCount).toBe(0);
+        // #396: the avg/request denominator counts DISTINCT request ids with
+        // sessions in the CURRENT month. Under T (June) the fixture has 21
+        // June days, each with one distinct request id, summing to $210 MTD.
+        expect(series.totalMtd).toBe(210);
+        expect(series.requestCount).toBe(21);
     });
 });
 

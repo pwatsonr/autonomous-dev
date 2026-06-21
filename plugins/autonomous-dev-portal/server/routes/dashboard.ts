@@ -24,6 +24,7 @@ import type {
     DashboardRequest,
 } from "../types/render";
 import type { DashboardV3Extra } from "../templates/views/dashboard";
+import { nowDate } from "../lib/clock";
 
 /**
  * Build the gate-type partition string ("{N} reviewer / {N} standards
@@ -117,7 +118,7 @@ async function buildV3Extra(
         swimlanes.reduce((s, g) => s + g.cards.length, 0),
     );
     const monthlyCap = await readMonthlyCapUsd();
-    const now = new Date();
+    const now = nowDate();
     const hoursElapsedThisMonth = Math.max(
         1,
         (now.getTime() - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)) / 3_600_000,
