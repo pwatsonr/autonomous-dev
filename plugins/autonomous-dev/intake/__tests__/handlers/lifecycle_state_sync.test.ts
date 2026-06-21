@@ -19,7 +19,10 @@ import {
   setHandoffDatabase,
   submitRequest,
 } from '../../core/handoff_manager';
-import { setAllowedRepositoriesForTest } from '../../core/path_security';
+import {
+  setAllowedRepositories,
+  setAllowedRepositoriesForTest,
+} from '../../core/path_security';
 import type { SubmitRequest } from '../../core/types';
 import { initializeDatabase } from '../../db/migrator';
 import { Repository } from '../../db/repository';
@@ -84,6 +87,37 @@ describe('#551: CancelHandler syncs state.json', () => {
   let ctx: Ctx;
   beforeEach(() => { ctx = setup(); });
   afterEach(() => { teardown(ctx); });
+
+  test('#556: cancel syncs state.json when the allowlist is set via the PRODUCTION setter', async () => {
+    // The other tests use the test-only setter, which masked the production gap
+    // (#556): initRouter must populate path_security via setAllowedRepositories.
+    // Reset to env-loaded (deny-all), then populate via the production path.
+    setAllowedRepositoriesForTest(null);
+    setAllowedRepositories([ctx.repo]); // what initRouter now does from config
+    await submitRequest(makeReq(ctx.repo, 7));
+
+    const handler = new CancelHandler(ctx.repoApi, noopEmitter);
+    await handler.execute(cmd(['REQ-000007', 'CONFIRM']), 'user-1');
+
+    expect(readStateStatus(ctx.repo, 'REQ-000007')).toBe('cancelled'); // synced, not db-only
+    expect(ctx.repoApi.getRequest('REQ-000007')!.status).toBe('cancelled');
+  });
+
+  test('#556: with a deny-all allowlist, cancel falls back to db-only (no throw, no regression)', async () => {
+    // Materialize the request with the allowlist set (submit needs it too)...
+    await submitRequest(makeReq(ctx.repo, 8));
+    const before = readStateStatus(ctx.repo, 'REQ-000008');
+    // ...then flip to deny-all so the cancel's buildRequestPath throws → F1 →
+    // the handler's db-only fallback runs (the no-regression path).
+    setAllowedRepositoriesForTest(null);
+
+    const handler = new CancelHandler(ctx.repoApi, noopEmitter);
+    const res = await handler.execute(cmd(['REQ-000008', 'CONFIRM']), 'user-1');
+
+    expect(res.success).toBe(true);
+    expect(ctx.repoApi.getRequest('REQ-000008')!.status).toBe('cancelled'); // db still updated
+    expect(readStateStatus(ctx.repo, 'REQ-000008')).toBe(before); // state.json untouched (deny-all)
+  });
 
   test('cancel writes "cancelled" to BOTH the db row and state.json', async () => {
     await submitRequest(makeReq(ctx.repo, 1)); // materializes db row + state.json
