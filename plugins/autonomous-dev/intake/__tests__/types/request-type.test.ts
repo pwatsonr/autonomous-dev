@@ -147,12 +147,18 @@ describe('getPhaseSequence()', () => {
     expect(seq).not.toContain('prd_review');
   });
 
-  test('HOTFIX returns 11 phases excluding prd, prd_review, plan_review', () => {
+  test('HOTFIX returns 10 phases excluding prd, prd_review, tdd, tdd_review', () => {
+    // #543: HOTFIX skips the full upfront design (PRD + TDD) to reach code fast;
+    // it KEEPS plan/plan_review (the test previously asserted the stale set
+    // "excludes plan_review" / 11 phases — see PHASE_OVERRIDE_MATRIX HOTFIX).
     const seq = getPhaseSequence(RequestType.HOTFIX);
-    expect(seq).toHaveLength(11);
+    expect(seq).toHaveLength(10);
     expect(seq).not.toContain('prd');
     expect(seq).not.toContain('prd_review');
-    expect(seq).not.toContain('plan_review');
+    expect(seq).not.toContain('tdd');
+    expect(seq).not.toContain('tdd_review');
+    expect(seq).toContain('plan');
+    expect(seq).toContain('plan_review');
   });
 });
 
@@ -165,7 +171,8 @@ describe('isEnhancedPhase()', () => {
     expect(isEnhancedPhase(RequestType.BUG, 'code')).toBe(true);
     expect(isEnhancedPhase(RequestType.INFRA, 'tdd')).toBe(true);
     expect(isEnhancedPhase(RequestType.REFACTOR, 'code_review')).toBe(true);
-    expect(isEnhancedPhase(RequestType.HOTFIX, 'tdd')).toBe(true);
+    // #543: HOTFIX enhances `code` (it SKIPS tdd; the prior `HOTFIX, 'tdd' →
+    // true` asserted the outdated matrix).
     expect(isEnhancedPhase(RequestType.HOTFIX, 'code')).toBe(true);
   });
 
@@ -180,6 +187,7 @@ describe('isEnhancedPhase()', () => {
     expect(isEnhancedPhase(RequestType.INFRA, 'code')).toBe(false);
     expect(isEnhancedPhase(RequestType.REFACTOR, 'tdd')).toBe(false);
     expect(isEnhancedPhase(RequestType.HOTFIX, 'plan')).toBe(false);
+    expect(isEnhancedPhase(RequestType.HOTFIX, 'tdd')).toBe(false); // #543: tdd is skipped, not enhanced
     expect(isEnhancedPhase(RequestType.FEATURE, 'intake')).toBe(false);
   });
 });
