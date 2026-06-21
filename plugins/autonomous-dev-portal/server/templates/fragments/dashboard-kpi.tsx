@@ -17,6 +17,7 @@
 
 import type { FC } from "hono/jsx";
 import { renderSparkline } from "../../charts/sparkline";
+import { icon } from "../../lib/icons";
 
 // Tone-to-hex map reusing design-token semantic colors so the SVG spark
 // stroke matches the token (tokens are not available inside SVG attributes).
@@ -57,11 +58,11 @@ export interface DashboardKpiTile {
     sparkTone: "info" | "ok" | "warn" | "err" | "brand";
 }
 
-/** Map valueTone to a visible icon and a screen-reader label (WCAG 1.4.1). */
-function toneIcon(tone: DashboardKpiTile["valueTone"]): { icon: string; label: string } | null {
-    if (tone === "kpi-warn") return { icon: "⚠", label: "warning" };
-    if (tone === "kpi-ok")   return { icon: "✓", label: "ok" };
-    if (tone === "kpi-err")  return { icon: "✕", label: "error" };
+/** Map valueTone to a lucide icon name and a screen-reader label (WCAG 1.4.1). */
+function toneIcon(tone: DashboardKpiTile["valueTone"]): { iconName: string; label: string } | null {
+    if (tone === "kpi-warn") return { iconName: "alert-triangle", label: "warning" };
+    if (tone === "kpi-ok")   return { iconName: "check",          label: "ok" };
+    if (tone === "kpi-err")  return { iconName: "x",              label: "error" };
     return null;
 }
 
@@ -118,7 +119,11 @@ export const DashboardKpiStrip: FC<DashboardKpiProps> = ({ tiles }) => (
                     >
                         {/* Non-color signal icon for warn/ok tones (WCAG 1.4.1) */}
                         {tone != null ? (
-                            <span class="kpi-tone-icon" aria-hidden="true">{tone.icon}</span>
+                            <span
+                                class="kpi-tone-icon"
+                                aria-hidden="true"
+                                dangerouslySetInnerHTML={{ __html: icon(tone.iconName, 14) }}
+                            ></span>
                         ) : null}
                         {tile.value}
                         {tile.unit != null ? (

@@ -50,6 +50,7 @@ describe("swimlane CSS coverage (kit parity)", () => {
         expect(css).toMatch(/\.pipeline-header\s*\{[^}]*grid-template-columns:\s*repeat\(8/);
         expect(css).toMatch(/\.pipeline-body\s*\{[^}]*min-height:\s*480px/);
         expect(css).toMatch(/\.pcard\s*\{[^}]*border-left:\s*3px solid/);
-        expect(css).toMatch(/\.ph-count\s*\{[^}]*border-radius:\s*999px/);
+        // border-radius: 999px (pill) or var(--r-pill) which resolves to 999px
+        expect(css).toMatch(/\.ph-count\s*\{[^}]*border-radius:\s*(999px|var\(--r-pill\))/);
     });
 });

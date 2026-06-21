@@ -36,15 +36,15 @@
     grid-template-columns: repeat(14, 1fr);
     height: 110px;
     align-items: end;
-    gap: 4px;
-    margin: 12px 0 6px;
+    gap: var(--s-1);
+    margin: var(--s-3) 0 var(--s-1h);
 }
 
 .cost-bar {
     display: flex;
     flex-direction: column-reverse;
     gap: 1px;
-    border-radius: 2px 2px 0 0;
+    border-radius: var(--r-1) var(--r-1) 0 0;
     min-height: 2px; /* visibility floor for tiny daily totals */
 }
 
@@ -184,7 +184,7 @@
 .audit-config-changes {
     background: var(--bg-1);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     padding: var(--s-4);
 }
 
@@ -208,7 +208,7 @@
 .modal-content {
     background: var(--bg-1);
     border: 1px solid var(--border-strong);
-    border-radius: 4px;
+    border-radius: var(--r-3);
     padding: var(--s-6);
     max-width: 480px;
     width: calc(100% - var(--s-8));
@@ -275,7 +275,7 @@
     padding: var(--s-2) var(--s-3);
     background: var(--ok-tint);
     border: 1px solid var(--ok-line);
-    border-radius: 3px;
+    border-radius: var(--r-2);
 }
 
 .service-error,
@@ -285,7 +285,7 @@
     padding: var(--s-2) var(--s-3);
     background: var(--err-tint);
     border: 1px solid var(--err-line);
-    border-radius: 3px;
+    border-radius: var(--r-2);
 }
 
 .warnings {
@@ -330,7 +330,7 @@
 .logs-grep-input {
     background: var(--bg-2);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     color: var(--fg-1);
     font-family: var(--font-mono);
     font-size: var(--t-meta);
@@ -341,7 +341,7 @@
 .logs-clear-btn {
     background: transparent;
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     color: var(--fg-2);
     font-size: var(--t-label);
     padding: var(--s-1) var(--s-2);
@@ -451,7 +451,7 @@
 .settings-redesign section.sec {
     background: var(--bg-1);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     padding: var(--s-4) var(--s-5);
 }
 
@@ -476,7 +476,7 @@
     align-items: center;
     background: var(--bg-2);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
 }
 
 .input-money .prefix {
