@@ -188,6 +188,38 @@ const CHECKS = [
     },
   },
   {
+    id: 'daemon-status-uptime-fields',
+    issue: 356,
+    fr: 'FR-404',
+    desc: 'Daemon writes start_time + portal daemon-status surfaces uptime/iteration/active-request',
+    run() {
+      const daemon = read('plugins/autonomous-dev/bin/supervisor-loop.sh');
+      if (daemon === null) return fail('supervisor-loop.sh not found');
+      if (!/start_time:\s*\(if\s*\$start/.test(daemon)) {
+        return fail('write_heartbeat does not emit start_time');
+      }
+      const route = read('plugins/autonomous-dev-portal/server/routes/daemon-status.ts');
+      if (route === null) return fail('daemon-status.ts route not found');
+      const ok =
+        /uptimeSeconds/.test(route) &&
+        /iterationCount/.test(route) &&
+        /activeRequestId/.test(route);
+      return ok ? pass() : fail('daemon-status body missing uptime/iteration/active-request fields');
+    },
+  },
+  {
+    id: 'ops-health-circuit-breaker',
+    issue: 356,
+    fr: 'FR-935',
+    desc: 'OpsHealth surfaces circuit-breaker state from crash-state.json',
+    run() {
+      const s = read('plugins/autonomous-dev-portal/server/wiring/ops-readers.ts');
+      if (s === null) return fail('ops-readers.ts not found');
+      const ok = /circuitBreaker/.test(s) && /crash-state\.json/.test(s);
+      return ok ? pass() : fail('readOpsHealth does not populate circuitBreaker from crash-state.json');
+    },
+  },
+  {
     id: 'portal-referrer-policy',
     issue: 356,
     fr: 'FR-S33',

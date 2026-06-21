@@ -14,6 +14,8 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type {
+    CircuitBreakerState,
+    KillSwitchState,
     LogEntry,
     OpsHealth,
     PluginChainCategory,
@@ -108,23 +110,57 @@ async function readRecentLog(maxLines = 50): Promise<LogEntry[]> {
     return entries;
 }
 
+/** crash-state.json shape (#356 / FR-935 — written by the daemon). */
+interface CrashStateFile {
+    consecutive_crashes?: number;
+    circuit_breaker_tripped?: boolean;
+    updated_at?: string;
+}
+
+/**
+ * Read circuit-breaker state from `crash-state.json` (#356 / FR-935). Returns
+ * undefined when the file is absent/unreadable so the view shows the empty
+ * state rather than a fabricated "closed".
+ */
+async function readCircuitBreaker(): Promise<CircuitBreakerState | undefined> {
+    try {
+        const raw = await readFile(join(stateDirRoot(), "crash-state.json"), "utf-8");
+        const parsed = JSON.parse(raw) as CrashStateFile;
+        if (typeof parsed.circuit_breaker_tripped !== "boolean") return undefined;
+        return {
+            state: parsed.circuit_breaker_tripped ? "open" : "closed",
+            failureCount:
+                typeof parsed.consecutive_crashes === "number"
+                    ? parsed.consecutive_crashes
+                    : 0,
+            changedAt: typeof parsed.updated_at === "string" ? parsed.updated_at : null,
+        };
+    } catch {
+        return undefined;
+    }
+}
+
 export async function readOpsHealth(): Promise<OpsHealth> {
-    const [daemon, pluginChain, recentLog] = await Promise.all([
+    const [daemon, pluginChain, recentLog, circuitBreaker] = await Promise.all([
         readDaemonStatus().catch(() => null),
         readPluginChain().catch(() => []),
         readRecentLog().catch(() => []),
+        readCircuitBreaker().catch(() => undefined),
     ]);
 
-    // DaemonStatus has `status` ("fresh"/"stale"/"dead"), pid, last_seen.
-    // It does NOT track a start-time, so true uptime can't be derived
-    // (the kit screenshot's "4d 12h" is aspirational on a real install).
-    // The old code put the string "alive" in an "Uptime" row — a label
-    // lie (visual crawl p6). heartbeat.json DOES carry a timestamp, so
-    // we render the honest fact we have: how long ago the daemon last
-    // heartbeat.
+    // DaemonStatus now carries start_time-derived uptime (#356); we surface the
+    // honest "how long ago the last heartbeat was" here plus the daemon's
+    // control-plane circuit-breaker + kill-switch state (FR-935/938).
     const daemonStatus = daemon?.status ?? "dead";
     const daemonPid = daemon?.pid ?? null;
     const lastHeartbeat = relativeAgo(daemon?.last_seen ?? null);
+
+    // Kill switch: the daemon exposes a single engaged flag (kill-switch.flag);
+    // there is no separate "armed" state, so engaged ⇒ armed.
+    const killSwitch: KillSwitchState | undefined =
+        daemon === null
+            ? undefined
+            : { engaged: daemon.kill_switch_active, armed: daemon.kill_switch_active };
 
     return {
         daemon: { status: daemonStatus, pid: daemonPid },
@@ -140,6 +176,8 @@ export async function readOpsHealth(): Promise<OpsHealth> {
         immutableCount: 0,
         heartbeat: [],
         lastHeartbeat,
+        circuitBreaker,
+        killSwitch,
     };
 }
 

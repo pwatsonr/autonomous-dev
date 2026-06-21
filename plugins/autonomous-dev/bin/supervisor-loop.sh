@@ -69,6 +69,9 @@ ONCE_MODE=false
 SHUTDOWN_REQUESTED=false
 CURRENT_CHILD_PID=""
 ITERATION_COUNT=0
+# UTC ISO-8601 timestamp of when this daemon instance started (#356). Set once at
+# startup before the main loop; the portal derives uptime from it.
+DAEMON_START_TIME=""
 EFFECTIVE_CONFIG=""
 CONSECUTIVE_CRASHES=0
 CIRCUIT_BREAKER_TRIPPED=false
@@ -315,11 +318,13 @@ write_heartbeat() {
         --argjson pid "$$" \
         --argjson iter "${ITERATION_COUNT}" \
         --arg req "${active_request}" \
+        --arg start "${DAEMON_START_TIME}" \
         '{
             timestamp: $ts,
             pid: $pid,
             iteration_count: $iter,
-            active_request_id: (if $req == "null" then null else $req end)
+            active_request_id: (if $req == "null" then null else $req end),
+            start_time: (if $start == "" then null else $start end)
         }' > "${tmp}"
 
     mv "${tmp}" "${HEARTBEAT_FILE}"
@@ -4650,6 +4655,9 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     # The EXIT trap handles both lock release and effective config cleanup.
     acquire_lock
     trap 'cleanup_effective_config; release_lock' EXIT
+
+    # Record this instance's start time (#356) so the heartbeat can report uptime.
+    DAEMON_START_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
     # Load and merge configuration (defaults + optional user overrides)
     # Must happen before stale heartbeat detection, as recovery scans repos from config.
