@@ -98,6 +98,29 @@ function ensureAllowlistLoaded(): string[] {
 }
 
 /**
+ * Production: set the repository allowlist explicitly (#556).
+ *
+ * The intake CLI does not run with `AUTONOMOUS_DEV_ALLOWED_REPOS` in its env,
+ * so the lazy env loader yields an empty (deny-all) allowlist. Anything that
+ * resolves a request path from the CLI — the lifecycle handlers' state.json
+ * sync (#551) — must populate this from the daemon's repositories.allowlist
+ * first, or every `buildRequestPath` throws REPO_NOT_ALLOWED. Realpath-
+ * normalizes each entry; unresolvable entries are dropped (the per-call check
+ * still guards them).
+ */
+export function setAllowedRepositories(repos: string[]): void {
+  const normalized: string[] = [];
+  for (const r of repos) {
+    try {
+      normalized.push(fs.realpathSync(r));
+    } catch {
+      // Drop entries that don't resolve — same posture as the env loader.
+    }
+  }
+  allowedRepos = normalized;
+}
+
+/**
  * Test-only: override the allowlist. Pass `null` to reset to env-loaded.
  *
  * Tests MUST call this in `beforeEach` and reset (`null`) in `afterEach` to

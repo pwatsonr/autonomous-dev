@@ -874,6 +874,33 @@ function defaultDbPath(): string {
 }
 
 /**
+ * Read the daemon's repository allowlist from `~/.claude/autonomous-dev.json`
+ * (`.repositories.allowlist`) — the same source the bash daemon uses (#556).
+ * Returns `[]` on any error (missing file, bad JSON, wrong shape), which leaves
+ * path_security deny-all: lifecycle commands then fall back to the db-only path
+ * rather than throwing — no regression, just no state.json sync for that repo.
+ */
+function loadDaemonRepoAllowlist(): string[] {
+  try {
+    const cfgPath = path.join(
+      process.env.HOME ?? os.homedir(),
+      '.claude',
+      'autonomous-dev.json',
+    );
+    /* eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
+    const fs = require('fs') as typeof import('fs');
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    const list = cfg?.repositories?.allowlist;
+    if (Array.isArray(list)) {
+      return list.filter((r): r is string => typeof r === 'string');
+    }
+  } catch {
+    // Best-effort — see doc comment.
+  }
+  return [];
+}
+
+/**
  * Default location of the authz YAML config.
  */
 /* istanbul ignore next — exercised only by the production entry point */
@@ -908,6 +935,7 @@ export async function initRouter(): Promise<IntakeRouterLike> {
   const { RateLimiter } = await import('../rate_limit/rate_limiter');
   const { IntakeRouter } = await import('../core/intake_router');
   const { setHandoffDatabase } = await import('../core/handoff_manager');
+  const { setAllowedRepositories } = await import('../core/path_security');
   /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
 
   const dbPath = defaultDbPath();
@@ -921,6 +949,14 @@ export async function initRouter(): Promise<IntakeRouterLike> {
   // :memory: if unset) — a different handle — and the on-disk state.json would
   // never get synced, leaving the daemon to re-select cancelled requests.
   setHandoffDatabase({ db, repo });
+
+  // #556: the transition helpers' buildRequestPath() checks path_security's
+  // repo allowlist, which the CLI process loads (lazily, deny-all) from an env
+  // var it never sets. Populate it from the daemon's repositories.allowlist so
+  // the #551 state.json sync actually fires instead of falling back to db-only.
+  // Best-effort: a missing/unreadable config leaves it deny-all (same as
+  // before — db-only fallback, no regression).
+  setAllowedRepositories(loadDaemonRepoAllowlist());
 
   const auditLogRepo = AuditLogger.fromDatabase(db);
   const auditLogger = new AuditLogger(auditLogRepo, {
