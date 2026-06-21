@@ -58,7 +58,7 @@ type Database = any;
  * relative order. Robust to additional migrations landing in the chain
  * (004/005+): checks presence + monotonic order, not exact equality.
  */
-function expectAppliedInOrder(applied: string[], names: string[]): void {
+function expectAppliedInOrder(applied: readonly string[], names: string[]): void {
   let prev = -1;
   for (const name of names) {
     const at = applied.indexOf(name);
