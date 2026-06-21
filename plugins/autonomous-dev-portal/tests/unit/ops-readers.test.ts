@@ -1,7 +1,7 @@
 // PLAN-038 TASK-017 — Ops composition reader tests.
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -43,6 +43,11 @@ describe("readOpsHealth — empty state-dir (honesty contract)", () => {
         expect(ops.heartbeat).toEqual([]);
     });
 
+    test("#562: production intelligence is undefined when no observe cycle has run", async () => {
+        const ops = await readOpsHealth();
+        expect(ops.productionIntelligence).toBeUndefined();
+    });
+
     test("plugin chain reads real plugin manifests (≥1 entry from this workspace)", async () => {
         const ops = await readOpsHealth();
         // The workspace has plugins/autonomous-dev*, so at least one
@@ -57,5 +62,82 @@ describe("readOpsHealth — empty state-dir (honesty contract)", () => {
             // the manifest, which is currently 0.x.
             expect(pkg).not.toBe("autonomous-dev@2.4.0");
         }
+    });
+});
+
+describe("readOpsHealth — production intelligence (#562 / FR-938)", () => {
+    let dir: string;
+    beforeAll(() => {
+        dir = mkdtempSync(join(tmpdir(), "ops-prod-intel-"));
+        process.env["AUTONOMOUS_DEV_STATE_DIR"] = dir;
+    });
+    afterAll(() => {
+        rmSync(dir, { recursive: true, force: true });
+        if (ORIGINAL_STATE_DIR === undefined) {
+            delete process.env["AUTONOMOUS_DEV_STATE_DIR"];
+        } else {
+            process.env["AUTONOMOUS_DEV_STATE_DIR"] = ORIGINAL_STATE_DIR;
+        }
+    });
+
+    function writeSummary(obj: unknown): void {
+        writeFileSync(
+            join(dir, "production-intelligence.json"),
+            JSON.stringify(obj),
+            "utf-8",
+        );
+    }
+
+    test("maps a completed observe cycle into productionIntelligence", async () => {
+        writeSummary({
+            last_run_id: "RUN-20260621-040000",
+            last_run_at: "2026-06-21T04:00:00Z",
+            services_scanned: 3,
+            observations_generated: 12,
+            observations_filtered: 4,
+            triage_processed: 7,
+            error_count: 1,
+            updated_at: "2026-06-21T04:00:05Z",
+        });
+        const ops = await readOpsHealth();
+        expect(ops.productionIntelligence).toEqual({
+            lastRunId: "RUN-20260621-040000",
+            lastRunAt: "2026-06-21T04:00:00Z",
+            servicesScanned: 3,
+            observationsGenerated: 12,
+            observationsFiltered: 4,
+            triageProcessed: 7,
+            errorCount: 1,
+        });
+    });
+
+    test("missing numeric fields default to 0 (no NaN leakage)", async () => {
+        writeSummary({ last_run_id: "RUN-20260621-050000" });
+        const ops = await readOpsHealth();
+        expect(ops.productionIntelligence).toEqual({
+            lastRunId: "RUN-20260621-050000",
+            lastRunAt: null,
+            servicesScanned: 0,
+            observationsGenerated: 0,
+            observationsFiltered: 0,
+            triageProcessed: 0,
+            errorCount: 0,
+        });
+    });
+
+    test("a summary without last_run_id is treated as absent (honesty)", async () => {
+        writeSummary({ observations_generated: 99 });
+        const ops = await readOpsHealth();
+        expect(ops.productionIntelligence).toBeUndefined();
+    });
+
+    test("malformed JSON yields undefined, not a throw", async () => {
+        writeFileSync(
+            join(dir, "production-intelligence.json"),
+            "{ not json",
+            "utf-8",
+        );
+        const ops = await readOpsHealth();
+        expect(ops.productionIntelligence).toBeUndefined();
     });
 });

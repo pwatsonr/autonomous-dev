@@ -19,6 +19,7 @@ import type {
     LogEntry,
     OpsHealth,
     PluginChainCategory,
+    ProductionIntelligenceState,
 } from "../types/render";
 
 import { readDaemonStatus } from "../lib/daemon-status";
@@ -140,13 +141,60 @@ async function readCircuitBreaker(): Promise<CircuitBreakerState | undefined> {
     }
 }
 
+/** production-intelligence.json shape (#562 / FR-938 — written by the observe runner). */
+interface ProductionIntelligenceFile {
+    last_run_id?: string;
+    last_run_at?: string;
+    services_scanned?: number;
+    observations_generated?: number;
+    observations_filtered?: number;
+    triage_processed?: number;
+    error_count?: number;
+}
+
+/**
+ * Read the observe-loop's last-cycle summary from `production-intelligence.json`
+ * (#562 / FR-938). Returns undefined when the file is absent/unreadable so the
+ * Ops view shows the honest "no observe cycle yet" empty state rather than a
+ * fabricated zero-run. The runner writes this file on every completed cycle
+ * (src/runner/audit-logger.ts writeMetadata).
+ */
+async function readProductionIntelligence(): Promise<
+    ProductionIntelligenceState | undefined
+> {
+    try {
+        const raw = await readFile(
+            join(stateDirRoot(), "production-intelligence.json"),
+            "utf-8",
+        );
+        const parsed = JSON.parse(raw) as ProductionIntelligenceFile;
+        // A valid summary must carry at least a run id; otherwise treat as absent.
+        if (typeof parsed.last_run_id !== "string") return undefined;
+        const num = (v: unknown): number => (typeof v === "number" ? v : 0);
+        return {
+            lastRunId: parsed.last_run_id,
+            lastRunAt:
+                typeof parsed.last_run_at === "string" ? parsed.last_run_at : null,
+            servicesScanned: num(parsed.services_scanned),
+            observationsGenerated: num(parsed.observations_generated),
+            observationsFiltered: num(parsed.observations_filtered),
+            triageProcessed: num(parsed.triage_processed),
+            errorCount: num(parsed.error_count),
+        };
+    } catch {
+        return undefined;
+    }
+}
+
 export async function readOpsHealth(): Promise<OpsHealth> {
-    const [daemon, pluginChain, recentLog, circuitBreaker] = await Promise.all([
-        readDaemonStatus().catch(() => null),
-        readPluginChain().catch(() => []),
-        readRecentLog().catch(() => []),
-        readCircuitBreaker().catch(() => undefined),
-    ]);
+    const [daemon, pluginChain, recentLog, circuitBreaker, productionIntelligence] =
+        await Promise.all([
+            readDaemonStatus().catch(() => null),
+            readPluginChain().catch(() => []),
+            readRecentLog().catch(() => []),
+            readCircuitBreaker().catch(() => undefined),
+            readProductionIntelligence().catch(() => undefined),
+        ]);
 
     // DaemonStatus now carries start_time-derived uptime (#356); we surface the
     // honest "how long ago the last heartbeat was" here plus the daemon's
@@ -178,6 +226,7 @@ export async function readOpsHealth(): Promise<OpsHealth> {
         lastHeartbeat,
         circuitBreaker,
         killSwitch,
+        productionIntelligence,
     };
 }
 

@@ -757,6 +757,28 @@ export interface KillSwitchState {
     armedAt?: string;
 }
 
+/**
+ * Production-intelligence (observe-loop) summary surfaced on Ops (#562 / FR-938).
+ * Reflects the LAST observe cycle the runner persisted to
+ * `production-intelligence.json`; counts are per-run, not cumulative.
+ */
+export interface ProductionIntelligenceState {
+    /** Run id of the last observe cycle (e.g. "RUN-20260621-040000"). */
+    lastRunId: string | null;
+    /** ISO timestamp the last cycle completed. */
+    lastRunAt: string | null;
+    /** Number of services scanned in the last cycle. */
+    servicesScanned: number;
+    /** Observations generated in the last cycle. */
+    observationsGenerated: number;
+    /** Observations filtered out (false-positives) in the last cycle. */
+    observationsFiltered: number;
+    /** Triage decisions processed in the last cycle. */
+    triageProcessed: number;
+    /** Number of errors recorded in the last cycle. */
+    errorCount: number;
+}
+
 export interface OpsHealth {
     daemon: { status: string; pid: number | null };
     components: Record<string, string>;
@@ -781,6 +803,8 @@ export interface OpsHealth {
     circuitBreaker?: CircuitBreakerState;
     /** Kill switch idle/armed/engaged state. */
     killSwitch?: KillSwitchState;
+    /** Production-intelligence (observe-loop) last-run summary (#562 / FR-938). */
+    productionIntelligence?: ProductionIntelligenceState;
     /** Relative time since the last daemon heartbeat ("3s ago", "—").
      *  Replaces the old `uptime` label, which rendered the string
      *  "alive" in a duration field — heartbeat.json has no start time,
