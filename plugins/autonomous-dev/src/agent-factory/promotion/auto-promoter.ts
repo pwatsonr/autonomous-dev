@@ -1,6 +1,16 @@
 /**
  * Autonomous Patch-Level Promoter with Risk-Tier Gating (SPEC-005-5-3, Tasks 5 & 8).
  *
+ * ⚠️ DORMANT — NOT WIRED INTO PRODUCTION (#541). Nothing calls
+ * `attemptAutoPromote` / `isEligibleForAutoPromotion` / `new AutoPromoter`
+ * outside this module and its tests (locked in by no_autonomous_promotion.test.ts).
+ * Gate 1 below depends on `config.autonomousPromotion.enabled`, which `loadConfig`
+ * deliberately does NOT parse (DEFAULT_CONFIG omits it) — so it can never be
+ * enabled by a config edit; doing so requires a deliberate code change that must
+ * ALSO preserve the human gate. The only live promotion path is operator-gated:
+ * `agent improve` parks a proposal at `meta_approved`, and an explicit
+ * `agent accept`/`agent promote` lands it. Do not wire this in without that gate.
+ *
  * Implements the autonomous promotion system that auto-promotes validated
  * patch-level changes for low-risk agents. Integrates risk-tier gating to
  * restrict which agents are eligible for autonomous promotion.
