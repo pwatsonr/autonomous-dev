@@ -393,6 +393,15 @@ export function loadConfig(configPath?: string): AgentFactoryConfig {
     }
   }
 
+  // #541: `autonomous-promotion` is DELIBERATELY not parsed from YAML, and
+  // DEFAULT_CONFIG omits it, so `config.autonomousPromotion` is always
+  // undefined here. This is intentional, not an oversight: autonomous (no-human)
+  // promotion is dormant machinery (`promotion/auto-promoter.ts`) with no
+  // production caller. Enabling it must be a deliberate CODE change that also
+  // wires the human-acknowledged gate — it must NOT be switchable by a config
+  // edit. The only live promotion path is operator-gated: `agent improve` parks
+  // a proposal at `meta_approved`, and an explicit `agent accept`/`agent promote`
+  // is required to land it. See no_autonomous_promotion.test.ts (the guard).
   return config;
 }
 
