@@ -89,17 +89,28 @@ test.afterAll(() => {
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-// QUARANTINED (2026-06-09): these full-page surface goldens are
-// non-deterministic. The data-backed surfaces (dashboard / requests /
-// approvals / repos / costs) read live daemon state from
-// ~/.autonomous-dev rather than the fixture state dir, so the screenshots
-// drift whenever the daemon mutates state. The spec sets
-// AUTONOMOUS_DEV_STATE_DIR=FIXTURE_STATE_DIR, but several readers do not
-// yet honor it (state-dir isolation gap). Re-enable once every
-// surface reader resolves its path from AUTONOMOUS_DEV_STATE_DIR and the
-// fixture dir seeds deterministic request/cost/approval data.
-// Tracked as a PRD-025/026 visual-harness follow-up.
-test.skip(true, "portal surfaces read live daemon state — goldens non-deterministic until reader state-dir isolation lands");
+// QUARANTINED (2026-06-09) — comment updated #361 (2026-06-20).
+//
+// UPDATE: the original blocker — "surface readers don't honor
+// AUTONOMOUS_DEV_STATE_DIR" — is RESOLVED. The data-backed surfaces
+// (dashboard / requests / approvals / repos / costs / agents) all resolve
+// their paths through `stateDirRoot()` (wiring/state-paths.ts), which honors
+// AUTONOMOUS_DEV_STATE_DIR. So reader isolation is done.
+//
+// The remaining blockers to un-skipping are NOT reader isolation:
+//   1. Date/clock coupling — cost/dashboard/ops readers window relative to
+//      `new Date()` (e.g. costs-readers dailyToPoints last-30-days,
+//      daemon-readers readMtdSpend currentMonthKeyUtc), so renders drift by
+//      date even with the fixture state dir. Needs an injectable clock or
+//      relative-dated fixtures.
+//   2. Fixture freshness — server/fixtures/kit-parity/cost-ledger.json is
+//      pinned to 2026-05; the MTD / 30-day windows miss it today. Plus
+//      missing heartbeat.json / cost-cap.json / gate-decisions/.
+//   3. Surface goldens were never captured/committed, and cross-OS pixel
+//      parity needs the CI Docker image (capture there, not on a dev macOS).
+// Tracked as #361 (this comment) — capture goldens in the visual-regression CI
+// job once (1)+(2) land.
+test.skip(true, "reader isolation DONE; remaining: clock-determinism + fixture refresh + capture surface goldens in CI Docker (#361)");
 
 test.beforeEach(async ({ context }) => {
     await context.addCookies([
