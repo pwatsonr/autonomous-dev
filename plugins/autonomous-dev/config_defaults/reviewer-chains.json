@@ -16,6 +16,10 @@
           "threshold": 0,
           "trigger": { "kind": "path-filter", "paths": ["**/.autonomous-dev/standards.yaml"] }
         }
+      ],
+      "spec_review": [
+        { "name": "ux-ui-reviewer", "type": "specialist", "blocking": false, "threshold": 75, "trigger": "frontend" },
+        { "name": "accessibility-reviewer", "type": "specialist", "blocking": false, "threshold": 75, "trigger": "frontend" }
       ]
     },
     "bug": {
