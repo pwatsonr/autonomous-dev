@@ -98,6 +98,60 @@ const CHECKS = [
     },
   },
   {
+    id: 'specialist-reviewers-registered',
+    issue: 359,
+    fr: 'FR-1242/1261',
+    desc: 'The 4 specialist reviewers are registered in the default reviewer chains',
+    run() {
+      const s = read('plugins/autonomous-dev/config_defaults/reviewer-chains.json');
+      if (s === null) return fail('reviewer-chains.json not found');
+      let cfg;
+      try {
+        cfg = JSON.parse(s);
+      } catch (e) {
+        return fail(`reviewer-chains.json invalid JSON: ${e.message}`);
+      }
+      const names = new Set();
+      for (const t of Object.values(cfg.request_types ?? {})) {
+        for (const gate of Object.values(t ?? {})) {
+          for (const entry of gate ?? []) if (entry && entry.name) names.add(entry.name);
+        }
+      }
+      const required = [
+        'ux-ui-reviewer',
+        'accessibility-reviewer',
+        'qa-edge-case-reviewer',
+        'rule-set-enforcement-reviewer',
+      ];
+      const missing = required.filter((r) => !names.has(r));
+      return missing.length === 0
+        ? pass()
+        : fail(`specialist reviewers not registered in any chain: ${missing.join(', ')}`);
+    },
+  },
+  {
+    id: 'spec-review-has-ux-ui',
+    issue: 359,
+    fr: 'FR-1262',
+    desc: 'ux-ui-reviewer is in a default spec_review chain',
+    run() {
+      const s = read('plugins/autonomous-dev/config_defaults/reviewer-chains.json');
+      if (s === null) return fail('reviewer-chains.json not found');
+      let cfg;
+      try {
+        cfg = JSON.parse(s);
+      } catch (e) {
+        return fail(`reviewer-chains.json invalid JSON: ${e.message}`);
+      }
+      const found = Object.values(cfg.request_types ?? {}).some((t) =>
+        (t?.spec_review ?? []).some((e) => e && e.name === 'ux-ui-reviewer'),
+      );
+      return found
+        ? pass()
+        : fail('no spec_review chain contains ux-ui-reviewer');
+    },
+  },
+  {
     id: 'trivial-docs-skips-design',
     issue: 526,
     fr: 'PRD-526',

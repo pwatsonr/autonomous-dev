@@ -74,6 +74,22 @@ describe('hook-manifest-v1.json schema', () => {
     expect(def.properties.failure_mode.enum.sort()).toEqual(['block', 'ignore', 'warn']);
   });
 
+  test('#359: reviewer_slot accepts a bare string OR a rich ReviewerSlot object', () => {
+    const def = schema.$defs.hookEntry as {
+      properties: { reviewer_slot: { oneOf?: Array<Record<string, unknown>> } };
+    };
+    const oneOf = def.properties.reviewer_slot.oneOf;
+    expect(Array.isArray(oneOf)).toBe(true);
+    // Branch 1: bare string.
+    expect(oneOf!.some((b) => b.type === 'string')).toBe(true);
+    // Branch 2: object requiring agent_name + review_gates (the registry-indexed form).
+    const objBranch = oneOf!.find((b) => b.type === 'object') as
+      | { required?: string[] }
+      | undefined;
+    expect(objBranch).toBeDefined();
+    expect((objBranch!.required ?? []).sort()).toEqual(['agent_name', 'review_gates']);
+  });
+
   test('embedded examples[0] passes the helper validator', () => {
     expect(schema.examples).toHaveLength(1);
     const errs = validateManifest(schema.examples[0], SCHEMA_PATH);

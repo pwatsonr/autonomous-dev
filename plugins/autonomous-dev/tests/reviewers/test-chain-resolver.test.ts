@@ -63,6 +63,14 @@ describe('chain-resolver', () => {
       expect(chain.filter((e) => e.type === 'built-in')).toHaveLength(2);
       expect(chain.length).toBeGreaterThanOrEqual(2);
     });
+
+    it('#359: returns the default feature.spec_review chain with ux-ui-reviewer (FR-1262)', async () => {
+      const repo = trackedRepo();
+      const chain = await resolveChain(repo, 'feature', 'spec_review');
+      const names = chain.map((e) => e.name);
+      expect(names).toContain('ux-ui-reviewer');
+      expect(names).toContain('accessibility-reviewer');
+    });
   });
 
   describe('repo override precedence', () => {

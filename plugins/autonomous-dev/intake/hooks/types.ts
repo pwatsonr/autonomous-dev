@@ -5,7 +5,7 @@
  * are the canonical shapes consumed by every other piece of the hook engine
  * (discovery, registry, executor, reload-controller, IPC).
  *
- * - `HookPoint` — the 10 lifecycle points the daemon emits.
+ * - `HookPoint` — the 12 lifecycle points the daemon emits.
  * - `FailureMode` — how the executor reacts to a hook returning non-OK.
  * - `Capability` — closed-world flag set requested by hooks; future sandbox.
  * - `HookEntry` — one hook inside a manifest's `hooks[]` array.
@@ -17,7 +17,8 @@
  */
 
 /**
- * The 10 hook points the autonomous-dev daemon emits.
+ * The 12 hook points the autonomous-dev daemon emits (#359: plan-pre-author and
+ * spec-pre-author were added for FR-1108).
  *
  * String values match the kebab-case names in TDD-019 §9 so they round-trip
  * through JSON without translation. These are stable identifiers — adding a
