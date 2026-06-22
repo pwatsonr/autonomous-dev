@@ -80,7 +80,13 @@ function readStateStatus(repo: string, requestId: string): string {
 }
 
 function cmd(args: string[]): IncomingCommand {
-  return { commandName: 'x', args, flags: {}, rawText: '', source: 'cli' as IncomingCommand['source'] };
+  return {
+    commandName: 'x',
+    args,
+    flags: {},
+    rawText: '',
+    source: { channelType: 'cli', userId: 'test-user', timestamp: new Date() },
+  };
 }
 
 describe('#551: CancelHandler syncs state.json', () => {

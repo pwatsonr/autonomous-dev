@@ -12,9 +12,13 @@
  * The portal's tsconfig differs (ESM, bundler resolution); using `projects`
  * lets each project supply its own `transform` and `testEnvironment`.
  */
-module.exports = {
-  globalSetup: '<rootDir>/tests/setup/global-setup.cjs',
-  projects: [
+// The portal targets bun / Node 20+ — its auth suites use the Web Crypto
+// `crypto` global, which is undefined in Node 18 (`ReferenceError: crypto is
+// not defined`). Only include the portal:auth project where the runtime
+// provides it, so the daemon Test matrix's Node 18 leg passes (#570).
+const nodeMajor = parseInt(process.versions.node.split('.')[0], 10);
+
+const projects = [
     {
       displayName: 'autonomous-dev',
       rootDir: __dirname,
@@ -41,6 +45,13 @@ module.exports = {
         '^(\\.{1,2}/.*)\\.js$': '$1',
       },
     },
-    '<rootDir>/../autonomous-dev-portal/jest.config.cjs',
-  ],
+];
+
+if (nodeMajor >= 20) {
+  projects.push('<rootDir>/../autonomous-dev-portal/jest.config.cjs');
+}
+
+module.exports = {
+  globalSetup: '<rootDir>/tests/setup/global-setup.cjs',
+  projects,
 };

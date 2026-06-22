@@ -34,13 +34,24 @@ EXIT=0
 while IFS= read -r file; do
     [ -z "$file" ] && continue
 
+    # Strip `/* … */` block comments (including multi-line ones) before
+    # scanning, replacing comment characters with spaces while PRESERVING
+    # newlines so `grep -n` still reports the correct line. The old approach
+    # allowlisted only lines that themselves started with `/*` or `*`, which
+    # missed block-comment CONTINUATION lines (e.g. a bare `   #416 — note`
+    # inside a `/* … */` block) — those mis-flagged issue refs like `#416` as
+    # hex colors and forced a `GH-NNN` workaround in the CSS (#570). With
+    # comments stripped, no comment text can false-positive regardless of how
+    # the comment is formatted.
+    code=$(perl -0777 -pe 's{/\*.*?\*/}{ (my $c = $&) =~ s/[^\n]/ /g; $c }gse' "$file")
+
     # 1. Hex color literals (#xxx, #xxxxxx, #xxxxxxxx).
     #    Per TDD-034 §5.8 v1.1: the first char after '#' must be a digit (0-9)
     #    so CSS ID selectors (#main, #sidebar) are not false-positives. Real
     #    color literals expanded to canonical form always lead with a digit.
-    #    Allowlist: var() references, line-leading CSS comments, url() values.
-    HEX=$(grep -nE '#[0-9][0-9a-fA-F]{2,7}\b' "$file" \
-        | grep -vE '^\s*/\*|^\s*\*|var\(--' \
+    #    Allowlist: var() references, url() values (comments already stripped).
+    HEX=$(grep -nE '#[0-9][0-9a-fA-F]{2,7}\b' <<<"$code" \
+        | grep -vE 'var\(--' \
         | grep -vE 'url\(' || true)
     if [ -n "$HEX" ]; then
         echo "ERROR: Hex color literal in $file:"
@@ -53,10 +64,9 @@ while IFS= read -r file; do
     #              font-family: none    (rare reset value)
     #    These do not hard-code a specific typeface and do not bypass the
     #    token system; they explicitly inherit or clear the font stack.
-    FONT=$(grep -nE 'font-family\s*:' "$file" \
+    FONT=$(grep -nE 'font-family\s*:' <<<"$code" \
         | grep -v 'var(--font-' \
-        | grep -vE 'font-family\s*:\s*(inherit|none)\s*[;,)]' \
-        | grep -vE '^\s*/\*|^\s*\*' || true)
+        | grep -vE 'font-family\s*:\s*(inherit|none)\s*[;,)]' || true)
     if [ -n "$FONT" ]; then
         echo "ERROR: Hardcoded font-family in $file:"
         echo "$FONT"
@@ -68,9 +78,8 @@ while IFS= read -r file; do
     #    (border hairlines and CSS resets are intentional, not token regressions).
     #    Structural dimensions (max-width, min-width, width, height) are not
     #    scanned — they are layout-specific, not design tokens.
-    PX=$(grep -nE '(font-size|padding|margin|gap|border-radius)\s*:.*[0-9]+px' "$file" \
+    PX=$(grep -nE '(font-size|padding|margin|gap|border-radius)\s*:.*[0-9]+px' <<<"$code" \
         | grep -v 'var(--' \
-        | grep -vE '^\s*/\*|^\s*\*' \
         | grep -vE '\b[01]px\b' || true)
     if [ -n "$PX" ]; then
         echo "ERROR: Hardcoded px size in $file:"

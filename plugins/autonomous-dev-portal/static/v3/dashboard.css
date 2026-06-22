@@ -30,7 +30,7 @@
 .pipeline-shell {
     background: var(--bg-1);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     overflow: hidden;
 }
 
@@ -44,10 +44,10 @@
 .ph-col {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 12px;
+    gap: var(--s-1h);
+    padding: var(--s-2h) var(--s-3);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: var(--t-label);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -65,18 +65,18 @@
     flex: none;
     width: 8px;
     height: 8px;
-    border-radius: 2px;
+    border-radius: var(--r-1);
     display: inline-block;
 }
 
 .ph-count {
     margin-left: auto;
     flex: none;
-    padding: 1px 6px;
-    border-radius: 999px;
+    padding: 1px var(--s-1h);
+    border-radius: var(--r-pill);
     background: var(--bg-3);
     color: var(--fg-2);
-    font-size: 10px;
+    font-size: var(--t-label);
 }
 
 .pipeline-body {
@@ -87,10 +87,10 @@
 
 .lane {
     border-right: 1px solid var(--border-thin);
-    padding: 10px;
+    padding: var(--s-2h);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--s-2);
     min-width: 0;
 }
 
@@ -111,12 +111,12 @@
 .pcard {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--s-1h);
     background: var(--bg-2);
     border: 1px solid var(--border-thin);
     border-left: 3px solid var(--lane-color, var(--border-thin));
-    border-radius: 3px;
-    padding: 10px;
+    border-radius: var(--r-2);
+    padding: var(--s-2h);
     cursor: pointer;
     text-decoration: none;
     color: inherit;
@@ -162,14 +162,14 @@
 .pid {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--s-1h);
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: var(--t-label);
     color: var(--fg-3);
 }
 
 .ptitle {
-    font-size: 12.5px;
+    font-size: var(--t-12h);
     font-weight: 500;
     color: var(--fg-0);
     line-height: 1.35;
@@ -185,14 +185,14 @@
 .pfoot {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
+    gap: var(--s-1h);
+    font-size: var(--t-11);
 }
 
 .pfoot .agent {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--s-1h);
     min-width: 0;
 }
 
@@ -207,7 +207,7 @@
     align-items: center;
     justify-content: center;
     font-family: var(--font-mono);
-    font-size: 8px;
+    font-size: var(--t-8);
     line-height: 1;
 }
 
@@ -478,7 +478,7 @@
 .seg.seg-spec    { background: var(--phase-spec); }
 .seg.seg-code    { background: var(--phase-code); }
 /* #389: single-tone bar when the ledger has no per-phase attribution */
-.seg.seg-unattributed { background: var(--accent, #6b7280); opacity: 0.75; }
+.seg.seg-unattributed { background: var(--accent, var(--fg-3)); opacity: 0.75; }
 .seg.seg-review  { background: var(--phase-review); }
 .seg.seg-deploy  { background: var(--phase-deploy); }
 .seg.seg-observe { background: var(--phase-observe); }
@@ -494,7 +494,7 @@
 .cost-legend-swatch.swatch-plan    { background: var(--phase-plan); }
 .cost-legend-swatch.swatch-spec    { background: var(--phase-spec); }
 .cost-legend-swatch.swatch-code    { background: var(--phase-code); }
-.cost-legend-swatch.swatch-unattributed { background: var(--accent, #6b7280); opacity: 0.75; }
+.cost-legend-swatch.swatch-unattributed { background: var(--accent, var(--fg-3)); opacity: 0.75; }
 .cost-legend-swatch.swatch-review  { background: var(--phase-review); }
 .cost-legend-swatch.swatch-deploy  { background: var(--phase-deploy); }
 .cost-legend-swatch.swatch-observe { background: var(--phase-observe); }

@@ -344,8 +344,11 @@ function parseArgs(argv: string[]): CliOptions {
     }
     const tokenPath =
         positional[0] ??
-        // default: vendored portal token file relative to this script
-        join(import.meta.dir ?? __dirname, "..", "server", "static", "design-tokens.css");
+        // default: vendored portal token file relative to this script. The
+        // committed token file lives at `static/design-tokens.css` (served at
+        // `/static/...`); the old `server/static/` default ENOENT'd in CI
+        // because that path is never built/committed (#570).
+        join(import.meta.dir ?? __dirname, "..", "static", "design-tokens.css");
     return { tokenPath, skipPeerChip };
 }
 

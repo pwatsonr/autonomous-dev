@@ -19,6 +19,12 @@ module.exports = {
     ],
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
+  // When this project runs inside the daemon's jest `projects` array, Node
+  // module resolution starts from the daemon's node_modules and misses portal
+  // dependencies (e.g. `hono`). Adding the portal's own node_modules here
+  // ensures those packages are found without requiring the daemon CI to install
+  // them — option (a) from issue #570 Fix 3 analysis.
+  moduleDirectories: ['node_modules', require('path').resolve(__dirname, 'node_modules')],
   collectCoverageFrom: [
     // SPEC-030-1-05: scoped to the 9 auth files PLAN-030-1 targeted with
     // dedicated test suites. Files outside this list (tailscale-client.ts

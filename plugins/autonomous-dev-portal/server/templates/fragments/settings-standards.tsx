@@ -11,6 +11,7 @@
 
 import type { FC } from "hono/jsx";
 
+import { icon } from "../../lib/icons";
 import type { SettingsData, StandardRule } from "../../types/render";
 
 interface Props {
@@ -31,7 +32,12 @@ const StandardRow: FC<RowProps> = ({ rule }) => (
         </td>
         <td>
             {rule.desc}
-            {rule.immutable ? " 🔒" : ""}
+            {rule.immutable ? (
+                <span
+                    aria-label="immutable"
+                    dangerouslySetInnerHTML={{ __html: icon("lock", 12) }}
+                ></span>
+            ) : null}
         </td>
         <td class="mono">{rule.applies}</td>
         <td class="mono">{rule.hits}</td>
