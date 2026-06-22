@@ -86,6 +86,9 @@ function gitToplevel(fromDir: string, fallback: string): string {
         return execFileSync("git", ["rev-parse", "--show-toplevel"], {
             cwd: fromDir,
             encoding: "utf-8",
+            // Suppress git's "fatal: not a git repository" on stderr when fromDir
+            // isn't a repo — the catch already returns the fallback.
+            stdio: ["ignore", "pipe", "ignore"],
         }).trim();
     } catch {
         return fallback;
