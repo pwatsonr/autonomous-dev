@@ -353,8 +353,10 @@ export function enforceConstraints(
  */
 export function extractDefinitionFromResponse(response: string): string | null {
   // Match fenced code blocks: ```markdown, ```md, or plain ```
-  // Use a regex that captures the content between the fences
-  const codeBlockRegex = /```(?:markdown|md)?\s*\n([\s\S]*?)```/;
+  // Greedy capture to the LAST closing fence so that fenced code blocks INSIDE
+  // the agent definition body (e.g. ```json examples) do not truncate the
+  // extraction at the first inner fence (issue #577).
+  const codeBlockRegex = /```(?:markdown|md)?\s*\n([\s\S]*)```/;
   const match = response.match(codeBlockRegex);
 
   if (match && match[1]) {
