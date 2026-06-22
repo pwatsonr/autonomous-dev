@@ -12,6 +12,7 @@ import {
   LLMInvoker,
   enforceConstraints,
   extractDefinitionFromResponse,
+  reconcileFrontmatterVersion,
   buildImprovementPrompt,
   computeUnifiedDiff,
 } from '../../../src/agent-factory/improvement/proposer';
@@ -484,6 +485,35 @@ function test_extraction_preserves_internal_fences(): void {
   console.log('PASS: test_extraction_preserves_internal_fences');
 }
 
+function test_reconcile_frontmatter_version_quoted(): void {
+  // #580: reconcile the artifact's frontmatter version to the classifier's.
+  const md = ['---', 'name: x', 'version: "1.1.0"', 'role: author', '---', 'body'].join('\n');
+  const out = reconcileFrontmatterVersion(md, '2.0.0');
+  assert(out.includes('version: "2.0.0"'), `expected reconciled quoted version; got:\n${out}`);
+  assert(!out.includes('1.1.0'), 'old version should be gone');
+  console.log('PASS: test_reconcile_frontmatter_version_quoted');
+}
+
+function test_reconcile_frontmatter_version_unquoted_keeps_history(): void {
+  const md = [
+    '---',
+    'name: x',
+    'version: 1.0.0',
+    'version_history:',
+    '  - version: 1.0.0',
+    '    change: init',
+    '---',
+    'body',
+  ].join('\n');
+  const out = reconcileFrontmatterVersion(md, '2.0.0');
+  assert(out.includes('version: 2.0.0'), 'frontmatter version reconciled (unquoted)');
+  assert(
+    out.includes('  - version: 1.0.0'),
+    `version_history entry must be untouched; got:\n${out}`,
+  );
+  console.log('PASS: test_reconcile_frontmatter_version_unquoted_keeps_history');
+}
+
 // ---------------------------------------------------------------------------
 // Improvement prompt tests
 // ---------------------------------------------------------------------------
@@ -856,6 +886,11 @@ describe('proposer', () => {
   it('test_extraction_from_md_code_block', test_extraction_from_md_code_block);
   it('test_extraction_failure_no_code_block', test_extraction_failure_no_code_block);
   it('test_extraction_preserves_internal_fences', test_extraction_preserves_internal_fences);
+  it('test_reconcile_frontmatter_version_quoted', test_reconcile_frontmatter_version_quoted);
+  it(
+    'test_reconcile_frontmatter_version_unquoted_keeps_history',
+    test_reconcile_frontmatter_version_unquoted_keeps_history,
+  );
   it('test_prompt_includes_weakness_report', test_prompt_includes_weakness_report);
   it('test_prompt_includes_current_definition', test_prompt_includes_current_definition);
   it('test_prompt_includes_constraints', test_prompt_includes_constraints);

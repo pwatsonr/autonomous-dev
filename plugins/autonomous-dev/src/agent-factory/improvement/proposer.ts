@@ -152,10 +152,22 @@ export class ProposalGenerator {
       return { success: false, constraintViolations: violations };
     }
 
-    // Step 5: Compute diff and version bump
-    const diff = computeUnifiedDiff(currentContent, proposedContent, agentName);
-    const classification = classifyVersionBump(currentAgent, proposedAgent, diff);
+    // Step 5: Compute the version bump from the LLM's proposed content.
+    const classification = classifyVersionBump(
+      currentAgent,
+      proposedAgent,
+      computeUnifiedDiff(currentContent, proposedContent, agentName),
+    );
     const proposedVersion = incrementVersion(currentAgent.version, classification.bump);
+
+    // #580: the version classifier is authoritative. The LLM's artifact often
+    // disagrees (e.g. writes 1.1.0 while the classifier computes a major 2.0.0),
+    // which left the committed file inconsistent with the registry/proposal record
+    // (promoter logged `promotion_registry_version_mismatch`). Reconcile the
+    // proposed definition's frontmatter `version` to the computed version before
+    // persisting, and compute the stored diff from the reconciled artifact.
+    const reconciledContent = reconcileFrontmatterVersion(proposedContent, proposedVersion);
+    const diff = computeUnifiedDiff(currentContent, reconciledContent, agentName);
 
     // Step 6: Create proposal record
     const proposal: AgentProposal = {
@@ -166,7 +178,7 @@ export class ProposalGenerator {
       version_bump: classification.bump,
       weakness_report_id: report.report_id,
       current_definition: currentContent,
-      proposed_definition: proposedContent,
+      proposed_definition: reconciledContent,
       diff,
       rationale: classification.reason,
       status: 'pending_meta_review',
@@ -364,6 +376,20 @@ export function extractDefinitionFromResponse(response: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Reconcile the frontmatter `version:` value in an agent definition to the
+ * authoritative version computed by the version classifier (#580). Preserves the
+ * existing quote style and touches only the top-level frontmatter `version:` line
+ * (version_history entries are indented `- version:`, so `^version:` never
+ * matches them).
+ */
+export function reconcileFrontmatterVersion(content: string, version: string): string {
+  return content.replace(
+    /^(version:[ \t]*)(["']?)[^"'\n]*(["']?)[ \t]*$/m,
+    (_m, prefix, q1, q2) => `${prefix}${q1 || q2 || ''}${version}${q1 || q2 || ''}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
