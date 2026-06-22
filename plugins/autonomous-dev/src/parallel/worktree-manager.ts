@@ -203,6 +203,16 @@ function parseWorktreeList(porcelainOutput: string): GitWorktreeEntry[] {
 // WorktreeManager
 // ---------------------------------------------------------------------------
 
+/** Options accepted by the WorktreeManager constructor. */
+export interface WorktreeManagerOptions {
+  /**
+   * Injectable provider for computing directory size in bytes.
+   * Defaults to the built-in recursive `calculateDirectorySize` implementation.
+   * Override in tests to return a deterministic value independent of real disk.
+   */
+  diskUsageProvider?: (dirPath: string) => Promise<number>;
+}
+
 export class WorktreeManager {
   /** Resolved absolute path to the worktree root directory. */
   private readonly worktreeRoot: string;
@@ -210,16 +220,20 @@ export class WorktreeManager {
   private lastPressureLevel: DiskPressureLevel = 'normal';
   /** Interval handle for the disk monitor. */
   private diskMonitorInterval: ReturnType<typeof setInterval> | null = null;
+  /** Function used to compute directory size (injectable for tests). */
+  private readonly _diskUsageProvider: (dirPath: string) => Promise<number>;
 
   constructor(
     private config: ParallelConfig,
     private repoRoot: string,
     private eventEmitter: EventEmitter,
+    options: WorktreeManagerOptions = {},
   ) {
     // Resolve worktree root relative to repo root if not absolute
     this.worktreeRoot = path.isAbsolute(config.worktree_root)
       ? config.worktree_root
       : path.join(repoRoot, config.worktree_root);
+    this._diskUsageProvider = options.diskUsageProvider ?? calculateDirectorySize;
   }
 
   // -------------------------------------------------------------------------
@@ -556,7 +570,7 @@ export class WorktreeManager {
     let totalBytes = 0;
 
     for (const wt of worktrees) {
-      const size = await calculateDirectorySize(wt.worktreePath);
+      const size = await this._diskUsageProvider(wt.worktreePath);
       const key = `${wt.requestId}/${wt.trackName}`;
       perWorktree[key] = size;
       totalBytes += size;
@@ -565,7 +579,7 @@ export class WorktreeManager {
     // Also include any worktree directories not yet tracked by git
     // but present under worktreeRoot
     if (fsSync.existsSync(this.worktreeRoot) && worktrees.length === 0) {
-      const rootSize = await calculateDirectorySize(this.worktreeRoot);
+      const rootSize = await this._diskUsageProvider(this.worktreeRoot);
       totalBytes = rootSize;
     }
 

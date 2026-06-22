@@ -17,6 +17,7 @@
 
 import { asset } from "../../lib/plugin-version";
 import type { FC } from "hono/jsx";
+import { icon } from "../../lib/icons";
 
 import { Topbar } from "../../components/topbar";
 import type { RenderProps } from "../../types/render";
@@ -226,7 +227,11 @@ export const DashboardView: FC<DashboardViewProps> = ({
               */}
             {readerError != null && (
                 <div class="dashboard-error-banner" role="alert" aria-live="assertive">
-                    <span class="dashboard-error-banner__icon" aria-hidden="true">⚠</span>
+                    <span
+                        class="dashboard-error-banner__icon"
+                        aria-hidden="true"
+                        dangerouslySetInnerHTML={{ __html: icon("alert-triangle", 16) }}
+                    ></span>
                     <span class="dashboard-error-banner__message">
                         {/* #396: there is no cache — zeros render where data
                             is unavailable. Don't claim a snapshot exists. */}
