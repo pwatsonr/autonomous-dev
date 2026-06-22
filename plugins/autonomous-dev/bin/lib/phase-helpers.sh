@@ -397,3 +397,87 @@ ${operator_feedback}
 
     echo "${base_prompt}"
 }
+
+# record_phase_metric(request_id, project, completed_phase, result_status) -> void
+#   Best-effort metrics SELF-FEED: when a `<X>_review` phase completes, record an
+#   InvocationMetric for the agent that PRODUCED phase `<X>` (resolve_agent), so
+#   `agent improve`/`agent analyze` have real data to analyze. Writes to the
+#   agent-factory data dir — the same agent-metrics.db those verbs read.
+#
+#   Derivation (the daemon's reviews emit pass/fail + a findings count, not a
+#   numeric score): pass -> approved, score 4.6 - 0.3*findings (floor 3.0);
+#   otherwise revision_requested, score 2.6 - 0.2*findings (floor 1.0). The work
+#   phase's retry_count becomes review_iteration_count; domain is inferred coarsely
+#   from the project's dominant language.
+#
+#   NEVER fails the caller — every path returns 0. Gated by env
+#   AUTONOMOUS_DEV_DISABLE_METRICS_RECORDING and config
+#   `agent_factory.metrics.record_from_pipeline` (default true).
+record_phase_metric() {
+    local request_id="$1" project="$2" completed_phase="$3" result_status="$4"
+
+    # Only `<X>_review` phases carry a quality verdict on a producing agent.
+    case "${completed_phase}" in *_review) ;; *) return 0 ;; esac
+
+    [[ -n "${AUTONOMOUS_DEV_DISABLE_METRICS_RECORDING:-}" ]] && return 0
+    local enabled="true"
+    if [[ -n "${EFFECTIVE_CONFIG:-}" && -f "${EFFECTIVE_CONFIG}" ]]; then
+        enabled=$(jq -r '.agent_factory.metrics.record_from_pipeline // true' "${EFFECTIVE_CONFIG}" 2>/dev/null || echo "true")
+    fi
+    [[ "${enabled}" == "false" ]] && return 0
+
+    local work_phase="${completed_phase%_review}"
+    local agent reviewer
+    agent=$(resolve_agent "${work_phase}" 2>/dev/null) || return 0
+    [[ -z "${agent}" ]] && return 0
+    reviewer=$(resolve_agent "${completed_phase}" 2>/dev/null || echo "")
+
+    local req_dir="${project}/.autonomous-dev/requests/${request_id}"
+    local result_file="${req_dir}/phase-result-${completed_phase}.json"
+    local state_file="${req_dir}/state.json"
+
+    local findings=0 retries=0
+    if [[ -f "${result_file}" ]]; then
+        findings=$(jq -r '(.findings | if type=="array" then length elif type=="number" then . else 0 end)' "${result_file}" 2>/dev/null || echo 0)
+    fi
+    if [[ -f "${state_file}" ]]; then
+        retries=$(jq -r --arg p "${work_phase}" '([.phase_history[]? | select(.state==$p) | .retry_count // 0] | max) // 0' "${state_file}" 2>/dev/null || echo 0)
+    fi
+    [[ "${findings}" =~ ^[0-9]+$ ]] || findings=0
+    [[ "${retries}" =~ ^[0-9]+$ ]] || retries=0
+
+    local outcome score
+    if [[ "${result_status}" == "pass" ]]; then
+        outcome="approved"
+        score=$(awk -v f="${findings}" 'BEGIN{s=4.6-0.3*f; if(s<3.0)s=3.0; printf "%.2f", s}')
+    else
+        outcome="revision_requested"
+        score=$(awk -v f="${findings}" 'BEGIN{s=2.6-0.2*f; if(s<1.0)s=1.0; printf "%.2f", s}')
+    fi
+
+    # Coarse domain inference from the project's dominant language.
+    local domain="general"
+    if [[ -d "${project}" ]]; then
+        local npy nts
+        npy=$(find "${project}" -maxdepth 3 -name '*.py' ! -path '*/.*' 2>/dev/null | head -40 | wc -l | tr -d ' ')
+        nts=$(find "${project}" -maxdepth 3 -name '*.ts' ! -path '*/.*' 2>/dev/null | head -40 | wc -l | tr -d ' ')
+        if (( npy > nts )); then domain="python"; elif (( nts > npy )); then domain="typescript"; fi
+    fi
+
+    # Resolve the node recorder; lazily build it from source if absent (the
+    # committed bin/lib/record-metric.js is the primary path).
+    local recorder="${PLUGIN_DIR}/bin/lib/record-metric.js"
+    if [[ ! -f "${recorder}" && -f "${PLUGIN_DIR}/bin/record-metric.ts" ]] && command -v bun >/dev/null 2>&1; then
+        bun build "${PLUGIN_DIR}/bin/record-metric.ts" --outfile="${recorder}" --target=node --external better-sqlite3 >/dev/null 2>&1 || true
+    fi
+    if [[ -f "${recorder}" ]] && command -v node >/dev/null 2>&1; then
+        if node "${recorder}" --agent "${agent}" --request-id "${request_id}" --outcome "${outcome}" \
+                --score "${score}" --reviewer "${reviewer}" --domain "${domain}" --retries "${retries}" \
+                --agents-dir "${PLUGIN_DIR}/agents" >/dev/null 2>&1; then
+            log_info "metrics: recorded ${agent} (${outcome}, score=${score}, domain=${domain}, retries=${retries}) from ${completed_phase}" 2>/dev/null || true
+        else
+            log_warn "metrics: recorder failed for ${agent} (best-effort, ignored)" 2>/dev/null || true
+        fi
+    fi
+    return 0
+}
