@@ -3198,6 +3198,12 @@ advance_phase() {
         result_status="pass"
     fi
 
+    # Self-feed the self-improvement loop: at a `<X>_review` completion, record an
+    # InvocationMetric for the reviewed agent so `agent improve`/`agent analyze`
+    # accumulate real data. Best-effort — never affects phase advancement; gated by
+    # config agent_factory.metrics.record_from_pipeline (default true).
+    record_phase_metric "$request_id" "$project" "$current_phase" "$result_status" || true
+
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
