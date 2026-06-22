@@ -13,6 +13,7 @@ import { readPortalSettings, maskWebhookForDisplay } from "../wiring/settings-re
 import { readAgentsData } from "../wiring/agents-readers";
 import { costLedgerPath, readMtdSpend } from "../wiring/daemon-readers";
 import { readFile } from "node:fs/promises";
+import { nowDate, nowIso } from "../lib/clock";
 
 /**
  * SPEC-036-4-01 AC-01 / AC-06 — pure function so it can be unit-tested
@@ -66,7 +67,7 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
             const ledger = JSON.parse(
                 await readFile(costLedgerPath(), "utf-8"),
             ) as { daily?: Record<string, { total_usd?: number } | undefined> };
-            const t = ledger.daily?.[new Date().toISOString().slice(0, 10)]?.total_usd;
+            const t = ledger.daily?.[nowDate().toISOString().slice(0, 10)]?.total_usd;
             if (typeof t === "number") today = t;
         } catch {
             /* zeros are honest when the ledger is unreadable */
@@ -128,7 +129,7 @@ export const settingsHandler = async (c: Context): Promise<Response> => {
         precisionPct: 0, // Not tracked by daemon, default to 0
         recallPct: 0, // Not tracked by daemon, default to 0
         version: agent.version,
-        lastTrainedAt: new Date().toISOString(), // Default to current time
+        lastTrainedAt: nowIso(), // Default to current time
         recentRuns: [], // Not tracked by daemon, empty array
     }));
 

@@ -29,6 +29,7 @@ import { join } from "node:path";
 
 import { readJsonOrNull } from "./atomic-json";
 import { approvalsQueuePath, stateDirRoot } from "./state-paths";
+import { nowMs } from "../lib/clock";
 
 const CACHE_TTL_MS = 5_000;
 
@@ -111,7 +112,7 @@ function currentMonthKeyUtc(now: number): string {
  * log when this rejects, and the rail-ops pill prefers a stable 0 over a
  * 500 response.
  */
-export async function readMtdSpend(now: () => number = Date.now): Promise<number> {
+export async function readMtdSpend(now: () => number = nowMs): Promise<number> {
     const t = now();
     const cached = cache.get<number>("mtd-spend", t);
     if (cached !== undefined) return cached;

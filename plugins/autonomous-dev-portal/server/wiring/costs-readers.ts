@@ -12,6 +12,7 @@
 import { readFile } from "node:fs/promises";
 
 import type { CostPoint, CostSeries } from "../types/render";
+import { nowDate } from "../lib/clock";
 
 import { costLedgerPath, readMtdSpend } from "./daemon-readers";
 import { readMonthlyCapUsd } from "./dashboard-readers";
@@ -46,7 +47,7 @@ async function readJsonOrNull<T>(path: string): Promise<T | null> {
  */
 function dailyToPoints(daily: CostLedgerFile["daily"]): CostPoint[] {
     const out: CostPoint[] = [];
-    const now = new Date();
+    const now = nowDate();
     for (let i = 29; i >= 0; i--) {
         const d = new Date(Date.UTC(
             now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i,
@@ -67,7 +68,7 @@ function dailyToPoints(daily: CostLedgerFile["daily"]): CostPoint[] {
  * the all-time request count, deflating the average (e.g. $2.10 vs $10.53).
  */
 function countMonthRequests(daily: CostLedgerFile["daily"]): number {
-    const monthPrefix = new Date().toISOString().slice(0, 7);
+    const monthPrefix = nowDate().toISOString().slice(0, 7);
     const ids = new Set<string>();
     for (const [date, day] of Object.entries(daily ?? {})) {
         if (!date.startsWith(monthPrefix)) continue;

@@ -28,6 +28,10 @@ import { expect, test } from "@playwright/test";
 const SPEC_DIR = dirname(fileURLToPath(import.meta.url));
 const PORT = 19282; // distinct from design-system spec's 19281
 const BASE_URL = `http://127.0.0.1:${PORT}`;
+// #361: the frozen render clock. Kit-parity fixtures are dated relative to
+// this (heartbeat = T-5s; cost-ledger fills June through this day). Mirrors
+// the reference used by tests/integration/render-determinism.test.ts.
+const FROZEN_NOW = "2026-06-21T12:00:00Z";
 const FIXTURE_STATE_DIR = join(
     SPEC_DIR,
     "..",
@@ -77,6 +81,11 @@ test.beforeAll(async () => {
             PORTAL_PORT: String(PORT),
             NODE_ENV: "test",
             AUTONOMOUS_DEV_STATE_DIR: FIXTURE_STATE_DIR,
+            // #361: freeze the render clock so the kit-parity fixtures (dated
+            // relative to this reference) produce reproducible screenshots.
+            // Must match the reference the fixtures are built around — the
+            // heartbeat is T-5s and the cost-ledger fills June up to this day.
+            AUTONOMOUS_DEV_NOW: FROZEN_NOW,
         },
         stdio: "pipe",
     });
@@ -89,28 +98,28 @@ test.afterAll(() => {
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-// QUARANTINED (2026-06-09) — comment updated #361 (2026-06-20).
+// QUARANTINED (2026-06-09) — comment updated #361 (2026-06-21).
 //
-// UPDATE: the original blocker — "surface readers don't honor
-// AUTONOMOUS_DEV_STATE_DIR" — is RESOLVED. The data-backed surfaces
-// (dashboard / requests / approvals / repos / costs / agents) all resolve
-// their paths through `stateDirRoot()` (wiring/state-paths.ts), which honors
-// AUTONOMOUS_DEV_STATE_DIR. So reader isolation is done.
+// Three of the original four blockers are now RESOLVED (#361):
+//   ✓ Reader isolation — surfaces resolve paths via `stateDirRoot()`, which
+//     honors AUTONOMOUS_DEV_STATE_DIR.
+//   ✓ Clock determinism — every render-path "now" read routes through
+//     server/lib/clock.ts (nowMs/nowDate/nowIso), honoring AUTONOMOUS_DEV_NOW.
+//     This beforeAll spawns the server with that env frozen (FROZEN_NOW), and
+//     tests/integration/render-determinism.test.ts proves the 8 surfaces render
+//     byte-identically under it (incl. the request-ledger ordering fix, #566).
+//   ✓ Fixture freshness — server/fixtures/kit-parity/ now carries June-dated
+//     cost-ledger.json + heartbeat.json (T-5s) + cost-cap.json so the MTD /
+//     30-day / heartbeat windows are populated under FROZEN_NOW.
 //
-// The remaining blockers to un-skipping are NOT reader isolation:
-//   1. Date/clock coupling — cost/dashboard/ops readers window relative to
-//      `new Date()` (e.g. costs-readers dailyToPoints last-30-days,
-//      daemon-readers readMtdSpend currentMonthKeyUtc), so renders drift by
-//      date even with the fixture state dir. Needs an injectable clock or
-//      relative-dated fixtures.
-//   2. Fixture freshness — server/fixtures/kit-parity/cost-ledger.json is
-//      pinned to 2026-05; the MTD / 30-day windows miss it today. Plus
-//      missing heartbeat.json / cost-cap.json / gate-decisions/.
-//   3. Surface goldens were never captured/committed, and cross-OS pixel
-//      parity needs the CI Docker image (capture there, not on a dev macOS).
-// Tracked as #361 (this comment) — capture goldens in the visual-regression CI
-// job once (1)+(2) land.
-test.skip(true, "reader isolation DONE; remaining: clock-determinism + fixture refresh + capture surface goldens in CI Docker (#361)");
+// REMAINING (the only reason this stays skipped):
+//   • Surface goldens have never been captured/committed, and cross-OS pixel
+//     parity needs the pinned Playwright Docker image — capture must happen in
+//     the visual-regression CI job (`npm run gen:visual-goldens`), not on a dev
+//     macOS. Once captured + committed, flip this skip and add this spec to the
+//     CI `npx playwright test` invocation.
+// Tracked as #361.
+test.skip(true, "determinism + fixtures DONE (#361); remaining: capture surface goldens in CI Docker, then un-skip");
 
 test.beforeEach(async ({ context }) => {
     await context.addCookies([

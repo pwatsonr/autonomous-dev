@@ -199,5 +199,16 @@ export async function readRequestLedger(
         }),
     );
 
-    return Array.from(actionsById.values());
+    // #566: impose a deterministic order. `readdir` + `Promise.all` completion
+    // order are both arbitrary, so without this the list comes back differently
+    // on identical state — flapping the Requests table on every poll and making
+    // the /requests visual golden non-reproducible. Newest-first (createdAt
+    // desc), with a unique id tiebreak so the order is fully stable even when
+    // createdAt is absent or tied.
+    return Array.from(actionsById.values()).sort((a, b) => {
+        const ca = a.createdAt ?? "";
+        const cb = b.createdAt ?? "";
+        if (ca !== cb) return cb.localeCompare(ca);
+        return a.id.localeCompare(b.id);
+    });
 }

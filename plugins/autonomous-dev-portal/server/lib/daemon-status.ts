@@ -18,6 +18,8 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { nowMs } from "./clock";
+
 export interface DaemonStatus {
     status: "fresh" | "stale" | "dead";
     last_seen: string | null;
@@ -106,7 +108,7 @@ export async function readDaemonStatus(): Promise<DaemonStatus> {
     if (Number.isNaN(timestampMs)) {
         return { ...DEAD };
     }
-    const now = Date.now();
+    const now = nowMs();
     const status = classify(timestampMs, now);
 
     const pidVal = obj["pid"];
