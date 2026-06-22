@@ -455,6 +455,35 @@ function test_extraction_failure_no_code_block(): void {
   console.log('PASS: test_extraction_failure_no_code_block');
 }
 
+function test_extraction_preserves_internal_fences(): void {
+  // Regression for #577: when the proposed definition body itself contains a
+  // fenced code block (e.g. a ```json example), extraction must capture the
+  // WHOLE definition rather than truncating at the first inner fence.
+  const body = [
+    '---',
+    'name: test',
+    '---',
+    'Intro line.',
+    '',
+    'Example:',
+    '```json',
+    '{ "k": "v" }',
+    '```',
+    '',
+    'Trailing line that MUST survive.',
+  ].join('\n');
+  const response = '```markdown\n' + body + '\n```';
+  const extracted = extractDefinitionFromResponse(response);
+  assert(extracted !== null, 'expected non-null extraction');
+  assert(extracted!.includes('name: test'), 'expected frontmatter preserved');
+  assert(
+    extracted!.includes('Trailing line that MUST survive.'),
+    `content after the internal fence must be preserved; got:\n${extracted}`,
+  );
+  assert(extracted!.includes('```json'), 'expected the internal fence to be preserved');
+  console.log('PASS: test_extraction_preserves_internal_fences');
+}
+
 // ---------------------------------------------------------------------------
 // Improvement prompt tests
 // ---------------------------------------------------------------------------
@@ -826,6 +855,7 @@ describe('proposer', () => {
   it('test_extraction_from_plain_code_block', test_extraction_from_plain_code_block);
   it('test_extraction_from_md_code_block', test_extraction_from_md_code_block);
   it('test_extraction_failure_no_code_block', test_extraction_failure_no_code_block);
+  it('test_extraction_preserves_internal_fences', test_extraction_preserves_internal_fences);
   it('test_prompt_includes_weakness_report', test_prompt_includes_weakness_report);
   it('test_prompt_includes_current_definition', test_prompt_includes_current_definition);
   it('test_prompt_includes_constraints', test_prompt_includes_constraints);

@@ -27,6 +27,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 import {
     commandFreeze,
@@ -38,6 +39,7 @@ import {
     dispatchCommand,
 } from "../src/agent-factory/cli";
 import { AgentRegistry } from "../src/agent-factory/registry";
+import { buildImprovementContext } from "../src/agent-factory/improvement/cli-context";
 
 // ---------------------------------------------------------------------------
 // Persistence
@@ -60,6 +62,34 @@ function stateFilePath(): string {
         return join(override, "agent-states.json");
     }
     return join(homedir(), ".autonomous-dev", "agent-states.json");
+}
+
+/**
+ * Directory for the improvement subsystem's persistent stores (metrics db,
+ * proposals, weakness reports, audit log). Defaults to
+ * `${AUTONOMOUS_DEV_STATE_DIR:-~/.autonomous-dev}/agent-factory`.
+ */
+function agentFactoryDataDir(): string {
+    const override = process.env["AUTONOMOUS_DEV_AGENT_FACTORY_DATA_DIR"];
+    if (override !== undefined && override.length > 0) return override;
+    const stateDir = process.env["AUTONOMOUS_DEV_STATE_DIR"];
+    const base =
+        stateDir !== undefined && stateDir.length > 0
+            ? stateDir
+            : join(homedir(), ".autonomous-dev");
+    return join(base, "agent-factory");
+}
+
+/** Best-effort git repo root containing `fromDir`; `fallback` if not a repo. */
+function gitToplevel(fromDir: string, fallback: string): string {
+    try {
+        return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+            cwd: fromDir,
+            encoding: "utf-8",
+        }).trim();
+    } catch {
+        return fallback;
+    }
 }
 
 async function readPersistedState(): Promise<PersistedState> {
@@ -188,7 +218,7 @@ async function main(): Promise<number> {
 
     if (!verb || verb === "--help" || verb === "-h") {
         console.error(
-            "Usage: autonomous-dev agent <inspect|freeze|unfreeze|shadow|unshadow|improve|promote|list> <name> [version] [--json]",
+            "Usage: autonomous-dev agent <inspect|freeze|unfreeze|shadow|unshadow|analyze|improve|promote|accept|reject|list> <name> [version] [--json]",
         );
         return verb && verb !== "--help" && verb !== "-h" ? 1 : 0;
     }
@@ -246,6 +276,19 @@ async function main(): Promise<number> {
 
     let output: string;
     let mutated = false;
+    // Lazily assemble the improvement subsystem (real stores + Claude-backed
+    // runtimes) only for the verbs that need it (issue #576).
+    const buildCtx = () => {
+        const dataDir = agentFactoryDataDir();
+        const projectRoot = gitToplevel(agentsDir, resolve(agentsDir, ".."));
+        try {
+            return buildImprovementContext({ registry, agentsDir, dataDir, projectRoot });
+        } catch (err) {
+            const m = err instanceof Error ? err.message : String(err);
+            console.error(`Warning: improvement subsystem unavailable (${m}).`);
+            return {};
+        }
+    };
     try {
         switch (verb) {
             case "inspect": {
@@ -298,20 +341,17 @@ async function main(): Promise<number> {
                 }
                 break;
             case "improve": {
-                // End-to-end, human-gated self-improvement (issue #529):
+                // End-to-end, human-gated self-improvement (issues #529, #576):
                 // analyze -> propose -> meta-review -> park for human approval.
-                // Routed through the in-process command router. The full
-                // improvement subsystem (analyzer/proposer/meta-review) is
-                // injected by the daemon's CliContext; when absent (as in this
-                // thin process wrapper), dispatchCommand returns a clear
-                // "Improvement subsystem not available" guard rather than a
-                // silent no-op. NEVER promotes — promotion stays behind the
-                // separate `promote`/`accept` verb (the human gate).
+                // The improvement subsystem (analyzer/proposer/meta-review) is
+                // assembled here with real Claude-backed runtimes via buildCtx().
+                // NEVER promotes — promotion stays behind the separate
+                // `promote`/`accept` verb (the human gate).
                 output = await dispatchCommand(
                     registry,
                     ["improve", name, ...rest],
                     agentsDir,
-                    {},
+                    buildCtx(),
                 );
                 break;
             }
@@ -326,11 +366,24 @@ async function main(): Promise<number> {
                     }
                     return 1;
                 }
-                output = await commandPromote(registry, name, version, {});
+                output = await commandPromote(registry, name, version, buildCtx());
+                break;
+            }
+            case "analyze":
+            case "accept":
+            case "reject": {
+                // Human-gated self-improvement verbs, routed through the
+                // in-process router with the real subsystem (issue #576).
+                output = await dispatchCommand(
+                    registry,
+                    [verb, name, ...rest],
+                    agentsDir,
+                    buildCtx(),
+                );
                 break;
             }
             default: {
-                const msg = `unknown verb '${verb}'. Use inspect|freeze|unfreeze|shadow|unshadow|promote|list.`;
+                const msg = `unknown verb '${verb}'. Use inspect|freeze|unfreeze|shadow|unshadow|analyze|improve|promote|accept|reject|list.`;
                 if (jsonMode) {
                     console.log(JSON.stringify({ error: msg }));
                 } else {

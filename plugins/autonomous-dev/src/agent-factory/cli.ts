@@ -881,7 +881,8 @@ function formatWeaknessReport(report: WeaknessReport): string {
   if (report.weaknesses.length > 0) {
     lines.push('  Weaknesses:');
     for (const w of report.weaknesses) {
-      lines.push(`    - ${w.dimension} (${w.severity}): ${w.evidence}`);
+      const evidence = typeof w.evidence === 'string' ? w.evidence : JSON.stringify(w.evidence);
+      lines.push(`    - ${w.dimension} (${w.severity}): ${evidence}`);
       lines.push(`      Affected domains: ${w.affected_domains.join(', ') || 'none'}`);
       lines.push(`      Focus: ${w.suggested_focus}`);
     }
