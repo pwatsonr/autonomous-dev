@@ -7,6 +7,7 @@
 
 import type { FC } from "hono/jsx";
 
+import { icon } from "../../lib/icons";
 import type { StandardsRule } from "../../types/render";
 
 interface Props {
@@ -38,15 +39,23 @@ export const StandardsApplied: FC<Props> = ({ rules }) => {
             <div class="std-list">
                 {rules.map((rule) => {
                     const sev = normalizeSeverity(rule.severity);
-                    const source = rule.immutable === true
-                        ? `${rule.source} · 🔒`
-                        : rule.source;
                     return (
                         <div class={`std-row sev-${sev}`}>
                             <div class="std-id meta-mono">{rule.id}</div>
                             <div class="std-desc">{rule.desc}</div>
                             <div class={`std-sev ${sev}`}>{sev}</div>
-                            <div class="std-source">{source}</div>
+                            <div class="std-source">
+                                {rule.source}
+                                {rule.immutable === true ? (
+                                    <>
+                                        {" · "}
+                                        <span
+                                            aria-label="immutable"
+                                            dangerouslySetInnerHTML={{ __html: icon("lock", 12) }}
+                                        ></span>
+                                    </>
+                                ) : null}
+                            </div>
                         </div>
                     );
                 })}

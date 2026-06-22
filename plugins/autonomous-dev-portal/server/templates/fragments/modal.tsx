@@ -17,6 +17,7 @@
 //     trap"` on the overlay root) per SPEC-037-5-06 implementation notes.
 
 import type { FC } from "hono/jsx";
+import { icon } from "../../lib/icons";
 
 interface ModalProps {
     title: string;
@@ -60,9 +61,8 @@ export const Modal: FC<ModalProps> = ({
                     class="modal-close"
                     data-modal-close
                     aria-label="Close"
-                >
-                    ✕
-                </button>
+                    dangerouslySetInnerHTML={{ __html: icon("x", 16) }}
+                ></button>
             </div>
             {body}
             {footer !== undefined ? (

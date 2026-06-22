@@ -287,12 +287,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: var(--s-1h);
     background: transparent;
     border: 0;
     padding: var(--s-2) var(--s-1);
     cursor: pointer;
-    border-radius: 3px;
+    border-radius: var(--r-2);
     min-width: 0;
 }
 
@@ -323,7 +323,7 @@
 
 .phase-name {
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: var(--t-label);
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--fg-2);
@@ -366,7 +366,7 @@
 .gate-panel {
     background: var(--bg-1);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     padding: var(--s-4);
     display: flex;
     flex-direction: column;
@@ -411,7 +411,7 @@
     min-height: 64px;
     background: var(--bg-2);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     color: var(--fg-1);
     font-family: var(--font-mono);
     font-size: var(--t-meta);
@@ -435,7 +435,7 @@
     background: var(--bg-1);
     border: 1px solid var(--border-strong);
     border-left-width: 3px;
-    border-radius: 3px;
+    border-radius: var(--r-2);
     color: var(--fg-1);
     font-size: var(--t-meta);
 }
@@ -459,10 +459,10 @@
 .artifact-pane .artifact-pre {
     background: var(--bg-0);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     padding: var(--s-3);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--t-mono-meta);
     line-height: 1.55;
     overflow: auto;
     max-height: 520px;
@@ -846,7 +846,7 @@ a.rd-artifact-row:focus-visible {
     min-height: 48px;
     background: var(--bg-2);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     color: var(--fg-1);
     font-family: var(--font-mono);
     font-size: var(--t-meta);

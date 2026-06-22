@@ -177,6 +177,9 @@
   --t-label: 10px;     /* compact label / eyebrow / badge text */
   --t-badge: 9.5px;    /* theme-toggle pill labels (extra-tight) */
   --t-nano: 9px;       /* smallest text — agent-grid KPI label */
+  --t-11: 11px;        /* pipeline card footer text (between meta:12px and label:10px) */
+  --t-12h: 12.5px;     /* pipeline card title (between meta:12px and mono-body:13px) */
+  --t-8: 8px;          /* avatar initials — densest text in the pipeline card */
 
   /* ----- Radii (small. this is not a friendly app.) ----- */
   --r-0: 0;
@@ -280,6 +283,18 @@
   --shadow-1: 0 1px 0 rgba(0,0,0,0.4), 0 0 0 1px var(--line-1);
   --shadow-2: 0 2px 4px rgba(0,0,0,0.5), 0 0 0 1px var(--line-1);
   --shadow-pop: 0 8px 24px rgba(0,0,0,0.6), 0 0 0 1px var(--line-2);
+
+  /* Terminal / Log surface colors — same in both themes.
+     The log viewer is always a dark-terminal surface regardless of UI theme,
+     so these values are intentionally identical to the light-theme block. */
+  --log-bg:    #14130f;    /* deep warm black — log background */
+  --log-fg:    #ede9d8;    /* warm white — default log text */
+  --log-time:  #95917f;    /* dim timestamp color */
+  --log-info:  #88adcb;    /* info/agent tag color */
+  --log-warn:  #dfba6b;    /* warning line color */
+  --log-err:   #d99891;    /* error line color */
+  --log-ok:    #98c39a;    /* ok/success line color */
+  --log-mark:  #e89255;    /* brand/mark line color */
 }
 
 /* Honor system preference when no explicit theme is set */

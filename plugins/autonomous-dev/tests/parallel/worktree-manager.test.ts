@@ -422,12 +422,16 @@ describe('WorktreeManager', () => {
     });
 
     it('emits critical event when hard limit exceeded', async () => {
+      // Inject a provider that reports 200 bytes — reliably above the ~107-byte hard
+      // limit — so the test is deterministic regardless of actual git worktree size.
       const lowConfig = loadConfig({
         worktree_root: worktreeRoot,
         disk_warning_threshold_gb: 0.00000001, // ~10 bytes
         disk_hard_limit_gb: 0.0000001,        // ~107 bytes
       });
-      const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter);
+      const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter, {
+        diskUsageProvider: async () => 200,
+      });
 
       await lowWm.createIntegrationBranch('req-001', 'main');
       await lowWm.createTrackWorktree('req-001', 'track-a');
@@ -447,12 +451,16 @@ describe('WorktreeManager', () => {
     });
 
     it('getDiskPressureLevel updates after checkDiskUsage', async () => {
+      // Inject a provider that reports 200 bytes — reliably above the ~107-byte hard
+      // limit — so the test is deterministic regardless of actual git worktree size.
       const lowConfig = loadConfig({
         worktree_root: worktreeRoot,
         disk_warning_threshold_gb: 0.00000001, // ~10 bytes
         disk_hard_limit_gb: 0.0000001,        // ~107 bytes
       });
-      const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter);
+      const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter, {
+        diskUsageProvider: async () => 200,
+      });
 
       await lowWm.createIntegrationBranch('req-001', 'main');
       await lowWm.createTrackWorktree('req-001', 'track-a');
