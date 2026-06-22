@@ -17,7 +17,10 @@ import {
   createMockObservation,
   listObservations,
 } from '../helpers/mock-observations';
-import { checkOscillation, buildOscillationWarningMarkdown } from '../../src/governance/oscillation';
+import {
+  checkOscillation,
+  buildOscillationWarningMarkdown,
+} from '../../src/governance/oscillation';
 import type { GovernanceConfig, ObservationSummary } from '../../src/governance/types';
 
 // ---------------------------------------------------------------------------
@@ -53,7 +56,11 @@ async function runObservationCycle(
   // Check oscillation BEFORE creating the new observation
   // (the new observation is the "current" one)
   const existingObservations = await findObservationsForOscillation(
-    rootDir, service, errorClass, config, clock,
+    rootDir,
+    service,
+    errorClass,
+    config,
+    clock,
   );
 
   // Create the new observation
@@ -83,7 +90,7 @@ async function runObservationCycle(
       oscillating: true,
       count: allObservations.length,
       window_days: config.oscillation_window_days,
-      observation_ids: allObservations.map(o => o.id),
+      observation_ids: allObservations.map((o) => o.id),
       observation_summaries: allObservations,
       recommendation: 'systemic_investigation' as const,
     };
@@ -92,8 +99,10 @@ async function runObservationCycle(
     const content = await fs.readFile(obs.filePath, 'utf-8');
 
     // Update frontmatter
-    const updatedContent = content
-      .replace('oscillation_warning: false', 'oscillation_warning: true');
+    const updatedContent = content.replace(
+      'oscillation_warning: false',
+      'oscillation_warning: true',
+    );
 
     // Append oscillation warning to the body
     await fs.writeFile(obs.filePath, updatedContent + '\n' + warningMd + '\n', 'utf-8');
@@ -143,8 +152,12 @@ async function findObservationsForOscillation(
           let val: any = line.substring(ci + 1).trim();
           // Strip YAML double-quotes that buildMockObservationFile adds
           // around values containing ':' (e.g. ISO-8601 timestamps).
-          if (typeof val === 'string' && val.length >= 2 &&
-              val.startsWith('"') && val.endsWith('"')) {
+          if (
+            typeof val === 'string' &&
+            val.length >= 2 &&
+            val.startsWith('"') &&
+            val.endsWith('"')
+          ) {
             val = val.slice(1, -1);
           }
           if (val === 'null' || val === '') val = null;
@@ -155,7 +168,8 @@ async function findObservationsForOscillation(
 
         if (
           fm.service === service &&
-          (fm.error_class === errorClass || (fm.fingerprint && fm.fingerprint.startsWith(errorClass))) &&
+          (fm.error_class === errorClass ||
+            (fm.fingerprint && fm.fingerprint.startsWith(errorClass))) &&
           fm.timestamp &&
           new Date(fm.timestamp) >= windowStart
         ) {
@@ -195,9 +209,7 @@ describe('E2E: oscillation detection over multiple runs', () => {
     const config = defaultGovernanceConfig();
 
     // Run 1: first observation -- no oscillation
-    const run1 = await runObservationCycle(
-      rootDir, 'api-gateway', 'ConnPool', clock, config,
-    );
+    const run1 = await runObservationCycle(rootDir, 'api-gateway', 'ConnPool', clock, config);
     expect(run1.oscillationDetected).toBe(false);
 
     const obs1 = await listObservations(rootDir);
@@ -208,9 +220,7 @@ describe('E2E: oscillation detection over multiple runs', () => {
     clock.advanceDays(10);
 
     // Run 2: second observation -- still no oscillation (2 < 3)
-    const run2 = await runObservationCycle(
-      rootDir, 'api-gateway', 'ConnPool', clock, config,
-    );
+    const run2 = await runObservationCycle(rootDir, 'api-gateway', 'ConnPool', clock, config);
     expect(run2.oscillationDetected).toBe(false);
 
     const obs2 = await listObservations(rootDir);
@@ -221,9 +231,7 @@ describe('E2E: oscillation detection over multiple runs', () => {
     clock.advanceDays(10);
 
     // Run 3: third observation -- OSCILLATION DETECTED (3 >= 3)
-    const run3 = await runObservationCycle(
-      rootDir, 'api-gateway', 'ConnPool', clock, config,
-    );
+    const run3 = await runObservationCycle(rootDir, 'api-gateway', 'ConnPool', clock, config);
     expect(run3.oscillationDetected).toBe(true);
 
     const obs3 = await listObservations(rootDir);

@@ -13,11 +13,9 @@ import type { AuditEvent } from '../../src/audit/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const UUID_V4_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const ISO_8601_MS_REGEX =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const ISO_8601_MS_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 function makePartialEvent(overrides: Partial<PartialAuditEvent> = {}): PartialAuditEvent {
   return {
@@ -35,8 +33,8 @@ function readEventsFromFile(logPath: string): AuditEvent[] {
   const content = fs.readFileSync(logPath, 'utf-8');
   return content
     .split('\n')
-    .filter(line => line.trim().length > 0)
-    .map(line => JSON.parse(line));
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line));
 }
 
 // ---------------------------------------------------------------------------
@@ -121,16 +119,14 @@ describe('AuditEventWriter', () => {
     const writer = new AuditEventWriter(logPath);
 
     for (let i = 0; i < 5; i++) {
-      await writer.append(
-        makePartialEvent({ request_id: `req-${i}` }),
-      );
+      await writer.append(makePartialEvent({ request_id: `req-${i}` }));
     }
 
     const events = readEventsFromFile(logPath);
     expect(events).toHaveLength(5);
 
     // Verify each has unique event_id
-    const ids = events.map(e => e.event_id);
+    const ids = events.map((e) => e.event_id);
     expect(new Set(ids).size).toBe(5);
   });
 
@@ -146,7 +142,7 @@ describe('AuditEventWriter', () => {
     }
 
     const content = fs.readFileSync(logPath, 'utf-8');
-    const lines = content.split('\n').filter(l => l.trim().length > 0);
+    const lines = content.split('\n').filter((l) => l.trim().length > 0);
 
     for (const line of lines) {
       // Each line must parse as valid JSON without errors
@@ -191,9 +187,7 @@ describe('AuditEventWriter', () => {
     // Spawn 10 async appends simultaneously
     const promises: Promise<AuditEvent>[] = [];
     for (let i = 0; i < 10; i++) {
-      promises.push(
-        writer.append(makePartialEvent({ request_id: `concurrent-${i}` })),
-      );
+      promises.push(writer.append(makePartialEvent({ request_id: `concurrent-${i}` })));
     }
     await Promise.all(promises);
 
@@ -201,11 +195,11 @@ describe('AuditEventWriter', () => {
     expect(events).toHaveLength(10);
 
     // All 10 events present with unique IDs
-    const ids = new Set(events.map(e => e.event_id));
+    const ids = new Set(events.map((e) => e.event_id));
     expect(ids.size).toBe(10);
 
     // All request IDs present (order may vary)
-    const requestIds = new Set(events.map(e => e.request_id));
+    const requestIds = new Set(events.map((e) => e.request_id));
     for (let i = 0; i < 10; i++) {
       expect(requestIds.has(`concurrent-${i}`)).toBe(true);
     }
@@ -345,7 +339,7 @@ describe('AuditEventWriter', () => {
     expect(events).toHaveLength(2);
 
     // The flushed buffered event should come first (written during flush)
-    const requestIds = events.map(e => e.request_id);
+    const requestIds = events.map((e) => e.request_id);
     expect(requestIds).toContain('will-be-buffered');
     expect(requestIds).toContain('success-event');
   });

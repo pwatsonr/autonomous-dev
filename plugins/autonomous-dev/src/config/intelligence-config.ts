@@ -18,9 +18,7 @@ import {
 export function intervalToCron(interval: string): string {
   const match = interval.match(/^(\d+)(h|m)$/);
   if (!match) {
-    throw new Error(
-      `Invalid interval format "${interval}". Expected a value like "4h" or "30m".`,
-    );
+    throw new Error(`Invalid interval format "${interval}". Expected a value like "4h" or "30m".`);
   }
 
   const value = match[1];

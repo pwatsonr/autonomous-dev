@@ -1,9 +1,6 @@
-import {
-  TrustConfigLoader,
-  DEFAULT_TRUST_CONFIG,
-} from "../../src/trust/trust-config";
-import type { ConfigProvider } from "../../src/trust/trust-config";
-import type { TrustConfig } from "../../src/trust/types";
+import { TrustConfigLoader, DEFAULT_TRUST_CONFIG } from '../../src/trust/trust-config';
+import type { ConfigProvider } from '../../src/trust/trust-config';
+import type { TrustConfig } from '../../src/trust/types';
 
 // ---------------------------------------------------------------------------
 // Mock ConfigProvider
@@ -47,7 +44,7 @@ class MockConfigProvider implements ConfigProvider {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("TrustConfigLoader", () => {
+describe('TrustConfigLoader', () => {
   let provider: MockConfigProvider;
   let loader: TrustConfigLoader;
 
@@ -64,12 +61,12 @@ describe("TrustConfigLoader", () => {
   // -------------------------------------------------------------------------
   // Test Case 6: Valid full config loads correctly
   // -------------------------------------------------------------------------
-  test("valid full config loads correctly", () => {
+  test('valid full config loads correctly', () => {
     provider.setTrustSection({
       system_default_level: 2,
       repositories: {
-        "repo-a": { default_level: 3 },
-        "repo-b": { default_level: 0 },
+        'repo-a': { default_level: 3 },
+        'repo-b': { default_level: 0 },
       },
       auto_demotion: {
         enabled: true,
@@ -86,8 +83,8 @@ describe("TrustConfigLoader", () => {
     const config = loader.load();
 
     expect(config.system_default_level).toBe(2);
-    expect(config.repositories["repo-a"]).toEqual({ default_level: 3 });
-    expect(config.repositories["repo-b"]).toEqual({ default_level: 0 });
+    expect(config.repositories['repo-a']).toEqual({ default_level: 3 });
+    expect(config.repositories['repo-b']).toEqual({ default_level: 0 });
     expect(config.auto_demotion).toEqual({
       enabled: true,
       failure_threshold: 5,
@@ -103,13 +100,13 @@ describe("TrustConfigLoader", () => {
   // -------------------------------------------------------------------------
   // Test Case 7: Missing trust section returns DEFAULT_TRUST_CONFIG
   // -------------------------------------------------------------------------
-  test("missing trust section returns default config", () => {
+  test('missing trust section returns default config', () => {
     provider.setTrustSection(undefined);
     const config = loader.load();
     expect(config).toEqual(DEFAULT_TRUST_CONFIG);
   });
 
-  test("null trust section returns default config", () => {
+  test('null trust section returns default config', () => {
     provider.setTrustSection(null);
     const config = loader.load();
     expect(config).toEqual(DEFAULT_TRUST_CONFIG);
@@ -118,53 +115,49 @@ describe("TrustConfigLoader", () => {
   // -------------------------------------------------------------------------
   // Test Case 8: Invalid system_default_level = 5 falls back to 1
   // -------------------------------------------------------------------------
-  test("invalid system_default_level = 5 falls back to 1 with warning", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  test('invalid system_default_level = 5 falls back to 1 with warning', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     provider.setTrustSection({ system_default_level: 5 });
     const config = loader.load();
 
     expect(config.system_default_level).toBe(1);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid system_default_level"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid system_default_level'));
   });
 
   // -------------------------------------------------------------------------
   // Test Case 9: Invalid system_default_level = "high" falls back to 1
   // -------------------------------------------------------------------------
   test('invalid system_default_level = "high" falls back to 1 with warning', () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
-    provider.setTrustSection({ system_default_level: "high" });
+    provider.setTrustSection({ system_default_level: 'high' });
     const config = loader.load();
 
     expect(config.system_default_level).toBe(1);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid system_default_level"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid system_default_level'));
   });
 
   // -------------------------------------------------------------------------
   // Test Case 10: Invalid repo level -- repo entry skipped, others intact
   // -------------------------------------------------------------------------
-  test("invalid repo default_level is skipped; other repos still load", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  test('invalid repo default_level is skipped; other repos still load', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     provider.setTrustSection({
       system_default_level: 1,
       repositories: {
-        "good-repo": { default_level: 2 },
-        "bad-repo": { default_level: 99 },
-        "also-good": { default_level: 0 },
+        'good-repo': { default_level: 2 },
+        'bad-repo': { default_level: 99 },
+        'also-good': { default_level: 0 },
       },
     });
 
     const config = loader.load();
 
-    expect(config.repositories["good-repo"]).toEqual({ default_level: 2 });
-    expect(config.repositories["also-good"]).toEqual({ default_level: 0 });
-    expect(config.repositories["bad-repo"]).toBeUndefined();
+    expect(config.repositories['good-repo']).toEqual({ default_level: 2 });
+    expect(config.repositories['also-good']).toEqual({ default_level: 0 });
+    expect(config.repositories['bad-repo']).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Invalid default_level for repository "bad-repo"'),
     );
@@ -173,8 +166,8 @@ describe("TrustConfigLoader", () => {
   // -------------------------------------------------------------------------
   // Test Case 11: require_human_approval set to false is forced to true
   // -------------------------------------------------------------------------
-  test("require_human_approval set to false is forced to true with error", () => {
-    const errorSpy = jest.spyOn(console, "error").mockImplementation();
+  test('require_human_approval set to false is forced to true with error', () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation();
 
     provider.setTrustSection({
       system_default_level: 1,
@@ -189,16 +182,14 @@ describe("TrustConfigLoader", () => {
 
     expect(config.promotion.require_human_approval).toBe(true);
     expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "promotion.require_human_approval cannot be set to false",
-      ),
+      expect.stringContaining('promotion.require_human_approval cannot be set to false'),
     );
   });
 
   // -------------------------------------------------------------------------
   // Test Case 12: Partial config -- missing fields filled with defaults
   // -------------------------------------------------------------------------
-  test("partial config fills missing fields with defaults", () => {
+  test('partial config fills missing fields with defaults', () => {
     provider.setTrustSection({
       system_default_level: 3,
     });
@@ -211,7 +202,7 @@ describe("TrustConfigLoader", () => {
     expect(config.promotion).toEqual(DEFAULT_TRUST_CONFIG.promotion);
   });
 
-  test("partial auto_demotion uses defaults for missing fields", () => {
+  test('partial auto_demotion uses defaults for missing fields', () => {
     provider.setTrustSection({
       system_default_level: 1,
       auto_demotion: { enabled: true },
@@ -224,7 +215,7 @@ describe("TrustConfigLoader", () => {
     expect(config.auto_demotion.window_hours).toBe(24);
   });
 
-  test("partial promotion uses defaults for missing fields", () => {
+  test('partial promotion uses defaults for missing fields', () => {
     provider.setTrustSection({
       system_default_level: 1,
       promotion: { cooldown_hours: 48 },
@@ -240,7 +231,7 @@ describe("TrustConfigLoader", () => {
   // -------------------------------------------------------------------------
   // Test Case 13: Hot-reload -- valid new config returned on next load
   // -------------------------------------------------------------------------
-  test("hot-reload: valid new config is applied after change", () => {
+  test('hot-reload: valid new config is applied after change', () => {
     provider.setTrustSection({ system_default_level: 1 });
     const config1 = loader.load();
     expect(config1.system_default_level).toBe(1);
@@ -256,13 +247,13 @@ describe("TrustConfigLoader", () => {
   // -------------------------------------------------------------------------
   // Test Case 14: Hot-reload -- invalid new config retains previous
   // -------------------------------------------------------------------------
-  test("hot-reload: invalid new config retains previous valid config", () => {
-    const errorSpy = jest.spyOn(console, "error").mockImplementation();
+  test('hot-reload: invalid new config retains previous valid config', () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation();
 
     // Load valid config first
     provider.setTrustSection({
       system_default_level: 2,
-      repositories: { "repo-a": { default_level: 3 } },
+      repositories: { 'repo-a': { default_level: 3 } },
     });
     const config1 = loader.load();
     expect(config1.system_default_level).toBe(2);
@@ -274,19 +265,17 @@ describe("TrustConfigLoader", () => {
     // Previous config should be retained
     const config2 = loader.load();
     expect(config2.system_default_level).toBe(2);
-    expect(config2.repositories["repo-a"]).toEqual({ default_level: 3 });
+    expect(config2.repositories['repo-a']).toEqual({ default_level: 3 });
 
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Retaining previous config"),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Retaining previous config'));
   });
 
   // -------------------------------------------------------------------------
   // Additional validation edge cases
   // -------------------------------------------------------------------------
 
-  test("invalid system_default_level = -1 falls back to 1", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  test('invalid system_default_level = -1 falls back to 1', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     provider.setTrustSection({ system_default_level: -1 });
     const config = loader.load();
@@ -295,15 +284,15 @@ describe("TrustConfigLoader", () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 
-  test("system_default_level = 0 is valid (falsy but legal)", () => {
+  test('system_default_level = 0 is valid (falsy but legal)', () => {
     provider.setTrustSection({ system_default_level: 0 });
     const config = loader.load();
 
     expect(config.system_default_level).toBe(0);
   });
 
-  test("invalid auto_demotion.failure_threshold uses default", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  test('invalid auto_demotion.failure_threshold uses default', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     provider.setTrustSection({
       system_default_level: 1,
@@ -314,12 +303,12 @@ describe("TrustConfigLoader", () => {
 
     expect(config.auto_demotion.failure_threshold).toBe(3);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid auto_demotion.failure_threshold"),
+      expect.stringContaining('Invalid auto_demotion.failure_threshold'),
     );
   });
 
-  test("invalid auto_demotion.failure_threshold (non-integer) uses default", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  test('invalid auto_demotion.failure_threshold (non-integer) uses default', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     provider.setTrustSection({
       system_default_level: 1,
@@ -332,8 +321,8 @@ describe("TrustConfigLoader", () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 
-  test("invalid auto_demotion.window_hours uses default", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  test('invalid auto_demotion.window_hours uses default', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     provider.setTrustSection({
       system_default_level: 1,
@@ -344,31 +333,31 @@ describe("TrustConfigLoader", () => {
 
     expect(config.auto_demotion.window_hours).toBe(24);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid auto_demotion.window_hours"),
+      expect.stringContaining('Invalid auto_demotion.window_hours'),
     );
   });
 
-  test("invalid repository config (non-object) is skipped", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  test('invalid repository config (non-object) is skipped', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     provider.setTrustSection({
       system_default_level: 1,
       repositories: {
-        "good-repo": { default_level: 2 },
-        "bad-repo": "not-an-object",
+        'good-repo': { default_level: 2 },
+        'bad-repo': 'not-an-object',
       },
     });
 
     const config = loader.load();
 
-    expect(config.repositories["good-repo"]).toEqual({ default_level: 2 });
-    expect(config.repositories["bad-repo"]).toBeUndefined();
+    expect(config.repositories['good-repo']).toEqual({ default_level: 2 });
+    expect(config.repositories['bad-repo']).toBeUndefined();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Invalid repository config for "bad-repo"'),
     );
   });
 
-  test("onConfigChange callback is fired on valid hot-reload", () => {
+  test('onConfigChange callback is fired on valid hot-reload', () => {
     const callback = jest.fn();
     loader.onConfigChange(callback);
 
@@ -381,8 +370,8 @@ describe("TrustConfigLoader", () => {
     expect(callback).toHaveBeenCalledTimes(1);
   });
 
-  test("onConfigChange callback is NOT fired on invalid hot-reload", () => {
-    jest.spyOn(console, "error").mockImplementation();
+  test('onConfigChange callback is NOT fired on invalid hot-reload', () => {
+    jest.spyOn(console, 'error').mockImplementation();
     const callback = jest.fn();
     loader.onConfigChange(callback);
 
@@ -395,7 +384,7 @@ describe("TrustConfigLoader", () => {
     expect(callback).not.toHaveBeenCalled();
   });
 
-  test("unsubscribing onConfigChange stops callback", () => {
+  test('unsubscribing onConfigChange stops callback', () => {
     const callback = jest.fn();
     const unsub = loader.onConfigChange(callback);
     unsub();
@@ -406,7 +395,7 @@ describe("TrustConfigLoader", () => {
     expect(callback).not.toHaveBeenCalled();
   });
 
-  test("destroy cleans up subscriptions", () => {
+  test('destroy cleans up subscriptions', () => {
     const callback = jest.fn();
     loader.onConfigChange(callback);
     loader.destroy();
@@ -417,7 +406,7 @@ describe("TrustConfigLoader", () => {
     expect(callback).not.toHaveBeenCalled();
   });
 
-  test("DEFAULT_TRUST_CONFIG has expected shape", () => {
+  test('DEFAULT_TRUST_CONFIG has expected shape', () => {
     expect(DEFAULT_TRUST_CONFIG).toEqual({
       system_default_level: 1,
       repositories: {},
@@ -430,7 +419,7 @@ describe("TrustConfigLoader", () => {
     });
   });
 
-  test("hot-reload: change callbacks get latest config via load()", () => {
+  test('hot-reload: change callbacks get latest config via load()', () => {
     let capturedConfig: TrustConfig | null = null;
 
     loader.onConfigChange(() => {
@@ -447,7 +436,7 @@ describe("TrustConfigLoader", () => {
     expect(capturedConfig!.system_default_level).toBe(3);
   });
 
-  test("multiple load() calls without changes return consistent config", () => {
+  test('multiple load() calls without changes return consistent config', () => {
     provider.setTrustSection({ system_default_level: 2 });
 
     const config1 = loader.load();

@@ -96,17 +96,13 @@ export function initializeMetricBaseline(value: number): MetricBaseline {
  * @param newValue   Newly observed metric value
  * @returns          Updated metric baseline (mutates and returns input)
  */
-export function updateMetricBaseline(
-  existing: MetricBaseline,
-  newValue: number,
-): MetricBaseline {
+export function updateMetricBaseline(existing: MetricBaseline, newValue: number): MetricBaseline {
   // EWMA mean update
   existing.mean_7d = (1 - EWMA_ALPHA) * existing.mean_7d + EWMA_ALPHA * newValue;
 
   // EWMA variance-tracking stddev update
   existing.stddev_7d = Math.sqrt(
-    (1 - EWMA_ALPHA) * existing.stddev_7d ** 2 +
-      EWMA_ALPHA * (newValue - existing.mean_7d) ** 2,
+    (1 - EWMA_ALPHA) * existing.stddev_7d ** 2 + EWMA_ALPHA * (newValue - existing.mean_7d) ** 2,
   );
 
   return existing;
@@ -221,18 +217,17 @@ export function updatePercentiles(
  * @returns         `true` if the service is STILL in learning mode,
  *                  `false` if learning mode just ended or was already off
  */
-export function checkLearningMode(
-  baseline: BaselineMetrics,
-  now: Date = new Date(),
-): boolean {
+export function checkLearningMode(baseline: BaselineMetrics, now: Date = new Date()): boolean {
   if (!baseline.learning_mode) return false;
 
   const learningStart = new Date(baseline.learning_started);
-  const daysSinceLearningStart =
-    (now.getTime() - learningStart.getTime()) / (24 * 60 * 60 * 1000);
+  const daysSinceLearningStart = (now.getTime() - learningStart.getTime()) / (24 * 60 * 60 * 1000);
 
   // Exit learning mode when BOTH conditions are met
-  if (daysSinceLearningStart >= LEARNING_MIN_DAYS && baseline.observation_run_count >= LEARNING_MIN_RUNS) {
+  if (
+    daysSinceLearningStart >= LEARNING_MIN_DAYS &&
+    baseline.observation_run_count >= LEARNING_MIN_RUNS
+  ) {
     baseline.learning_mode = false;
     baseline.learning_completed = now.toISOString();
     return false; // No longer in learning mode

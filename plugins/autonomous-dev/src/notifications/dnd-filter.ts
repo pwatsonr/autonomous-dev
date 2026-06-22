@@ -104,8 +104,8 @@ function formatAsHHMM(date: Date, timezone: string): string {
   });
 
   const parts = formatter.formatToParts(date);
-  const hour = parts.find(p => p.type === 'hour')?.value ?? '00';
-  const minute = parts.find(p => p.type === 'minute')?.value ?? '00';
+  const hour = parts.find((p) => p.type === 'hour')?.value ?? '00';
+  const minute = parts.find((p) => p.type === 'minute')?.value ?? '00';
 
   return `${hour}:${minute}`;
 }

@@ -27,9 +27,7 @@ describe('SPEC-032-1-03 cost-cap-shim once-per-process warning', () => {
     const dir = await tmp();
     try {
       await jest.isolateModulesAsync(async () => {
-        const warnSpy = jest
-          .spyOn(console, 'warn')
-          .mockImplementation(() => undefined);
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
         const shim = await import('../../intake/deploy/cost-cap-shim');
         shim.__setCostCapDayForTest(() => FIXED_DAY);
         try {
@@ -46,9 +44,7 @@ describe('SPEC-032-1-03 cost-cap-shim once-per-process warning', () => {
             estimatedUsd: 1,
           });
           expect(warnSpy).toHaveBeenCalledTimes(1);
-          expect(warnSpy).toHaveBeenCalledWith(
-            shim.COST_CAP_SHIM_WARNING_TEXT,
-          );
+          expect(warnSpy).toHaveBeenCalledWith(shim.COST_CAP_SHIM_WARNING_TEXT);
         } finally {
           shim.__setCostCapDayForTest(null);
           warnSpy.mockRestore();
@@ -63,9 +59,7 @@ describe('SPEC-032-1-03 cost-cap-shim once-per-process warning', () => {
     const dir = await tmp();
     try {
       await jest.isolateModulesAsync(async () => {
-        const warnSpy = jest
-          .spyOn(console, 'warn')
-          .mockImplementation(() => undefined);
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
         const shim = await import('../../intake/deploy/cost-cap-shim');
         shim.__setCostCapDayForTest(() => FIXED_DAY);
         try {
@@ -90,9 +84,7 @@ describe('SPEC-032-1-03 cost-cap-shim once-per-process warning', () => {
     const dir = await tmp();
     try {
       await jest.isolateModulesAsync(async () => {
-        const warnSpy = jest
-          .spyOn(console, 'warn')
-          .mockImplementation(() => undefined);
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
         const shim = await import('../../intake/deploy/cost-cap-shim');
         shim.__setCostCapDayForTest(() => FIXED_DAY);
         try {
@@ -112,9 +104,7 @@ describe('SPEC-032-1-03 cost-cap-shim once-per-process warning', () => {
     const dir = await tmp();
     try {
       await jest.isolateModulesAsync(async () => {
-        const warnSpy = jest
-          .spyOn(console, 'warn')
-          .mockImplementation(() => undefined);
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
         const shim = await import('../../intake/deploy/cost-cap-shim');
         shim.__setCostCapDayForTest(() => FIXED_DAY);
         try {

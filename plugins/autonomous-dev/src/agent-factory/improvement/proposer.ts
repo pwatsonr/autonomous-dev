@@ -20,16 +20,8 @@ import * as crypto from 'crypto';
 import { ParsedAgent, IAgentRegistry } from '../types';
 import { parseAgentString } from '../parser';
 import { AuditLogger } from '../audit';
-import {
-  WeaknessReport,
-  AgentProposal,
-  ProposalResult,
-  ConstraintViolation,
-} from './types';
-import {
-  classifyVersionBump,
-  incrementVersion,
-} from './version-classifier';
+import { WeaknessReport, AgentProposal, ProposalResult, ConstraintViolation } from './types';
+import { classifyVersionBump, incrementVersion } from './version-classifier';
 
 // Re-export for convenience
 export type { ProposalResult, ConstraintViolation };
@@ -99,10 +91,7 @@ export class ProposalGenerator {
    *   5. Compute diff and version bump.
    *   6. Create proposal record with status `pending_meta_review`.
    */
-  async generateProposal(
-    agentName: string,
-    report: WeaknessReport,
-  ): Promise<ProposalResult> {
+  async generateProposal(agentName: string, report: WeaknessReport): Promise<ProposalResult> {
     // Step 1: Load current agent definition
     const loadResult = this.loadCurrentDefinition(agentName);
     if (!loadResult.success) {
@@ -134,7 +123,7 @@ export class ProposalGenerator {
     // Parse the proposed definition
     const parseResult = parseAgentString(proposedContent);
     if (!parseResult.success || !parseResult.agent) {
-      const parseErrors = parseResult.errors.map(e => e.message).join('; ');
+      const parseErrors = parseResult.errors.map((e) => e.message).join('; ');
       return {
         success: false,
         error: `Failed to parse proposed definition: ${parseErrors}`,
@@ -151,7 +140,7 @@ export class ProposalGenerator {
         agent_name: agentName,
         details: {
           reason: 'proposal_rejected_constraint_violation',
-          violations: violations.map(v => ({
+          violations: violations.map((v) => ({
             field: v.field,
             rule: v.rule,
             current_value: v.current_value,
@@ -191,14 +180,16 @@ export class ProposalGenerator {
   // Internal: load current definition
   // -------------------------------------------------------------------------
 
-  private loadCurrentDefinition(agentName: string): {
-    success: true;
-    content: string;
-    agent: ParsedAgent;
-  } | {
-    success: false;
-    error: string;
-  } {
+  private loadCurrentDefinition(agentName: string):
+    | {
+        success: true;
+        content: string;
+        agent: ParsedAgent;
+      }
+    | {
+        success: false;
+        error: string;
+      } {
     // Check the registry first
     const record = this.registry.get(agentName);
     if (!record) {
@@ -240,12 +231,15 @@ export function buildImprovementPrompt(
   currentContent: string,
   report: WeaknessReport,
 ): string {
-  const weaknessLines = report.weaknesses.map(w =>
-    `  - Dimension: ${w.dimension} (severity: ${w.severity})\n` +
-    `    Evidence: ${w.evidence}\n` +
-    `    Affected domains: ${w.affected_domains.join(', ')}\n` +
-    `    Suggested focus: ${w.suggested_focus}`,
-  ).join('\n');
+  const weaknessLines = report.weaknesses
+    .map(
+      (w) =>
+        `  - Dimension: ${w.dimension} (severity: ${w.severity})\n` +
+        `    Evidence: ${w.evidence}\n` +
+        `    Affected domains: ${w.affected_domains.join(', ')}\n` +
+        `    Suggested focus: ${w.suggested_focus}`,
+    )
+    .join('\n');
 
   return `You are improving the agent definition for '${agent.name}' (v${agent.version}, role: ${agent.role}).
 
@@ -320,12 +314,8 @@ export function enforceConstraints(
   }
 
   // CONSTRAINT 3: no new expertise tags (subset check, case-insensitive)
-  const currentExpertiseLower = new Set(
-    current.expertise.map(t => t.toLowerCase()),
-  );
-  const newTags = proposed.expertise.filter(
-    t => !currentExpertiseLower.has(t.toLowerCase()),
-  );
+  const currentExpertiseLower = new Set(current.expertise.map((t) => t.toLowerCase()));
+  const newTags = proposed.expertise.filter((t) => !currentExpertiseLower.has(t.toLowerCase()));
   if (newTags.length > 0) {
     violations.push({
       field: 'expertise',
@@ -336,15 +326,9 @@ export function enforceConstraints(
   }
 
   // CONSTRAINT 4: no rubric dimensions removed
-  const currentDimensions = new Set(
-    current.evaluation_rubric.map(d => d.name),
-  );
-  const proposedDimensions = new Set(
-    proposed.evaluation_rubric.map(d => d.name),
-  );
-  const removedDimensions = [...currentDimensions].filter(
-    d => !proposedDimensions.has(d),
-  );
+  const currentDimensions = new Set(current.evaluation_rubric.map((d) => d.name));
+  const proposedDimensions = new Set(proposed.evaluation_rubric.map((d) => d.name));
+  const removedDimensions = [...currentDimensions].filter((d) => !proposedDimensions.has(d));
   if (removedDimensions.length > 0) {
     violations.push({
       field: 'evaluation_rubric',
@@ -410,10 +394,21 @@ export function computeUnifiedDiff(
   let pi = 0; // proposed index
   let li = 0; // lcs index
 
-  const diffLines: Array<{ type: '-' | '+' | ' '; text: string; oldLine: number; newLine: number }> = [];
+  const diffLines: Array<{
+    type: '-' | '+' | ' ';
+    text: string;
+    oldLine: number;
+    newLine: number;
+  }> = [];
 
   while (ci < currentLines.length || pi < proposedLines.length) {
-    if (li < lcs.length && ci < currentLines.length && pi < proposedLines.length && currentLines[ci] === lcs[li] && proposedLines[pi] === lcs[li]) {
+    if (
+      li < lcs.length &&
+      ci < currentLines.length &&
+      pi < proposedLines.length &&
+      currentLines[ci] === lcs[li] &&
+      proposedLines[pi] === lcs[li]
+    ) {
       // Common line
       diffLines.push({ type: ' ', text: currentLines[ci], oldLine: ci + 1, newLine: pi + 1 });
       ci++;

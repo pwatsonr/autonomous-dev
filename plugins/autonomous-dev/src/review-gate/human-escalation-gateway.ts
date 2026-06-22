@@ -79,15 +79,14 @@ export interface EscalationPackage {
 export function computeRecommendedAction(
   reviewHistory: GateReviewResult[],
   currentFindings: MergedFinding[],
-  threshold: number
+  threshold: number,
 ): { action: 'approve_override' | 'manual_revision' | 'reject_and_restart'; rationale: string } {
   const latestReview = reviewHistory[reviewHistory.length - 1];
   const latestScore = latestReview.aggregate_score;
   const hasCriticalFindings = currentFindings.some((f) => f.severity === 'critical');
   const scoreTrend = reviewHistory.map((r) => r.aggregate_score);
   const isScoreDeclining =
-    scoreTrend.length >= 2 &&
-    scoreTrend[scoreTrend.length - 1] < scoreTrend[scoreTrend.length - 2];
+    scoreTrend.length >= 2 && scoreTrend[scoreTrend.length - 1] < scoreTrend[scoreTrend.length - 2];
   const isStagnating = latestReview.stagnation_warning;
 
   // approve_override: within 3 points of threshold AND no critical findings
@@ -129,7 +128,7 @@ function computeUnifiedDiff(
   fromContent: string,
   toContent: string,
   fromLabel: string,
-  toLabel: string
+  toLabel: string,
 ): string {
   const fromLines = fromContent.split('\n');
   const toLines = toContent.split('\n');
@@ -194,7 +193,7 @@ export class HumanEscalationGateway {
     escalationTrigger: EscalationTrigger,
     documentVersions: DocumentVersion[],
     parentDocument: DocumentSummary | null,
-    traceLinks: TraceLink[]
+    traceLinks: TraceLink[],
   ): Promise<EscalationPackage> {
     // Current version is the last in the list
     const currentVersion = documentVersions[documentVersions.length - 1];
@@ -204,7 +203,7 @@ export class HumanEscalationGateway {
       escalationTrigger,
       iterationState,
       currentFindings,
-      reviewHistory
+      reviewHistory,
     );
 
     // Version diffs: consecutive pairs
@@ -214,19 +213,15 @@ export class HumanEscalationGateway {
     const scoreTrend = reviewHistory.map((r) => r.aggregate_score);
 
     // Filter findings
-    const unresolvedFindings = currentFindings.filter(
-      (f) => f.resolution_status === 'open'
-    );
-    const recurredFindings = currentFindings.filter(
-      (f) => f.resolution_status === 'recurred'
-    );
+    const unresolvedFindings = currentFindings.filter((f) => f.resolution_status === 'open');
+    const recurredFindings = currentFindings.filter((f) => f.resolution_status === 'recurred');
 
     // Recommended action
     const threshold = reviewHistory.length > 0 ? reviewHistory[0].threshold : 85;
     const { action, rationale } = computeRecommendedAction(
       reviewHistory,
       currentFindings,
-      threshold
+      threshold,
     );
 
     return {
@@ -255,7 +250,7 @@ export class HumanEscalationGateway {
     trigger: EscalationTrigger,
     state: IterationState,
     findings: MergedFinding[],
-    reviewHistory: GateReviewResult[]
+    reviewHistory: GateReviewResult[],
   ): string {
     switch (trigger) {
       case 'max_iterations_exhausted':
@@ -263,7 +258,7 @@ export class HumanEscalationGateway {
 
       case 'critical_reject_finding': {
         const criticalFinding = findings.find(
-          (f) => f.severity === 'critical' && f.critical_sub === 'reject'
+          (f) => f.severity === 'critical' && f.critical_sub === 'reject',
         );
         const description = criticalFinding?.description ?? 'Unknown critical finding';
         return `A critical finding requiring human intervention was identified: ${description}`;
@@ -271,9 +266,7 @@ export class HumanEscalationGateway {
 
       case 'stagnation_persisted': {
         const trend = reviewHistory.map((r) => r.aggregate_score).join(', ');
-        const recurredCount = findings.filter(
-          (f) => f.resolution_status === 'recurred'
-        ).length;
+        const recurredCount = findings.filter((f) => f.resolution_status === 'recurred').length;
         return `Review loop stagnated for 2+ consecutive iterations. Score trend: ${trend}. Recurring findings: ${recurredCount}.`;
       }
 

@@ -220,9 +220,7 @@ export function shouldHaltForBudget(
       `Token budget exhausted (${tokenBudget.tokensConsumed}/${tokenBudget.budget}). ` +
         `Completing current service ${currentService}, skipping remaining: ${remainingServices.join(', ')}`,
     );
-    metadata.errors.push(
-      `Token budget exceeded. Skipped: ${remainingServices.join(', ')}`,
-    );
+    metadata.errors.push(`Token budget exceeded. Skipped: ${remainingServices.join(', ')}`);
     metadata.skipped_services.push(...remainingServices);
     return true;
   }

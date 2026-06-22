@@ -9,14 +9,14 @@
  * - Parse and validation result types
  */
 
-import type { EscalationOption } from "./types";
+import type { EscalationOption } from './types';
 
 // ---------------------------------------------------------------------------
 // Core response type union
 // ---------------------------------------------------------------------------
 
 /** The three response formats a human can provide. */
-export type ResponseType = "option" | "freetext" | "delegate";
+export type ResponseType = 'option' | 'freetext' | 'delegate';
 
 // ---------------------------------------------------------------------------
 // EscalationResponse
@@ -52,11 +52,11 @@ export interface EscalationResponse {
 
 /** The concrete action the pipeline should take after a human response. */
 export type ResolvedAction =
-  | { action: "approve" }
-  | { action: "retry_with_changes"; guidance: string }
-  | { action: "cancel" }
-  | { action: "override_proceed"; justification: string }
-  | { action: "delegate"; target: string };
+  | { action: 'approve' }
+  | { action: 'retry_with_changes'; guidance: string }
+  | { action: 'cancel' }
+  | { action: 'override_proceed'; justification: string }
+  | { action: 'delegate'; target: string };
 
 // ---------------------------------------------------------------------------
 // ResponseValidationError
@@ -65,12 +65,12 @@ export type ResolvedAction =
 /** Error returned when a response cannot be validated or acted upon. */
 export interface ResponseValidationError {
   code:
-    | "ESCALATION_NOT_FOUND"
-    | "ESCALATION_ALREADY_RESOLVED"
-    | "INVALID_OPTION_ID"
-    | "UNKNOWN_DELEGATE_TARGET"
-    | "REQUEST_CANCELLED"
-    | "RESUME_FAILED";
+    | 'ESCALATION_NOT_FOUND'
+    | 'ESCALATION_ALREADY_RESOLVED'
+    | 'INVALID_OPTION_ID'
+    | 'UNKNOWN_DELEGATE_TARGET'
+    | 'REQUEST_CANCELLED'
+    | 'RESUME_FAILED';
   message: string;
 
   /** Included for INVALID_OPTION_ID to show valid choices. */

@@ -29,8 +29,7 @@ import {
   detectPlatform,
 } from '../../intake/standards/sandbox-platform';
 
-const F = (name: string): string =>
-  resolve(__dirname, 'fixtures', 'escape', name);
+const F = (name: string): string => resolve(__dirname, 'fixtures', 'escape', name);
 
 const PLATFORM = (() => {
   __resetPlatformCacheForTests();
@@ -88,12 +87,7 @@ describe('subprocess sandbox — allowlist invariants (always run)', () => {
 
   it('refuses relative path even when string-equal in allowlist', async () => {
     await expect(
-      runCustomEvaluator(
-        './evil.sh',
-        [],
-        {},
-        { allowlist: ['./evil.sh'] },
-      ),
+      runCustomEvaluator('./evil.sh', [], {}, { allowlist: ['./evil.sh'] }),
     ).rejects.toThrow(/absolute/);
   });
 });

@@ -4,17 +4,12 @@
  * @module tests/deploy/test-backend-selector.test
  */
 
-import {
-  ParameterValidationError,
-  UnknownBackendError,
-} from '../../intake/deploy/errors';
+import { ParameterValidationError, UnknownBackendError } from '../../intake/deploy/errors';
 import { mergeParameters, selectBackend } from '../../intake/deploy/selector';
 import { makeStubRegistry } from './helpers/test-registry';
 import type { ResolvedEnvironment } from '../../intake/deploy/types-config';
 
-function makeResolved(
-  partial: Partial<ResolvedEnvironment> = {},
-): ResolvedEnvironment {
+function makeResolved(partial: Partial<ResolvedEnvironment> = {}): ResolvedEnvironment {
   return {
     envName: 'dev',
     backend: 'local-stub',

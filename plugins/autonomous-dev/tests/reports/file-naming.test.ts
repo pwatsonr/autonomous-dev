@@ -68,7 +68,14 @@ describe('getObservationFilePath', () => {
     const filePath = getObservationFilePath(id, '/projects/my-app');
 
     expect(filePath).toBe(
-      path.join('/projects/my-app', '.autonomous-dev', 'observations', '2026', '04', 'OBS-20260408-143022-a1b2.md'),
+      path.join(
+        '/projects/my-app',
+        '.autonomous-dev',
+        'observations',
+        '2026',
+        '04',
+        'OBS-20260408-143022-a1b2.md',
+      ),
     );
   });
 
@@ -92,15 +99,15 @@ describe('getObservationFilePath', () => {
   });
 
   it('throws for ID with uppercase hex', () => {
-    expect(() =>
-      getObservationFilePath('OBS-20260408-143022-A1B2', '/root'),
-    ).toThrow('Invalid observation ID format');
+    expect(() => getObservationFilePath('OBS-20260408-143022-A1B2', '/root')).toThrow(
+      'Invalid observation ID format',
+    );
   });
 
   it('throws for ID with wrong number of hex chars', () => {
-    expect(() =>
-      getObservationFilePath('OBS-20260408-143022-a1b', '/root'),
-    ).toThrow('Invalid observation ID format');
+    expect(() => getObservationFilePath('OBS-20260408-143022-a1b', '/root')).toThrow(
+      'Invalid observation ID format',
+    );
   });
 });
 
@@ -157,13 +164,7 @@ describe('writeObservationReport', () => {
     const filePath = await writeObservationReport(id, content, tmpDir);
 
     // Verify directory was created
-    const expectedDir = path.join(
-      tmpDir,
-      '.autonomous-dev',
-      'observations',
-      '2026',
-      '04',
-    );
+    const expectedDir = path.join(tmpDir, '.autonomous-dev', 'observations', '2026', '04');
     const stats = await fs.stat(expectedDir);
     expect(stats.isDirectory()).toBe(true);
 
@@ -203,9 +204,7 @@ describe('writeObservationReport', () => {
     // The second file should have a different name
     expect(secondPath).not.toContain('OBS-20260408-143022-a1b2.md');
     // But should still be in the same directory
-    expect(secondPath).toContain(
-      path.join('.autonomous-dev', 'observations', '2026', '04'),
-    );
+    expect(secondPath).toContain(path.join('.autonomous-dev', 'observations', '2026', '04'));
     // The content should have the updated ID
     const secondContent = await fs.readFile(secondPath, 'utf-8');
     expect(secondContent).not.toContain('OBS-20260408-143022-a1b2');

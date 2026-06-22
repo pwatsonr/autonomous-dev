@@ -6,10 +6,7 @@
 
 import { AssumeRoleCommand } from '@aws-sdk/client-sts';
 
-import {
-  AWSCredentialScoper,
-  type StsLike,
-} from '../../intake/cred-proxy/scopers/aws';
+import { AWSCredentialScoper, type StsLike } from '../../intake/cred-proxy/scopers/aws';
 
 interface SentCmd {
   RoleArn?: string;
@@ -18,9 +15,10 @@ interface SentCmd {
   DurationSeconds?: number;
 }
 
-function makeMockSts(
-  response: Awaited<ReturnType<StsLike['send']>> | Error,
-): { sts: StsLike; sent: SentCmd[] } {
+function makeMockSts(response: Awaited<ReturnType<StsLike['send']>> | Error): {
+  sts: StsLike;
+  sent: SentCmd[];
+} {
   const sent: SentCmd[] = [];
   const sts: StsLike = {
     async send(cmd) {
@@ -63,10 +61,7 @@ describe('AWSCredentialScoper.scope', () => {
     expect(sent[0].DurationSeconds).toBe(900);
     const policy = JSON.parse(sent[0].Policy ?? '');
     expect(policy.Version).toBe('2012-10-17');
-    expect(policy.Statement[0].Action).toEqual([
-      'ecs:UpdateService',
-      'ecs:DescribeServices',
-    ]);
+    expect(policy.Statement[0].Action).toEqual(['ecs:UpdateService', 'ecs:DescribeServices']);
     expect(policy.Statement[0].Resource).toBe(
       'arn:aws:ecs:us-east-1:123456789012:service/prod/api',
     );
@@ -74,10 +69,7 @@ describe('AWSCredentialScoper.scope', () => {
 
   it('produces a RoleSessionName ≤64 chars matching [a-zA-Z0-9-]', async () => {
     const { sts, sent } = makeMockSts(VALID_RESPONSE);
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'arn', region: 'us-east-1' },
-      sts,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'arn', region: 'us-east-1' }, sts);
     await scoper.scope('ECS:UpdateService', VALID_SCOPE);
     const name = sent[0].RoleSessionName ?? '';
     expect(name.length).toBeGreaterThan(0);
@@ -87,10 +79,7 @@ describe('AWSCredentialScoper.scope', () => {
 
   it('returns a payload with the three AWS env-var keys and an ISO expiry', async () => {
     const { sts } = makeMockSts(VALID_RESPONSE);
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'arn', region: 'us-east-1' },
-      sts,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'arn', region: 'us-east-1' }, sts);
     const out = await scoper.scope('ECS:UpdateService', VALID_SCOPE);
     const payload = JSON.parse(out.payload);
     expect(payload).toEqual({
@@ -103,13 +92,8 @@ describe('AWSCredentialScoper.scope', () => {
 
   it('throws when STS returns no Credentials', async () => {
     const { sts } = makeMockSts({});
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'arn', region: 'us-east-1' },
-      sts,
-    );
-    await expect(scoper.scope('ECS:UpdateService', VALID_SCOPE)).rejects.toThrow(
-      /no credentials/i,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'arn', region: 'us-east-1' }, sts);
+    await expect(scoper.scope('ECS:UpdateService', VALID_SCOPE)).rejects.toThrow(/no credentials/i);
   });
 
   it('throws when STS returns partial credentials (missing SessionToken)', async () => {
@@ -120,10 +104,7 @@ describe('AWSCredentialScoper.scope', () => {
         Expiration: new Date(),
       },
     });
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'arn', region: 'us-east-1' },
-      sts,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'arn', region: 'us-east-1' }, sts);
     await expect(scoper.scope('ECS:UpdateService', VALID_SCOPE)).rejects.toThrow(
       /partial credentials/i,
     );
@@ -131,10 +112,7 @@ describe('AWSCredentialScoper.scope', () => {
 
   it('propagates STS-mocked errors', async () => {
     const { sts } = makeMockSts(new Error('sts-403-AccessDenied'));
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'arn', region: 'us-east-1' },
-      sts,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'arn', region: 'us-east-1' }, sts);
     await expect(scoper.scope('ECS:UpdateService', VALID_SCOPE)).rejects.toThrow(
       'sts-403-AccessDenied',
     );
@@ -142,10 +120,7 @@ describe('AWSCredentialScoper.scope', () => {
 
   it('revoke() resolves and makes no additional STS calls', async () => {
     const { sts, sent } = makeMockSts(VALID_RESPONSE);
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'arn', region: 'us-east-1' },
-      sts,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'arn', region: 'us-east-1' }, sts);
     const out = await scoper.scope('ECS:UpdateService', VALID_SCOPE);
     const before = sent.length;
     await expect(out.revoke()).resolves.toBeUndefined();
@@ -154,10 +129,7 @@ describe('AWSCredentialScoper.scope', () => {
 
   it('two consecutive scopes produce distinct RoleSessionNames', async () => {
     const { sts, sent } = makeMockSts(VALID_RESPONSE);
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'arn', region: 'us-east-1' },
-      sts,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'arn', region: 'us-east-1' }, sts);
     await scoper.scope('ECS:UpdateService', VALID_SCOPE);
     // small delay to guarantee Date.now() differs
     await new Promise((r) => setTimeout(r, 5));
@@ -167,19 +139,14 @@ describe('AWSCredentialScoper.scope', () => {
 
   it('passes operation policy through unmodified (snapshot via Policy field)', async () => {
     const { sts, sent } = makeMockSts(VALID_RESPONSE);
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'arn', region: 'us-east-1' },
-      sts,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'arn', region: 'us-east-1' }, sts);
     await scoper.scope('Lambda:UpdateFunctionCode', {
       region: 'us-west-2',
       account: '123',
       functionName: 'fn1',
     });
     const p = JSON.parse(sent[0].Policy ?? '');
-    expect(p.Statement[0].Resource).toBe(
-      'arn:aws:lambda:us-west-2:123:function:fn1',
-    );
+    expect(p.Statement[0].Resource).toBe('arn:aws:lambda:us-west-2:123:function:fn1');
   });
 
   it('makes the scoper structurally implement CredentialScoper', () => {
@@ -204,10 +171,7 @@ describe('AWSCredentialScoper.scope', () => {
 
   it('AssumeRoleCommand argument is the real SDK class (compile-time check)', async () => {
     const { sts } = makeMockSts(VALID_RESPONSE);
-    const scoper = new AWSCredentialScoper(
-      { proxyAssumeRoleArn: 'a', region: 'r' },
-      sts,
-    );
+    const scoper = new AWSCredentialScoper({ proxyAssumeRoleArn: 'a', region: 'r' }, sts);
     await scoper.scope('ECS:UpdateService', VALID_SCOPE);
     // Reaching here means @aws-sdk/client-sts's AssumeRoleCommand type
     // imported and compiled; compile-time assertion below is a runtime

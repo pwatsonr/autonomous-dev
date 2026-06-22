@@ -19,11 +19,11 @@ import {
   PipelineResumptionCoordinator,
   type PipelineExecutor,
   type ResumeResult,
-} from "../pipeline-resumption";
-import { EscalationChainManager } from "../chain-manager";
-import type { AuditTrail, Timer, TimerHandle, DeliveryAdapter } from "../types";
-import type { ResolvedAction } from "../response-types";
-import type { StoredEscalation } from "../response-validator";
+} from '../pipeline-resumption';
+import { EscalationChainManager } from '../chain-manager';
+import type { AuditTrail, Timer, TimerHandle, DeliveryAdapter } from '../types';
+import type { ResolvedAction } from '../response-types';
+import type { StoredEscalation } from '../response-validator';
 
 // ---------------------------------------------------------------------------
 // Mock factories
@@ -102,18 +102,16 @@ function createMockDeliveryAdapter(): DeliveryAdapter {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeEscalation(
-  overrides: Partial<StoredEscalation> = {},
-): StoredEscalation {
+function makeEscalation(overrides: Partial<StoredEscalation> = {}): StoredEscalation {
   return {
-    escalationId: "esc-20260408-001",
-    requestId: "req-1",
-    status: "pending",
+    escalationId: 'esc-20260408-001',
+    requestId: 'req-1',
+    status: 'pending',
     options: [
-      { option_id: "opt-1", label: "Approve", action: "approve" },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-1', label: 'Approve', action: 'approve' },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ],
-    gate: "code_review",
+    gate: 'code_review',
     ...overrides,
   };
 }
@@ -122,7 +120,7 @@ function makeEscalation(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("PipelineResumptionCoordinator", () => {
+describe('PipelineResumptionCoordinator', () => {
   let executor: ReturnType<typeof createMockPipelineExecutor>;
   let chainManager: EscalationChainManager;
   let audit: MockAuditTrail;
@@ -134,165 +132,147 @@ describe("PipelineResumptionCoordinator", () => {
     const delivery = createMockDeliveryAdapter();
     audit = createMockAuditTrail();
     chainManager = new EscalationChainManager(timer, delivery, audit);
-    coordinator = new PipelineResumptionCoordinator(
-      executor,
-      chainManager,
-      audit,
-    );
+    coordinator = new PipelineResumptionCoordinator(executor, chainManager, audit);
   });
 
   // =========================================================================
   // Test Case 10: Approve resumes pipeline
   // =========================================================================
-  test("approve: markGatePassed and resumePipeline called; chain timer cancelled; escalation_resolved emitted", () => {
+  test('approve: markGatePassed and resumePipeline called; chain timer cancelled; escalation_resolved emitted', () => {
     const escalation = makeEscalation();
-    const action: ResolvedAction = { action: "approve" };
+    const action: ResolvedAction = { action: 'approve' };
 
     // Spy on cancelChain
-    const cancelSpy = jest.spyOn(chainManager, "cancelChain");
+    const cancelSpy = jest.spyOn(chainManager, 'cancelChain');
 
-    const result = coordinator.resume(escalation, action, "user-1");
+    const result = coordinator.resume(escalation, action, 'user-1');
 
     expect(result.success).toBe(true);
-    expect(result.action).toBe("approve");
-    expect(result.requestId).toBe("req-1");
+    expect(result.action).toBe('approve');
+    expect(result.requestId).toBe('req-1');
 
     // Verify pipeline executor calls
-    expect(executor.markGatePassed).toHaveBeenCalledWith("req-1", "code_review");
-    expect(executor.resumePipeline).toHaveBeenCalledWith("req-1");
+    expect(executor.markGatePassed).toHaveBeenCalledWith('req-1', 'code_review');
+    expect(executor.resumePipeline).toHaveBeenCalledWith('req-1');
 
     // Verify chain timer cancelled
-    expect(cancelSpy).toHaveBeenCalledWith("esc-20260408-001");
+    expect(cancelSpy).toHaveBeenCalledWith('esc-20260408-001');
 
     // Verify audit event
-    const resolvedEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_resolved",
-    );
+    const resolvedEvents = audit.events.filter((e) => e.event_type === 'escalation_resolved');
     expect(resolvedEvents.length).toBeGreaterThanOrEqual(1);
-    expect(resolvedEvents[0].payload.resolution).toBe("approved");
+    expect(resolvedEvents[0].payload.resolution).toBe('approved');
   });
 
   // =========================================================================
   // Test Case 11: Retry injects guidance and re-executes
   // =========================================================================
-  test("retry_with_changes: injectGuidance and reExecutePhase called with correct args", () => {
+  test('retry_with_changes: injectGuidance and reExecutePhase called with correct args', () => {
     const escalation = makeEscalation();
     const action: ResolvedAction = {
-      action: "retry_with_changes",
-      guidance: "Use smaller batches",
+      action: 'retry_with_changes',
+      guidance: 'Use smaller batches',
     };
 
-    const result = coordinator.resume(escalation, action, "user-1");
+    const result = coordinator.resume(escalation, action, 'user-1');
 
     expect(result.success).toBe(true);
-    expect(result.action).toBe("retry_with_changes");
+    expect(result.action).toBe('retry_with_changes');
 
-    expect(executor.injectGuidance).toHaveBeenCalledWith(
-      "req-1",
-      "Use smaller batches",
-    );
-    expect(executor.reExecutePhase).toHaveBeenCalledWith("req-1");
+    expect(executor.injectGuidance).toHaveBeenCalledWith('req-1', 'Use smaller batches');
+    expect(executor.reExecutePhase).toHaveBeenCalledWith('req-1');
   });
 
   // =========================================================================
   // Test Case 12: Cancel terminates request
   // =========================================================================
-  test("cancel: terminateRequest called; state preserved", () => {
+  test('cancel: terminateRequest called; state preserved', () => {
     const escalation = makeEscalation();
-    const action: ResolvedAction = { action: "cancel" };
+    const action: ResolvedAction = { action: 'cancel' };
 
-    const result = coordinator.resume(escalation, action, "user-1");
+    const result = coordinator.resume(escalation, action, 'user-1');
 
     expect(result.success).toBe(true);
-    expect(result.action).toBe("cancel");
+    expect(result.action).toBe('cancel');
 
-    expect(executor.terminateRequest).toHaveBeenCalledWith(
-      "req-1",
-      "Cancelled by human",
-    );
+    expect(executor.terminateRequest).toHaveBeenCalledWith('req-1', 'Cancelled by human');
 
     // Verify audit event has resolution: "cancelled"
-    const resolvedEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_resolved",
-    );
+    const resolvedEvents = audit.events.filter((e) => e.event_type === 'escalation_resolved');
     expect(resolvedEvents.length).toBeGreaterThanOrEqual(1);
-    expect(resolvedEvents[0].payload.resolution).toBe("cancelled");
+    expect(resolvedEvents[0].payload.resolution).toBe('cancelled');
   });
 
   // =========================================================================
   // Test Case 13: Override marks gate as overridden
   // =========================================================================
-  test("override_proceed: markGateOverridden called with justification; human_override audit event emitted with responder and justification", () => {
+  test('override_proceed: markGateOverridden called with justification; human_override audit event emitted with responder and justification', () => {
     const escalation = makeEscalation();
     const action: ResolvedAction = {
-      action: "override_proceed",
-      justification: "Risk accepted by tech lead",
+      action: 'override_proceed',
+      justification: 'Risk accepted by tech lead',
     };
 
-    const result = coordinator.resume(escalation, action, "tech-lead");
+    const result = coordinator.resume(escalation, action, 'tech-lead');
 
     expect(result.success).toBe(true);
-    expect(result.action).toBe("override_proceed");
+    expect(result.action).toBe('override_proceed');
 
     // Verify markGateOverridden called
     expect(executor.markGateOverridden).toHaveBeenCalledWith(
-      "req-1",
-      "code_review",
-      "Risk accepted by tech lead",
+      'req-1',
+      'code_review',
+      'Risk accepted by tech lead',
     );
 
     // Verify resumePipeline called
-    expect(executor.resumePipeline).toHaveBeenCalledWith("req-1");
+    expect(executor.resumePipeline).toHaveBeenCalledWith('req-1');
 
     // Verify human_override audit event
-    const overrideEvents = audit.events.filter(
-      (e) => e.event_type === "human_override",
-    );
+    const overrideEvents = audit.events.filter((e) => e.event_type === 'human_override');
     expect(overrideEvents).toHaveLength(1);
-    expect(overrideEvents[0].payload.responder).toBe("tech-lead");
-    expect(overrideEvents[0].payload.justification).toBe(
-      "Risk accepted by tech lead",
-    );
-    expect(overrideEvents[0].payload.gate).toBe("code_review");
+    expect(overrideEvents[0].payload.responder).toBe('tech-lead');
+    expect(overrideEvents[0].payload.justification).toBe('Risk accepted by tech lead');
+    expect(overrideEvents[0].payload.gate).toBe('code_review');
   });
 
   // =========================================================================
   // Test Case 14: Delegate re-dispatches
   // =========================================================================
-  test("delegate: old chain cancelled, new chain started with new target", () => {
+  test('delegate: old chain cancelled, new chain started with new target', () => {
     const escalation = makeEscalation();
     const action: ResolvedAction = {
-      action: "delegate",
-      target: "security-lead",
+      action: 'delegate',
+      target: 'security-lead',
     };
 
-    const cancelSpy = jest.spyOn(chainManager, "cancelChain");
-    const startChainSpy = jest.spyOn(chainManager, "startChain");
+    const cancelSpy = jest.spyOn(chainManager, 'cancelChain');
+    const startChainSpy = jest.spyOn(chainManager, 'startChain');
 
-    const result = coordinator.resume(escalation, action, "user-1");
+    const result = coordinator.resume(escalation, action, 'user-1');
 
     expect(result.success).toBe(true);
-    expect(result.action).toBe("delegate");
+    expect(result.action).toBe('delegate');
 
     // Verify old chain cancelled
-    expect(cancelSpy).toHaveBeenCalledWith("esc-20260408-001");
+    expect(cancelSpy).toHaveBeenCalledWith('esc-20260408-001');
 
     // Verify new chain started with new target
     expect(startChainSpy).toHaveBeenCalled();
     const [delegateMessage, delegateRoute] = startChainSpy.mock.calls[0];
-    expect(delegateRoute.primary.target_id).toBe("security-lead");
+    expect(delegateRoute.primary.target_id).toBe('security-lead');
   });
 
   // =========================================================================
   // Test Case 15: Failed resumption: pipeline stays paused
   // =========================================================================
-  test("failed resumption: result has success: false; chain NOT cancelled", () => {
+  test('failed resumption: result has success: false; chain NOT cancelled', () => {
     const escalation = makeEscalation();
-    const action: ResolvedAction = { action: "approve" };
+    const action: ResolvedAction = { action: 'approve' };
 
     // Make resumePipeline throw
     executor.resumePipeline = jest.fn(() => {
-      throw new Error("Pipeline executor unavailable");
+      throw new Error('Pipeline executor unavailable');
     });
 
     // We need the cancelChain to succeed but resumePipeline to fail.
@@ -311,78 +291,74 @@ describe("PipelineResumptionCoordinator", () => {
     // human to retry, we should test that when an error occurs, the result
     // is success: false.
 
-    const result = coordinator.resume(escalation, action, "user-1");
+    const result = coordinator.resume(escalation, action, 'user-1');
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Pipeline executor unavailable");
-    expect(result.requestId).toBe("req-1");
+    expect(result.error).toBe('Pipeline executor unavailable');
+    expect(result.requestId).toBe('req-1');
   });
 
   // =========================================================================
   // Test Case 16: Failed resumption: escalation remains active
   // =========================================================================
-  test("failed resumption: escalation status is still pending after failure", () => {
+  test('failed resumption: escalation status is still pending after failure', () => {
     const escalation = makeEscalation();
-    const action: ResolvedAction = { action: "approve" };
+    const action: ResolvedAction = { action: 'approve' };
 
     // Make markGatePassed throw (first pipeline call after cancelChain)
     executor.markGatePassed = jest.fn(() => {
-      throw new Error("Gate not found");
+      throw new Error('Gate not found');
     });
 
-    const result = coordinator.resume(escalation, action, "user-1");
+    const result = coordinator.resume(escalation, action, 'user-1');
 
     expect(result.success).toBe(false);
 
     // The escalation object itself still has status "pending"
     // (the coordinator does not mutate it on failure)
-    expect(escalation.status).toBe("pending");
+    expect(escalation.status).toBe('pending');
   });
 
   // =========================================================================
   // Test Case 17: Audit: escalation_resolved emitted for approve
   // =========================================================================
-  test("audit: escalation_resolved emitted for approve with correct payload", () => {
+  test('audit: escalation_resolved emitted for approve with correct payload', () => {
     const escalation = makeEscalation();
-    const action: ResolvedAction = { action: "approve" };
+    const action: ResolvedAction = { action: 'approve' };
 
-    coordinator.resume(escalation, action, "user-1");
+    coordinator.resume(escalation, action, 'user-1');
 
-    const resolvedEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_resolved",
-    );
+    const resolvedEvents = audit.events.filter((e) => e.event_type === 'escalation_resolved');
     expect(resolvedEvents).toHaveLength(1);
     expect(resolvedEvents[0].payload).toMatchObject({
-      escalation_id: "esc-20260408-001",
-      request_id: "req-1",
-      resolution: "approved",
-      responder: "user-1",
-      gate: "code_review",
+      escalation_id: 'esc-20260408-001',
+      request_id: 'req-1',
+      resolution: 'approved',
+      responder: 'user-1',
+      gate: 'code_review',
     });
   });
 
   // =========================================================================
   // Test Case 18: Audit: human_override emitted for override
   // =========================================================================
-  test("audit: human_override emitted for override with responder, justification, gate", () => {
+  test('audit: human_override emitted for override with responder, justification, gate', () => {
     const escalation = makeEscalation();
     const action: ResolvedAction = {
-      action: "override_proceed",
-      justification: "Deadline pressure",
+      action: 'override_proceed',
+      justification: 'Deadline pressure',
     };
 
-    coordinator.resume(escalation, action, "pm-user");
+    coordinator.resume(escalation, action, 'pm-user');
 
-    const overrideEvents = audit.events.filter(
-      (e) => e.event_type === "human_override",
-    );
+    const overrideEvents = audit.events.filter((e) => e.event_type === 'human_override');
     expect(overrideEvents).toHaveLength(1);
     expect(overrideEvents[0].payload).toMatchObject({
-      escalation_id: "esc-20260408-001",
-      request_id: "req-1",
-      responder: "pm-user",
-      justification: "Deadline pressure",
-      gate: "code_review",
+      escalation_id: 'esc-20260408-001',
+      request_id: 'req-1',
+      responder: 'pm-user',
+      justification: 'Deadline pressure',
+      gate: 'code_review',
     });
   });
 
@@ -392,45 +368,39 @@ describe("PipelineResumptionCoordinator", () => {
   test("audit: escalation_resolved with delegation includes resolution 'delegated' and newTarget", () => {
     const escalation = makeEscalation();
     const action: ResolvedAction = {
-      action: "delegate",
-      target: "security-lead",
+      action: 'delegate',
+      target: 'security-lead',
     };
 
-    coordinator.resume(escalation, action, "user-1");
+    coordinator.resume(escalation, action, 'user-1');
 
     const resolvedEvents = audit.events.filter(
-      (e) =>
-        e.event_type === "escalation_resolved" &&
-        e.payload.resolution === "delegated",
+      (e) => e.event_type === 'escalation_resolved' && e.payload.resolution === 'delegated',
     );
     expect(resolvedEvents).toHaveLength(1);
     expect(resolvedEvents[0].payload).toMatchObject({
-      escalation_id: "esc-20260408-001",
-      request_id: "req-1",
-      resolution: "delegated",
-      responder: "user-1",
-      newTarget: "security-lead",
+      escalation_id: 'esc-20260408-001',
+      request_id: 'req-1',
+      resolution: 'delegated',
+      responder: 'user-1',
+      newTarget: 'security-lead',
     });
   });
 
   // =========================================================================
   // Additional: override emits BOTH human_override AND escalation_resolved
   // =========================================================================
-  test("override_proceed emits both human_override and escalation_resolved events", () => {
+  test('override_proceed emits both human_override and escalation_resolved events', () => {
     const escalation = makeEscalation();
     const action: ResolvedAction = {
-      action: "override_proceed",
-      justification: "Ship it",
+      action: 'override_proceed',
+      justification: 'Ship it',
     };
 
-    coordinator.resume(escalation, action, "cto");
+    coordinator.resume(escalation, action, 'cto');
 
-    const overrideEvents = audit.events.filter(
-      (e) => e.event_type === "human_override",
-    );
-    const resolvedEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_resolved",
-    );
+    const overrideEvents = audit.events.filter((e) => e.event_type === 'human_override');
+    const resolvedEvents = audit.events.filter((e) => e.event_type === 'escalation_resolved');
 
     expect(overrideEvents).toHaveLength(1);
     expect(resolvedEvents.length).toBeGreaterThanOrEqual(1);
@@ -439,15 +409,13 @@ describe("PipelineResumptionCoordinator", () => {
   // =========================================================================
   // Additional: approve does NOT emit human_override
   // =========================================================================
-  test("approve does NOT emit human_override audit event", () => {
+  test('approve does NOT emit human_override audit event', () => {
     const escalation = makeEscalation();
-    const action: ResolvedAction = { action: "approve" };
+    const action: ResolvedAction = { action: 'approve' };
 
-    coordinator.resume(escalation, action, "user-1");
+    coordinator.resume(escalation, action, 'user-1');
 
-    const overrideEvents = audit.events.filter(
-      (e) => e.event_type === "human_override",
-    );
+    const overrideEvents = audit.events.filter((e) => e.event_type === 'human_override');
     expect(overrideEvents).toHaveLength(0);
   });
 
@@ -456,41 +424,41 @@ describe("PipelineResumptionCoordinator", () => {
   // =========================================================================
   test("escalation without gate field uses 'unknown' as gate value", () => {
     const escalation = makeEscalation({ gate: undefined });
-    const action: ResolvedAction = { action: "approve" };
+    const action: ResolvedAction = { action: 'approve' };
 
-    coordinator.resume(escalation, action, "user-1");
+    coordinator.resume(escalation, action, 'user-1');
 
-    expect(executor.markGatePassed).toHaveBeenCalledWith("req-1", "unknown");
+    expect(executor.markGatePassed).toHaveBeenCalledWith('req-1', 'unknown');
   });
 
   // =========================================================================
   // Additional: cancel chain timer cancelled for retry_with_changes
   // =========================================================================
-  test("retry_with_changes: chain timer cancelled", () => {
+  test('retry_with_changes: chain timer cancelled', () => {
     const escalation = makeEscalation();
     const action: ResolvedAction = {
-      action: "retry_with_changes",
-      guidance: "Try again",
+      action: 'retry_with_changes',
+      guidance: 'Try again',
     };
 
-    const cancelSpy = jest.spyOn(chainManager, "cancelChain");
+    const cancelSpy = jest.spyOn(chainManager, 'cancelChain');
 
-    coordinator.resume(escalation, action, "user-1");
+    coordinator.resume(escalation, action, 'user-1');
 
-    expect(cancelSpy).toHaveBeenCalledWith("esc-20260408-001");
+    expect(cancelSpy).toHaveBeenCalledWith('esc-20260408-001');
   });
 
   // =========================================================================
   // Additional: cancel chain timer cancelled for cancel action
   // =========================================================================
-  test("cancel: chain timer cancelled", () => {
+  test('cancel: chain timer cancelled', () => {
     const escalation = makeEscalation();
-    const action: ResolvedAction = { action: "cancel" };
+    const action: ResolvedAction = { action: 'cancel' };
 
-    const cancelSpy = jest.spyOn(chainManager, "cancelChain");
+    const cancelSpy = jest.spyOn(chainManager, 'cancelChain');
 
-    coordinator.resume(escalation, action, "user-1");
+    coordinator.resume(escalation, action, 'user-1');
 
-    expect(cancelSpy).toHaveBeenCalledWith("esc-20260408-001");
+    expect(cancelSpy).toHaveBeenCalledWith('esc-20260408-001');
   });
 });

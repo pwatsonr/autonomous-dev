@@ -96,8 +96,7 @@ export async function withMcpRetry<T>(
   try {
     return await Promise.race([operation(), rejectAfter(policy.timeout_ms)]);
   } catch (firstError) {
-    const firstMsg =
-      firstError instanceof Error ? firstError.message : String(firstError);
+    const firstMsg = firstError instanceof Error ? firstError.message : String(firstError);
 
     auditLog.warn(
       `MCP ${context.source} query failed for ${context.service}: ${firstMsg}. ` +
@@ -111,8 +110,7 @@ export async function withMcpRetry<T>(
     try {
       return await Promise.race([operation(), rejectAfter(policy.timeout_ms)]);
     } catch (secondError) {
-      const secondMsg =
-        secondError instanceof Error ? secondError.message : String(secondError);
+      const secondMsg = secondError instanceof Error ? secondError.message : String(secondError);
 
       auditLog.error(
         `MCP ${context.source} retry failed for ${context.service}: ${secondMsg}. ` +

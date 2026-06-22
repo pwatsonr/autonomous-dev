@@ -16,9 +16,7 @@ describe('DirectoryManager', () => {
 
   describe('path computation', () => {
     it('getPipelineDir returns {rootDir}/{pipelineId}', () => {
-      expect(dm.getPipelineDir(pipelineId)).toBe(
-        path.join(rootDir, pipelineId),
-      );
+      expect(dm.getPipelineDir(pipelineId)).toBe(path.join(rootDir, pipelineId));
     });
 
     it('getDocumentDir returns correct nested path for each type', () => {
@@ -29,30 +27,22 @@ describe('DirectoryManager', () => {
     });
 
     it('getVersionFilePath returns {docDir}/v{version}.md', () => {
-      const expected = path.join(
-        rootDir, pipelineId, 'documents', 'PRD', documentId, 'v1.0.md',
-      );
+      const expected = path.join(rootDir, pipelineId, 'documents', 'PRD', documentId, 'v1.0.md');
       expect(dm.getVersionFilePath(pipelineId, DocumentType.PRD, documentId, '1.0')).toBe(expected);
     });
 
     it('getCurrentSymlinkPath returns {docDir}/current.md', () => {
-      const expected = path.join(
-        rootDir, pipelineId, 'documents', 'PRD', documentId, 'current.md',
-      );
+      const expected = path.join(rootDir, pipelineId, 'documents', 'PRD', documentId, 'current.md');
       expect(dm.getCurrentSymlinkPath(pipelineId, DocumentType.PRD, documentId)).toBe(expected);
     });
 
     it('getReviewsDir returns {docDir}/reviews', () => {
-      const expected = path.join(
-        rootDir, pipelineId, 'documents', 'TDD', documentId, 'reviews',
-      );
+      const expected = path.join(rootDir, pipelineId, 'documents', 'TDD', documentId, 'reviews');
       expect(dm.getReviewsDir(pipelineId, DocumentType.TDD, documentId)).toBe(expected);
     });
 
     it('getDiffsDir returns {docDir}/diffs', () => {
-      const expected = path.join(
-        rootDir, pipelineId, 'documents', 'SPEC', documentId, 'diffs',
-      );
+      const expected = path.join(rootDir, pipelineId, 'documents', 'SPEC', documentId, 'diffs');
       expect(dm.getDiffsDir(pipelineId, DocumentType.SPEC, documentId)).toBe(expected);
     });
 
@@ -63,9 +53,7 @@ describe('DirectoryManager', () => {
     });
 
     it('getAuditLogPath returns {pipeDir}/audit.log', () => {
-      expect(dm.getAuditLogPath(pipelineId)).toBe(
-        path.join(rootDir, pipelineId, 'audit.log'),
-      );
+      expect(dm.getAuditLogPath(pipelineId)).toBe(path.join(rootDir, pipelineId, 'audit.log'));
     });
   });
 

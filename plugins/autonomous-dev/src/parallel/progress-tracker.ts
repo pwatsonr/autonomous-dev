@@ -18,10 +18,7 @@
 import { execSync } from 'child_process';
 
 import type { ParallelConfig } from './config';
-import {
-  EventBus,
-  TrackState,
-} from './events';
+import { EventBus, TrackState } from './events';
 import type { StatePersister } from './state-persister';
 import type { TrackAssignment } from './types';
 
@@ -43,8 +40,7 @@ export class InvalidStateTransitionError extends Error {
     public readonly detail: string,
   ) {
     super(
-      `Invalid state transition for track "${trackName}": ` +
-      `"${from}" -> "${to}". ${detail}`,
+      `Invalid state transition for track "${trackName}": ` + `"${from}" -> "${to}". ${detail}`,
     );
     this.name = 'InvalidStateTransitionError';
   }
@@ -67,15 +63,15 @@ export interface StateTransition {
 
 /** Valid state transitions defined as an adjacency set. */
 export const VALID_TRANSITIONS: Record<TrackState, TrackState[]> = {
-  pending:   ['queued'],
-  queued:    ['executing', 'failed'],
+  pending: ['queued'],
+  queued: ['executing', 'failed'],
   executing: ['testing', 'failed', 'escalated'],
-  testing:   ['reviewing', 'failed', 'escalated'],
+  testing: ['reviewing', 'failed', 'escalated'],
   reviewing: ['merging', 'failed', 'escalated'],
-  merging:   ['complete', 'failed', 'escalated'],
-  complete:  [],  // terminal state
-  failed:    ['queued'],  // can re-queue after failure (retry)
-  escalated: [],  // terminal state
+  merging: ['complete', 'failed', 'escalated'],
+  complete: [], // terminal state
+  failed: ['queued'], // can re-queue after failure (retry)
+  escalated: [], // terminal state
 };
 
 // ============================================================================
@@ -315,10 +311,9 @@ export class StallDetector {
    */
   async checkGitActivity(trackName: string, worktreePath: string): Promise<boolean> {
     try {
-      const commitTime = execSync(
-        `git -C "${worktreePath}" log -1 --format=%ct 2>/dev/null`,
-        { encoding: 'utf-8' },
-      ).trim();
+      const commitTime = execSync(`git -C "${worktreePath}" log -1 --format=%ct 2>/dev/null`, {
+        encoding: 'utf-8',
+      }).trim();
       const commitMs = parseInt(commitTime, 10) * 1000;
       const lastKnown = this.lastActivity.get(trackName) ?? 0;
       if (commitMs > lastKnown) {
@@ -424,11 +419,7 @@ export class ProgressTracker {
    * @param assignment  The track's assignment record
    * @param sm          The track's state machine instance
    */
-  registerTrack(
-    trackName: string,
-    assignment: TrackAssignment,
-    sm: TrackStateMachineLike,
-  ): void {
+  registerTrack(trackName: string, assignment: TrackAssignment, sm: TrackStateMachineLike): void {
     this.trackMachines.set(trackName, sm);
     this.trackAssignments.set(trackName, assignment);
   }
@@ -483,9 +474,7 @@ export class ProgressTracker {
     }
 
     const startedAt = assignment.startedAt;
-    const elapsedMs = startedAt
-      ? Date.now() - new Date(startedAt).getTime()
-      : 0;
+    const elapsedMs = startedAt ? Date.now() - new Date(startedAt).getTime() : 0;
 
     return {
       trackName,
@@ -510,10 +499,7 @@ export class ProgressTracker {
    * @param totalClusters   Total number of clusters in the execution plan
    * @returns RequestProgress with totals, percentages, ETA, cluster info
    */
-  getRequestProgress(
-    currentCluster: number,
-    totalClusters: number,
-  ): RequestProgress {
+  getRequestProgress(currentCluster: number, totalClusters: number): RequestProgress {
     const total = this.trackMachines.size;
     let completed = 0;
     let failed = 0;
@@ -530,9 +516,7 @@ export class ProgressTracker {
       }
     }
 
-    const percentComplete = total > 0
-      ? Math.round((completed / total) * 100)
-      : 0;
+    const percentComplete = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     const etaMinutes = this.calculateETA(
       total,
@@ -584,8 +568,7 @@ export class ProgressTracker {
     if (this.completedDurations.length > 0) {
       // Rolling average of completed track durations
       const avgDuration =
-        this.completedDurations.reduce((a, b) => a + b, 0) /
-        this.completedDurations.length;
+        this.completedDurations.reduce((a, b) => a + b, 0) / this.completedDurations.length;
 
       // Effective parallelism: min(max_tracks, remaining tracks)
       const parallelism = Math.min(this.config.max_tracks, remaining);
@@ -616,10 +599,7 @@ export class ProgressTracker {
    * @param remainingClusters  Number of clusters remaining
    * @returns Estimated minutes remaining
    */
-  private calculateHeuristicETA(
-    remaining: number,
-    remainingClusters: number,
-  ): number {
+  private calculateHeuristicETA(remaining: number, remainingClusters: number): number {
     let totalEstimate = 0;
 
     for (const [trackName, assignment] of this.trackAssignments) {

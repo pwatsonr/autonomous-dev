@@ -8,12 +8,7 @@
 
 import * as crypto from 'crypto';
 
-import type {
-  InvocationMetric,
-  AlertRecord,
-  AlertSeverity,
-  AggregateSnapshot,
-} from './types';
+import type { InvocationMetric, AlertRecord, AlertSeverity, AggregateSnapshot } from './types';
 import type { SqliteStore } from './sqlite-store';
 
 // ---------------------------------------------------------------------------
@@ -34,10 +29,10 @@ export interface AnomalyThresholds {
 }
 
 export const DEFAULT_THRESHOLDS: AnomalyThresholds = {
-  approvalRateDrop: 0.70,
+  approvalRateDrop: 0.7,
   qualityDeclinePoints: 0.5,
   qualityDeclineWindow: 10,
-  escalationRate: 0.30,
+  escalationRate: 0.3,
   tokenBudgetMultiplier: 2.0,
 };
 
@@ -128,9 +123,7 @@ const approvalRateDropRule: AnomalyRule = {
   evaluate(agentName, metrics, _aggregate, config) {
     if (metrics.length === 0) return null;
 
-    const approved = metrics.filter(
-      (m) => m.review_outcome === 'approved',
-    ).length;
+    const approved = metrics.filter((m) => m.review_outcome === 'approved').length;
     const rate = approved / metrics.length;
 
     if (rate < config.approvalRateDrop) {
@@ -169,8 +162,7 @@ const qualityDeclineRule: AnomalyRule = {
     // metrics are ordered DESC by timestamp; take the most recent N
     const recentMetrics = metrics.slice(0, windowSize);
     const recentAvg =
-      recentMetrics.reduce((sum, m) => sum + m.output_quality_score, 0) /
-      recentMetrics.length;
+      recentMetrics.reduce((sum, m) => sum + m.output_quality_score, 0) / recentMetrics.length;
 
     const decline = overallAvg - recentAvg;
 
@@ -205,18 +197,14 @@ const reviewIterationSpikeRule: AnomalyRule = {
     // Need at least 10 total invocations for reliable p95
     if (metrics.length < 10) return null;
 
-    const allIterations = metrics
-      .map((m) => m.review_iteration_count)
-      .sort((a, b) => a - b);
+    const allIterations = metrics.map((m) => m.review_iteration_count).sort((a, b) => a - b);
     const p95 = percentile(allIterations, 95);
 
     // metrics are ordered DESC by timestamp; last 3 = first 3 in array
     const last3 = metrics.slice(0, 3);
     if (last3.length < 3) return null;
 
-    const allAtOrAboveP95 = last3.every(
-      (m) => m.review_iteration_count >= p95,
-    );
+    const allAtOrAboveP95 = last3.every((m) => m.review_iteration_count >= p95);
 
     if (allAtOrAboveP95) {
       return {
@@ -246,9 +234,7 @@ const escalationRateRule: AnomalyRule = {
   evaluate(agentName, metrics, _aggregate, config) {
     if (metrics.length === 0) return null;
 
-    const rejected = metrics.filter(
-      (m) => m.review_outcome === 'rejected',
-    ).length;
+    const rejected = metrics.filter((m) => m.review_outcome === 'rejected').length;
     const rate = rejected / metrics.length;
 
     if (rate > config.escalationRate) {
@@ -318,8 +304,7 @@ const tokenBudgetRule: AnomalyRule = {
 
     const lastMetric = metrics[0]; // most recent (DESC order)
     const invocationTokens = lastMetric.input_tokens + lastMetric.output_tokens;
-    const avgTokens =
-      aggregate.current.total_tokens / aggregate.current.invocation_count;
+    const avgTokens = aggregate.current.total_tokens / aggregate.current.invocation_count;
     const budget = avgTokens * config.tokenBudgetMultiplier;
 
     if (invocationTokens > budget) {
@@ -381,9 +366,7 @@ export class AnomalyDetector {
    * Returns all alerts produced (both existing and newly created).
    */
   evaluate(agentName: string): AlertRecord[] {
-    const thirtyDaysAgo = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000,
-    ).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
     const metrics = this.store.getInvocations(agentName, {
       since: thirtyDaysAgo,
@@ -393,12 +376,7 @@ export class AnomalyDetector {
     const alerts: AlertRecord[] = [];
 
     for (const rule of ANOMALY_RULES) {
-      const finding = rule.evaluate(
-        agentName,
-        metrics,
-        aggregateContext,
-        this.thresholds,
-      );
+      const finding = rule.evaluate(agentName, metrics, aggregateContext, this.thresholds);
 
       if (finding) {
         const alert = this.deduplicateOrCreate(agentName, finding);
@@ -488,9 +466,7 @@ export class AnomalyDetector {
     tokenMultiplier: number;
     trendDirection: string | null;
   } {
-    const thirtyDaysAgo = new Date(
-      Date.now() - 30 * 24 * 60 * 60 * 1000,
-    ).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const allMetrics = this.store.getInvocations(agentName, {
       since: thirtyDaysAgo,
     });
@@ -498,17 +474,13 @@ export class AnomalyDetector {
     const overallAvg = aggregateContext.current?.avg_quality_score ?? 0;
 
     // Compute p95 of review iterations
-    const allIterations = allMetrics
-      .map((m) => m.review_iteration_count)
-      .sort((a, b) => a - b);
-    const p95 =
-      allIterations.length >= 10 ? percentile(allIterations, 95) : Infinity;
+    const allIterations = allMetrics.map((m) => m.review_iteration_count).sort((a, b) => a - b);
+    const p95 = allIterations.length >= 10 ? percentile(allIterations, 95) : Infinity;
 
     // Compute average tokens
     const avgTokens =
       aggregateContext.current && aggregateContext.current.invocation_count > 0
-        ? aggregateContext.current.total_tokens /
-          aggregateContext.current.invocation_count
+        ? aggregateContext.current.total_tokens / aggregateContext.current.invocation_count
         : 0;
 
     return {
@@ -525,10 +497,7 @@ export class AnomalyDetector {
    * Deduplicate alerts: if an active (unresolved) alert exists for the same
    * agent + rule, return it.  Otherwise create and persist a new alert.
    */
-  private deduplicateOrCreate(
-    agentName: string,
-    finding: AnomalyFinding,
-  ): AlertRecord {
+  private deduplicateOrCreate(agentName: string, finding: AnomalyFinding): AlertRecord {
     const existing = this.store.findActiveAlert(agentName, finding.ruleId);
     if (existing) return existing;
 

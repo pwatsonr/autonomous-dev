@@ -77,7 +77,7 @@ export interface ScoreAggregatorInterface {
   aggregateScores(
     reviewOutputs: ReviewOutput[],
     rubric: Rubric,
-    method: 'mean' | 'median' | 'min'
+    method: 'mean' | 'median' | 'min',
   ): AggregationResult;
 }
 
@@ -110,7 +110,7 @@ export interface ApprovalEvaluatorInterface {
     reviewerOutputs: ReviewOutput[],
     rubric: Rubric,
     iterationCount: number,
-    maxIterations: number
+    maxIterations: number,
   ): ApprovalDecision;
 }
 
@@ -125,7 +125,7 @@ export interface FeedbackFormatterResult {
 export interface FeedbackFormatter {
   formatFindings(
     reviewOutputs: ReviewOutput[],
-    previousFindings: MergedFinding[] | null
+    previousFindings: MergedFinding[] | null,
   ): FeedbackFormatterResult;
 }
 
@@ -143,7 +143,7 @@ export interface FindingTracker {
   trackFindings(
     currentFindings: MergedFinding[],
     previousFindings: MergedFinding[] | null,
-    allPriorFindings: MergedFinding[]
+    allPriorFindings: MergedFinding[],
   ): FindingTrackingResult;
 }
 
@@ -177,7 +177,7 @@ export interface TrustLevelCheckResult {
 export interface TrustLevelManager {
   requiresHumanApproval(
     documentType: DocumentType,
-    aiOutcome: 'approved' | 'changes_requested' | 'rejected'
+    aiOutcome: 'approved' | 'changes_requested' | 'rejected',
   ): TrustLevelCheckResult;
 }
 
@@ -205,7 +205,7 @@ export interface HumanEscalationGateway {
     reason: string,
     reviewResults: GateReviewResult[],
     totalIterations: number,
-    finalScore: number
+    finalScore: number,
   ): EscalationPackage;
 }
 
@@ -302,7 +302,7 @@ export function generateSummary(
   decision: ApprovalDecision,
   aggregation: AggregationResult,
   tracking: FindingTrackingResult,
-  threshold: number
+  threshold: number,
 ): string {
   const parts: string[] = [];
   parts.push(`Score: ${aggregation.aggregate_score.toFixed(2)}/${threshold}.`);
@@ -351,7 +351,7 @@ export class ReviewGateService {
     private trustLevelManager: TrustLevelManager,
     private humanEscalationGateway: HumanEscalationGateway,
     private rubricRegistry: RubricRegistry,
-    private config: ReviewGateServiceConfig
+    private config: ReviewGateServiceConfig,
   ) {}
 
   /**
@@ -365,7 +365,7 @@ export class ReviewGateService {
     documentType: DocumentType,
     authorId: string,
     parentDocument?: DocumentForReview,
-    previousPanel?: ReviewerAssignment[]
+    previousPanel?: ReviewerAssignment[],
   ): Promise<GateOutcome> {
     // Check for crash recovery first
     const existingState = this.gateStates.get(document.id);
@@ -385,7 +385,7 @@ export class ReviewGateService {
                 documentType,
                 document,
                 null,
-                null
+                null,
               );
             }
           }
@@ -516,7 +516,7 @@ export class ReviewGateService {
       pipelineDocType as any,
       authorId,
       state.current_iteration,
-      previousPanel
+      previousPanel,
     );
 
     // -----------------------------------------------------------------------
@@ -553,7 +553,7 @@ export class ReviewGateService {
         filteredDoc.content,
         filteredParent?.content ?? null,
         document.traces_from ?? null,
-        sectionMappings
+        sectionMappings,
       );
       prompts.set(reviewer.reviewer_id, prompt);
     }
@@ -569,7 +569,7 @@ export class ReviewGateService {
     const executionResult = await this.reviewerExecutor.executePanel(
       panel,
       prompts as Map<string, any>,
-      rubric
+      rubric,
     );
 
     if (executionResult.escalation_required) {
@@ -581,7 +581,7 @@ export class ReviewGateService {
         'reviewer failure',
         this.reviewResultHistory.get(document.id) ?? [],
         state.current_iteration,
-        0
+        0,
       );
 
       const reviewResult: GateReviewResult = {
@@ -611,7 +611,13 @@ export class ReviewGateService {
         review_result: reviewResult,
         escalation_package: escalationPackage,
         human_approval_required: true,
-        gate_record: this.buildGateRecord(state, reviewResult, executionResult, documentType, rubric),
+        gate_record: this.buildGateRecord(
+          state,
+          reviewResult,
+          executionResult,
+          documentType,
+          rubric,
+        ),
       };
     }
 
@@ -626,16 +632,13 @@ export class ReviewGateService {
     const aggregationResult = this.scoreAggregator.aggregateScores(
       executionResult.review_outputs,
       rubric,
-      this.config.aggregation_method
+      this.config.aggregation_method,
     );
 
     // -----------------------------------------------------------------------
     // Step 12: Disagreement Detection
     // -----------------------------------------------------------------------
-    const disagreements = this.disagreementDetector.detect(
-      executionResult.review_outputs,
-      rubric
-    );
+    const disagreements = this.disagreementDetector.detect(executionResult.review_outputs, rubric);
 
     // -----------------------------------------------------------------------
     // Step 13: Approval Evaluation
@@ -645,7 +648,7 @@ export class ReviewGateService {
       executionResult.review_outputs,
       rubric,
       state.current_iteration,
-      this.config.max_iterations
+      this.config.max_iterations,
     );
 
     // -----------------------------------------------------------------------
@@ -658,7 +661,7 @@ export class ReviewGateService {
 
     const formattedFeedback = this.feedbackFormatter.formatFindings(
       executionResult.review_outputs,
-      previousFindings
+      previousFindings,
     );
 
     // -----------------------------------------------------------------------
@@ -667,7 +670,7 @@ export class ReviewGateService {
     const trackingResult = this.findingTracker.trackFindings(
       formattedFeedback.merged_findings,
       previousFindings,
-      state.finding_history.flatMap((h) => h.findings)
+      state.finding_history.flatMap((h) => h.findings),
     );
 
     // -----------------------------------------------------------------------
@@ -678,17 +681,14 @@ export class ReviewGateService {
       aggregationResult.aggregate_score,
       trackingResult.tracked_findings,
       contentHash,
-      approvalDecision.outcome
+      approvalDecision.outcome,
     );
 
     // -----------------------------------------------------------------------
     // Step 17: Trust Level Evaluation
     // -----------------------------------------------------------------------
     if (approvalDecision.outcome === 'approved') {
-      const humanCheck = this.trustLevelManager.requiresHumanApproval(
-        documentType,
-        'approved'
-      );
+      const humanCheck = this.trustLevelManager.requiresHumanApproval(documentType, 'approved');
       if (humanCheck.human_approval_required) {
         const reviewResult = this.buildReviewResult(
           state,
@@ -698,7 +698,7 @@ export class ReviewGateService {
           trackingResult,
           disagreements,
           iterationDecision,
-          rubric
+          rubric,
         );
         this.addReviewResult(document.id, reviewResult);
 
@@ -712,7 +712,13 @@ export class ReviewGateService {
           review_result: reviewResult,
           escalation_package: null,
           human_approval_required: true,
-          gate_record: this.buildGateRecord(state, reviewResult, executionResult, documentType, rubric),
+          gate_record: this.buildGateRecord(
+            state,
+            reviewResult,
+            executionResult,
+            documentType,
+            rubric,
+          ),
         };
       }
     }
@@ -728,7 +734,7 @@ export class ReviewGateService {
       trackingResult,
       disagreements,
       iterationDecision,
-      rubric
+      rubric,
     );
 
     this.addReviewResult(document.id, reviewResult);
@@ -736,10 +742,7 @@ export class ReviewGateService {
     // -----------------------------------------------------------------------
     // Step 19: Escalation (if needed)
     // -----------------------------------------------------------------------
-    if (
-      approvalDecision.outcome === 'rejected' ||
-      iterationDecision.outcome === 'rejected'
-    ) {
+    if (approvalDecision.outcome === 'rejected' || iterationDecision.outcome === 'rejected') {
       const escalationPackage = this.humanEscalationGateway.assemblePackage(
         state.gate_id,
         document.id,
@@ -747,7 +750,7 @@ export class ReviewGateService {
         iterationDecision.reason,
         this.reviewResultHistory.get(document.id) ?? [],
         state.current_iteration,
-        aggregationResult.aggregate_score
+        aggregationResult.aggregate_score,
       );
 
       // Step 20: Checkpoint (decision)
@@ -763,7 +766,13 @@ export class ReviewGateService {
         review_result: reviewResult,
         escalation_package: escalationPackage,
         human_approval_required: true,
-        gate_record: this.buildGateRecord(state, reviewResult, executionResult, documentType, rubric),
+        gate_record: this.buildGateRecord(
+          state,
+          reviewResult,
+          executionResult,
+          documentType,
+          rubric,
+        ),
       };
     }
 
@@ -824,7 +833,7 @@ export class ReviewGateService {
     tracking: FindingTrackingResult,
     disagreements: Disagreement[],
     iterationDecision: IterationDecision,
-    rubric: Readonly<Rubric>
+    rubric: Readonly<Rubric>,
   ): GateReviewResult {
     return {
       gate_id: state.gate_id,
@@ -857,7 +866,7 @@ export class ReviewGateService {
     reviewResult: GateReviewResult,
     executionResult: ExecutionResult | null,
     documentType: DocumentType,
-    rubric: Readonly<Rubric>
+    rubric: Readonly<Rubric>,
   ): ReviewGateRecord {
     const now = new Date().toISOString();
     return {
@@ -882,9 +891,7 @@ export class ReviewGateService {
       quality_regression: reviewResult.quality_regression,
       stagnation_warning: reviewResult.stagnation_warning,
       human_escalation: false,
-      started_at: state.checkpoints.length > 0
-        ? state.checkpoints[0].timestamp
-        : now,
+      started_at: state.checkpoints.length > 0 ? state.checkpoints[0].timestamp : now,
       completed_at: now,
       created_by: 'review-gate-service',
     };
@@ -893,7 +900,7 @@ export class ReviewGateService {
   private buildRejectedFromValidation(
     document: DocumentForValidation,
     documentType: DocumentType,
-    errors: { code: string; message: string; section_id?: string; field?: string }[]
+    errors: { code: string; message: string; section_id?: string; field?: string }[],
   ): GateOutcome {
     const gateId = generateId();
     const findings: MergedFinding[] = errors.map((err, idx) => ({
@@ -973,13 +980,14 @@ export class ReviewGateService {
     documentType: DocumentType,
     document: DocumentForValidation,
     executionResult: ExecutionResult | null,
-    rubric: Readonly<Rubric> | null
+    rubric: Readonly<Rubric> | null,
   ): GateOutcome {
-    const outcome = reviewResult.outcome === 'approved'
-      ? 'approved'
-      : reviewResult.outcome === 'rejected'
-        ? 'escalated'
-        : 'rejected';
+    const outcome =
+      reviewResult.outcome === 'approved'
+        ? 'approved'
+        : reviewResult.outcome === 'rejected'
+          ? 'escalated'
+          : 'rejected';
 
     return {
       gate_id: state.gate_id,
@@ -1013,9 +1021,8 @@ export class ReviewGateService {
         quality_regression: reviewResult.quality_regression,
         stagnation_warning: reviewResult.stagnation_warning,
         human_escalation: false,
-        started_at: state.checkpoints.length > 0
-          ? state.checkpoints[0].timestamp
-          : new Date().toISOString(),
+        started_at:
+          state.checkpoints.length > 0 ? state.checkpoints[0].timestamp : new Date().toISOString(),
         completed_at: new Date().toISOString(),
         created_by: 'review-gate-service',
       },

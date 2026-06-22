@@ -11,11 +11,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { updateFrontmatter, readFrontmatter, extractErrorClass } from '../frontmatter-io';
-import type {
-  TriageDecision,
-  TriageAuditLogger,
-  InvestigationRequest,
-} from '../types';
+import type { TriageDecision, TriageAuditLogger, InvestigationRequest } from '../types';
 
 // ---------------------------------------------------------------------------
 // Investigation request writer delegate
@@ -26,9 +22,7 @@ import type {
  * Default implementation writes JSON to
  * `.autonomous-dev/observations/investigations/`.
  */
-export type WriteInvestigationRequestFn = (
-  request: InvestigationRequest,
-) => Promise<void>;
+export type WriteInvestigationRequestFn = (request: InvestigationRequest) => Promise<void>;
 
 /**
  * Creates an investigation request writer bound to a directory.

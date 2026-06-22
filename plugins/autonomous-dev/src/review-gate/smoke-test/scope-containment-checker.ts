@@ -44,7 +44,7 @@ export class ScopeContainmentChecker {
   check(
     parent: ParentDocument,
     children: ChildDocument[],
-    config?: Partial<ScopeContainmentConfig>
+    config?: Partial<ScopeContainmentConfig>,
   ): ScopeContainmentResult {
     const mergedConfig: ScopeContainmentConfig = {
       ...DEFAULT_CONFIG,
@@ -93,7 +93,7 @@ export class ScopeContainmentChecker {
 
     // pass = ALL children have creep_percentage <= threshold
     const pass = childrenWithScopeCreep.every(
-      (c) => c.creep_percentage <= mergedConfig.creep_threshold_percentage
+      (c) => c.creep_percentage <= mergedConfig.creep_threshold_percentage,
     );
 
     return {

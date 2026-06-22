@@ -10,13 +10,8 @@
  * that earlier safeguards block before safeguard 6 is reached.
  */
 
-import {
-  evaluateAutoPromote,
-} from '../../src/governance/auto-promote';
-import type {
-  AutoPromoteConfig,
-  AutoPromoteCandidate,
-} from '../../src/governance/auto-promote';
+import { evaluateAutoPromote } from '../../src/governance/auto-promote';
+import type { AutoPromoteConfig, AutoPromoteCandidate } from '../../src/governance/auto-promote';
 import {
   scheduleOverrideCheck,
   processPendingOverrides,
@@ -279,7 +274,10 @@ describe('scheduleOverrideCheck', () => {
     );
 
     const overrideFile = path.join(
-      tmpDir, '.autonomous-dev', 'governance', 'pending-overrides',
+      tmpDir,
+      '.autonomous-dev',
+      'governance',
+      'pending-overrides',
       'OBS-20260408-143022-a7f3.json',
     );
     const content = await fs.readFile(overrideFile, 'utf-8');
@@ -303,20 +301,24 @@ describe('processPendingOverrides', () => {
     // Set up observation file -- still promoted by auto-promote-engine
     const obsDir = path.join(tmpDir, '.autonomous-dev', 'observations', '2026', '04');
     await fs.mkdir(obsDir, { recursive: true });
-    await fs.writeFile(path.join(obsDir, 'OBS-20260408-143022-a7f3.md'), [
-      '---',
-      'id: OBS-20260408-143022-a7f3',
-      'service: api-gateway',
-      'triage_status: promoted',
-      'triage_decision: promote',
-      'triage_by: auto-promote-engine',
-      'triage_at: 2026-04-08T14:00:00Z',
-      'linked_prd: PRD-OBS-20260408-143022-a7f3',
-      '---',
-      '',
-      '## Evidence',
-      'Test evidence',
-    ].join('\n'), 'utf-8');
+    await fs.writeFile(
+      path.join(obsDir, 'OBS-20260408-143022-a7f3.md'),
+      [
+        '---',
+        'id: OBS-20260408-143022-a7f3',
+        'service: api-gateway',
+        'triage_status: promoted',
+        'triage_decision: promote',
+        'triage_by: auto-promote-engine',
+        'triage_at: 2026-04-08T14:00:00Z',
+        'linked_prd: PRD-OBS-20260408-143022-a7f3',
+        '---',
+        '',
+        '## Evidence',
+        'Test evidence',
+      ].join('\n'),
+      'utf-8',
+    );
 
     // Schedule override check with past deadline
     const pastDeadline = new Date('2026-04-08T16:00:00Z');
@@ -340,7 +342,10 @@ describe('processPendingOverrides', () => {
 
     // Check override file was updated
     const overrideFile = path.join(
-      tmpDir, '.autonomous-dev', 'governance', 'pending-overrides',
+      tmpDir,
+      '.autonomous-dev',
+      'governance',
+      'pending-overrides',
       'OBS-20260408-143022-a7f3.json',
     );
     const check: OverrideCheck = JSON.parse(await fs.readFile(overrideFile, 'utf-8'));
@@ -357,31 +362,31 @@ describe('processPendingOverrides', () => {
     // Set up observation file -- PM Lead overrode triage
     const obsDir = path.join(tmpDir, '.autonomous-dev', 'observations', '2026', '04');
     await fs.mkdir(obsDir, { recursive: true });
-    await fs.writeFile(path.join(obsDir, 'OBS-20260408-143022-a7f3.md'), [
-      '---',
-      'id: OBS-20260408-143022-a7f3',
-      'service: api-gateway',
-      'triage_status: dismissed',
-      'triage_decision: dismiss',
-      'triage_by: pm-lead',
-      'triage_at: 2026-04-08T15:00:00Z',
-      'triage_reason: Not actionable',
-      'linked_prd: PRD-OBS-20260408-143022-a7f3',
-      '---',
-      '',
-      '## Evidence',
-      'Test evidence',
-    ].join('\n'), 'utf-8');
+    await fs.writeFile(
+      path.join(obsDir, 'OBS-20260408-143022-a7f3.md'),
+      [
+        '---',
+        'id: OBS-20260408-143022-a7f3',
+        'service: api-gateway',
+        'triage_status: dismissed',
+        'triage_decision: dismiss',
+        'triage_by: pm-lead',
+        'triage_at: 2026-04-08T15:00:00Z',
+        'triage_reason: Not actionable',
+        'linked_prd: PRD-OBS-20260408-143022-a7f3',
+        '---',
+        '',
+        '## Evidence',
+        'Test evidence',
+      ].join('\n'),
+      'utf-8',
+    );
 
     // Set up PRD file that should be cancelled
     const prdDir = path.join(tmpDir, '.autonomous-dev', 'prd');
     await fs.mkdir(prdDir, { recursive: true });
     const prdId = 'PRD-OBS-20260408-143022-a7f3';
-    await fs.writeFile(
-      path.join(prdDir, `${prdId}.md`),
-      '# PRD\nTest PRD content',
-      'utf-8',
-    );
+    await fs.writeFile(path.join(prdDir, `${prdId}.md`), '# PRD\nTest PRD content', 'utf-8');
 
     // Schedule override check with past deadline
     const pastDeadline = new Date('2026-04-08T16:00:00Z');
@@ -405,12 +410,18 @@ describe('processPendingOverrides', () => {
 
     // Check PRD was moved to cancelled/
     const cancelledPath = path.join(prdDir, 'cancelled', `${prdId}.md`);
-    const cancelledExists = await fs.access(cancelledPath).then(() => true).catch(() => false);
+    const cancelledExists = await fs
+      .access(cancelledPath)
+      .then(() => true)
+      .catch(() => false);
     expect(cancelledExists).toBe(true);
 
     // Check override file status
     const overrideFile = path.join(
-      tmpDir, '.autonomous-dev', 'governance', 'pending-overrides',
+      tmpDir,
+      '.autonomous-dev',
+      'governance',
+      'pending-overrides',
       'OBS-20260408-143022-a7f3.json',
     );
     const check: OverrideCheck = JSON.parse(await fs.readFile(overrideFile, 'utf-8'));
@@ -456,47 +467,67 @@ describe('processPendingOverrides', () => {
     // Observation 1: still promoted (will be confirmed)
     const obsDir = path.join(tmpDir, '.autonomous-dev', 'observations', '2026', '04');
     await fs.mkdir(obsDir, { recursive: true });
-    await fs.writeFile(path.join(obsDir, 'OBS-20260408-143022-a7f3.md'), [
-      '---',
-      'id: OBS-20260408-143022-a7f3',
-      'service: api-gateway',
-      'triage_status: promoted',
-      'triage_decision: promote',
-      'triage_by: auto-promote-engine',
-      '---',
-      '',
-      'Content',
-    ].join('\n'), 'utf-8');
+    await fs.writeFile(
+      path.join(obsDir, 'OBS-20260408-143022-a7f3.md'),
+      [
+        '---',
+        'id: OBS-20260408-143022-a7f3',
+        'service: api-gateway',
+        'triage_status: promoted',
+        'triage_decision: promote',
+        'triage_by: auto-promote-engine',
+        '---',
+        '',
+        'Content',
+      ].join('\n'),
+      'utf-8',
+    );
 
     // Observation 2: overridden by PM Lead
-    await fs.writeFile(path.join(obsDir, 'OBS-20260408-150000-b8e4.md'), [
-      '---',
-      'id: OBS-20260408-150000-b8e4',
-      'service: payment-service',
-      'triage_status: dismissed',
-      'triage_decision: dismiss',
-      'triage_by: pm-lead',
-      '---',
-      '',
-      'Content',
-    ].join('\n'), 'utf-8');
+    await fs.writeFile(
+      path.join(obsDir, 'OBS-20260408-150000-b8e4.md'),
+      [
+        '---',
+        'id: OBS-20260408-150000-b8e4',
+        'service: payment-service',
+        'triage_status: dismissed',
+        'triage_decision: dismiss',
+        'triage_by: pm-lead',
+        '---',
+        '',
+        'Content',
+      ].join('\n'),
+      'utf-8',
+    );
 
     // Set up PRD for observation 2
     const prdDir = path.join(tmpDir, '.autonomous-dev', 'prd');
     await fs.mkdir(prdDir, { recursive: true });
-    await fs.writeFile(
-      path.join(prdDir, 'PRD-OBS-20260408-150000-b8e4.md'),
-      '# PRD 2',
-      'utf-8',
-    );
+    await fs.writeFile(path.join(prdDir, 'PRD-OBS-20260408-150000-b8e4.md'), '# PRD 2', 'utf-8');
 
     // Schedule override checks for both
     const pastDeadline = new Date('2026-04-08T16:00:00Z');
-    await scheduleOverrideCheck('OBS-20260408-143022-a7f3', 'PRD-OBS-20260408-143022-a7f3', pastDeadline, tmpDir, logger as any);
-    await scheduleOverrideCheck('OBS-20260408-150000-b8e4', 'PRD-OBS-20260408-150000-b8e4', pastDeadline, tmpDir, logger as any);
+    await scheduleOverrideCheck(
+      'OBS-20260408-143022-a7f3',
+      'PRD-OBS-20260408-143022-a7f3',
+      pastDeadline,
+      tmpDir,
+      logger as any,
+    );
+    await scheduleOverrideCheck(
+      'OBS-20260408-150000-b8e4',
+      'PRD-OBS-20260408-150000-b8e4',
+      pastDeadline,
+      tmpDir,
+      logger as any,
+    );
 
     // Process
-    const result = await processPendingOverrides(tmpDir, logger as any, new Date('2026-04-08T17:00:00Z'));
+    const result = await processPendingOverrides(
+      tmpDir,
+      logger as any,
+      new Date('2026-04-08T17:00:00Z'),
+    );
 
     expect(result.confirmed).toBe(1);
     expect(result.overridden).toBe(1);

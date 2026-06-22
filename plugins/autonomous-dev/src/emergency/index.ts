@@ -12,79 +12,75 @@
 // Re-exports: shared types (from SPEC-009-4-1)
 // ---------------------------------------------------------------------------
 
-export * from "./types";
+export * from './types';
 
 // ---------------------------------------------------------------------------
 // Re-exports: AbortManager (from SPEC-009-4-1)
 // ---------------------------------------------------------------------------
 
-export { AbortManager } from "./abort-manager";
+export { AbortManager } from './abort-manager';
 
 // ---------------------------------------------------------------------------
 // Re-exports: StateSnapshotCapture (SPEC-009-4-2, Task 3)
 // ---------------------------------------------------------------------------
 
-export { StateSnapshotCapture, defaultFs } from "./state-snapshot";
-export type { KillSnapshot, FileSystem } from "./state-snapshot";
+export { StateSnapshotCapture, defaultFs } from './state-snapshot';
+export type { KillSnapshot, FileSystem } from './state-snapshot';
 
 // ---------------------------------------------------------------------------
 // Re-exports: KillSwitch (SPEC-009-4-2, Task 4)
 // ---------------------------------------------------------------------------
 
-export { KillSwitch } from "./kill-switch";
+export { KillSwitch } from './kill-switch';
 export type {
   NotificationPayload,
   AbortManagerPort,
   AuditTrail,
   EscalationCanceller,
   Notifier,
-} from "./kill-switch";
+} from './kill-switch';
 
 // ---------------------------------------------------------------------------
 // Re-exports: HaltedGate (SPEC-009-4-3, Task 5)
 // ---------------------------------------------------------------------------
 
-export { HaltedGate } from "./halted-gate";
-export type { GateCheckResult, HaltedError } from "./halted-gate";
+export { HaltedGate } from './halted-gate';
+export type { GateCheckResult, HaltedError } from './halted-gate';
 
 // ---------------------------------------------------------------------------
 // Re-exports: PauseResumeController (SPEC-009-4-3, Task 6)
 // ---------------------------------------------------------------------------
 
-export { PauseResumeController } from "./pause-resume";
+export { PauseResumeController } from './pause-resume';
 
 // ---------------------------------------------------------------------------
 // Re-exports: EmergencyConfigLoader (SPEC-009-4-3, Task 8)
 // ---------------------------------------------------------------------------
 
-export { EmergencyConfigLoader } from "./emergency-config";
+export { EmergencyConfigLoader } from './emergency-config';
 export type {
   EmergencyConfig,
   RawEmergencyConfig,
   ConfigProvider,
   ConfigLogger,
-} from "./emergency-config";
+} from './emergency-config';
 
 // ---------------------------------------------------------------------------
 // Re-exports: StatePersistence (SPEC-009-4-4, Task 7)
 // ---------------------------------------------------------------------------
 
-export { StatePersistence } from "./state-persistence";
-export type { PipelineState, StatePersistenceFs } from "./state-persistence";
+export { StatePersistence } from './state-persistence';
+export type { PipelineState, StatePersistenceFs } from './state-persistence';
 
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
-import { AbortManager } from "./abort-manager";
-import { StateSnapshotCapture } from "./state-snapshot";
-import { KillSwitch } from "./kill-switch";
-import { HaltedGate } from "./halted-gate";
-import type {
-  AuditTrail,
-  EscalationCanceller,
-  Notifier,
-} from "./kill-switch";
+import { AbortManager } from './abort-manager';
+import { StateSnapshotCapture } from './state-snapshot';
+import { KillSwitch } from './kill-switch';
+import { HaltedGate } from './halted-gate';
+import type { AuditTrail, EscalationCanceller, Notifier } from './kill-switch';
 
 /**
  * Create a fully-wired KillSwitch with all dependencies injected.

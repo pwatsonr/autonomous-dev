@@ -130,7 +130,9 @@ function extractFrontmatter(content: string): ExtractionResult {
     if (content.replace(/\r$/, '') === DELIMITER) {
       return {
         ok: false,
-        errors: [{ message: 'No YAML frontmatter found (opening delimiter but no closing delimiter)' }],
+        errors: [
+          { message: 'No YAML frontmatter found (opening delimiter but no closing delimiter)' },
+        ],
       };
     }
     return {
@@ -169,7 +171,9 @@ function extractFrontmatter(content: string): ExtractionResult {
   if (closingDelimStart === -1) {
     return {
       ok: false,
-      errors: [{ message: 'No YAML frontmatter found (opening delimiter but no closing delimiter)' }],
+      errors: [
+        { message: 'No YAML frontmatter found (opening delimiter but no closing delimiter)' },
+      ],
     };
   }
 
@@ -237,10 +241,7 @@ function parseYaml(yamlStr: string): Record<string, unknown> {
     const rawValue = line.substring(colonIdx + 1).trim();
 
     if (key === '') {
-      throw new YamlParseError(
-        `Invalid YAML at line ${i + 1}: empty key`,
-        i + 1,
-      );
+      throw new YamlParseError(`Invalid YAML at line ${i + 1}: empty key`, i + 1);
     }
 
     // Check if this is a block-style sequence or mapping (value is empty,
@@ -266,7 +267,11 @@ function parseYaml(yamlStr: string): Record<string, unknown> {
       let j = i + 1;
       while (j < lines.length) {
         const raw = lines[j].replace(/\r$/, '');
-        if (raw.trim() === '') { body.push(''); j++; continue; }
+        if (raw.trim() === '') {
+          body.push('');
+          j++;
+          continue;
+        }
         if (!/^\s/.test(raw)) break; // dedent to column 0 ends the block
         body.push(raw);
         j++;
@@ -326,7 +331,12 @@ function parseBlockArray(
 
     // Check if this dash line has a key: value (object item on same line)
     const objColonIdx = afterDash.indexOf(':');
-    if (objColonIdx !== -1 && !afterDash.startsWith('[') && !afterDash.startsWith('"') && !afterDash.startsWith("'")) {
+    if (
+      objColonIdx !== -1 &&
+      !afterDash.startsWith('[') &&
+      !afterDash.startsWith('"') &&
+      !afterDash.startsWith("'")
+    ) {
       // Object item — collect this line and subsequent indented lines
       const obj: Record<string, unknown> = {};
       const firstKey = afterDash.substring(0, objColonIdx).trim();
@@ -424,10 +434,7 @@ function parseScalarValue(rawValue: string): unknown {
  *   - `evaluation_rubric` maps objects to QualityDimension[]
  *   - `version_history` maps objects to VersionHistoryEntry[]
  */
-function mapToParsedAgent(
-  raw: Record<string, unknown>,
-  body: string,
-): ParsedAgent {
+function mapToParsedAgent(raw: Record<string, unknown>, body: string): ParsedAgent {
   return {
     name: asString(raw.name),
     version: asString(raw.version),
@@ -439,12 +446,11 @@ function mapToParsedAgent(
     expertise: asStringArray(raw.expertise),
     evaluation_rubric: asQualityDimensions(raw.evaluation_rubric),
     version_history: asVersionHistory(raw.version_history),
-    risk_tier: raw.risk_tier !== undefined && raw.risk_tier !== null
-      ? (asString(raw.risk_tier) as RiskTier)
-      : undefined,
-    frozen: raw.frozen !== undefined && raw.frozen !== null
-      ? Boolean(raw.frozen)
-      : undefined,
+    risk_tier:
+      raw.risk_tier !== undefined && raw.risk_tier !== null
+        ? (asString(raw.risk_tier) as RiskTier)
+        : undefined,
+    frozen: raw.frozen !== undefined && raw.frozen !== null ? Boolean(raw.frozen) : undefined,
     description: asString(raw.description),
     system_prompt: body,
   };

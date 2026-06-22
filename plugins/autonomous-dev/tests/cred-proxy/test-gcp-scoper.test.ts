@@ -82,21 +82,12 @@ describe('GCPCredentialScoper.scope', () => {
   it('adds binding then mints token for Run.Deploy', async () => {
     const { editor, state } = makeEditor();
     const iamWrap = makeIam();
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
-    const scoper = new GCPCredentialScoper(
-      cfg,
-      editors,
-      iamWrap.iam,
-      () => 1_700_000_000_000,
-    );
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
+    const scoper = new GCPCredentialScoper(cfg, editors, iamWrap.iam, () => 1_700_000_000_000);
     const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
     expect(state.getCalls).toBe(1);
     expect(state.setCalls).toBe(1);
-    expect(state.setArgs[0].resource).toBe(
-      'projects/p1/locations/us-central1/services/s1',
-    );
+    expect(state.setArgs[0].resource).toBe('projects/p1/locations/us-central1/services/s1');
     const policy = state.setArgs[0].policy as {
       bindings: Array<{ role: string; members: string[] }>;
     };
@@ -109,9 +100,7 @@ describe('GCPCredentialScoper.scope', () => {
     expect(iamWrap.calls).toBe(1);
     const payload = JSON.parse(out.payload);
     expect(payload.access_token).toBe('gcp-tok');
-    expect(out.expires_at).toBe(
-      new Date(1_700_000_000_000 + 900_000).toISOString(),
-    );
+    expect(out.expires_at).toBe(new Date(1_700_000_000_000 + 900_000).toISOString());
   });
 
   it('dispatches Storage.Upload to the bucket editor', async () => {
@@ -130,24 +119,17 @@ describe('GCPCredentialScoper.scope', () => {
   });
 
   it('throws when a required scope key is missing', async () => {
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', makeEditor().editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', makeEditor().editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     await expect(
-      scoper.scope('Run.Deploy', { project: 'p1', service: 's1' } as Record<
-        string,
-        string
-      >),
+      scoper.scope('Run.Deploy', { project: 'p1', service: 's1' } as Record<string, string>),
     ).rejects.toThrow(/missing required scope key 'location'/);
   });
 
   it('throws on unknown operation', async () => {
     const editors = new Map<GcpResourceType, IamPolicyEditor>();
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
-    await expect(scoper.scope('UnknownOp', {})).rejects.toThrow(
-      /unknown GCP operation/,
-    );
+    await expect(scoper.scope('UnknownOp', {})).rejects.toThrow(/unknown GCP operation/);
   });
 
   it('throws when no editor is registered for the resourceType', async () => {
@@ -165,18 +147,14 @@ describe('GCPCredentialScoper.scope', () => {
         return [{ accessToken: null }];
       },
     };
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, iam);
     await expect(scoper.scope('Run.Deploy', RUN_SCOPE)).rejects.toThrow(/no token/);
   });
 
   it('revoke() fetches a fresh policy and removes the binding', async () => {
     const { editor, state } = makeEditor();
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
     const getsAfterScope = state.getCalls;
@@ -184,8 +162,9 @@ describe('GCPCredentialScoper.scope', () => {
     await out.revoke();
     expect(state.getCalls).toBe(getsAfterScope + 1);
     expect(state.setCalls).toBe(setsAfterScope + 1);
-    const finalPolicy = state.setArgs[state.setArgs.length - 1]
-      .policy as { bindings: Array<{ role: string; members: string[] }> };
+    const finalPolicy = state.setArgs[state.setArgs.length - 1].policy as {
+      bindings: Array<{ role: string; members: string[] }>;
+    };
     // No more bindings for the delegated SA.
     const stillThere = finalPolicy.bindings.some((b) =>
       b.members.includes('serviceAccount:deleg@p.iam.gserviceaccount.com'),
@@ -195,9 +174,7 @@ describe('GCPCredentialScoper.scope', () => {
 
   it('revoke() propagates editor errors (etag conflict)', async () => {
     const { editor } = makeEditor();
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
     // Force the next setIamPolicy to reject — simulates 409 etag conflict.
@@ -209,9 +186,7 @@ describe('GCPCredentialScoper.scope', () => {
 
   it('two consecutive scopes both add the binding (idempotent on duplicate member)', async () => {
     const { editor, state } = makeEditor();
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     await scoper.scope('Run.Deploy', RUN_SCOPE);
     await scoper.scope('Run.Deploy', RUN_SCOPE);
@@ -220,46 +195,32 @@ describe('GCPCredentialScoper.scope', () => {
     const finalPolicy = state.setArgs[1].policy as {
       bindings: Array<{ role: string; members: string[] }>;
     };
-    const runBinding = finalPolicy.bindings.find(
-      (b) => b.role === 'roles/run.developer',
-    );
-    expect(runBinding?.members).toEqual([
-      'serviceAccount:deleg@p.iam.gserviceaccount.com',
-    ]);
+    const runBinding = finalPolicy.bindings.find((b) => b.role === 'roles/run.developer');
+    expect(runBinding?.members).toEqual(['serviceAccount:deleg@p.iam.gserviceaccount.com']);
   });
 
   it('addBinding adds the member to an existing role binding (different member already present)', async () => {
     const { editor, state } = makeEditor();
     state.policy = {
-      bindings: [
-        { role: 'roles/run.developer', members: ['user:other@x.com'] },
-      ],
+      bindings: [{ role: 'roles/run.developer', members: ['user:other@x.com'] }],
       etag: 'etag-pre',
     };
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     await scoper.scope('Run.Deploy', RUN_SCOPE);
     const finalPolicy = state.setArgs[0].policy as {
       bindings: Array<{ role: string; members: string[] }>;
     };
-    const runBinding = finalPolicy.bindings.find(
-      (b) => b.role === 'roles/run.developer',
-    );
+    const runBinding = finalPolicy.bindings.find((b) => b.role === 'roles/run.developer');
     expect(runBinding?.members).toContain('user:other@x.com');
-    expect(runBinding?.members).toContain(
-      'serviceAccount:deleg@p.iam.gserviceaccount.com',
-    );
+    expect(runBinding?.members).toContain('serviceAccount:deleg@p.iam.gserviceaccount.com');
   });
 
   it('addBinding tolerates a policy without a bindings array', async () => {
     const { editor, state } = makeEditor();
     // Policy with NO bindings field — exercises the `?? []` fallback.
     state.policy = { etag: 'etag-no-bindings' };
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     await scoper.scope('Run.Deploy', RUN_SCOPE);
     const finalPolicy = state.setArgs[0].policy as {
@@ -281,28 +242,20 @@ describe('GCPCredentialScoper.scope', () => {
       bindings: [{}, { role: undefined, members: undefined }],
       etag: 'etag-sparse',
     };
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     await scoper.scope('Run.Deploy', RUN_SCOPE);
     const finalPolicy = state.setArgs[0].policy as {
       bindings: Array<{ role: string; members: string[] }>;
     };
     // Our role/member must have landed; sparse entries normalised.
-    const newBinding = finalPolicy.bindings.find(
-      (b) => b.role === 'roles/run.developer',
-    );
-    expect(newBinding?.members).toEqual([
-      'serviceAccount:deleg@p.iam.gserviceaccount.com',
-    ]);
+    const newBinding = finalPolicy.bindings.find((b) => b.role === 'roles/run.developer');
+    expect(newBinding?.members).toEqual(['serviceAccount:deleg@p.iam.gserviceaccount.com']);
   });
 
   it('removeBinding tolerates sparse binding entries when the member is absent', async () => {
     const { editor, state } = makeEditor();
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
     // Replace the policy with a sparse entry that lacks both `role` and
@@ -319,9 +272,7 @@ describe('GCPCredentialScoper.scope', () => {
 
   it('removeBinding tolerates a policy without a bindings array (no-op)', async () => {
     const { editor, state } = makeEditor();
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
     state.policy = { etag: 'etag-empty-no-bindings' };
@@ -332,9 +283,7 @@ describe('GCPCredentialScoper.scope', () => {
 
   it('removeBinding short-circuits when the policy is already empty', async () => {
     const { editor, state } = makeEditor();
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     const out = await scoper.scope('Run.Deploy', RUN_SCOPE);
     // Forcibly empty the policy server-side between scope and revoke
@@ -352,9 +301,7 @@ describe('GCPCredentialScoper.scope', () => {
       bindings: [{ role: 'roles/viewer', members: ['user:alice@x.com'] }],
       etag: 'etag-pre',
     };
-    const editors = new Map<GcpResourceType, IamPolicyEditor>([
-      ['service', editor],
-    ]);
+    const editors = new Map<GcpResourceType, IamPolicyEditor>([['service', editor]]);
     const scoper = new GCPCredentialScoper(cfg, editors, makeIam().iam);
     await scoper.scope('Run.Deploy', RUN_SCOPE);
     const finalPolicy = state.setArgs[0].policy as {

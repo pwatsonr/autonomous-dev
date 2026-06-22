@@ -60,11 +60,7 @@ export async function detectOrphans(
     // Read parent
     try {
       const parentType = getParentDocType(doc.type);
-      const parentDoc = await storage.readDocument(
-        pipelineId,
-        parentType,
-        doc.parentId,
-      );
+      const parentDoc = await storage.readDocument(pipelineId, parentType, doc.parentId);
 
       // Dynamically import section parser (from the versioning module)
       const { parseSections } = await import('../versioning/section-parser');

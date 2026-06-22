@@ -76,10 +76,7 @@ export class ObservationTrigger {
    */
   check(agentName: string, agentVersion: string): TriggerDecision {
     // Step 1: Record the invocation in the observation tracker
-    const state = this.observationTracker.recordInvocation(
-      agentName,
-      agentVersion,
-    );
+    const state = this.observationTracker.recordInvocation(agentName, agentVersion);
 
     // Step 2: Guard — agent must not be FROZEN
     const agentState = this.registry.getState(agentName);
@@ -154,8 +151,7 @@ export class ObservationTrigger {
         triggered: false,
         reason: 'agent is FROZEN (cannot force frozen agents)',
         agentName,
-        invocationCount: this.observationTracker.getState(agentName)
-          .invocations_since_promotion,
+        invocationCount: this.observationTracker.getState(agentName).invocations_since_promotion,
         threshold: this.observationTracker.getState(agentName).threshold,
       };
     }

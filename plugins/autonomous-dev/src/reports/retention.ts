@@ -100,11 +100,7 @@ async function findObservationFiles(
       if (entry.name === 'archive' && currentDir === baseDir) continue;
       const subResults = await findObservationFiles(baseDir, fullPath);
       results.push(...subResults);
-    } else if (
-      entry.isFile() &&
-      entry.name.startsWith('OBS-') &&
-      entry.name.endsWith('.md')
-    ) {
+    } else if (entry.isFile() && entry.name.startsWith('OBS-') && entry.name.endsWith('.md')) {
       results.push(fullPath);
     }
   }
@@ -126,11 +122,7 @@ async function findArchiveFiles(archiveDir: string): Promise<string[]> {
   }
 
   for (const entry of entries) {
-    if (
-      entry.isFile() &&
-      entry.name.startsWith('OBS-') &&
-      entry.name.endsWith('.md')
-    ) {
+    if (entry.isFile() && entry.name.startsWith('OBS-') && entry.name.endsWith('.md')) {
       results.push(path.join(archiveDir, entry.name));
     }
   }
@@ -145,9 +137,7 @@ async function findArchiveFiles(archiveDir: string): Promise<string[]> {
  * Uses a lightweight parser (no full YAML dependency) consistent
  * with frontmatter-io.ts conventions.
  */
-export async function readFrontmatter(
-  filePath: string,
-): Promise<RetentionFrontmatter | null> {
+export async function readFrontmatter(filePath: string): Promise<RetentionFrontmatter | null> {
   try {
     const content = await fs.readFile(filePath, 'utf-8');
     const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
@@ -191,10 +181,7 @@ export async function readFrontmatter(
  *
  * If the PRD file does not exist, returns false (not active).
  */
-export async function isPrdInActiveState(
-  prdId: string,
-  rootDir: string,
-): Promise<boolean> {
+export async function isPrdInActiveState(prdId: string, rootDir: string): Promise<boolean> {
   const prdPath = path.join(rootDir, '.autonomous-dev', 'prd', `${prdId}.md`);
   try {
     const content = await fs.readFile(prdPath, 'utf-8');

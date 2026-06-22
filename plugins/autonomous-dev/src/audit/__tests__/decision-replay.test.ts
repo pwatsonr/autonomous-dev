@@ -40,7 +40,7 @@ function makeEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
 }
 
 function writeEventsToFile(filePath: string, events: AuditEvent[]): void {
-  const content = events.map(e => JSON.stringify(e)).join('\n') + '\n';
+  const content = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -88,11 +88,11 @@ describe('DecisionReplay', () => {
 
     // req-1 gets indices 0, 3, 6, 9 = 4 events
     expect(req1Events).toHaveLength(4);
-    expect(req1Events.every(e => e.request_id === 'req-1')).toBe(true);
+    expect(req1Events.every((e) => e.request_id === 'req-1')).toBe(true);
 
     // req-2 gets indices 1, 4, 7 = 3 events
     expect(req2Events).toHaveLength(3);
-    expect(req2Events.every(e => e.request_id === 'req-2')).toBe(true);
+    expect(req2Events.every((e) => e.request_id === 'req-2')).toBe(true);
 
     // req-3 gets indices 2, 5, 8 = 3 events
     expect(req3Events).toHaveLength(3);

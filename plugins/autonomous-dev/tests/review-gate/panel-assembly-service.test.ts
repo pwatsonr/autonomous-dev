@@ -28,17 +28,14 @@ describe('REVIEWER_ROLES', () => {
     expect(Object.keys(REVIEWER_ROLES)).toHaveLength(8);
   });
 
-  it.each(Object.entries(REVIEWER_ROLES))(
-    '%s has required fields',
-    (_id, role: ReviewerRole) => {
-      expect(role.role_id).toBeTruthy();
-      expect(role.role_name).toBeTruthy();
-      expect(role.document_types.length).toBeGreaterThanOrEqual(1);
-      expect(role.designation.size).toBeGreaterThanOrEqual(1);
-      expect(role.specialization_description).toBeTruthy();
-      expect(role.prompt_identity).toBeTruthy();
-    },
-  );
+  it.each(Object.entries(REVIEWER_ROLES))('%s has required fields', (_id, role: ReviewerRole) => {
+    expect(role.role_id).toBeTruthy();
+    expect(role.role_name).toBeTruthy();
+    expect(role.document_types.length).toBeGreaterThanOrEqual(1);
+    expect(role.designation.size).toBeGreaterThanOrEqual(1);
+    expect(role.specialization_description).toBeTruthy();
+    expect(role.prompt_identity).toBeTruthy();
+  });
 
   it.each(Object.entries(REVIEWER_ROLES))(
     '%s prompt_identity is at least 30 words',
@@ -243,7 +240,7 @@ describe('PanelAssemblyService', () => {
   describe('Unique reviewer IDs', () => {
     it('all assignments in a panel have distinct reviewer_id values', () => {
       const panel = service.assemblePanel(DocumentType.PRD, 'author-1', 1);
-      const ids = panel.map(a => a.reviewer_id);
+      const ids = panel.map((a) => a.reviewer_id);
       expect(new Set(ids).size).toBe(ids.length);
     });
 
@@ -252,7 +249,7 @@ describe('PanelAssemblyService', () => {
         panel_sizes: { ...DEFAULT_PANEL_SIZES, [DocumentType.PRD]: 3 },
       });
       const panel = custom.assemblePanel(DocumentType.PRD, 'author-1', 1);
-      const ids = panel.map(a => a.reviewer_id);
+      const ids = panel.map((a) => a.reviewer_id);
       expect(new Set(ids).size).toBe(ids.length);
     });
   });

@@ -12,7 +12,7 @@
  * as freetext with an empty string (the validator handles rejection).
  */
 
-import type { EscalationResponse, ParseResult } from "./response-types";
+import type { EscalationResponse, ParseResult } from './response-types';
 
 // ---------------------------------------------------------------------------
 // Patterns
@@ -44,7 +44,7 @@ export class ResponseParser {
    */
   parse(rawInput: string, escalationId: string, responder: string): ParseResult {
     // Coerce null/undefined to empty string -- parser never throws
-    const input = rawInput == null ? "" : String(rawInput);
+    const input = rawInput == null ? '' : String(rawInput);
     const timestamp = new Date().toISOString();
 
     // 1. Option pattern: /^opt-\d+$/i
@@ -55,7 +55,7 @@ export class ResponseParser {
           escalation_id: escalationId,
           responder,
           timestamp,
-          response_type: "option",
+          response_type: 'option',
           option_id: input.toLowerCase(),
         },
       };
@@ -70,7 +70,7 @@ export class ResponseParser {
           escalation_id: escalationId,
           responder,
           timestamp,
-          response_type: "delegate",
+          response_type: 'delegate',
           delegate_target: delegateMatch[1].trim(),
         },
       };
@@ -83,7 +83,7 @@ export class ResponseParser {
         escalation_id: escalationId,
         responder,
         timestamp,
-        response_type: "freetext",
+        response_type: 'freetext',
         freetext: input.trim(),
       },
     };

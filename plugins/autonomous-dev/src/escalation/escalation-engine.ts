@@ -18,11 +18,11 @@
  *   quality        -> pause_at_boundary
  */
 
-import type { EscalationClassifier } from "./classifier";
-import type { FailureContext } from "./classifier";
-import type { EscalationFormatter } from "./formatter";
-import type { RoutingEngine } from "./routing-engine";
-import type { EscalationChainManager } from "./chain-manager";
+import type { EscalationClassifier } from './classifier';
+import type { FailureContext } from './classifier';
+import type { EscalationFormatter } from './formatter';
+import type { RoutingEngine } from './routing-engine';
+import type { EscalationChainManager } from './chain-manager';
 import type {
   AuditTrail,
   EscalationMessage,
@@ -32,7 +32,7 @@ import type {
   EscalationUrgency,
   PipelineBehavior,
   RequestContext,
-} from "./types";
+} from './types';
 
 // ---------------------------------------------------------------------------
 // Pipeline behavior resolution
@@ -43,16 +43,16 @@ import type {
  */
 export function resolvePipelineBehavior(type: EscalationType): PipelineBehavior {
   switch (type) {
-    case "security":
-      return "halt_immediately";
-    case "infrastructure":
-      return "pause_immediately";
-    case "cost":
-      return "pause_before_incurring";
-    case "product":
-    case "technical":
-    case "quality":
-      return "pause_at_boundary";
+    case 'security':
+      return 'halt_immediately';
+    case 'infrastructure':
+      return 'pause_immediately';
+    case 'cost':
+      return 'pause_before_incurring';
+    case 'product':
+    case 'technical':
+    case 'quality':
+      return 'pause_at_boundary';
   }
 }
 
@@ -66,46 +66,47 @@ export function resolvePipelineBehavior(type: EscalationType): PipelineBehavior 
  * Every escalation requires at least 2 options. These are sensible defaults
  * that cover the most common response patterns for each type.
  */
-function buildOptionsForType(
-  type: EscalationType,
-  urgency: EscalationUrgency,
-): EscalationOption[] {
+function buildOptionsForType(type: EscalationType, urgency: EscalationUrgency): EscalationOption[] {
   switch (type) {
-    case "security":
+    case 'security':
       return [
-        { option_id: "opt-1", label: "Investigate and remediate", action: "investigate" },
-        { option_id: "opt-2", label: "Accept risk and continue", action: "accept_risk" },
-        { option_id: "opt-3", label: "Roll back changes", action: "rollback" },
+        { option_id: 'opt-1', label: 'Investigate and remediate', action: 'investigate' },
+        { option_id: 'opt-2', label: 'Accept risk and continue', action: 'accept_risk' },
+        { option_id: 'opt-3', label: 'Roll back changes', action: 'rollback' },
       ];
-    case "infrastructure":
+    case 'infrastructure':
       return [
-        { option_id: "opt-1", label: "Retry with different configuration", action: "retry_reconfigure" },
-        { option_id: "opt-2", label: "Investigate infrastructure issue", action: "investigate" },
-        { option_id: "opt-3", label: "Skip and continue manually", action: "skip" },
+        {
+          option_id: 'opt-1',
+          label: 'Retry with different configuration',
+          action: 'retry_reconfigure',
+        },
+        { option_id: 'opt-2', label: 'Investigate infrastructure issue', action: 'investigate' },
+        { option_id: 'opt-3', label: 'Skip and continue manually', action: 'skip' },
       ];
-    case "cost":
+    case 'cost':
       return [
-        { option_id: "opt-1", label: "Approve additional spend", action: "approve_cost" },
-        { option_id: "opt-2", label: "Cancel to avoid cost", action: "cancel" },
-        { option_id: "opt-3", label: "Find cheaper alternative", action: "alternative" },
+        { option_id: 'opt-1', label: 'Approve additional spend', action: 'approve_cost' },
+        { option_id: 'opt-2', label: 'Cancel to avoid cost', action: 'cancel' },
+        { option_id: 'opt-3', label: 'Find cheaper alternative', action: 'alternative' },
       ];
-    case "quality":
+    case 'quality':
       return [
-        { option_id: "opt-1", label: "Review and provide feedback", action: "review" },
-        { option_id: "opt-2", label: "Accept current quality", action: "accept" },
-        { option_id: "opt-3", label: "Request re-implementation", action: "redo" },
+        { option_id: 'opt-1', label: 'Review and provide feedback', action: 'review' },
+        { option_id: 'opt-2', label: 'Accept current quality', action: 'accept' },
+        { option_id: 'opt-3', label: 'Request re-implementation', action: 'redo' },
       ];
-    case "technical":
+    case 'technical':
       return [
-        { option_id: "opt-1", label: "Provide guidance for retry", action: "guide_retry" },
-        { option_id: "opt-2", label: "Take over implementation", action: "manual_takeover" },
-        { option_id: "opt-3", label: "Skip this task", action: "skip" },
+        { option_id: 'opt-1', label: 'Provide guidance for retry', action: 'guide_retry' },
+        { option_id: 'opt-2', label: 'Take over implementation', action: 'manual_takeover' },
+        { option_id: 'opt-3', label: 'Skip this task', action: 'skip' },
       ];
-    case "product":
+    case 'product':
     default:
       return [
-        { option_id: "opt-1", label: "Clarify requirements", action: "clarify" },
-        { option_id: "opt-2", label: "Proceed with best interpretation", action: "proceed" },
+        { option_id: 'opt-1', label: 'Clarify requirements', action: 'clarify' },
+        { option_id: 'opt-2', label: 'Proceed with best interpretation', action: 'proceed' },
       ];
   }
 }
@@ -143,10 +144,7 @@ export class EscalationEngine {
    *
    * The caller (pipeline orchestrator) should act on `result.pipelineBehavior`.
    */
-  raise(
-    failureContext: FailureContext,
-    requestContext: RequestContext,
-  ): EscalationResult {
+  raise(failureContext: FailureContext, requestContext: RequestContext): EscalationResult {
     // Step 1: Classify
     const { type, urgency } = this.classifier.classify(failureContext);
 
@@ -170,7 +168,7 @@ export class EscalationEngine {
       costImpact: failureContext.costData
         ? {
             estimated_cost: failureContext.costData.estimated,
-            currency: "USD",
+            currency: 'USD',
             threshold_exceeded:
               failureContext.costData.estimated > failureContext.costData.threshold,
           }

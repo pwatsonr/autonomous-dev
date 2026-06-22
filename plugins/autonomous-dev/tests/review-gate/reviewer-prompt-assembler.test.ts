@@ -115,7 +115,11 @@ const PRD_SECTION_MAPPINGS: DocumentSectionMappings = {
     { section_id: 'user_stories', category_ids: ['user_story_coverage', 'internal_consistency'] },
     {
       section_id: 'functional_requirements',
-      category_ids: ['requirements_completeness', 'requirements_testability', 'internal_consistency'],
+      category_ids: [
+        'requirements_completeness',
+        'requirements_testability',
+        'internal_consistency',
+      ],
     },
     {
       section_id: 'non_functional_requirements',

@@ -16,7 +16,7 @@ import { ApprovalEvaluator } from '../../src/review-gate/approval-evaluator';
  */
 function makeRubricWithThreshold(
   categories: { id: string; name?: string; weight: number; minimumScore: number }[],
-  approvalThreshold: number
+  approvalThreshold: number,
 ): QualityRubric & { approval_threshold: number } {
   return {
     documentType: 'PRD',
@@ -43,7 +43,7 @@ function makeRubricWithThreshold(
 function makeAggregationResult(
   aggregateScore: number,
   perReviewerScores: { reviewer_id: string; weighted_score: number }[] = [],
-  categoryAggregates: CategoryAggregate[] = []
+  categoryAggregates: CategoryAggregate[] = [],
 ): AggregationResult {
   return {
     aggregate_score: aggregateScore,
@@ -58,7 +58,7 @@ function makeAggregationResult(
 function makeReviewOutput(
   reviewerId: string,
   scores: { category_id: string; score: number }[],
-  findings: Finding[] = []
+  findings: Finding[] = [],
 ): ReviewOutput {
   return {
     reviewer_id: reviewerId,
@@ -74,7 +74,7 @@ function makeReviewOutput(
 // Default rubric: single category, threshold 85
 const DEFAULT_RUBRIC = makeRubricWithThreshold(
   [{ id: 'completeness', name: 'Completeness', weight: 1.0, minimumScore: 50 }],
-  85
+  85,
 );
 
 // ---------------------------------------------------------------------------
@@ -88,9 +88,7 @@ describe('ApprovalEvaluator', () => {
   // Test 1: All conditions pass -- approved
   // -----------------------------------------------------------------------
   test('All conditions pass: aggregate 86, threshold 85 => approved', () => {
-    const aggResult = makeAggregationResult(86, [
-      { reviewer_id: 'r1', weighted_score: 86 },
-    ]);
+    const aggResult = makeAggregationResult(86, [{ reviewer_id: 'r1', weighted_score: 86 }]);
     const reviewer = makeReviewOutput('r1', [{ category_id: 'completeness', score: 86 }]);
 
     const decision = evaluator.evaluate(aggResult, [reviewer], DEFAULT_RUBRIC, 1, 3);
@@ -106,9 +104,7 @@ describe('ApprovalEvaluator', () => {
   // Test 2: Score exactly at threshold -- approved
   // -----------------------------------------------------------------------
   test('Score exactly at threshold: aggregate 85, threshold 85 => approved', () => {
-    const aggResult = makeAggregationResult(85, [
-      { reviewer_id: 'r1', weighted_score: 85 },
-    ]);
+    const aggResult = makeAggregationResult(85, [{ reviewer_id: 'r1', weighted_score: 85 }]);
     const reviewer = makeReviewOutput('r1', [{ category_id: 'completeness', score: 85 }]);
 
     const decision = evaluator.evaluate(aggResult, [reviewer], DEFAULT_RUBRIC, 1, 3);
@@ -121,9 +117,7 @@ describe('ApprovalEvaluator', () => {
   // Test 3: Score one below threshold -- changes_requested
   // -----------------------------------------------------------------------
   test('Score below threshold: aggregate 84.99, threshold 85 => changes_requested', () => {
-    const aggResult = makeAggregationResult(84.99, [
-      { reviewer_id: 'r1', weighted_score: 84.99 },
-    ]);
+    const aggResult = makeAggregationResult(84.99, [{ reviewer_id: 'r1', weighted_score: 84.99 }]);
     const reviewer = makeReviewOutput('r1', [{ category_id: 'completeness', score: 84.99 }]);
 
     const decision = evaluator.evaluate(aggResult, [reviewer], DEFAULT_RUBRIC, 1, 3);
@@ -136,9 +130,7 @@ describe('ApprovalEvaluator', () => {
   // Test 4: Critical blocking finding -- changes_requested
   // -----------------------------------------------------------------------
   test('Critical blocking finding: aggregate 90 => changes_requested', () => {
-    const aggResult = makeAggregationResult(90, [
-      { reviewer_id: 'r1', weighted_score: 90 },
-    ]);
+    const aggResult = makeAggregationResult(90, [{ reviewer_id: 'r1', weighted_score: 90 }]);
     const blockingFinding: Finding = {
       severity: 'critical',
       critical_sub: 'blocking',
@@ -151,7 +143,7 @@ describe('ApprovalEvaluator', () => {
     const reviewer = makeReviewOutput(
       'r1',
       [{ category_id: 'completeness', score: 90 }],
-      [blockingFinding]
+      [blockingFinding],
     );
 
     const decision = evaluator.evaluate(aggResult, [reviewer], DEFAULT_RUBRIC, 1, 3);
@@ -164,9 +156,7 @@ describe('ApprovalEvaluator', () => {
   // Test 5: Critical reject finding -- rejected
   // -----------------------------------------------------------------------
   test('Critical reject finding: aggregate 90 => rejected immediately', () => {
-    const aggResult = makeAggregationResult(90, [
-      { reviewer_id: 'r1', weighted_score: 90 },
-    ]);
+    const aggResult = makeAggregationResult(90, [{ reviewer_id: 'r1', weighted_score: 90 }]);
     const rejectFinding: Finding = {
       severity: 'critical',
       critical_sub: 'reject',
@@ -179,7 +169,7 @@ describe('ApprovalEvaluator', () => {
     const reviewer = makeReviewOutput(
       'r1',
       [{ category_id: 'completeness', score: 90 }],
-      [rejectFinding]
+      [rejectFinding],
     );
 
     const decision = evaluator.evaluate(aggResult, [reviewer], DEFAULT_RUBRIC, 1, 3);
@@ -194,15 +184,11 @@ describe('ApprovalEvaluator', () => {
   test('Floor violation: aggregate 86, category below min_threshold => changes_requested', () => {
     const rubric = makeRubricWithThreshold(
       [{ id: 'risk_identification', name: 'Risk Identification', weight: 1.0, minimumScore: 50 }],
-      85
+      85,
     );
-    const aggResult = makeAggregationResult(86, [
-      { reviewer_id: 'r1', weighted_score: 86 },
-    ]);
+    const aggResult = makeAggregationResult(86, [{ reviewer_id: 'r1', weighted_score: 86 }]);
     // Reviewer scored the category at 40, below minimumScore of 50
-    const reviewer = makeReviewOutput('r1', [
-      { category_id: 'risk_identification', score: 40 },
-    ]);
+    const reviewer = makeReviewOutput('r1', [{ category_id: 'risk_identification', score: 40 }]);
 
     const decision = evaluator.evaluate(aggResult, [reviewer], rubric, 1, 3);
 
@@ -220,14 +206,10 @@ describe('ApprovalEvaluator', () => {
   test('Floor violation auto-generated finding has correct content', () => {
     const rubric = makeRubricWithThreshold(
       [{ id: 'risk_identification', name: 'Risk Identification', weight: 1.0, minimumScore: 50 }],
-      85
+      85,
     );
-    const aggResult = makeAggregationResult(86, [
-      { reviewer_id: 'r1', weighted_score: 86 },
-    ]);
-    const reviewer = makeReviewOutput('r1', [
-      { category_id: 'risk_identification', score: 40 },
-    ]);
+    const aggResult = makeAggregationResult(86, [{ reviewer_id: 'r1', weighted_score: 86 }]);
+    const reviewer = makeReviewOutput('r1', [{ category_id: 'risk_identification', score: 40 }]);
 
     const decision = evaluator.evaluate(aggResult, [reviewer], rubric, 1, 3);
 
@@ -255,11 +237,9 @@ describe('ApprovalEvaluator', () => {
         { id: 'cat_a', name: 'Category A', weight: 0.5, minimumScore: 60 },
         { id: 'cat_b', name: 'Category B', weight: 0.5, minimumScore: 70 },
       ],
-      85
+      85,
     );
-    const aggResult = makeAggregationResult(86, [
-      { reviewer_id: 'r1', weighted_score: 86 },
-    ]);
+    const aggResult = makeAggregationResult(86, [{ reviewer_id: 'r1', weighted_score: 86 }]);
     const reviewer = makeReviewOutput('r1', [
       { category_id: 'cat_a', score: 50 },
       { category_id: 'cat_b', score: 60 },
@@ -317,9 +297,7 @@ describe('ApprovalEvaluator', () => {
   // Test 12: Critical reject takes precedence over score pass
   // -----------------------------------------------------------------------
   test('Critical reject takes precedence even when score passes threshold', () => {
-    const aggResult = makeAggregationResult(95, [
-      { reviewer_id: 'r1', weighted_score: 95 },
-    ]);
+    const aggResult = makeAggregationResult(95, [{ reviewer_id: 'r1', weighted_score: 95 }]);
     const rejectFinding: Finding = {
       severity: 'critical',
       critical_sub: 'reject',
@@ -332,7 +310,7 @@ describe('ApprovalEvaluator', () => {
     const reviewer = makeReviewOutput(
       'r1',
       [{ category_id: 'completeness', score: 95 }],
-      [rejectFinding]
+      [rejectFinding],
     );
 
     const decision = evaluator.evaluate(aggResult, [reviewer], DEFAULT_RUBRIC, 1, 3);
@@ -345,18 +323,14 @@ describe('ApprovalEvaluator', () => {
   // Additional: Max iterations reached with failing score => rejected
   // -----------------------------------------------------------------------
   test('Max iterations reached with failing score => rejected', () => {
-    const aggResult = makeAggregationResult(80, [
-      { reviewer_id: 'r1', weighted_score: 80 },
-    ]);
+    const aggResult = makeAggregationResult(80, [{ reviewer_id: 'r1', weighted_score: 80 }]);
     const reviewer = makeReviewOutput('r1', [{ category_id: 'completeness', score: 80 }]);
 
     const decision = evaluator.evaluate(aggResult, [reviewer], DEFAULT_RUBRIC, 3, 3);
 
     expect(decision.outcome).toBe('rejected');
     expect(decision.reasons).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('Iteration count 3'),
-      ])
+      expect.arrayContaining([expect.stringContaining('Iteration count 3')]),
     );
   });
 
@@ -377,9 +351,7 @@ describe('ApprovalEvaluator', () => {
   // Additional: Approved has empty reasons array
   // -----------------------------------------------------------------------
   test('Approved decision has empty reasons array', () => {
-    const aggResult = makeAggregationResult(90, [
-      { reviewer_id: 'r1', weighted_score: 90 },
-    ]);
+    const aggResult = makeAggregationResult(90, [{ reviewer_id: 'r1', weighted_score: 90 }]);
     const reviewer = makeReviewOutput('r1', [{ category_id: 'completeness', score: 90 }]);
 
     const decision = evaluator.evaluate(aggResult, [reviewer], DEFAULT_RUBRIC, 1, 3);
@@ -394,11 +366,9 @@ describe('ApprovalEvaluator', () => {
   test('Critical blocking combined with floor violation => changes_requested', () => {
     const rubric = makeRubricWithThreshold(
       [{ id: 'cat_a', name: 'Category A', weight: 1.0, minimumScore: 70 }],
-      85
+      85,
     );
-    const aggResult = makeAggregationResult(90, [
-      { reviewer_id: 'r1', weighted_score: 90 },
-    ]);
+    const aggResult = makeAggregationResult(90, [{ reviewer_id: 'r1', weighted_score: 90 }]);
     const blockingFinding: Finding = {
       severity: 'critical',
       critical_sub: 'blocking',
@@ -411,7 +381,7 @@ describe('ApprovalEvaluator', () => {
     const reviewer = makeReviewOutput(
       'r1',
       [{ category_id: 'cat_a', score: 60 }],
-      [blockingFinding]
+      [blockingFinding],
     );
 
     const decision = evaluator.evaluate(aggResult, [reviewer], rubric, 1, 3);

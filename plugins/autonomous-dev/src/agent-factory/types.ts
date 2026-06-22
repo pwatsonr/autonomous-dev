@@ -24,12 +24,7 @@ export const AGENT_ROLES: readonly AgentRole[] = [
 export type RiskTier = 'low' | 'medium' | 'high' | 'critical';
 
 /** Valid RiskTier values as a readonly tuple for runtime checks. */
-export const RISK_TIERS: readonly RiskTier[] = [
-  'low',
-  'medium',
-  'high',
-  'critical',
-] as const;
+export const RISK_TIERS: readonly RiskTier[] = ['low', 'medium', 'high', 'critical'] as const;
 
 // ---------------------------------------------------------------------------
 // Agent definition sub-structures
@@ -194,8 +189,8 @@ export interface RankedAgent {
 
 /** Options for the agent discovery function (SPEC-005-1-3). */
 export interface DiscoveryOptions {
-  similarityThreshold?: number;  // default 0.6
-  maxResults?: number;           // default 5
+  similarityThreshold?: number; // default 0.6
+  maxResults?: number; // default 5
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +231,7 @@ export type AuditEventType =
 
 /** A single audit event written to the JSONL log. */
 export interface AuditEvent {
-  timestamp: string;           // ISO 8601
+  timestamp: string; // ISO 8601
   event_type: AuditEventType;
   agent_name?: string;
   details: Record<string, unknown>;

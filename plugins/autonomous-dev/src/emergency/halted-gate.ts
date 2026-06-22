@@ -11,8 +11,8 @@
  * issued the kill, when, and in what mode).
  */
 
-import type { KillSwitch } from "./kill-switch";
-import type { KillMode } from "./types";
+import type { KillSwitch } from './kill-switch';
+import type { KillMode } from './types';
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -25,9 +25,7 @@ import type { KillMode } from "./types";
  *   - `{ allowed: true }` -- request may proceed.
  *   - `{ allowed: false; error: HaltedError }` -- system is halted.
  */
-export type GateCheckResult =
-  | { allowed: true }
-  | { allowed: false; error: HaltedError };
+export type GateCheckResult = { allowed: true } | { allowed: false; error: HaltedError };
 
 /**
  * Structured error returned when the system is halted.
@@ -36,7 +34,7 @@ export type GateCheckResult =
  * rejection message without needing to query the kill switch separately.
  */
 export interface HaltedError {
-  code: "SYSTEM_HALTED";
+  code: 'SYSTEM_HALTED';
   message: string;
   killedBy: string;
   killedAt: Date;
@@ -85,7 +83,7 @@ export class HaltedGate {
     return {
       allowed: false,
       error: {
-        code: "SYSTEM_HALTED",
+        code: 'SYSTEM_HALTED',
         message: `System is halted. Kill issued by ${lastKill.issuedBy} at ${lastKill.issuedAt.toISOString()} (mode: ${lastKill.mode}). Re-enable required before processing new requests.`,
         killedBy: lastKill.issuedBy,
         killedAt: lastKill.issuedAt,

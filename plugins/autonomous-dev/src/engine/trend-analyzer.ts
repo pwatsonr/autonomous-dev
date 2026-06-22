@@ -130,10 +130,7 @@ export function linearRegressionSlope(dataPoints: DataPoint[]): number {
  * @param thresholds  Configured thresholds
  * @returns           Threshold value or null if not mapped
  */
-export function getThresholdForMetric(
-  metric: string,
-  thresholds: MetricThresholds,
-): number | null {
+export function getThresholdForMetric(metric: string, thresholds: MetricThresholds): number | null {
   const mapping: Record<string, string> = {
     error_rate: 'error_rate_percent',
     latency_p99_ms: 'p99_latency_ms',
@@ -203,8 +200,7 @@ export function analyzeTrend(
   // Determine if this direction is degrading
   const slopeDirection: 'above' | 'below' = pctChange > 0 ? 'above' : 'below';
   const isDegrading =
-    isBadDirection(metric, slopeDirection) &&
-    Math.abs(pctChange) > config.min_slope_threshold;
+    isBadDirection(metric, slopeDirection) && Math.abs(pctChange) > config.min_slope_threshold;
 
   // Classify direction
   let direction: 'degrading' | 'improving' | 'stable';
@@ -224,8 +220,7 @@ export function analyzeTrend(
       const currentValue =
         dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].y : baselineMean;
       const hoursToBreach = (threshold - currentValue) / slope;
-      daysToBreachEstimate =
-        hoursToBreach > 0 ? Math.round(hoursToBreach / 24) : undefined;
+      daysToBreachEstimate = hoursToBreach > 0 ? Math.round(hoursToBreach / 24) : undefined;
     }
   }
 
@@ -269,14 +264,7 @@ export function analyzeMetricTrends(
     const dataPoints = windowDataMap[window];
     if (!dataPoints || dataPoints.length === 0) continue;
 
-    const result = analyzeTrend(
-      metric,
-      window,
-      dataPoints,
-      baseline,
-      config,
-      thresholds,
-    );
+    const result = analyzeTrend(metric, window, dataPoints, baseline, config, thresholds);
 
     // During learning mode, trend observations are NOT generated
     if (isLearningMode) continue;

@@ -45,9 +45,7 @@ interface RecordingChecker extends ChainTrustChecker {
   calls: string[];
 }
 
-function makeTrustChecker(
-  verdicts: Record<string, ChainTrustVerdict>,
-): RecordingChecker {
+function makeTrustChecker(verdicts: Record<string, ChainTrustVerdict>): RecordingChecker {
   const calls: string[] = [];
   return {
     calls,
@@ -87,9 +85,7 @@ function makeTrioManifests(
     buildManifest({
       id: 'security-reviewer',
       version: '1.0.0',
-      produces: [
-        { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-      ],
+      produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
     }),
     buildManifest({
       id: 'code-fixer',
@@ -199,14 +195,9 @@ describe('SPEC-022-2-04: trust integration', () => {
     const trust = makeTrustChecker({
       'code-fixer': { trusted: false, reason: 'not-allowlisted' },
     });
-    const exec = new ChainExecutor(
-      graph,
-      registry,
-      lookup,
-      async () => [],
-      undefined,
-      { trustChecker: trust },
-    );
+    const exec = new ChainExecutor(graph, registry, lookup, async () => [], undefined, {
+      trustChecker: trust,
+    });
     const result = await exec.executeChain(
       'security-reviewer',
       { requestRoot: tempRoot, requestId: 'REQ-T3' },
@@ -225,14 +216,9 @@ describe('SPEC-022-2-04: trust integration', () => {
         throw new Error('validator offline');
       },
     };
-    const exec = new ChainExecutor(
-      graph,
-      registry,
-      lookup,
-      async () => [],
-      undefined,
-      { trustChecker: throwing },
-    );
+    const exec = new ChainExecutor(graph, registry, lookup, async () => [], undefined, {
+      trustChecker: throwing,
+    });
     const result = await exec.executeChain(
       'security-reviewer',
       { requestRoot: tempRoot, requestId: 'REQ-T4' },
@@ -402,9 +388,7 @@ describe('SPEC-022-2-04: PrivilegedChainResolver glob matcher', () => {
           version: '1.0.0',
           manifest: buildManifest({
             id: 'p',
-            produces: [
-              { artifact_type: 'a', schema_version: '1.0', format: 'json' },
-            ],
+            produces: [{ artifact_type: 'a', schema_version: '1.0', format: 'json' }],
           }),
         },
         {
@@ -463,9 +447,7 @@ describe('SPEC-022-2-04: PrivilegedChainResolver glob matcher', () => {
           version: '1.0.0',
           manifest: buildManifest({
             id: 'p',
-            produces: [
-              { artifact_type: 'a', schema_version: '1.0', format: 'json' },
-            ],
+            produces: [{ artifact_type: 'a', schema_version: '1.0', format: 'json' }],
           }),
         },
         {

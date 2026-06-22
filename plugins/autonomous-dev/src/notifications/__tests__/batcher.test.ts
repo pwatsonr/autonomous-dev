@@ -65,9 +65,7 @@ class MockTimer implements Timer {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makePayload(
-  overrides: Partial<NotificationPayload> = {},
-): NotificationPayload {
+function makePayload(overrides: Partial<NotificationPayload> = {}): NotificationPayload {
   return {
     notification_id: `notif-${Math.random().toString(36).slice(2, 8)}`,
     event_type: 'pipeline_completed',
@@ -197,11 +195,7 @@ describe('NotificationBatcher', () => {
 
   // Test Case 12: Buffer flushed at max size
   test('buffer flushed when max size reached', () => {
-    const batcher = new NotificationBatcher(
-      makeConfig({ maxBufferSize: 5 }),
-      dm,
-      timer,
-    );
+    const batcher = new NotificationBatcher(makeConfig({ maxBufferSize: 5 }), dm, timer);
 
     for (let i = 0; i < 5; i++) {
       batcher.submit(makePayload({ urgency: 'informational' }));

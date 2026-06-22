@@ -99,7 +99,8 @@ export class ResourceMonitor {
 
     // Emergency: check available disk space
     const freeDiskBytes = await this.getFreeDiskSpace();
-    if (freeDiskBytes < 1_073_741_824) { // 1 GB
+    if (freeDiskBytes < 1_073_741_824) {
+      // 1 GB
       return { allowed: false, reason: 'Available disk space below 1 GB' };
     }
 
@@ -115,9 +116,7 @@ export class ResourceMonitor {
   async getFreeDiskSpace(): Promise<number> {
     try {
       const worktreeRoot = this.worktreeManager.resolvedWorktreeRoot;
-      const output = execSync(`df -k "${worktreeRoot}" | tail -1`)
-        .toString()
-        .trim();
+      const output = execSync(`df -k "${worktreeRoot}" | tail -1`).toString().trim();
       const parts = output.split(/\s+/);
       const availKB = parseInt(parts[3], 10);
       if (isNaN(availKB)) {

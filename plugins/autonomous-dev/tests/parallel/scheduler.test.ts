@@ -23,9 +23,7 @@ function makeConfig(overrides?: Partial<ParallelConfig>): ParallelConfig {
   return { ...DEFAULT_PARALLEL_CONFIG, ...overrides };
 }
 
-function makeWorktreeManager(
-  activeCount: number = 0,
-): SchedulerWorktreeManager {
+function makeWorktreeManager(activeCount: number = 0): SchedulerWorktreeManager {
   return {
     getActiveWorktreeCount: () => activeCount,
   };
@@ -118,11 +116,7 @@ describe('createExecutionPlan', () => {
   });
 
   it('sets totalTracks from DAG node count', () => {
-    const dag = buildAndScheduleDAG('req-003', [
-      { name: 'A' },
-      { name: 'B' },
-      { name: 'C' },
-    ]);
+    const dag = buildAndScheduleDAG('req-003', [{ name: 'A' }, { name: 'B' }, { name: 'C' }]);
 
     const scheduler = new Scheduler(
       makeConfig(),
@@ -755,9 +749,7 @@ describe('notifyTrackComplete', () => {
       callbacks,
     );
 
-    const cluster = makeClusterPlan(0, [
-      { trackName: 't1', priority: 10 },
-    ]);
+    const cluster = makeClusterPlan(0, [{ trackName: 't1', priority: 10 }]);
 
     const resultPromise = scheduler.executeCluster('req-001', cluster);
     await new Promise((r) => setTimeout(r, 10));
@@ -765,9 +757,7 @@ describe('notifyTrackComplete', () => {
     scheduler.notifyTrackComplete('req-001', 't1', true);
     await resultPromise;
 
-    expect(completedTracks).toEqual([
-      { req: 'req-001', name: 't1', success: true },
-    ]);
+    expect(completedTracks).toEqual([{ req: 'req-001', name: 't1', success: true }]);
   });
 });
 
@@ -777,12 +767,14 @@ describe('notifyTrackComplete', () => {
 
 describe('ResourceMonitor', () => {
   // Create a mock WorktreeManager with the minimal interface needed
-  function makeMockWorkTreeManagerForRM(overrides: {
-    pressureLevel?: DiskPressureLevel;
-    activeCount?: number;
-    diskUsageBytes?: number;
-    worktreeRoot?: string;
-  } = {}) {
+  function makeMockWorkTreeManagerForRM(
+    overrides: {
+      pressureLevel?: DiskPressureLevel;
+      activeCount?: number;
+      diskUsageBytes?: number;
+      worktreeRoot?: string;
+    } = {},
+  ) {
     const {
       pressureLevel = 'normal',
       activeCount = 0,

@@ -199,9 +199,18 @@ describe('adapter_interface types', () => {
 
   test('AuthzAction covers all variants', () => {
     const actions: AuthzAction[] = [
-      'submit', 'status', 'list', 'cancel', 'pause',
-      'resume', 'priority', 'logs', 'feedback', 'kill',
-      'approve_review', 'config_change',
+      'submit',
+      'status',
+      'list',
+      'cancel',
+      'pause',
+      'resume',
+      'priority',
+      'logs',
+      'feedback',
+      'kill',
+      'approve_review',
+      'config_change',
     ];
     expect(actions).toHaveLength(12);
   });
@@ -232,9 +241,7 @@ describe('adapter_interface types', () => {
   });
 
   test('RequestStatus accepts valid values', () => {
-    const statuses: RequestStatus[] = [
-      'queued', 'active', 'paused', 'cancelled', 'done', 'failed',
-    ];
+    const statuses: RequestStatus[] = ['queued', 'active', 'paused', 'cancelled', 'done', 'failed'];
     expect(statuses).toHaveLength(6);
   });
 });

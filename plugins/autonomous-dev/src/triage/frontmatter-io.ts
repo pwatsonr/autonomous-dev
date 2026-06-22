@@ -7,10 +7,7 @@
  */
 
 import * as fs from 'fs/promises';
-import type {
-  ObservationFrontmatter,
-  ObservationValidationResult,
-} from './types';
+import type { ObservationFrontmatter, ObservationValidationResult } from './types';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -132,9 +129,7 @@ function serializeYamlValue(value: unknown): string {
  * @param filePath Absolute path to the observation .md file
  * @returns Validation result with parsed frontmatter or errors
  */
-export async function validateOnRead(
-  filePath: string,
-): Promise<ObservationValidationResult> {
+export async function validateOnRead(filePath: string): Promise<ObservationValidationResult> {
   const errors: string[] = [];
 
   let content: string;
@@ -253,14 +248,10 @@ export async function validateOnRead(
  * Reads and returns just the frontmatter of an observation file.
  * Throws if the file is invalid.
  */
-export async function readFrontmatter(
-  filePath: string,
-): Promise<ObservationFrontmatter> {
+export async function readFrontmatter(filePath: string): Promise<ObservationFrontmatter> {
   const result = await validateOnRead(filePath);
   if (!result.valid || !result.frontmatter) {
-    throw new Error(
-      `Invalid observation file ${filePath}: ${result.errors.join('; ')}`,
-    );
+    throw new Error(`Invalid observation file ${filePath}: ${result.errors.join('; ')}`);
   }
   return result.frontmatter;
 }
@@ -317,10 +308,7 @@ export async function updateFrontmatter(
 /**
  * Appends text to the Markdown body of an observation file (after frontmatter).
  */
-export async function appendToBody(
-  filePath: string,
-  text: string,
-): Promise<void> {
+export async function appendToBody(filePath: string, text: string): Promise<void> {
   const content = await fs.readFile(filePath, 'utf-8');
   await fs.writeFile(filePath, content + text, 'utf-8');
 }

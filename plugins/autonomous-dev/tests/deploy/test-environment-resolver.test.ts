@@ -9,15 +9,8 @@ import { mkdtemp, rm, copyFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  configPathFor,
-  loadConfig,
-  resolveEnvironment,
-} from '../../intake/deploy/environment';
-import {
-  ConfigValidationError,
-  UnknownEnvironmentError,
-} from '../../intake/deploy/errors';
+import { configPathFor, loadConfig, resolveEnvironment } from '../../intake/deploy/environment';
+import { ConfigValidationError, UnknownEnvironmentError } from '../../intake/deploy/errors';
 
 const FIXTURES = join(__dirname, 'fixtures-023-2');
 

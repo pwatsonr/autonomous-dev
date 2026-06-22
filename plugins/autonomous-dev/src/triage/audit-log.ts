@@ -150,9 +150,7 @@ export class TriageAuditLogger {
    * @param action The action type to filter by
    * @returns Array of matching audit entries
    */
-  async readByAction(
-    action: TriageAuditEntry['action'],
-  ): Promise<TriageAuditEntry[]> {
+  async readByAction(action: TriageAuditEntry['action']): Promise<TriageAuditEntry[]> {
     const all = await this.readAll();
     return all.filter((e) => e.action === action);
   }

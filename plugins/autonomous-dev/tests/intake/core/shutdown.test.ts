@@ -27,7 +27,9 @@ function createMockAdapter(
     channelType,
     start: jest.fn().mockResolvedValue({ dispose: jest.fn() }),
     sendMessage: jest.fn().mockResolvedValue({ success: true }),
-    promptUser: jest.fn().mockResolvedValue({ responderId: 'u1', content: 'ok', timestamp: new Date() }),
+    promptUser: jest
+      .fn()
+      .mockResolvedValue({ responderId: 'u1', content: 'ok', timestamp: new Date() }),
     shutdown: jest.fn(shutdownFn ?? (() => Promise.resolve())),
   };
 }
@@ -92,10 +94,14 @@ describe('setupGracefulShutdown', () => {
 
     // Add a listener so we can verify removeAllListeners was called.
     let listenerCalled = false;
-    eventBus.subscribe('intake', () => { listenerCalled = true; });
+    eventBus.subscribe('intake', () => {
+      listenerCalled = true;
+    });
 
     const exitCalls: number[] = [];
-    const exitFn = (code: number) => { exitCalls.push(code); };
+    const exitFn = (code: number) => {
+      exitCalls.push(code);
+    };
 
     const shutdown = setupGracefulShutdown(
       [adapter1, adapter2],
@@ -140,7 +146,9 @@ describe('setupGracefulShutdown', () => {
     const eventBus = new TypedEventBus();
 
     const exitCalls: number[] = [];
-    const exitFn = (code: number) => { exitCalls.push(code); };
+    const exitFn = (code: number) => {
+      exitCalls.push(code);
+    };
 
     const shutdown = setupGracefulShutdown(
       [adapter],
@@ -175,7 +183,9 @@ describe('setupGracefulShutdown', () => {
     const { logger, logs } = createMockLogger();
 
     const exitCalls: number[] = [];
-    const exitFn = (code: number) => { exitCalls.push(code); };
+    const exitFn = (code: number) => {
+      exitCalls.push(code);
+    };
 
     const shutdown = setupGracefulShutdown(
       [failingAdapter, healthyAdapter],
@@ -221,7 +231,9 @@ describe('setupGracefulShutdown', () => {
     const eventBus = new TypedEventBus();
 
     const exitCalls: number[] = [];
-    const exitFn = (code: number) => { exitCalls.push(code); };
+    const exitFn = (code: number) => {
+      exitCalls.push(code);
+    };
 
     const shutdown = setupGracefulShutdown(
       [adapter],
@@ -246,7 +258,9 @@ describe('setupGracefulShutdown', () => {
     const eventBus = new TypedEventBus();
 
     const exitCalls: number[] = [];
-    const exitFn = (code: number) => { exitCalls.push(code); };
+    const exitFn = (code: number) => {
+      exitCalls.push(code);
+    };
 
     const shutdown = setupGracefulShutdown(
       [adapter],
@@ -272,7 +286,9 @@ describe('setupGracefulShutdown', () => {
     const eventBus = new TypedEventBus();
 
     const exitCalls: number[] = [];
-    const exitFn = (code: number) => { exitCalls.push(code); };
+    const exitFn = (code: number) => {
+      exitCalls.push(code);
+    };
 
     const shutdown = setupGracefulShutdown(
       [],

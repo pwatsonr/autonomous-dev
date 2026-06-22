@@ -58,10 +58,7 @@ export class FilesystemIsolationHook {
    * PostToolUse hook handler. Returns true to allow, false to block.
    * Called after every tool invocation by the agent.
    */
-  async validate(
-    toolName: string,
-    toolInput: Record<string, any>,
-  ): Promise<boolean> {
+  async validate(toolName: string, toolInput: Record<string, any>): Promise<boolean> {
     // Extract file paths from tool input based on tool type
     const paths = this.extractPaths(toolName, toolInput);
 
@@ -143,10 +140,7 @@ export class FilesystemIsolationHook {
   /**
    * Extract file paths from tool inputs based on tool type.
    */
-  private extractPaths(
-    toolName: string,
-    toolInput: Record<string, any>,
-  ): string[] {
+  private extractPaths(toolName: string, toolInput: Record<string, any>): string[] {
     switch (toolName) {
       case 'Read':
       case 'Write':

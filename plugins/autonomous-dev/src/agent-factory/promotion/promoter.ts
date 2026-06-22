@@ -179,7 +179,12 @@ export class Promoter {
       fs.writeFileSync(agentFilePath, proposal.proposed_definition, { encoding: 'utf-8' });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return this.failResult(agentName, previousVersion, newVersion, `Failed to write agent file: ${message}`);
+      return this.failResult(
+        agentName,
+        previousVersion,
+        newVersion,
+        `Failed to write agent file: ${message}`,
+      );
     }
 
     // Step 4: Commit to git
@@ -195,7 +200,12 @@ export class Promoter {
         proposalId,
         error: message,
       });
-      return this.failResult(agentName, previousVersion, newVersion, `Git commit failed: ${message}`);
+      return this.failResult(
+        agentName,
+        previousVersion,
+        newVersion,
+        `Git commit failed: ${message}`,
+      );
     }
 
     // Step 5: Reload registry and verify
@@ -309,7 +319,12 @@ export class Promoter {
       fs.writeFileSync(agentFilePath, proposal.proposed_definition, { encoding: 'utf-8' });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return this.failResult(agentName, previousVersion, newVersion, `Failed to write agent file: ${message}`);
+      return this.failResult(
+        agentName,
+        previousVersion,
+        newVersion,
+        `Failed to write agent file: ${message}`,
+      );
     }
 
     // Step 3: Commit to git with custom message
@@ -332,7 +347,12 @@ export class Promoter {
     } catch (err) {
       this.rollbackFile(agentFilePath, originalContent);
       const message = err instanceof Error ? err.message : String(err);
-      return this.failResult(agentName, previousVersion, newVersion, `Git commit failed: ${message}`);
+      return this.failResult(
+        agentName,
+        previousVersion,
+        newVersion,
+        `Git commit failed: ${message}`,
+      );
     }
 
     // Step 4: Reload registry
@@ -368,7 +388,9 @@ export class Promoter {
   buildReviewSummary(proposal: AgentProposal): string {
     const lines: string[] = [];
 
-    lines.push(`Promotion Review: ${proposal.agent_name} (${proposal.current_version} -> ${proposal.proposed_version})`);
+    lines.push(
+      `Promotion Review: ${proposal.agent_name} (${proposal.current_version} -> ${proposal.proposed_version})`,
+    );
     lines.push('='.repeat(63));
     lines.push('');
 
@@ -390,7 +412,9 @@ export class Promoter {
         const warnings = metaReview.findings.filter((f) => f.severity === 'warning').length;
         lines.push('Meta-Review:');
         lines.push(`  Verdict: ${metaReview.verdict}`);
-        lines.push(`  Findings: ${metaReview.findings.length} (${blockers} blockers, ${warnings} warnings)`);
+        lines.push(
+          `  Findings: ${metaReview.findings.length} (${blockers} blockers, ${warnings} warnings)`,
+        );
         lines.push('');
       }
     }
@@ -416,7 +440,9 @@ export class Promoter {
           const proposedScore = input.version_b_scores.overall.toFixed(2);
           const delta = input.overall_delta.toFixed(2);
           const winner = formatOutcome(input.outcome);
-          lines.push(`  | ${input.input_id.substring(0, 5)}... | ${domain} | ${currentScore} | ${proposedScore} | ${delta} | ${winner} |`);
+          lines.push(
+            `  | ${input.input_id.substring(0, 5)}... | ${domain} | ${currentScore} | ${proposedScore} | ${delta} | ${winner} |`,
+          );
         }
         lines.push('');
 
@@ -486,12 +512,7 @@ export class Promoter {
     newVersion: string,
     proposal: AgentProposal,
   ): string {
-    const commitMessage = this.buildCommitMessage(
-      agentName,
-      previousVersion,
-      newVersion,
-      proposal,
-    );
+    const commitMessage = this.buildCommitMessage(agentName, previousVersion, newVersion, proposal);
 
     const relativeAgentPath = `agents/${agentName}.md`;
 

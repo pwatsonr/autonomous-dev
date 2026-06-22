@@ -56,10 +56,7 @@ export const FINDING_SEVERITIES: readonly FindingSeverity[] = [
 export type CriticalSub = 'blocking' | 'reject';
 
 /** Valid CriticalSub values for runtime validation. */
-export const CRITICAL_SUBS: readonly CriticalSub[] = [
-  'blocking',
-  'reject',
-] as const;
+export const CRITICAL_SUBS: readonly CriticalSub[] = ['blocking', 'reject'] as const;
 
 // ---------------------------------------------------------------------------
 // Type guards

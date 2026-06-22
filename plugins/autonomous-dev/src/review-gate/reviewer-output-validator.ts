@@ -129,11 +129,7 @@ export class ReviewerOutputValidator {
    * @param reviewerId - System-assigned reviewer ID (overrides whatever the LLM returns)
    * @returns ValidationParseResult with success status, parsed output, warnings, and errors
    */
-  validateAndParse(
-    rawOutput: string,
-    rubric: Rubric,
-    reviewerId: string,
-  ): ValidationParseResult {
+  validateAndParse(rawOutput: string, rubric: Rubric, reviewerId: string): ValidationParseResult {
     const warnings: string[] = [];
     const errors: string[] = [];
 
@@ -201,7 +197,10 @@ export class ReviewerOutputValidator {
     }
 
     // category_scores: non-empty array
-    if (!Array.isArray(parsed['category_scores']) || (parsed['category_scores'] as unknown[]).length === 0) {
+    if (
+      !Array.isArray(parsed['category_scores']) ||
+      (parsed['category_scores'] as unknown[]).length === 0
+    ) {
       errors.push("'category_scores' must be a non-empty array.");
     }
 
@@ -228,7 +227,7 @@ export class ReviewerOutputValidator {
       }
 
       // Check category_id matches rubric
-      const rubricCategory = rubric.categories.find(c => c.id === categoryId);
+      const rubricCategory = rubric.categories.find((c) => c.id === categoryId);
       if (!rubricCategory) {
         warnings.push(`Category '${categoryId}' not in rubric; keeping as-is.`);
       }
@@ -258,7 +257,7 @@ export class ReviewerOutputValidator {
       if (validScoringMode === 'per_section') {
         const rawSS = rawCS['section_scores'];
         if (rawSS !== null && rawSS !== undefined && Array.isArray(rawSS)) {
-          sectionScores = (rawSS as Record<string, unknown>[]).map(ss => {
+          sectionScores = (rawSS as Record<string, unknown>[]).map((ss) => {
             let ssScore = ss['score'] as number;
             if (typeof ssScore === 'number') {
               const origSS = ssScore;
@@ -277,8 +276,12 @@ export class ReviewerOutputValidator {
         }
       } else {
         // For document_level scoring mode, just pass through what's there
-        if (rawCS['section_scores'] !== null && rawCS['section_scores'] !== undefined && Array.isArray(rawCS['section_scores'])) {
-          sectionScores = (rawCS['section_scores'] as Record<string, unknown>[]).map(ss => ({
+        if (
+          rawCS['section_scores'] !== null &&
+          rawCS['section_scores'] !== undefined &&
+          Array.isArray(rawCS['section_scores'])
+        ) {
+          sectionScores = (rawCS['section_scores'] as Record<string, unknown>[]).map((ss) => ({
             section_id: String(ss['section_id'] ?? ''),
             score: typeof ss['score'] === 'number' ? clampScore(ss['score'] as number) : 0,
           }));
@@ -299,7 +302,7 @@ export class ReviewerOutputValidator {
     }
 
     // --- Missing category detection ---
-    const presentCategoryIds = new Set(validatedCategoryScores.map(cs => cs.category_id));
+    const presentCategoryIds = new Set(validatedCategoryScores.map((cs) => cs.category_id));
     const autoFindings: Finding[] = [];
 
     for (const rubricCat of rubric.categories) {
@@ -385,13 +388,14 @@ export class ReviewerOutputValidator {
           );
         }
       } else if (rawF['critical_sub'] !== undefined && rawF['critical_sub'] !== null) {
-        criticalSub = isCriticalSub(rawF['critical_sub']) ? rawF['critical_sub'] as CriticalSub : null;
+        criticalSub = isCriticalSub(rawF['critical_sub'])
+          ? (rawF['critical_sub'] as CriticalSub)
+          : null;
       }
 
       // upstream_defect
-      const upstreamDefect = typeof rawF['upstream_defect'] === 'boolean'
-        ? rawF['upstream_defect'] as boolean
-        : false;
+      const upstreamDefect =
+        typeof rawF['upstream_defect'] === 'boolean' ? (rawF['upstream_defect'] as boolean) : false;
 
       // description
       const description = rawF['description'];
@@ -414,7 +418,10 @@ export class ReviewerOutputValidator {
       }
 
       // For critical/major: warn if no suggested_resolution
-      if ((severity === 'critical' || severity === 'major') && suggestedResolution.trim().length === 0) {
+      if (
+        (severity === 'critical' || severity === 'major') &&
+        suggestedResolution.trim().length === 0
+      ) {
         warnings.push(
           `Finding '${findingId}' is severity '${severity}' but has no suggested_resolution.`,
         );

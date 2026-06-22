@@ -34,10 +34,7 @@ export function formatVersion(major: number, minor: number): string {
  * @param reason Why the new version is being created
  * @returns The next version string
  */
-export function calculateNextVersion(
-  currentVersion: string | null,
-  reason: VersionReason,
-): string {
+export function calculateNextVersion(currentVersion: string | null, reason: VersionReason): string {
   if (reason === 'INITIAL') {
     return '1.0';
   }

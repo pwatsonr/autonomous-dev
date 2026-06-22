@@ -78,8 +78,7 @@ export function buildExecutor(
   opts: BuildExecutorOpts = {},
 ): ChainExecutor {
   const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
-  const invoker: ChainHookInvoker =
-    opts.invoker ?? (async () => []);
+  const invoker: ChainHookInvoker = opts.invoker ?? (async () => []);
   return new ChainExecutor(graph, artifacts, lookup, invoker, opts.logger);
 }
 
@@ -110,12 +109,6 @@ export async function loadSecurityFindingsExample(): Promise<unknown> {
 
 /** Read the canonical code-patches example fixture from disk. */
 export async function loadCodePatchesExample(): Promise<unknown> {
-  const p = path.resolve(
-    __dirname,
-    '..',
-    'fixtures',
-    'artifacts',
-    'code-patches.example.json',
-  );
+  const p = path.resolve(__dirname, '..', 'fixtures', 'artifacts', 'code-patches.example.json');
   return JSON.parse(await fs.readFile(p, 'utf-8'));
 }

@@ -45,13 +45,7 @@ describe('mcp-error-handler', () => {
         return 'success-on-retry';
       };
 
-      const result = await withMcpRetry(
-        operation,
-        testPolicy,
-        testContext,
-        auditLog,
-        noopDelay,
-      );
+      const result = await withMcpRetry(operation, testPolicy, testContext, auditLog, noopDelay);
 
       expect(result).toBe('success-on-retry');
       expect(callCount).toBe(2);
@@ -68,13 +62,7 @@ describe('mcp-error-handler', () => {
         return 'immediate-success';
       };
 
-      const result = await withMcpRetry(
-        operation,
-        testPolicy,
-        testContext,
-        auditLog,
-        noopDelay,
-      );
+      const result = await withMcpRetry(operation, testPolicy, testContext, auditLog, noopDelay);
 
       expect(result).toBe('immediate-success');
       expect(callCount).toBe(1);
@@ -94,13 +82,7 @@ describe('mcp-error-handler', () => {
         throw new Error(`Attempt ${callCount} failed`);
       };
 
-      const result = await withMcpRetry(
-        operation,
-        testPolicy,
-        testContext,
-        auditLog,
-        noopDelay,
-      );
+      const result = await withMcpRetry(operation, testPolicy, testContext, auditLog, noopDelay);
 
       expect(result).toBeNull();
       expect(callCount).toBe(2);
@@ -124,13 +106,7 @@ describe('mcp-error-handler', () => {
         return 'should not reach';
       };
 
-      const result = await withMcpRetry(
-        operation,
-        shortPolicy,
-        testContext,
-        auditLog,
-        noopDelay,
-      );
+      const result = await withMcpRetry(operation, shortPolicy, testContext, auditLog, noopDelay);
 
       expect(result).toBeNull();
     });
@@ -143,13 +119,7 @@ describe('mcp-error-handler', () => {
         throw new Error('HTTP 500: Internal Server Error');
       };
 
-      const result = await withMcpRetry(
-        operation,
-        testPolicy,
-        testContext,
-        auditLog,
-        noopDelay,
-      );
+      const result = await withMcpRetry(operation, testPolicy, testContext, auditLog, noopDelay);
 
       expect(result).toBeNull();
 

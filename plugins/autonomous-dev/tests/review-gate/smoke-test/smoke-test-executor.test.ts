@@ -24,7 +24,7 @@ function makeChild(
   id: string,
   sectionIds: string[],
   tracesFrom: { document_id: string; section_ids: string[] }[],
-  contentOverrides?: Record<string, string>
+  contentOverrides?: Record<string, string>,
 ): ChildDocument {
   return {
     id,
@@ -101,18 +101,12 @@ describe('SmokeTestExecutor', () => {
   test('Contradiction failure blocks: overall_pass is false', async () => {
     const parent = makeParent('p1', ['s1', 's2']);
     const children = [
-      makeChild(
-        'c1',
-        ['cs1'],
-        [{ document_id: 'p1', section_ids: ['s1', 'cs1'] }],
-        { cs1: 'We will use PostgreSQL for the database.' }
-      ),
-      makeChild(
-        'c2',
-        ['cs2'],
-        [{ document_id: 'p1', section_ids: ['s2', 'cs2'] }],
-        { cs2: 'We will use MongoDB for the database.' }
-      ),
+      makeChild('c1', ['cs1'], [{ document_id: 'p1', section_ids: ['s1', 'cs1'] }], {
+        cs1: 'We will use PostgreSQL for the database.',
+      }),
+      makeChild('c2', ['cs2'], [{ document_id: 'p1', section_ids: ['s2', 'cs2'] }], {
+        cs2: 'We will use MongoDB for the database.',
+      }),
     ];
 
     const result = await executor.execute(parent, children, 'v1.0');
@@ -137,7 +131,7 @@ describe('SmokeTestExecutor', () => {
         cs2: 'Extra scope content.',
         cs3: 'More extra scope.',
         cs4: 'Even more extra scope.',
-      }
+      },
     );
 
     const result = await executor.execute(parent, [child], 'v1.0');
@@ -167,7 +161,7 @@ describe('SmokeTestExecutor', () => {
           cs3: 'More extra.',
           cs4: 'Even more.',
           cs5: 'Way more.',
-        }
+        },
       ),
       makeChild(
         'c2',
@@ -179,7 +173,7 @@ describe('SmokeTestExecutor', () => {
           cs8: 'More extra.',
           cs9: 'Even more.',
           cs10: 'Way more.',
-        }
+        },
       ),
     ];
 

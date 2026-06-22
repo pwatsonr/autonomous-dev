@@ -10,7 +10,10 @@
  */
 
 import { DocumentType } from '../../../src/pipeline/types/document-type';
-import { PanelAssemblyService, ReviewerAssignment } from '../../../src/review-gate/panel-assembly-service';
+import {
+  PanelAssemblyService,
+  ReviewerAssignment,
+} from '../../../src/review-gate/panel-assembly-service';
 import {
   BlindScoringContextFilter,
   DocumentForReview,
@@ -28,7 +31,10 @@ import {
   ReviewerExecutorConfig,
   DEFAULT_EXECUTOR_CONFIG,
 } from '../../../src/review-gate/reviewer-executor';
-import { ReviewerAgentPool, ReviewerAgentInstance } from '../../../src/review-gate/reviewer-agent-pool';
+import {
+  ReviewerAgentPool,
+  ReviewerAgentInstance,
+} from '../../../src/review-gate/reviewer-agent-pool';
 import { DisagreementDetector } from '../../../src/review-gate/disagreement-detector';
 import { getSectionMappings } from '../../../src/review-gate/section-mappings';
 import type { Rubric, ReviewOutput } from '../../../src/review-gate/types';
@@ -154,13 +160,25 @@ function makePRDDocument(): DocumentForReview {
     version: '1.0',
     created_at: '2026-04-01T00:00:00Z',
     sections: [
-      { id: 'problem_statement', title: 'Problem Statement', content: 'Users need a better way...' },
+      {
+        id: 'problem_statement',
+        title: 'Problem Statement',
+        content: 'Users need a better way...',
+      },
       { id: 'goals', title: 'Goals', content: 'Increase task completion rate...' },
       { id: 'user_stories', title: 'User Stories', content: 'As a project manager...' },
       { id: 'functional_requirements', title: 'Functional Requirements', content: 'FR-001...' },
-      { id: 'non_functional_requirements', title: 'Non-Functional Requirements', content: 'NFR-001...' },
+      {
+        id: 'non_functional_requirements',
+        title: 'Non-Functional Requirements',
+        content: 'NFR-001...',
+      },
       { id: 'success_metrics', title: 'Success Metrics', content: 'Task completion rate...' },
-      { id: 'risks_and_mitigations', title: 'Risks and Mitigations', content: 'Risk: Low adoption...' },
+      {
+        id: 'risks_and_mitigations',
+        title: 'Risks and Mitigations',
+        content: 'Risk: Low adoption...',
+      },
     ],
   };
 }

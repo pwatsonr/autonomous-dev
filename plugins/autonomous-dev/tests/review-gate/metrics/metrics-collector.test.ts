@@ -77,7 +77,7 @@ function makeReviewOutput(
   reviewerId: string,
   role: string,
   scores: { category_id: string; score: number }[],
-  findings: Finding[] = []
+  findings: Finding[] = [],
 ): ReviewOutput {
   return {
     reviewer_id: reviewerId,
@@ -117,9 +117,7 @@ function makeFinding(severity: 'critical' | 'major' | 'minor' | 'suggestion'): F
 /**
  * Build a minimal MergedFinding for testing.
  */
-function makeMergedFinding(
-  severity: 'critical' | 'major' | 'minor' | 'suggestion'
-): MergedFinding {
+function makeMergedFinding(severity: 'critical' | 'major' | 'minor' | 'suggestion'): MergedFinding {
   return {
     id: `merged-${Math.random().toString(36).slice(2)}`,
     section_id: 'sec-1',
@@ -291,9 +289,7 @@ describe('MetricsCollector', () => {
   // Test 3: Per-reviewer weighted score delta (positive)
   // -----------------------------------------------------------------------
   test('score_vs_aggregate_delta is positive when reviewer scores higher than aggregate', () => {
-    const reviewer = makeReviewOutput('r1', 'architect', [
-      { category_id: 'overall', score: 88 },
-    ]);
+    const reviewer = makeReviewOutput('r1', 'architect', [{ category_id: 'overall', score: 88 }]);
 
     const metrics = buildReviewerMetrics([reviewer], 85);
     expect(metrics[0].weighted_score).toBe(88);
@@ -304,9 +300,7 @@ describe('MetricsCollector', () => {
   // Test 4: Per-reviewer negative delta
   // -----------------------------------------------------------------------
   test('score_vs_aggregate_delta is negative when reviewer scores lower than aggregate', () => {
-    const reviewer = makeReviewOutput('r1', 'architect', [
-      { category_id: 'overall', score: 80 },
-    ]);
+    const reviewer = makeReviewOutput('r1', 'architect', [{ category_id: 'overall', score: 80 }]);
 
     const metrics = buildReviewerMetrics([reviewer], 85);
     expect(metrics[0].weighted_score).toBe(80);
@@ -398,7 +392,7 @@ describe('MetricsCollector', () => {
     expect(mockStore.write).toHaveBeenCalledTimes(3);
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Metrics write failed after 3 attempts for gate gate-fail'),
-      expect.any(Error)
+      expect.any(Error),
     );
 
     errorSpy.mockRestore();

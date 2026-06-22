@@ -14,16 +14,9 @@ import { join } from 'node:path';
 import { promises as fs } from 'node:fs';
 
 import { CostCapEnforcer } from '../../intake/deploy/cost-cap-enforcer';
-import {
-  AdminOverrideRequiredError,
-  DailyCostCapExceededError,
-} from '../../intake/deploy/errors';
+import { AdminOverrideRequiredError, DailyCostCapExceededError } from '../../intake/deploy/errors';
 import type { EscalationMessage } from '../../intake/deploy/monitor-types';
-import {
-  TEST_HMAC_KEY,
-  buildLedgerAt,
-  writeOverrides,
-} from './fixtures/cost-ledger-fixtures';
+import { TEST_HMAC_KEY, buildLedgerAt, writeOverrides } from './fixtures/cost-ledger-fixtures';
 
 const FIXED_NOW = new Date('2026-05-02T12:00:00.000Z');
 const CAP = 100;
@@ -197,10 +190,7 @@ describe('SPEC-023-3-04 CostCapEnforcer thresholds', () => {
         backend: 'static',
       });
       // Override consumed -> file should now have an empty list.
-      const txt = await fs.readFile(
-        join(h.dir, 'deploy-cap-overrides.json'),
-        'utf8',
-      );
+      const txt = await fs.readFile(join(h.dir, 'deploy-cap-overrides.json'), 'utf8');
       const parsed = JSON.parse(txt) as { overrides: unknown[] };
       expect(parsed.overrides).toHaveLength(0);
       // Second deploy with same id → rejected.

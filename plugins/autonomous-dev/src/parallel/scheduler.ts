@@ -107,9 +107,7 @@ export class Scheduler {
    * Internal callback for the current cluster execution.
    * Set by `executeCluster`, invoked by `notifyTrackComplete`.
    */
-  private onTrackComplete:
-    | ((trackName: string, success: boolean) => void)
-    | null = null;
+  private onTrackComplete: ((trackName: string, success: boolean) => void) | null = null;
 
   /**
    * Cached active worktree count, refreshed before each cluster execution
@@ -171,10 +169,7 @@ export class Scheduler {
    * track. The returned promise resolves when all tracks in the cluster
    * have completed (success or failure).
    */
-  async executeCluster(
-    requestId: string,
-    clusterPlan: ClusterPlan,
-  ): Promise<ClusterResult> {
+  async executeCluster(requestId: string, clusterPlan: ClusterPlan): Promise<ClusterResult> {
     // Refresh cached active worktree count before dispatching
     this.cachedActiveWorktrees = await Promise.resolve(
       this.worktreeManager.getActiveWorktreeCount(),

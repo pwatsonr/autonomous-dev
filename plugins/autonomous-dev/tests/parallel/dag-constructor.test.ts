@@ -39,10 +39,7 @@ describe('extractExplicitDependencies', () => {
   });
 
   it('returns empty array when no specs have dependencies', () => {
-    const specs: SpecMetadata[] = [
-      { name: 'track-a' },
-      { name: 'track-b' },
-    ];
+    const specs: SpecMetadata[] = [{ name: 'track-a' }, { name: 'track-b' }];
     const edges = extractExplicitDependencies(specs);
     expect(edges).toEqual([]);
   });
@@ -98,10 +95,7 @@ describe('extractFileOverlapDependencies', () => {
   });
 
   it('returns empty when no specs have filesModified', () => {
-    const specs: SpecMetadata[] = [
-      { name: 'track-a' },
-      { name: 'track-b' },
-    ];
+    const specs: SpecMetadata[] = [{ name: 'track-a' }, { name: 'track-b' }];
     const edges = extractFileOverlapDependencies(specs);
     expect(edges).toEqual([]);
   });
@@ -137,9 +131,7 @@ describe('extractInterfaceContractDependencies', () => {
   });
 
   it('throws on unresolved interface', () => {
-    const specs: SpecMetadata[] = [
-      { name: 'track-a', interfacesConsumed: ['NonExistent'] },
-    ];
+    const specs: SpecMetadata[] = [{ name: 'track-a', interfacesConsumed: ['NonExistent'] }];
     expect(() => extractInterfaceContractDependencies(specs)).toThrow(UnresolvedInterfaceError);
   });
 
@@ -172,7 +164,12 @@ describe('buildDAG', () => {
   it('TDD 2.3 worked example: A->B dependency, C independent', () => {
     const specs: SpecMetadata[] = [
       { name: 'track-a', complexity: 'medium', dependsOn: [], filesModified: ['src/a.ts'] },
-      { name: 'track-b', complexity: 'medium', dependsOn: ['track-a'], filesModified: ['src/b.ts'] },
+      {
+        name: 'track-b',
+        complexity: 'medium',
+        dependsOn: ['track-a'],
+        filesModified: ['src/b.ts'],
+      },
       { name: 'track-c', complexity: 'small', dependsOn: [], filesModified: ['src/c.ts'] },
     ];
     const dag = buildDAG('req-001', specs);
@@ -209,11 +206,13 @@ describe('buildDAG', () => {
     ];
     const dag = buildDAG('req-001', specs);
     // A->C should be removed since A->B->C exists
-    expect(dag.reducedEdges.find(e => e.from === 'track-a' && e.to === 'track-c')).toBeUndefined();
-    expect(dag.reducedEdges.find(e => e.from === 'track-a' && e.to === 'track-b')).toBeDefined();
-    expect(dag.reducedEdges.find(e => e.from === 'track-b' && e.to === 'track-c')).toBeDefined();
+    expect(
+      dag.reducedEdges.find((e) => e.from === 'track-a' && e.to === 'track-c'),
+    ).toBeUndefined();
+    expect(dag.reducedEdges.find((e) => e.from === 'track-a' && e.to === 'track-b')).toBeDefined();
+    expect(dag.reducedEdges.find((e) => e.from === 'track-b' && e.to === 'track-c')).toBeDefined();
     // Original preserved
-    expect(dag.originalEdges.find(e => e.from === 'track-a' && e.to === 'track-c')).toBeDefined();
+    expect(dag.originalEdges.find((e) => e.from === 'track-a' && e.to === 'track-c')).toBeDefined();
   });
 
   it('handles single-node DAG', () => {
@@ -281,9 +280,7 @@ describe('buildDAG', () => {
   });
 
   it('uses estimatedMinutes override when provided', () => {
-    const specs: SpecMetadata[] = [
-      { name: 'custom', complexity: 'small', estimatedMinutes: 42 },
-    ];
+    const specs: SpecMetadata[] = [{ name: 'custom', complexity: 'small', estimatedMinutes: 42 }];
     const dag = buildDAG('req-001', specs);
     expect(dag.nodes.get('custom')!.estimatedMinutes).toBe(42);
   });
@@ -324,8 +321,8 @@ describe('buildDAG', () => {
     ];
     const dag = buildDAG('req-001', specs);
     // Both explicit and interface-contract edges should be present in originalEdges
-    const explicitEdge = dag.originalEdges.find(e => e.type === 'explicit');
-    const ifaceEdge = dag.originalEdges.find(e => e.type === 'interface-contract');
+    const explicitEdge = dag.originalEdges.find((e) => e.type === 'explicit');
+    const ifaceEdge = dag.originalEdges.find((e) => e.type === 'interface-contract');
     expect(explicitEdge).toBeDefined();
     expect(ifaceEdge).toBeDefined();
   });
@@ -387,7 +384,9 @@ describe('assignClusters', () => {
 
   it('all independent -> 1 cluster', () => {
     const specs: SpecMetadata[] = Array.from({ length: 5 }, (_, i) => ({
-      name: `t${i}`, complexity: 'small' as const, dependsOn: [],
+      name: `t${i}`,
+      complexity: 'small' as const,
+      dependsOn: [],
     }));
     const dag = buildDAG('req-001', specs);
     assignClusters(dag);
@@ -419,7 +418,7 @@ describe('assignClusters', () => {
     ];
     const dag = buildDAG('req-001', specs);
     assignClusters(dag);
-    const allNodes = dag.clusters.flatMap(c => c.nodes);
+    const allNodes = dag.clusters.flatMap((c) => c.nodes);
     expect(allNodes.length).toBe(4);
     expect(new Set(allNodes).size).toBe(4);
   });
@@ -442,9 +441,9 @@ describe('assignClusters', () => {
 describe('computeCriticalPath', () => {
   it('finds longest path by weight', () => {
     const specs: SpecMetadata[] = [
-      { name: 'a', complexity: 'small', estimatedMinutes: 5 },     // path A->B = 20
+      { name: 'a', complexity: 'small', estimatedMinutes: 5 }, // path A->B = 20
       { name: 'b', complexity: 'medium', estimatedMinutes: 15, dependsOn: ['a'] },
-      { name: 'c', complexity: 'large', estimatedMinutes: 30 },    // path C = 30
+      { name: 'c', complexity: 'large', estimatedMinutes: 30 }, // path C = 30
     ];
     const dag = buildDAG('req-001', specs);
     assignClusters(dag);

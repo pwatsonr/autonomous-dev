@@ -39,17 +39,12 @@ import { AuditTrailEngine } from './audit-trail-engine';
  *   - AuditTrailEngine composing all of the above
  */
 export function createAuditTrailEngine(config: AuditConfig): AuditTrailEngine {
-  const hashChain = new HashChainComputerClass(
-    config.integrity.hash_chain_enabled,
-  );
+  const hashChain = new HashChainComputerClass(config.integrity.hash_chain_enabled);
 
   const writer = new AuditEventWriter(config.log_path, hashChain);
   const replay = new DecisionReplay(config.log_path);
 
-  const integrityLogPath = config.log_path.replace(
-    /\.jsonl$/,
-    '.integrity.jsonl',
-  );
+  const integrityLogPath = config.log_path.replace(/\.jsonl$/, '.integrity.jsonl');
   const verifier = new HashChainVerifier(hashChain, integrityLogPath);
 
   return new AuditTrailEngine(writer, hashChain, replay, verifier, config.log_path);

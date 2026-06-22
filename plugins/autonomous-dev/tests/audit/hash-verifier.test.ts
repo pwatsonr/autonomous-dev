@@ -294,25 +294,12 @@ async function test_integrity_failure_logged_separately(): Promise<void> {
     'hash_chain_integrity_failure',
     'integrity log should have hash_chain_integrity_failure event_type',
   );
-  assertEqual(
-    integrityRecord.urgency,
-    'immediate',
-    'integrity log should have immediate urgency',
-  );
-  assert(
-    integrityRecord.error_count > 0,
-    'integrity log should report error count > 0',
-  );
-  assert(
-    Array.isArray(integrityRecord.errors),
-    'integrity log should contain errors array',
-  );
+  assertEqual(integrityRecord.urgency, 'immediate', 'integrity log should have immediate urgency');
+  assert(integrityRecord.error_count > 0, 'integrity log should report error count > 0');
+  assert(Array.isArray(integrityRecord.errors), 'integrity log should contain errors array');
 
   // The integrity log should NOT be the same as the events.jsonl
-  assert(
-    integrityLogPath !== logPath,
-    'integrity log path should differ from events log path',
-  );
+  assert(integrityLogPath !== logPath, 'integrity log path should differ from events log path');
 
   cleanup(tmpDir);
   console.log('PASS: test_integrity_failure_logged_separately');
@@ -466,16 +453,38 @@ async function test_nonexistent_file(): Promise<void> {
 // Test runner
 // ---------------------------------------------------------------------------
 
-describe("HashVerifier", () => {
-  it("passes a valid 10-event chain", async () => { await test_valid_10_event_chain_passes(); });
-  it("detects a tampered event", async () => { await test_tampered_event_detected(); });
-  it("detects a deleted event", async () => { await test_deleted_event_detected(); });
-  it("detects reordered events", async () => { await test_reordered_events_detected(); });
-  it("handles an empty log file", async () => { await test_empty_log_file(); });
-  it("handles a single-event chain", async () => { await test_single_event_chain(); });
-  it("logs integrity failure separately", async () => { await test_integrity_failure_logged_separately(); });
-  it("does not halt on integrity failure", async () => { await test_integrity_failure_does_not_halt(); });
-  it("returns chain head hash", async () => { await test_chain_head_hash_returned(); });
-  it("supports streaming verification", async () => { await test_streaming_verification(); });
-  it("handles a nonexistent file", async () => { await test_nonexistent_file(); });
+describe('HashVerifier', () => {
+  it('passes a valid 10-event chain', async () => {
+    await test_valid_10_event_chain_passes();
+  });
+  it('detects a tampered event', async () => {
+    await test_tampered_event_detected();
+  });
+  it('detects a deleted event', async () => {
+    await test_deleted_event_detected();
+  });
+  it('detects reordered events', async () => {
+    await test_reordered_events_detected();
+  });
+  it('handles an empty log file', async () => {
+    await test_empty_log_file();
+  });
+  it('handles a single-event chain', async () => {
+    await test_single_event_chain();
+  });
+  it('logs integrity failure separately', async () => {
+    await test_integrity_failure_logged_separately();
+  });
+  it('does not halt on integrity failure', async () => {
+    await test_integrity_failure_does_not_halt();
+  });
+  it('returns chain head hash', async () => {
+    await test_chain_head_hash_returned();
+  });
+  it('supports streaming verification', async () => {
+    await test_streaming_verification();
+  });
+  it('handles a nonexistent file', async () => {
+    await test_nonexistent_file();
+  });
 });

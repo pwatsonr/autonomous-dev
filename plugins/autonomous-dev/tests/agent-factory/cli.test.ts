@@ -45,16 +45,17 @@ function makeAgent(overrides: Partial<ParsedAgent> = {}): ParsedAgent {
       { name: 'correctness', weight: 0.6, description: 'Code passes tests' },
       { name: 'quality', weight: 0.4, description: 'Clean code' },
     ],
-    version_history: [
-      { version: '1.0.0', date: '2026-01-01', change: 'Initial release' },
-    ],
+    version_history: [{ version: '1.0.0', date: '2026-01-01', change: 'Initial release' }],
     description: 'Test agent description',
     system_prompt: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7',
     ...overrides,
   };
 }
 
-function makeRecord(overrides: Partial<AgentRecord> = {}, agentOverrides: Partial<ParsedAgent> = {}): AgentRecord {
+function makeRecord(
+  overrides: Partial<AgentRecord> = {},
+  agentOverrides: Partial<ParsedAgent> = {},
+): AgentRecord {
   return {
     agent: makeAgent(agentOverrides),
     state: 'ACTIVE' as AgentState,
@@ -106,7 +107,8 @@ class MockRegistry implements IAgentRegistry {
   freeze(name: string): void {
     const record = this.agents.get(name);
     if (!record) throw new Error(`Cannot freeze: agent '${name}' not found in registry`);
-    if (record.state === 'FROZEN') throw new Error(`Cannot freeze: agent '${name}' is already FROZEN`);
+    if (record.state === 'FROZEN')
+      throw new Error(`Cannot freeze: agent '${name}' is already FROZEN`);
     record.state = 'FROZEN';
     this.freezeCalls.push(name);
   }
@@ -114,7 +116,10 @@ class MockRegistry implements IAgentRegistry {
   unfreeze(name: string): void {
     const record = this.agents.get(name);
     if (!record) throw new Error(`Cannot unfreeze: agent '${name}' not found in registry`);
-    if (record.state !== 'FROZEN') throw new Error(`Cannot unfreeze: agent '${name}' is not FROZEN (current state: ${record.state})`);
+    if (record.state !== 'FROZEN')
+      throw new Error(
+        `Cannot unfreeze: agent '${name}' is not FROZEN (current state: ${record.state})`,
+      );
     record.state = 'ACTIVE';
     this.unfreezeCalls.push(name);
   }
@@ -122,8 +127,12 @@ class MockRegistry implements IAgentRegistry {
   shadow(name: string): void {
     const record = this.agents.get(name);
     if (!record) throw new Error(`Cannot shadow: agent '${name}' not found in registry`);
-    if (record.state === 'SHADOWED') throw new Error(`Cannot shadow: agent '${name}' is already SHADOWED`);
-    if (record.state !== 'ACTIVE') throw new Error(`Cannot shadow: agent '${name}' is not ACTIVE (current state: ${record.state})`);
+    if (record.state === 'SHADOWED')
+      throw new Error(`Cannot shadow: agent '${name}' is already SHADOWED`);
+    if (record.state !== 'ACTIVE')
+      throw new Error(
+        `Cannot shadow: agent '${name}' is not ACTIVE (current state: ${record.state})`,
+      );
     record.state = 'SHADOWED';
     this.shadowCalls.push(name);
   }
@@ -131,7 +140,10 @@ class MockRegistry implements IAgentRegistry {
   unshadow(name: string): void {
     const record = this.agents.get(name);
     if (!record) throw new Error(`Cannot unshadow: agent '${name}' not found in registry`);
-    if (record.state !== 'SHADOWED') throw new Error(`Cannot unshadow: agent '${name}' is not SHADOWED (current state: ${record.state})`);
+    if (record.state !== 'SHADOWED')
+      throw new Error(
+        `Cannot unshadow: agent '${name}' is not SHADOWED (current state: ${record.state})`,
+      );
     record.state = 'ACTIVE';
     this.unshadowCalls.push(name);
   }
@@ -161,15 +173,30 @@ function test_list_command_output_format(): void {
   const registry = new MockRegistry([
     makeRecord(
       { state: 'ACTIVE' },
-      { name: 'prd-author', version: '1.0.0', role: 'author', expertise: ['product-requirements', 'user-stories'] },
+      {
+        name: 'prd-author',
+        version: '1.0.0',
+        role: 'author',
+        expertise: ['product-requirements', 'user-stories'],
+      },
     ),
     makeRecord(
       { state: 'ACTIVE' },
-      { name: 'code-executor', version: '1.0.0', role: 'executor', expertise: ['implementation', 'typescript'] },
+      {
+        name: 'code-executor',
+        version: '1.0.0',
+        role: 'executor',
+        expertise: ['implementation', 'typescript'],
+      },
     ),
     makeRecord(
       { state: 'FROZEN' },
-      { name: 'agent-meta-reviewer', version: '1.0.0', role: 'meta', expertise: ['agent-safety', 'prompt-review'] },
+      {
+        name: 'agent-meta-reviewer',
+        version: '1.0.0',
+        role: 'meta',
+        expertise: ['agent-safety', 'prompt-review'],
+      },
     ),
   ]);
 
@@ -270,9 +297,7 @@ function test_reload_command_displays_results(): void {
 }
 
 function test_freeze_command(): void {
-  const registry = new MockRegistry([
-    makeRecord({ state: 'ACTIVE' }, { name: 'code-executor' }),
-  ]);
+  const registry = new MockRegistry([makeRecord({ state: 'ACTIVE' }, { name: 'code-executor' })]);
 
   const output = commandFreeze(registry, 'code-executor');
   assert(output.includes('frozen'), `expected freeze confirmation, got: ${output}`);
@@ -290,7 +315,10 @@ function test_unfreeze_command(): void {
   const output = commandUnfreeze(registry, 'agent-meta-reviewer');
   assert(output.includes('unfrozen'), `expected unfreeze confirmation, got: ${output}`);
   assert(output.includes('agent-meta-reviewer'), 'output should include agent name');
-  assert(registry.unfreezeCalls.includes('agent-meta-reviewer'), 'unfreeze should have been called');
+  assert(
+    registry.unfreezeCalls.includes('agent-meta-reviewer'),
+    'unfreeze should have been called',
+  );
 
   console.log('PASS: test_unfreeze_command');
 }
@@ -303,18 +331,14 @@ function test_freeze_nonexistent_agent(): void {
 }
 
 function test_unfreeze_non_frozen_agent(): void {
-  const registry = new MockRegistry([
-    makeRecord({ state: 'ACTIVE' }, { name: 'code-executor' }),
-  ]);
+  const registry = new MockRegistry([makeRecord({ state: 'ACTIVE' }, { name: 'code-executor' })]);
   const output = commandUnfreeze(registry, 'code-executor');
   assert(output.startsWith('Error:'), `expected error, got: ${output}`);
   console.log('PASS: test_unfreeze_non_frozen_agent');
 }
 
 function test_shadow_command(): void {
-  const registry = new MockRegistry([
-    makeRecord({ state: 'ACTIVE' }, { name: 'code-executor' }),
-  ]);
+  const registry = new MockRegistry([makeRecord({ state: 'ACTIVE' }, { name: 'code-executor' })]);
 
   const output = commandShadow(registry, 'code-executor');
   assert(output.includes('shadowed'), `expected shadow confirmation, got: ${output}`);
@@ -326,9 +350,7 @@ function test_shadow_command(): void {
 }
 
 function test_unshadow_command(): void {
-  const registry = new MockRegistry([
-    makeRecord({ state: 'SHADOWED' }, { name: 'code-executor' }),
-  ]);
+  const registry = new MockRegistry([makeRecord({ state: 'SHADOWED' }, { name: 'code-executor' })]);
 
   const output = commandUnshadow(registry, 'code-executor');
   assert(output.includes('unshadowed'), `expected unshadow confirmation, got: ${output}`);
@@ -347,9 +369,7 @@ function test_shadow_nonexistent_agent(): void {
 }
 
 function test_shadow_already_shadowed_agent(): void {
-  const registry = new MockRegistry([
-    makeRecord({ state: 'SHADOWED' }, { name: 'code-executor' }),
-  ]);
+  const registry = new MockRegistry([makeRecord({ state: 'SHADOWED' }, { name: 'code-executor' })]);
   const output = commandShadow(registry, 'code-executor');
   assert(output.startsWith('Error:'), `expected error, got: ${output}`);
   assert(output.includes('already SHADOWED'), `expected idempotency error, got: ${output}`);
@@ -357,9 +377,7 @@ function test_shadow_already_shadowed_agent(): void {
 }
 
 function test_shadow_frozen_agent_rejected(): void {
-  const registry = new MockRegistry([
-    makeRecord({ state: 'FROZEN' }, { name: 'code-executor' }),
-  ]);
+  const registry = new MockRegistry([makeRecord({ state: 'FROZEN' }, { name: 'code-executor' })]);
   const output = commandShadow(registry, 'code-executor');
   assert(output.startsWith('Error:'), `expected error, got: ${output}`);
   assert(output.includes('not ACTIVE'), `expected guard error, got: ${output}`);
@@ -367,9 +385,7 @@ function test_shadow_frozen_agent_rejected(): void {
 }
 
 function test_unshadow_non_shadowed_agent(): void {
-  const registry = new MockRegistry([
-    makeRecord({ state: 'ACTIVE' }, { name: 'code-executor' }),
-  ]);
+  const registry = new MockRegistry([makeRecord({ state: 'ACTIVE' }, { name: 'code-executor' })]);
   const output = commandUnshadow(registry, 'code-executor');
   assert(output.startsWith('Error:'), `expected error, got: ${output}`);
   console.log('PASS: test_unshadow_non_shadowed_agent');

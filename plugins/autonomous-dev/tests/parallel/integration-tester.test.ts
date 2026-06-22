@@ -102,7 +102,10 @@ function createTestRepo(opts: {
 
     // Return to integration and merge with conventional message
     git(repoRoot, 'checkout auto/req-001/integration');
-    git(repoRoot, `merge --no-ff auto/req-001/${trackName} -m "merge: ${trackName} into auto/req-001/integration"`);
+    git(
+      repoRoot,
+      `merge --no-ff auto/req-001/${trackName} -m "merge: ${trackName} into auto/req-001/integration"`,
+    );
   }
 
   return repoRoot;
@@ -164,8 +167,8 @@ class MockWorktreeManager {
 
   async listWorktrees(requestId?: string): Promise<WorktreeInfo[]> {
     return this.createdWorktrees
-      .filter(w => !requestId || w.requestId === requestId)
-      .map(w => ({
+      .filter((w) => !requestId || w.requestId === requestId)
+      .map((w) => ({
         requestId: w.requestId,
         trackName: w.trackName,
         worktreePath: `/tmp/worktrees/${w.requestId}/${w.trackName}`,
@@ -204,7 +207,8 @@ describe('attributeFailures', () => {
         tracks: {
           'track-a': {
             'src/user.ts': 'export function createUser() { return true; }\n',
-            'src/user.test.ts': 'import { createUser } from "./user";\ntest("should create user", () => expect(createUser()).toBe(true));\n',
+            'src/user.test.ts':
+              'import { createUser } from "./user";\ntest("should create user", () => expect(createUser()).toBe(true));\n',
           },
           'track-b': {
             'src/auth.ts': 'export function authenticate() { return true; }\n',
@@ -226,33 +230,39 @@ describe('attributeFailures', () => {
     });
 
     it('attributes test failure to track that modified test file', async () => {
-      const attributions = await tester.attributeFailures('req-001', [{
-        testFile: 'src/user.test.ts',
-        testName: 'should create user',
-        lineNumber: null,
-        errorMessage: 'expected true, got false',
-      }]);
+      const attributions = await tester.attributeFailures('req-001', [
+        {
+          testFile: 'src/user.test.ts',
+          testName: 'should create user',
+          lineNumber: null,
+          errorMessage: 'expected true, got false',
+        },
+      ]);
       expect(attributions.has('track-a')).toBe(true);
     });
 
     it('does not attribute test failure to unrelated track', async () => {
-      const attributions = await tester.attributeFailures('req-001', [{
-        testFile: 'src/user.test.ts',
-        testName: 'should create user',
-        lineNumber: null,
-        errorMessage: 'expected true, got false',
-      }]);
+      const attributions = await tester.attributeFailures('req-001', [
+        {
+          testFile: 'src/user.test.ts',
+          testName: 'should create user',
+          lineNumber: null,
+          errorMessage: 'expected true, got false',
+        },
+      ]);
       // track-b did not modify user.test.ts
       expect(attributions.has('track-b')).toBe(false);
     });
 
     it('sets confidence to high when single track identified', async () => {
-      const attributions = await tester.attributeFailures('req-001', [{
-        testFile: 'src/user.test.ts',
-        testName: 'should create user',
-        lineNumber: null,
-        errorMessage: 'expected true, got false',
-      }]);
+      const attributions = await tester.attributeFailures('req-001', [
+        {
+          testFile: 'src/user.test.ts',
+          testName: 'should create user',
+          lineNumber: null,
+          errorMessage: 'expected true, got false',
+        },
+      ]);
       const attrs = attributions.get('track-a')!;
       expect(attrs).toBeDefined();
       expect(attrs[0].confidence).toBe('high');
@@ -267,7 +277,8 @@ describe('attributeFailures', () => {
       // We need to set up base files that exist before the tracks merge
       repoRoot = createTestRepo({
         baseFiles: {
-          'src/integration.test.ts': 'import { createUser } from "./user";\ntest("integration", () => expect(createUser()).toBe(true));\n',
+          'src/integration.test.ts':
+            'import { createUser } from "./user";\ntest("integration", () => expect(createUser()).toBe(true));\n',
           'src/user.ts': '// placeholder\n',
         },
         tracks: {
@@ -291,12 +302,14 @@ describe('attributeFailures', () => {
     });
 
     it('attributes via import analysis when test file not directly modified', async () => {
-      const attributions = await tester.attributeFailures('req-001', [{
-        testFile: 'src/integration.test.ts',
-        testName: 'integration test',
-        lineNumber: null,
-        errorMessage: 'error',
-      }]);
+      const attributions = await tester.attributeFailures('req-001', [
+        {
+          testFile: 'src/integration.test.ts',
+          testName: 'integration test',
+          lineNumber: null,
+          errorMessage: 'error',
+        },
+      ]);
       // Strategy 1 should find nothing (test file not modified by a merge).
       // Strategy 2 traces the import to src/user.ts, which was modified by track-a.
       expect(attributions.size).toBeGreaterThan(0);
@@ -317,7 +330,8 @@ describe('attributeFailures', () => {
             'src/combined.test.ts': '// modified by track-a\ntest("a", () => {});\n',
           },
           'track-b': {
-            'src/combined.test.ts': '// modified by track-a and track-b\ntest("a", () => {});\ntest("b", () => {});\n',
+            'src/combined.test.ts':
+              '// modified by track-a and track-b\ntest("a", () => {});\ntest("b", () => {});\n',
           },
         },
       });
@@ -336,12 +350,14 @@ describe('attributeFailures', () => {
     });
 
     it('handles multiple responsible tracks', async () => {
-      const attributions = await tester.attributeFailures('req-001', [{
-        testFile: 'src/combined.test.ts',
-        testName: 'combined test',
-        lineNumber: null,
-        errorMessage: 'error',
-      }]);
+      const attributions = await tester.attributeFailures('req-001', [
+        {
+          testFile: 'src/combined.test.ts',
+          testName: 'combined test',
+          lineNumber: null,
+          errorMessage: 'error',
+        },
+      ]);
       // Both tracks modified the test file
       expect(attributions.size).toBeGreaterThanOrEqual(1);
       for (const [, attrs] of attributions) {
@@ -379,12 +395,14 @@ describe('attributeFailures', () => {
     });
 
     it('falls back to unknown when no track identified', async () => {
-      const attributions = await tester.attributeFailures('req-001', [{
-        testFile: 'src/unrelated.test.ts',
-        testName: 'unrelated test',
-        lineNumber: null,
-        errorMessage: 'error',
-      }]);
+      const attributions = await tester.attributeFailures('req-001', [
+        {
+          testFile: 'src/unrelated.test.ts',
+          testName: 'unrelated test',
+          lineNumber: null,
+          errorMessage: 'error',
+        },
+      ]);
       expect(attributions.has('unknown')).toBe(true);
     });
   });
@@ -419,18 +437,18 @@ describe('attributeFailures', () => {
     it('uses blame on specific line numbers when available', async () => {
       // The test file was modified by the merge, so strategy 1 should find track-a.
       // This test verifies that line-level attribution also works if strategy 1 fails.
-      const attributions = await tester.attributeFailures('req-001', [{
-        testFile: 'src/blame.test.ts',
-        testName: 'blame test',
-        lineNumber: 2,
-        errorMessage: 'line 2 assertion failed',
-      }]);
+      const attributions = await tester.attributeFailures('req-001', [
+        {
+          testFile: 'src/blame.test.ts',
+          testName: 'blame test',
+          lineNumber: 2,
+          errorMessage: 'line 2 assertion failed',
+        },
+      ]);
       // At least one track should be identified
       expect(attributions.size).toBeGreaterThan(0);
       // track-a modified line 2
-      expect(
-        attributions.has('track-a') || attributions.has('unknown'),
-      ).toBe(true);
+      expect(attributions.has('track-a') || attributions.has('unknown')).toBe(true);
     });
   });
 });
@@ -471,15 +489,15 @@ describe('reviseTrack', () => {
   it('creates revision worktree with cycle number', async () => {
     await tester.reviseTrack('req-001', 'track-a', [mockAttribution]);
     const worktrees = await mockWorktreeManager.listWorktrees('req-001');
-    expect(worktrees.find(w => w.trackName === 'track-a-rev1')).toBeDefined();
+    expect(worktrees.find((w) => w.trackName === 'track-a-rev1')).toBeDefined();
   });
 
   it('increments revision count', async () => {
     await tester.reviseTrack('req-001', 'track-a', [mockAttribution]);
     await tester.reviseTrack('req-001', 'track-a', [mockAttribution]);
     const worktrees = await mockWorktreeManager.listWorktrees('req-001');
-    expect(worktrees.find(w => w.trackName === 'track-a-rev1')).toBeDefined();
-    expect(worktrees.find(w => w.trackName === 'track-a-rev2')).toBeDefined();
+    expect(worktrees.find((w) => w.trackName === 'track-a-rev1')).toBeDefined();
+    expect(worktrees.find((w) => w.trackName === 'track-a-rev2')).toBeDefined();
   });
 
   it('throws RevisionLimitExceededError when max cycles exceeded', async () => {
@@ -593,12 +611,14 @@ describe('integration test circuit breaker', () => {
 
   it('increments consecutive failure count on each failure', async () => {
     mockTestRunner.pass = false;
-    mockTestRunner.failedTests = [{
-      testFile: 'src/user.ts',
-      testName: 'test',
-      lineNumber: null,
-      errorMessage: 'fail',
-    }];
+    mockTestRunner.failedTests = [
+      {
+        testFile: 'src/user.ts',
+        testName: 'test',
+        lineNumber: null,
+        errorMessage: 'fail',
+      },
+    ];
 
     await tester.runIntegrationTestsWithRevision('req-001');
     expect((tester as any).consecutiveFailures).toBe(1);
@@ -606,12 +626,14 @@ describe('integration test circuit breaker', () => {
 
   it('trips after 3 consecutive failures', async () => {
     mockTestRunner.pass = false;
-    mockTestRunner.failedTests = [{
-      testFile: 'src/some.test.ts',
-      testName: 'test',
-      lineNumber: null,
-      errorMessage: 'fail',
-    }];
+    mockTestRunner.failedTests = [
+      {
+        testFile: 'src/some.test.ts',
+        testName: 'test',
+        lineNumber: null,
+        errorMessage: 'fail',
+      },
+    ];
 
     await expect(async () => {
       for (let i = 0; i < 3; i++) {
@@ -625,12 +647,14 @@ describe('integration test circuit breaker', () => {
     bus.on('request.escalated', (e: any) => events.push(e));
 
     mockTestRunner.pass = false;
-    mockTestRunner.failedTests = [{
-      testFile: 'src/some.test.ts',
-      testName: 'test',
-      lineNumber: null,
-      errorMessage: 'fail',
-    }];
+    mockTestRunner.failedTests = [
+      {
+        testFile: 'src/some.test.ts',
+        testName: 'test',
+        lineNumber: null,
+        errorMessage: 'fail',
+      },
+    ];
 
     try {
       for (let i = 0; i < 3; i++) {
@@ -639,17 +663,19 @@ describe('integration test circuit breaker', () => {
     } catch {
       // expected
     }
-    expect(events.some(e => e.reason.includes('circuit breaker'))).toBe(true);
+    expect(events.some((e) => e.reason.includes('circuit breaker'))).toBe(true);
   });
 
   it('does not trip before 3 failures', async () => {
     mockTestRunner.pass = false;
-    mockTestRunner.failedTests = [{
-      testFile: 'src/some.test.ts',
-      testName: 'test',
-      lineNumber: null,
-      errorMessage: 'fail',
-    }];
+    mockTestRunner.failedTests = [
+      {
+        testFile: 'src/some.test.ts',
+        testName: 'test',
+        lineNumber: null,
+        errorMessage: 'fail',
+      },
+    ];
 
     // 2 failures should not trip
     await tester.runIntegrationTestsWithRevision('req-001');
@@ -659,12 +685,14 @@ describe('integration test circuit breaker', () => {
 
   it('attributes failures to tracks on failure', async () => {
     mockTestRunner.pass = false;
-    mockTestRunner.failedTests = [{
-      testFile: 'src/user.ts',
-      testName: 'test',
-      lineNumber: null,
-      errorMessage: 'fail',
-    }];
+    mockTestRunner.failedTests = [
+      {
+        testFile: 'src/user.ts',
+        testName: 'test',
+        lineNumber: null,
+        errorMessage: 'fail',
+      },
+    ];
 
     const result = await tester.runIntegrationTestsWithRevision('req-001');
     expect(result.passed).toBe(false);
@@ -674,12 +702,14 @@ describe('integration test circuit breaker', () => {
 
   it('resets on pass after failures', async () => {
     mockTestRunner.pass = false;
-    mockTestRunner.failedTests = [{
-      testFile: 'src/some.test.ts',
-      testName: 'test',
-      lineNumber: null,
-      errorMessage: 'fail',
-    }];
+    mockTestRunner.failedTests = [
+      {
+        testFile: 'src/some.test.ts',
+        testName: 'test',
+        lineNumber: null,
+        errorMessage: 'fail',
+      },
+    ];
 
     // 2 failures
     await tester.runIntegrationTestsWithRevision('req-001');
@@ -727,12 +757,14 @@ describe('runIntegrationTests', () => {
 
   it('returns failing result when tests fail', async () => {
     mockTestRunner.pass = false;
-    mockTestRunner.failedTests = [{
-      testFile: 'src/test.ts',
-      testName: 'test',
-      lineNumber: null,
-      errorMessage: 'fail',
-    }];
+    mockTestRunner.failedTests = [
+      {
+        testFile: 'src/test.ts',
+        testName: 'test',
+        lineNumber: null,
+        errorMessage: 'fail',
+      },
+    ];
     const result = await tester.runIntegrationTests('req-001');
     expect(result.passed).toBe(false);
     expect(result.failedTests).toHaveLength(1);
@@ -803,10 +835,7 @@ class StubWorktreeManager {
   public created: Array<{ requestId: string; trackName: string }> = [];
   public removed: Array<{ requestId: string; trackName: string; force: boolean }> = [];
 
-  async createTrackWorktree(
-    requestId: string,
-    trackName: string,
-  ): Promise<WorktreeInfo> {
+  async createTrackWorktree(requestId: string, trackName: string): Promise<WorktreeInfo> {
     this.created.push({ requestId, trackName });
     return {
       requestId,
@@ -819,11 +848,7 @@ class StubWorktreeManager {
     };
   }
 
-  async removeWorktree(
-    requestId: string,
-    trackName: string,
-    force: boolean,
-  ): Promise<void> {
+  async removeWorktree(requestId: string, trackName: string, force: boolean): Promise<void> {
     this.removed.push({ requestId, trackName, force });
   }
 }

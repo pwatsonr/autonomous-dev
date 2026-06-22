@@ -1,4 +1,7 @@
-import { createInitialPipelineState, PipelineState } from '../../../src/pipeline/flow/pipeline-state';
+import {
+  createInitialPipelineState,
+  PipelineState,
+} from '../../../src/pipeline/flow/pipeline-state';
 
 describe('createInitialPipelineState', () => {
   it('creates state with ACTIVE status', () => {

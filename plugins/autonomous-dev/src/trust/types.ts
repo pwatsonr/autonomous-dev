@@ -20,16 +20,16 @@ export const TRUST_LEVELS: readonly TrustLevel[] = [0, 1, 2, 3] as const;
 
 /** The 7 pipeline gates that can require approval. */
 export type PipelineGate =
-  | "prd_approval"
-  | "code_review"
-  | "test_review"
-  | "deployment_approval"
-  | "security_review"
-  | "cost_approval"
-  | "quality_gate";
+  | 'prd_approval'
+  | 'code_review'
+  | 'test_review'
+  | 'deployment_approval'
+  | 'security_review'
+  | 'cost_approval'
+  | 'quality_gate';
 
 /** Authority for a gate check: human must approve, or system auto-approves. */
-export type GateAuthority = "human" | "system";
+export type GateAuthority = 'human' | 'system';
 
 // ---------------------------------------------------------------------------
 // Type guards
@@ -37,10 +37,7 @@ export type GateAuthority = "human" | "system";
 
 /** Returns true if `value` is a valid TrustLevel (0, 1, 2, or 3). */
 export function isTrustLevel(value: unknown): value is TrustLevel {
-  return (
-    typeof value === "number" &&
-    (TRUST_LEVELS as readonly number[]).includes(value)
-  );
+  return typeof value === 'number' && (TRUST_LEVELS as readonly number[]).includes(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -54,7 +51,7 @@ export interface TrustLevelChangeRequest {
   requestedBy: string;
   requestedAt: Date;
   reason: string;
-  status: "pending" | "applied" | "rejected";
+  status: 'pending' | 'applied' | 'rejected';
 }
 
 // Phase 3 forward-compatible interface -- no scoring logic implemented yet
@@ -131,7 +128,7 @@ export interface PendingChange {
   requestId: string;
   fromLevel: TrustLevel;
   toLevel: TrustLevel;
-  status: "pending" | "awaiting_confirmation";
+  status: 'pending' | 'awaiting_confirmation';
   requestedBy: string;
   requestedAt: Date;
   reason: string;

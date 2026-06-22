@@ -117,9 +117,7 @@ export class RetentionManager {
     const startTime = Date.now();
     const cutoff = this.computeCutoffDate();
 
-    this.logger.info(
-      `Pruning records older than ${cutoff} (${this.retentionDays}-day retention)`,
-    );
+    this.logger.info(`Pruning records older than ${cutoff} (${this.retentionDays}-day retention)`);
 
     // JSONL pruning (atomic rename)
     const jsonlPruned = this.pruneJsonl(cutoff);
@@ -226,9 +224,7 @@ export class RetentionManager {
       return deleted;
     } catch (err: unknown) {
       this.logger.error(
-        `SQLite pruning failed: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `SQLite pruning failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       return 0;
     }
@@ -322,9 +318,7 @@ export function rebuildSqliteFromJsonl(
   let errors = 0;
 
   // Sort by timestamp to maintain insertion order
-  const sorted = [...allRecords].sort((a, b) =>
-    a.timestamp.localeCompare(b.timestamp),
-  );
+  const sorted = [...allRecords].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
   for (const record of sorted) {
     try {

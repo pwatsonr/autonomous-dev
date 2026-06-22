@@ -17,7 +17,7 @@
  * Based on SPEC-009-4-1 (TDD Section 3.3).
  */
 
-import type { AbortReason } from "./types";
+import type { AbortReason } from './types';
 
 // ---------------------------------------------------------------------------
 // Composite signal helper
@@ -31,15 +31,12 @@ import type { AbortReason } from "./types";
  * parent signals. If either parent is already aborted at construction
  * time, the composite is aborted immediately.
  */
-function createCompositeSignal(
-  global: AbortSignal,
-  request: AbortSignal,
-): AbortSignal {
+function createCompositeSignal(global: AbortSignal, request: AbortSignal): AbortSignal {
   const composite = new AbortController();
 
   const onAbort = () => composite.abort();
-  global.addEventListener("abort", onAbort, { once: true });
-  request.addEventListener("abort", onAbort, { once: true });
+  global.addEventListener('abort', onAbort, { once: true });
+  request.addEventListener('abort', onAbort, { once: true });
 
   // If either is already aborted, abort immediately
   if (global.aborted || request.aborted) {
@@ -88,10 +85,7 @@ export class AbortManager {
     const requestController = new AbortController();
     this.requestControllers.set(requestId, requestController);
 
-    return createCompositeSignal(
-      this.globalController.signal,
-      requestController.signal,
-    );
+    return createCompositeSignal(this.globalController.signal, requestController.signal);
   }
 
   /**

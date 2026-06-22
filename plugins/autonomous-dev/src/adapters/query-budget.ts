@@ -177,9 +177,7 @@ export class QueryBudgetEnforcer implements IQueryBudgetTracker {
       const budget = this.budgets[source];
       const current = this.getCount(source, service);
       const max = budget?.max_queries_per_service ?? 0;
-      this.logger.warn(
-        `Query budget exhausted for ${source}/${service} (${current}/${max})`,
-      );
+      this.logger.warn(`Query budget exhausted for ${source}/${service} (${current}/${max})`);
       this.recordBlocked(source, service);
       return null;
     }
@@ -230,9 +228,7 @@ export class QueryBudgetEnforcer implements IQueryBudgetTracker {
         const queriesExecuted = executedMap.get(service) ?? 0;
         const queriesBlocked = blockedMap.get(service) ?? 0;
         const budget = this.budgets[source];
-        const budgetExhausted = budget
-          ? queriesExecuted >= budget.max_queries_per_service
-          : true;
+        const budgetExhausted = budget ? queriesExecuted >= budget.max_queries_per_service : true;
 
         states.push({
           source,

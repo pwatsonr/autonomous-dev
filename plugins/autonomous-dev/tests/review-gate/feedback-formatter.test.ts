@@ -54,10 +54,7 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
 }
 
 /** Build a minimal ReviewOutput with given findings. */
-function makeReviewOutput(
-  reviewerId: string,
-  findings: Finding[],
-): ReviewOutput {
+function makeReviewOutput(reviewerId: string, findings: Finding[]): ReviewOutput {
   return {
     reviewer_id: reviewerId,
     reviewer_role: 'test-role',
@@ -91,9 +88,21 @@ describe('FeedbackFormatter', () => {
   // -----------------------------------------------------------------------
   test('1. Single reviewer, no deduplication needed', () => {
     const findings = [
-      makeFinding({ section_id: 'goals', category_id: 'measurability', description: 'Goals lack measurable targets' }),
-      makeFinding({ section_id: 'risks', category_id: 'risk_identification', description: 'Missing risk mitigation plan' }),
-      makeFinding({ section_id: 'scope', category_id: 'scope_clarity', description: 'Scope boundaries unclear' }),
+      makeFinding({
+        section_id: 'goals',
+        category_id: 'measurability',
+        description: 'Goals lack measurable targets',
+      }),
+      makeFinding({
+        section_id: 'risks',
+        category_id: 'risk_identification',
+        description: 'Missing risk mitigation plan',
+      }),
+      makeFinding({
+        section_id: 'scope',
+        category_id: 'scope_clarity',
+        description: 'Scope boundaries unclear',
+      }),
     ];
     const output = makeReviewOutput('reviewer-a', findings);
 
@@ -402,10 +411,31 @@ describe('FeedbackFormatter', () => {
   // -----------------------------------------------------------------------
   test('13. Sorting: critical before major before minor; within severity, alphabetical section_id', () => {
     const findings = [
-      makeFinding({ section_id: 'goals', category_id: 'cat-1', severity: 'minor', description: 'Minor issue in goals unique alpha' }),
-      makeFinding({ section_id: 'architecture', category_id: 'cat-2', severity: 'critical', critical_sub: 'blocking', description: 'Critical architecture issue unique beta' }),
-      makeFinding({ section_id: 'goals', category_id: 'cat-3', severity: 'major', description: 'Major issue in goals unique gamma' }),
-      makeFinding({ section_id: 'architecture', category_id: 'cat-4', severity: 'major', description: 'Major issue in architecture unique delta' }),
+      makeFinding({
+        section_id: 'goals',
+        category_id: 'cat-1',
+        severity: 'minor',
+        description: 'Minor issue in goals unique alpha',
+      }),
+      makeFinding({
+        section_id: 'architecture',
+        category_id: 'cat-2',
+        severity: 'critical',
+        critical_sub: 'blocking',
+        description: 'Critical architecture issue unique beta',
+      }),
+      makeFinding({
+        section_id: 'goals',
+        category_id: 'cat-3',
+        severity: 'major',
+        description: 'Major issue in goals unique gamma',
+      }),
+      makeFinding({
+        section_id: 'architecture',
+        category_id: 'cat-4',
+        severity: 'major',
+        description: 'Major issue in architecture unique delta',
+      }),
     ];
 
     const output = makeReviewOutput('reviewer-a', findings);
@@ -430,11 +460,31 @@ describe('FeedbackFormatter', () => {
   // -----------------------------------------------------------------------
   test('14. Group by section: 5 findings across 3 sections', () => {
     const findings = [
-      makeFinding({ section_id: 'goals', category_id: 'cat-1', description: 'Unique alpha bravo charlie' }),
-      makeFinding({ section_id: 'goals', category_id: 'cat-2', description: 'Unique delta echo foxtrot' }),
-      makeFinding({ section_id: 'risks', category_id: 'cat-3', description: 'Unique golf hotel india' }),
-      makeFinding({ section_id: 'risks', category_id: 'cat-4', description: 'Unique juliet kilo lima' }),
-      makeFinding({ section_id: 'scope', category_id: 'cat-5', description: 'Unique mike november oscar' }),
+      makeFinding({
+        section_id: 'goals',
+        category_id: 'cat-1',
+        description: 'Unique alpha bravo charlie',
+      }),
+      makeFinding({
+        section_id: 'goals',
+        category_id: 'cat-2',
+        description: 'Unique delta echo foxtrot',
+      }),
+      makeFinding({
+        section_id: 'risks',
+        category_id: 'cat-3',
+        description: 'Unique golf hotel india',
+      }),
+      makeFinding({
+        section_id: 'risks',
+        category_id: 'cat-4',
+        description: 'Unique juliet kilo lima',
+      }),
+      makeFinding({
+        section_id: 'scope',
+        category_id: 'cat-5',
+        description: 'Unique mike november oscar',
+      }),
     ];
 
     const output = makeReviewOutput('reviewer-a', findings);
@@ -451,16 +501,40 @@ describe('FeedbackFormatter', () => {
   // -----------------------------------------------------------------------
   test('15. Deduplication stats: 6 raw, 2 duplicate clusters of size 2, result: 4 after dedup', () => {
     // Cluster 1: same section/category/description -> will merge
-    const f1a = makeFinding({ section_id: 'goals', category_id: 'measurability', description: 'Missing measurable success criteria for project goals' });
-    const f1b = makeFinding({ section_id: 'goals', category_id: 'measurability', description: 'Project goals lack measurable success criteria' });
+    const f1a = makeFinding({
+      section_id: 'goals',
+      category_id: 'measurability',
+      description: 'Missing measurable success criteria for project goals',
+    });
+    const f1b = makeFinding({
+      section_id: 'goals',
+      category_id: 'measurability',
+      description: 'Project goals lack measurable success criteria',
+    });
 
     // Cluster 2: same section/category/description -> will merge
-    const f2a = makeFinding({ section_id: 'risks', category_id: 'risk_identification', description: 'Risk mitigation strategies completely missing from document' });
-    const f2b = makeFinding({ section_id: 'risks', category_id: 'risk_identification', description: 'Missing risk mitigation strategies from document' });
+    const f2a = makeFinding({
+      section_id: 'risks',
+      category_id: 'risk_identification',
+      description: 'Risk mitigation strategies completely missing from document',
+    });
+    const f2b = makeFinding({
+      section_id: 'risks',
+      category_id: 'risk_identification',
+      description: 'Missing risk mitigation strategies from document',
+    });
 
     // Unique findings
-    const f3 = makeFinding({ section_id: 'scope', category_id: 'scope_clarity', description: 'Unique finding about scope boundaries alpha bravo' });
-    const f4 = makeFinding({ section_id: 'arch', category_id: 'architecture', description: 'Unique finding about architecture gamma delta' });
+    const f3 = makeFinding({
+      section_id: 'scope',
+      category_id: 'scope_clarity',
+      description: 'Unique finding about scope boundaries alpha bravo',
+    });
+    const f4 = makeFinding({
+      section_id: 'arch',
+      category_id: 'architecture',
+      description: 'Unique finding about architecture gamma delta',
+    });
 
     const outputA = makeReviewOutput('reviewer-a', [f1a, f2a, f3]);
     const outputB = makeReviewOutput('reviewer-b', [f1b, f2b, f4]);
@@ -506,9 +580,21 @@ describe('FeedbackFormatter', () => {
   // -----------------------------------------------------------------------
   test('17. Three-way merge: 3 reviewers flag same issue, reported_by has all 3 IDs', () => {
     const desc = 'Missing measurable success criteria for project goals definition';
-    const findingA = makeFinding({ section_id: 'goals', category_id: 'measurability', description: desc });
-    const findingB = makeFinding({ section_id: 'goals', category_id: 'measurability', description: desc });
-    const findingC = makeFinding({ section_id: 'goals', category_id: 'measurability', description: desc });
+    const findingA = makeFinding({
+      section_id: 'goals',
+      category_id: 'measurability',
+      description: desc,
+    });
+    const findingB = makeFinding({
+      section_id: 'goals',
+      category_id: 'measurability',
+      description: desc,
+    });
+    const findingC = makeFinding({
+      section_id: 'goals',
+      category_id: 'measurability',
+      description: desc,
+    });
 
     const outputA = makeReviewOutput('reviewer-a', [findingA]);
     const outputB = makeReviewOutput('reviewer-b', [findingB]);
@@ -535,7 +621,11 @@ describe('FeedbackFormatter', () => {
     expect(result.total_findings).toBe(0);
     expect(result.findings_by_section.size).toBe(0);
     expect(result.severity_counts).toEqual({ critical: 0, major: 0, minor: 0, suggestion: 0 });
-    expect(result.deduplication_stats).toEqual({ total_raw: 0, after_dedup: 0, duplicates_merged: 0 });
+    expect(result.deduplication_stats).toEqual({
+      total_raw: 0,
+      after_dedup: 0,
+      duplicates_merged: 0,
+    });
   });
 });
 
@@ -583,7 +673,12 @@ describe('keywordOverlap', () => {
   });
 
   test('completely different descriptions return 0', () => {
-    expect(keywordOverlap('authentication module error handling', 'database normalization indexing schema')).toBe(0);
+    expect(
+      keywordOverlap(
+        'authentication module error handling',
+        'database normalization indexing schema',
+      ),
+    ).toBe(0);
   });
 
   test('both empty descriptions return 0', () => {

@@ -14,21 +14,27 @@ import {
 } from '../../src/reports/report-generator';
 import type { ReportInput } from '../../src/reports/report-generator';
 import { parseFrontmatter } from '../../src/reports/schema-validator';
-import type { CandidateObservation, BaselineMetrics, DeduplicationResult } from '../../src/engine/types';
+import type {
+  CandidateObservation,
+  BaselineMetrics,
+  DeduplicationResult,
+} from '../../src/engine/types';
 import type { SeverityResult, SeverityBreakdown } from '../../src/engine/severity-scorer';
 import type { ConfidenceScore } from '../../src/engine/confidence';
 import type { PrometheusResult, GrafanaAlertResult } from '../../src/adapters/types';
 import type { DataSourceStatus } from '../../src/adapters/types';
 import type { ScrubbedOpenSearchResult } from '../../src/safety/scrub-pipeline';
-import type { GovernanceFlags, LlmAnalysisResult, OscillationData } from '../../src/reports/templates';
+import type {
+  GovernanceFlags,
+  LlmAnalysisResult,
+  OscillationData,
+} from '../../src/reports/templates';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildCandidate(
-  overrides: Partial<CandidateObservation> = {},
-): CandidateObservation {
+function buildCandidate(overrides: Partial<CandidateObservation> = {}): CandidateObservation {
   return {
     type: 'error',
     error_type: 'error_rate',
@@ -55,9 +61,7 @@ function buildSeverityBreakdown(): SeverityBreakdown {
   };
 }
 
-function buildSeverityResult(
-  overrides: Partial<SeverityResult> = {},
-): SeverityResult {
+function buildSeverityResult(overrides: Partial<SeverityResult> = {}): SeverityResult {
   return {
     severity: 'P1',
     score: 0.6875,
@@ -66,9 +70,7 @@ function buildSeverityResult(
   };
 }
 
-function buildConfidence(
-  overrides: Partial<ConfidenceScore> = {},
-): ConfidenceScore {
+function buildConfidence(overrides: Partial<ConfidenceScore> = {}): ConfidenceScore {
   return {
     composite: 0.78,
     evidence_score: 1.0,
@@ -78,9 +80,7 @@ function buildConfidence(
   };
 }
 
-function buildDedupResult(
-  overrides: Partial<DeduplicationResult> = {},
-): DeduplicationResult {
+function buildDedupResult(overrides: Partial<DeduplicationResult> = {}): DeduplicationResult {
   return {
     action: 'new',
     ...overrides,
@@ -206,9 +206,7 @@ function buildBaseline(): BaselineMetrics {
   };
 }
 
-function buildGovernanceFlags(
-  overrides: Partial<GovernanceFlags> = {},
-): GovernanceFlags {
+function buildGovernanceFlags(overrides: Partial<GovernanceFlags> = {}): GovernanceFlags {
   return {
     cooldown_active: false,
     oscillation_warning: false,
@@ -216,9 +214,7 @@ function buildGovernanceFlags(
   };
 }
 
-function buildReportInput(
-  overrides: Partial<ReportInput> = {},
-): ReportInput {
+function buildReportInput(overrides: Partial<ReportInput> = {}): ReportInput {
   return {
     candidate: buildCandidate(),
     severity: buildSeverityResult(),

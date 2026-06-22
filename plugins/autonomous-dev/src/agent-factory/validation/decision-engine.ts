@@ -55,9 +55,7 @@ function generateRecommendation(
         .filter((d) => d.improved)
         .map((d) => d.dimension_name);
       const dimNote =
-        improvedDims.length > 0
-          ? ` Improved dimensions: ${improvedDims.join(', ')}.`
-          : '';
+        improvedDims.length > 0 ? ` Improved dimensions: ${improvedDims.join(', ')}.` : '';
       return (
         `Proposed version wins on ${proposedWins}/${total} inputs ` +
         `with mean quality improvement of ${meanDelta.toFixed(3)}.` +
@@ -70,9 +68,7 @@ function generateRecommendation(
         .filter((d) => !d.improved)
         .map((d) => d.dimension_name);
       const dimNote =
-        regressedDims.length > 0
-          ? ` Regressed dimensions: ${regressedDims.join(', ')}.`
-          : '';
+        regressedDims.length > 0 ? ` Regressed dimensions: ${regressedDims.join(', ')}.` : '';
       return (
         `Proposed version loses on ${currentWins}/${total} inputs ` +
         `with mean quality delta of ${meanDelta.toFixed(3)}.` +
@@ -113,12 +109,8 @@ export class DecisionEngine {
     }
 
     const total = comparisons.length;
-    const proposedWins = comparisons.filter(
-      (c) => c.outcome === 'proposed_wins',
-    ).length;
-    const currentWins = comparisons.filter(
-      (c) => c.outcome === 'current_wins',
-    ).length;
+    const proposedWins = comparisons.filter((c) => c.outcome === 'proposed_wins').length;
+    const currentWins = comparisons.filter((c) => c.outcome === 'current_wins').length;
     const ties = comparisons.filter((c) => c.outcome === 'tie').length;
     const meanDelta = mean(comparisons.map((c) => c.overall_delta));
 

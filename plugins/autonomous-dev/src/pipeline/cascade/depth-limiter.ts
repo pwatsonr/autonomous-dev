@@ -23,10 +23,7 @@ export interface DepthLimitResult {
  * @param config Pipeline configuration
  * @returns DepthLimitResult with action recommendation
  */
-export function checkCascadeDepth(
-  currentDepth: number,
-  config: PipelineConfig,
-): DepthLimitResult {
+export function checkCascadeDepth(currentDepth: number, config: PipelineConfig): DepthLimitResult {
   const maxDepth = config.backwardCascade.maxDepth;
 
   if (currentDepth > maxDepth) {

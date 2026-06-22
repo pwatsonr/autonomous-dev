@@ -64,7 +64,7 @@ export class QualityRegressionDetector {
    */
   detect(
     state: RegressionDetectorState,
-    config?: Partial<RegressionConfig>
+    config?: Partial<RegressionConfig>,
   ): QualityRegression | null {
     const effectiveMargin = config?.margin ?? this.config.margin;
 
@@ -73,11 +73,9 @@ export class QualityRegressionDetector {
       return null;
     }
 
-    const currentEntry = state.score_history.find(
-      (h) => h.iteration === state.current_iteration
-    );
+    const currentEntry = state.score_history.find((h) => h.iteration === state.current_iteration);
     const previousEntry = state.score_history.find(
-      (h) => h.iteration === state.current_iteration - 1
+      (h) => h.iteration === state.current_iteration - 1,
     );
 
     if (!currentEntry || !previousEntry) {

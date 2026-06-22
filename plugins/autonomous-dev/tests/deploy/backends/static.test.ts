@@ -10,14 +10,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import {
-  cpSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -120,9 +113,9 @@ describe('StaticBackend.build', () => {
   it('rejects build_command containing ;', async () => {
     const m = makeRunToolMock();
     const b = new StaticBackend({ runTool: m.runTool });
-    await expect(
-      b.build(ctx({ build_command: 'echo a; rm -rf /' })),
-    ).rejects.toThrow(ParameterValidationError);
+    await expect(b.build(ctx({ build_command: 'echo a; rm -rf /' }))).rejects.toThrow(
+      ParameterValidationError,
+    );
   });
 
   it('rejects build_dir of "../escape"', async () => {

@@ -44,11 +44,11 @@ export interface MonitoringState {
   promoted_version: string;
   previous_version: string;
   proposal_id: string;
-  monitoring_started_at: string;     // ISO 8601
-  monitoring_ends_at: string;        // ISO 8601 (started_at + autoRollbackHours)
+  monitoring_started_at: string; // ISO 8601
+  monitoring_ends_at: string; // ISO 8601 (started_at + autoRollbackHours)
   pre_promotion_baseline: QualityBaseline;
   rollback_triggered: boolean;
-  cooldown_until?: string;           // ISO 8601, set if rollback occurs
+  cooldown_until?: string; // ISO 8601, set if rollback occurs
 }
 
 /** Evidence collected when quality decline is detected. */
@@ -182,9 +182,7 @@ export class AutoRollbackMonitor {
    */
   startMonitoring(agentName: string, proposal: AgentProposal): void {
     const now = new Date();
-    const monitoringEndsAt = new Date(
-      now.getTime() + this.autoRollbackHours * 60 * 60 * 1000,
-    );
+    const monitoringEndsAt = new Date(now.getTime() + this.autoRollbackHours * 60 * 60 * 1000);
 
     // Capture pre-promotion baseline from aggregate metrics
     const baseline = this.captureBaseline(agentName);
@@ -306,13 +304,13 @@ export class AutoRollbackMonitor {
     if (approvalDeclined) {
       reasons.push(
         `Approval rate dropped from ${baseline.approval_rate.toFixed(2)} to ${postApprovalRate.toFixed(2)} ` +
-        `(delta: ${approvalDelta.toFixed(2)}, threshold: ${this.approvalRateDropThreshold})`,
+          `(delta: ${approvalDelta.toFixed(2)}, threshold: ${this.approvalRateDropThreshold})`,
       );
     }
     if (qualityDeclined) {
       reasons.push(
         `Quality score dropped from ${baseline.avg_quality_score.toFixed(2)} to ${postAvgQuality.toFixed(2)} ` +
-        `(delta: ${qualityDelta.toFixed(2)}, threshold: ${this.qualityScoreDropThreshold})`,
+          `(delta: ${qualityDelta.toFixed(2)}, threshold: ${this.qualityScoreDropThreshold})`,
       );
     }
 
@@ -434,9 +432,7 @@ export class AutoRollbackMonitor {
     state.rollback_triggered = true;
 
     // Set cooldown
-    const cooldownUntil = new Date(
-      Date.now() + this.cooldownDays * 24 * 60 * 60 * 1000,
-    );
+    const cooldownUntil = new Date(Date.now() + this.cooldownDays * 24 * 60 * 60 * 1000);
     state.cooldown_until = cooldownUntil.toISOString();
     this.persistState();
 
@@ -570,11 +566,9 @@ export class AutoRollbackMonitor {
     }
 
     try {
-      fs.writeFileSync(
-        this.statePath,
-        JSON.stringify(persisted, null, 2) + '\n',
-        { encoding: 'utf-8' },
-      );
+      fs.writeFileSync(this.statePath, JSON.stringify(persisted, null, 2) + '\n', {
+        encoding: 'utf-8',
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logRollbackMonitorEvent('state_persist_failed', { error: message });

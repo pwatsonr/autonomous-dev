@@ -29,7 +29,9 @@ function parseAndValidateAgent(filename: string): {
   const content = readAgentFile(filename);
   const parseResult = parseAgentString(content);
   if (!parseResult.success || !parseResult.agent) {
-    throw new Error(`Parse failed for ${filename}: ${parseResult.errors.map((e) => e.message).join('; ')}`);
+    throw new Error(
+      `Parse failed for ${filename}: ${parseResult.errors.map((e) => e.message).join('; ')}`,
+    );
   }
 
   const ctx = { existingNames: new Set<string>(), filename };
@@ -103,7 +105,8 @@ function test_doc_reviewer_passes_validation(): void {
 }
 
 function test_agent_meta_reviewer_passes_validation(): void {
-  const { agent, validationValid, validationErrors } = parseAndValidateAgent('agent-meta-reviewer.md');
+  const { agent, validationValid, validationErrors } =
+    parseAndValidateAgent('agent-meta-reviewer.md');
   assert(validationValid, `agent-meta-reviewer validation failed: ${validationErrors.join('; ')}`);
   assert(agent.name === 'agent-meta-reviewer', `name mismatch: ${agent.name}`);
   assert(agent.role === 'meta', `role mismatch: ${agent.role}`);
@@ -168,10 +171,7 @@ function test_all_system_prompts_are_substantive(): void {
   for (const file of files) {
     const { agent } = parseAndValidateAgent(file);
     const wordCount = agent.system_prompt.split(/\s+/).filter((w) => w.length > 0).length;
-    assert(
-      wordCount >= 200,
-      `${file}: system_prompt has ${wordCount} words, expected >= 200`,
-    );
+    assert(wordCount >= 200, `${file}: system_prompt has ${wordCount} words, expected >= 200`);
   }
   console.log('PASS: test_all_system_prompts_are_substantive');
 }
@@ -187,7 +187,9 @@ function test_every_agent_file_validates(): void {
   for (const file of files) {
     const parseResult = parseAgentString(readAgentFile(file));
     if (!parseResult.success || !parseResult.agent) {
-      failures.push(`${file}: parse failed — ${parseResult.errors.map((e) => e.message).join('; ')}`);
+      failures.push(
+        `${file}: parse failed — ${parseResult.errors.map((e) => e.message).join('; ')}`,
+      );
       continue;
     }
     const result = validateAgent(parseResult.agent, new Set<string>());
@@ -203,15 +205,35 @@ function test_every_agent_file_validates(): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-describe("AgentFactory: agent definitions", () => {
-  it("prd-author passes validation", () => { test_prd_author_passes_validation(); });
-  it("tdd-author passes validation", () => { test_tdd_author_passes_validation(); });
-  it("code-executor passes validation", () => { test_code_executor_passes_validation(); });
-  it("quality-reviewer passes validation", () => { test_quality_reviewer_passes_validation(); });
-  it("doc-reviewer passes validation", () => { test_doc_reviewer_passes_validation(); });
-  it("agent-meta-reviewer passes validation", () => { test_agent_meta_reviewer_passes_validation(); });
-  it("all agents have minimum 2 rubric dimensions", () => { test_all_agents_have_minimum_2_rubric_dimensions(); });
-  it("all agents respect tool allowlist", () => { test_all_agents_respect_tool_allowlist(); });
-  it("all system prompts are substantive", () => { test_all_system_prompts_are_substantive(); });
-  it("every agent file in the directory validates", () => { test_every_agent_file_validates(); });
+describe('AgentFactory: agent definitions', () => {
+  it('prd-author passes validation', () => {
+    test_prd_author_passes_validation();
+  });
+  it('tdd-author passes validation', () => {
+    test_tdd_author_passes_validation();
+  });
+  it('code-executor passes validation', () => {
+    test_code_executor_passes_validation();
+  });
+  it('quality-reviewer passes validation', () => {
+    test_quality_reviewer_passes_validation();
+  });
+  it('doc-reviewer passes validation', () => {
+    test_doc_reviewer_passes_validation();
+  });
+  it('agent-meta-reviewer passes validation', () => {
+    test_agent_meta_reviewer_passes_validation();
+  });
+  it('all agents have minimum 2 rubric dimensions', () => {
+    test_all_agents_have_minimum_2_rubric_dimensions();
+  });
+  it('all agents respect tool allowlist', () => {
+    test_all_agents_respect_tool_allowlist();
+  });
+  it('all system prompts are substantive', () => {
+    test_all_system_prompts_are_substantive();
+  });
+  it('every agent file in the directory validates', () => {
+    test_every_agent_file_validates();
+  });
 });

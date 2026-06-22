@@ -24,7 +24,8 @@ export const CODE_TEMPLATE: DocumentTemplate = {
       heading: 'Overview',
       level: 2,
       required: true,
-      description: 'Summary of the code artifact, its purpose, and how it relates to the parent spec',
+      description:
+        'Summary of the code artifact, its purpose, and how it relates to the parent spec',
       minWordCount: 50,
       subsections: [],
       rubricCategoryId: 'completeness',

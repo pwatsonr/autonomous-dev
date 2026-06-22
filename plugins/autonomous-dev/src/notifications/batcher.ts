@@ -1,8 +1,4 @@
-import type {
-  BatchingConfig,
-  NotificationEventType,
-  NotificationPayload,
-} from './types';
+import type { BatchingConfig, NotificationEventType, NotificationPayload } from './types';
 import type { DeliveryManager } from './delivery-manager';
 
 /** Opaque timer handle returned by Timer.setTimeout. */
@@ -18,10 +14,7 @@ export interface Timer {
  * Event types that are NEVER batched -- always delivered immediately.
  * Matches TDD Section 3.5.2 exemption rules.
  */
-const EXEMPT_TYPES: ReadonlySet<NotificationEventType> = new Set([
-  'escalation',
-  'pipeline_failed',
-]);
+const EXEMPT_TYPES: ReadonlySet<NotificationEventType> = new Set(['escalation', 'pipeline_failed']);
 
 /**
  * Accumulates non-urgent notifications and flushes them at configurable

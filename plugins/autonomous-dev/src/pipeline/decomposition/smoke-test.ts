@@ -40,9 +40,7 @@ export async function smokeTest(
   // 1. Read and parse parent document to get its sections
   const parentDoc = await storage.readDocument(pipelineId, parentType, parentId);
   const parentSections = parseSections(parentDoc.rawContent);
-  const parentSectionIds = new Set(
-    flattenSectionIds(parentSections.sections),
-  );
+  const parentSectionIds = new Set(flattenSectionIds(parentSections.sections));
 
   // 2. Coverage completeness check
   const coveredSections = new Set<string>();
@@ -51,9 +49,7 @@ export async function smokeTest(
       coveredSections.add(traceFrom);
     }
   }
-  const uncoveredParentSections = [...parentSectionIds].filter(
-    id => !coveredSections.has(id),
-  );
+  const uncoveredParentSections = [...parentSectionIds].filter((id) => !coveredSections.has(id));
   const coverageComplete = uncoveredParentSections.length === 0;
 
   // 3. Scope creep check

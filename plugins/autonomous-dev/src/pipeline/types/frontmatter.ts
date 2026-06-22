@@ -13,11 +13,7 @@ export type ExecutionMode = 'parallel' | 'sequential';
 export type DependencyType = 'blocks' | 'informs';
 export type Priority = 'critical' | 'high' | 'normal' | 'low';
 
-export type VersionReason =
-  | 'INITIAL'
-  | 'REVIEW_REVISION'
-  | 'BACKWARD_CASCADE'
-  | 'ROLLBACK';
+export type VersionReason = 'INITIAL' | 'REVIEW_REVISION' | 'BACKWARD_CASCADE' | 'ROLLBACK';
 
 export interface DocumentFrontmatter {
   /** Document ID, e.g. "PRD-001" or "TDD-001-01" */
@@ -72,24 +68,13 @@ export const DOCUMENT_STATUSES: readonly DocumentStatus[] = [
 ] as const;
 
 /** All valid ExecutionMode values */
-export const EXECUTION_MODES: readonly ExecutionMode[] = [
-  'parallel',
-  'sequential',
-] as const;
+export const EXECUTION_MODES: readonly ExecutionMode[] = ['parallel', 'sequential'] as const;
 
 /** All valid DependencyType values */
-export const DEPENDENCY_TYPES: readonly DependencyType[] = [
-  'blocks',
-  'informs',
-] as const;
+export const DEPENDENCY_TYPES: readonly DependencyType[] = ['blocks', 'informs'] as const;
 
 /** All valid Priority values */
-export const PRIORITIES: readonly Priority[] = [
-  'critical',
-  'high',
-  'normal',
-  'low',
-] as const;
+export const PRIORITIES: readonly Priority[] = ['critical', 'high', 'normal', 'low'] as const;
 
 /** Required fields that must always be present */
 export const REQUIRED_FIELDS: readonly (keyof DocumentFrontmatter)[] = [

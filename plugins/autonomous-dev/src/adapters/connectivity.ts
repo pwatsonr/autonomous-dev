@@ -156,8 +156,7 @@ export async function checkConnectivity(
   // Determine abort condition: all *configured* sources are unreachable.
   const configuredResults = results.filter((r) => r.status !== 'not_configured');
   const allUnreachable =
-    configuredResults.length > 0 &&
-    configuredResults.every((r) => r.status === 'unreachable');
+    configuredResults.length > 0 && configuredResults.every((r) => r.status === 'unreachable');
 
   return {
     results,
@@ -175,9 +174,7 @@ export async function checkConnectivity(
  * (status is `available` or `degraded`).
  */
 export function getEligibleSources(report: ConnectivityReport): ConnectivityResult[] {
-  return report.results.filter(
-    (r) => r.status === 'available' || r.status === 'degraded',
-  );
+  return report.results.filter((r) => r.status === 'available' || r.status === 'degraded');
 }
 
 /**

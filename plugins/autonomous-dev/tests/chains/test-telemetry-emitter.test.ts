@@ -148,17 +148,13 @@ describe('SPEC-022-2-04: executor emits exactly one chain.completed per run', ()
       buildManifest({
         id: 'security-reviewer',
         version: '1.0.0',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
         version: '1.0.0',
         consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
-        produces: [
-          { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'code-patches', schema_version: '1.0', format: 'json' }],
       }),
     ];
     return { manifests, lookup: (id) => manifests.find((m) => m.id === id) };
@@ -241,9 +237,7 @@ describe('SPEC-022-2-04: executor emits exactly one chain.completed per run', ()
       buildManifest({
         id: 'security-reviewer',
         version: '1.0.0',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',

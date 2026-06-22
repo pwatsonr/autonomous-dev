@@ -23,9 +23,7 @@ import type { CandidateObservation } from '../../src/engine/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildCandidate(
-  overrides: Partial<CandidateObservation> = {},
-): CandidateObservation {
+function buildCandidate(overrides: Partial<CandidateObservation> = {}): CandidateObservation {
   return {
     type: 'error',
     service: 'api-gateway',
@@ -40,18 +38,14 @@ function buildCandidate(
   };
 }
 
-function buildDedupResult(
-  overrides: Partial<DeduplicationResult> = {},
-): DeduplicationResult {
+function buildDedupResult(overrides: Partial<DeduplicationResult> = {}): DeduplicationResult {
   return {
     action: 'new',
     ...overrides,
   };
 }
 
-function buildHistory(
-  overrides: Partial<TriageHistorySummary> = {},
-): TriageHistorySummary {
+function buildHistory(overrides: Partial<TriageHistorySummary> = {}): TriageHistorySummary {
   return {
     total_similar: 0,
     promoted_count: 0,
@@ -68,15 +62,12 @@ function buildHistory(
 
 describe('CONFIDENCE_WEIGHTS', () => {
   it('weights sum to 1.0', () => {
-    const sum =
-      CONFIDENCE_WEIGHTS.evidence +
-      CONFIDENCE_WEIGHTS.dedup +
-      CONFIDENCE_WEIGHTS.history;
+    const sum = CONFIDENCE_WEIGHTS.evidence + CONFIDENCE_WEIGHTS.dedup + CONFIDENCE_WEIGHTS.history;
     expect(sum).toBe(1.0);
   });
 
   it('evidence weight is 0.50', () => {
-    expect(CONFIDENCE_WEIGHTS.evidence).toBe(0.50);
+    expect(CONFIDENCE_WEIGHTS.evidence).toBe(0.5);
   });
 
   it('dedup weight is 0.25', () => {
@@ -344,7 +335,13 @@ describe('computeConfidence', () => {
       dismissed: number;
     }> = [
       { sources: [], action: 'auto_dismiss', totalSimilar: 10, promoted: 0, dismissed: 10 },
-      { sources: ['prometheus', 'opensearch', 'grafana'], action: 'related_to_promoted', totalSimilar: 10, promoted: 10, dismissed: 0 },
+      {
+        sources: ['prometheus', 'opensearch', 'grafana'],
+        action: 'related_to_promoted',
+        totalSimilar: 10,
+        promoted: 10,
+        dismissed: 0,
+      },
       { sources: ['prometheus'], action: 'new', totalSimilar: 0, promoted: 0, dismissed: 0 },
     ];
 
@@ -371,41 +368,65 @@ describe('computeConfidence', () => {
 describe('All confidence lookup table combinations (SPEC-007-3-6)', () => {
   describe('Evidence score lookup table', () => {
     it('metric + log + alert -> 1.0', () => {
-      expect(computeEvidenceScore(buildCandidate({
-        data_sources_used: ['prometheus', 'opensearch', 'grafana'],
-      }))).toBe(1.0);
+      expect(
+        computeEvidenceScore(
+          buildCandidate({
+            data_sources_used: ['prometheus', 'opensearch', 'grafana'],
+          }),
+        ),
+      ).toBe(1.0);
     });
 
     it('metric + log -> 0.8', () => {
-      expect(computeEvidenceScore(buildCandidate({
-        data_sources_used: ['prometheus', 'opensearch'],
-      }))).toBe(0.8);
+      expect(
+        computeEvidenceScore(
+          buildCandidate({
+            data_sources_used: ['prometheus', 'opensearch'],
+          }),
+        ),
+      ).toBe(0.8);
     });
 
     it('metric + sustained -> 0.7', () => {
-      expect(computeEvidenceScore(buildCandidate({
-        data_sources_used: ['prometheus'],
-        sustained_minutes: 10,
-      }))).toBe(0.7);
+      expect(
+        computeEvidenceScore(
+          buildCandidate({
+            data_sources_used: ['prometheus'],
+            sustained_minutes: 10,
+          }),
+        ),
+      ).toBe(0.7);
     });
 
     it('log + 10+ samples -> 0.6', () => {
-      expect(computeEvidenceScore(buildCandidate({
-        data_sources_used: ['opensearch'],
-        log_samples: Array.from({ length: 11 }, (_, i) => `e${i}`),
-      }))).toBe(0.6);
+      expect(
+        computeEvidenceScore(
+          buildCandidate({
+            data_sources_used: ['opensearch'],
+            log_samples: Array.from({ length: 11 }, (_, i) => `e${i}`),
+          }),
+        ),
+      ).toBe(0.6);
     });
 
     it('single source -> 0.4', () => {
-      expect(computeEvidenceScore(buildCandidate({
-        data_sources_used: ['prometheus'],
-      }))).toBe(0.4);
+      expect(
+        computeEvidenceScore(
+          buildCandidate({
+            data_sources_used: ['prometheus'],
+          }),
+        ),
+      ).toBe(0.4);
     });
 
     it('data gaps (empty sources) -> 0.3', () => {
-      expect(computeEvidenceScore(buildCandidate({
-        data_sources_used: [],
-      }))).toBe(0.3);
+      expect(
+        computeEvidenceScore(
+          buildCandidate({
+            data_sources_used: [],
+          }),
+        ),
+      ).toBe(0.3);
     });
   });
 
@@ -437,46 +458,66 @@ describe('All confidence lookup table combinations (SPEC-007-3-6)', () => {
     });
 
     it('promote rate > 80% -> 1.0', () => {
-      expect(computeHistoryScore(buildHistory({
-        total_similar: 10,
-        promoted_count: 9,
-        dismissed_count: 1,
-      }))).toBe(1.0);
+      expect(
+        computeHistoryScore(
+          buildHistory({
+            total_similar: 10,
+            promoted_count: 9,
+            dismissed_count: 1,
+          }),
+        ),
+      ).toBe(1.0);
     });
 
     it('promote rate exactly 80% -> 0.7 (not >80%)', () => {
-      expect(computeHistoryScore(buildHistory({
-        total_similar: 10,
-        promoted_count: 8,
-        dismissed_count: 2,
-      }))).toBe(0.7);
+      expect(
+        computeHistoryScore(
+          buildHistory({
+            total_similar: 10,
+            promoted_count: 8,
+            dismissed_count: 2,
+          }),
+        ),
+      ).toBe(0.7);
     });
 
     it('promote rate >= 50% -> 0.7', () => {
-      expect(computeHistoryScore(buildHistory({
-        total_similar: 10,
-        promoted_count: 5,
-        dismissed_count: 5,
-      }))).toBe(0.7);
+      expect(
+        computeHistoryScore(
+          buildHistory({
+            total_similar: 10,
+            promoted_count: 5,
+            dismissed_count: 5,
+          }),
+        ),
+      ).toBe(0.7);
     });
 
     it('dismiss rate > 50% -> 0.2', () => {
-      expect(computeHistoryScore(buildHistory({
-        total_similar: 10,
-        promoted_count: 1,
-        dismissed_count: 6,
-        deferred_count: 3,
-      }))).toBe(0.2);
+      expect(
+        computeHistoryScore(
+          buildHistory({
+            total_similar: 10,
+            promoted_count: 1,
+            dismissed_count: 6,
+            deferred_count: 3,
+          }),
+        ),
+      ).toBe(0.2);
     });
 
     it('everything else -> 0.5', () => {
       // promote < 50%, dismiss <= 50%
-      expect(computeHistoryScore(buildHistory({
-        total_similar: 10,
-        promoted_count: 4,
-        dismissed_count: 4,
-        deferred_count: 2,
-      }))).toBe(0.5);
+      expect(
+        computeHistoryScore(
+          buildHistory({
+            total_similar: 10,
+            promoted_count: 4,
+            dismissed_count: 4,
+            deferred_count: 2,
+          }),
+        ),
+      ).toBe(0.5);
     });
   });
 

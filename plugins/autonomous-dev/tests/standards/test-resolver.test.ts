@@ -11,10 +11,7 @@
 import { performance } from 'node:perf_hooks';
 
 import { resolveStandards } from '../../intake/standards/resolver';
-import {
-  ValidationError,
-  AuthorizationError,
-} from '../../intake/standards/errors';
+import { ValidationError, AuthorizationError } from '../../intake/standards/errors';
 import * as authModule from '../../intake/standards/auth';
 import type { Rule } from '../../intake/standards/types';
 
@@ -40,10 +37,7 @@ function makeRule(overrides: Partial<Rule> & { id: string }): Rule {
 
 describe('resolveStandards — TDD §14 scenarios', () => {
   it('S1: defaults only — every rule sourced as `default`', () => {
-    const defaults = [
-      makeRule({ id: 'plat:rule-a' }),
-      makeRule({ id: 'plat:rule-b' }),
-    ];
+    const defaults = [makeRule({ id: 'plat:rule-a' }), makeRule({ id: 'plat:rule-b' })];
     const r = resolveStandards(defaults, [], [], []);
     expect(r.rules.size).toBe(2);
     expect(r.source.get('plat:rule-a')).toBe('default');
@@ -69,9 +63,7 @@ describe('resolveStandards — TDD §14 scenarios', () => {
 
   it('S4: repo cannot override immutable org rule — throws ValidationError with rule id', () => {
     const def: Rule[] = [];
-    const org = [
-      makeRule({ id: 'plat:locked', immutable: true, description: 'org locked' }),
-    ];
+    const org = [makeRule({ id: 'plat:locked', immutable: true, description: 'org locked' })];
     const repo = [makeRule({ id: 'plat:locked', description: 'repo attempt' })];
     expect(() => resolveStandards(def, org, repo, [])).toThrow(ValidationError);
     expect(() => resolveStandards(def, org, repo, [])).toThrow(/plat:locked/);
@@ -79,20 +71,14 @@ describe('resolveStandards — TDD §14 scenarios', () => {
 
   it('S5: per-request override without admin — throws AuthorizationError', () => {
     const def = [makeRule({ id: 'plat:rule-a' })];
-    const requestRules = [
-      makeRule({ id: 'plat:rule-a', description: 'from request' }),
-    ];
+    const requestRules = [makeRule({ id: 'plat:rule-a', description: 'from request' })];
     // Default isAdminRequest() returns false; do not mock here.
-    expect(() => resolveStandards(def, [], [], requestRules)).toThrow(
-      AuthorizationError,
-    );
+    expect(() => resolveStandards(def, [], [], requestRules)).toThrow(AuthorizationError);
   });
 
   it('S6: per-request override with admin (mocked) — applied, source `request`', () => {
     const def = [makeRule({ id: 'plat:rule-a', description: 'from default' })];
-    const requestRules = [
-      makeRule({ id: 'plat:rule-a', description: 'from request' }),
-    ];
+    const requestRules = [makeRule({ id: 'plat:rule-a', description: 'from request' })];
     const spy = jest.spyOn(authModule, 'isAdminRequest').mockReturnValue(true);
     try {
       const r = resolveStandards(def, [], [], requestRules);
@@ -226,10 +212,7 @@ describe('resolveStandards — inheritance & source tracking', () => {
   it('repo overlay: repo adds rules of its own that no other level defined', () => {
     const def = [makeRule({ id: 'plat:a' })];
     const org = [makeRule({ id: 'org:b' })];
-    const repo = [
-      makeRule({ id: 'repo:c' }),
-      makeRule({ id: 'repo:d' }),
-    ];
+    const repo = [makeRule({ id: 'repo:c' }), makeRule({ id: 'repo:d' })];
     const r = resolveStandards(def, org, repo, []);
     expect(r.rules.size).toBe(4);
     expect(r.source.get('plat:a')).toBe('default');

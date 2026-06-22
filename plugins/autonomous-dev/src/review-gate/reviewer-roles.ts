@@ -20,9 +20,7 @@ export const REVIEWER_ROLES: Record<string, ReviewerRole> = {
     role_id: 'product-analyst',
     role_name: 'Product Analyst',
     document_types: [DocumentType.PRD],
-    designation: new Map<DocumentType, 'primary' | 'specialist'>([
-      [DocumentType.PRD, 'primary'],
-    ]),
+    designation: new Map<DocumentType, 'primary' | 'specialist'>([[DocumentType.PRD, 'primary']]),
     specialization_description:
       'Requirements engineering, clarity assessment, completeness validation, measurability checks, internal consistency analysis.',
     prompt_identity:
@@ -46,9 +44,7 @@ export const REVIEWER_ROLES: Record<string, ReviewerRole> = {
     role_id: 'architect-reviewer',
     role_name: 'Architect Reviewer',
     document_types: [DocumentType.TDD],
-    designation: new Map<DocumentType, 'primary' | 'specialist'>([
-      [DocumentType.TDD, 'primary'],
-    ]),
+    designation: new Map<DocumentType, 'primary' | 'specialist'>([[DocumentType.TDD, 'primary']]),
     specialization_description:
       'Architectural soundness, trade-off analysis, data model integrity, API contract completeness, integration robustness.',
     prompt_identity:
@@ -72,9 +68,7 @@ export const REVIEWER_ROLES: Record<string, ReviewerRole> = {
     role_id: 'delivery-reviewer',
     role_name: 'Delivery Reviewer',
     document_types: [DocumentType.PLAN],
-    designation: new Map<DocumentType, 'primary' | 'specialist'>([
-      [DocumentType.PLAN, 'primary'],
-    ]),
+    designation: new Map<DocumentType, 'primary' | 'specialist'>([[DocumentType.PLAN, 'primary']]),
     specialization_description:
       'Work decomposition realism, dependency identification, effort estimation accuracy, test strategy, design alignment.',
     prompt_identity:
@@ -85,9 +79,7 @@ export const REVIEWER_ROLES: Record<string, ReviewerRole> = {
     role_id: 'implementation-reviewer',
     role_name: 'Implementation Reviewer',
     document_types: [DocumentType.SPEC],
-    designation: new Map<DocumentType, 'primary' | 'specialist'>([
-      [DocumentType.SPEC, 'primary'],
-    ]),
+    designation: new Map<DocumentType, 'primary' | 'specialist'>([[DocumentType.SPEC, 'primary']]),
     specialization_description:
       'Acceptance criteria precision, file path accuracy, test case comprehensiveness, code pattern clarity, plan alignment.',
     prompt_identity:
@@ -98,9 +90,7 @@ export const REVIEWER_ROLES: Record<string, ReviewerRole> = {
     role_id: 'code-quality-reviewer',
     role_name: 'Code Quality Reviewer',
     document_types: [DocumentType.CODE],
-    designation: new Map<DocumentType, 'primary' | 'specialist'>([
-      [DocumentType.CODE, 'primary'],
-    ]),
+    designation: new Map<DocumentType, 'primary' | 'specialist'>([[DocumentType.CODE, 'primary']]),
     specialization_description:
       'Spec compliance, test coverage, code quality, documentation completeness, performance, maintainability.',
     prompt_identity:

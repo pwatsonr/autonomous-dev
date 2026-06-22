@@ -22,7 +22,11 @@ import {
   type GovernanceFlags,
 } from '../../src/runner/governance-integration';
 
-import type { GovernanceConfig, DeploymentInfo, PrometheusClient } from '../../src/governance/types';
+import type {
+  GovernanceConfig,
+  DeploymentInfo,
+  PrometheusClient,
+} from '../../src/governance/types';
 import { AuditLogger } from '../../src/runner/audit-logger';
 
 // ---------------------------------------------------------------------------

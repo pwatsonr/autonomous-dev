@@ -21,15 +21,8 @@ import * as fsPromises from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 
-import {
-  RetryHandler,
-  FailureMode,
-  RetryDecision,
-} from '../../src/parallel/retry-handler';
-import {
-  AgentLifecyclePhase,
-  TrackAssignment,
-} from '../../src/parallel/types';
+import { RetryHandler, FailureMode, RetryDecision } from '../../src/parallel/retry-handler';
+import { AgentLifecyclePhase, TrackAssignment } from '../../src/parallel/types';
 import { AgentSpawner } from '../../src/parallel/agent-spawner';
 import { StatePersister } from '../../src/parallel/state-persister';
 import { WorktreeManager } from '../../src/parallel/worktree-manager';
@@ -39,9 +32,7 @@ import { loadConfig, ParallelConfig } from '../../src/parallel/config';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createAssignment(
-  overrides: Partial<TrackAssignment> = {},
-): TrackAssignment {
+function createAssignment(overrides: Partial<TrackAssignment> = {}): TrackAssignment {
   return {
     trackName: 'track-a',
     worktreePath: '/tmp/fake-worktree',
@@ -97,10 +88,7 @@ describe('RetryHandler', () => {
     );
 
     // Create integration branch
-    execSync(
-      `git -C "${repoRoot}" branch auto/req-001/integration main`,
-      { encoding: 'utf-8' },
-    );
+    execSync(`git -C "${repoRoot}" branch auto/req-001/integration main`, { encoding: 'utf-8' });
 
     // Create a worktree for track-a
     const wtPath = path.join(worktreeDir, 'req-001', 'track-a');
@@ -126,17 +114,9 @@ describe('RetryHandler', () => {
 
     worktreeManager = new WorktreeManager(config, repoRoot, emitter);
     agentSpawner = new AgentSpawner(config, emitter);
-    statePersister = new StatePersister(
-      path.join(tmpDir, 'state'),
-      path.join(tmpDir, 'archive'),
-    );
+    statePersister = new StatePersister(path.join(tmpDir, 'state'), path.join(tmpDir, 'archive'));
 
-    retryHandler = new RetryHandler(
-      worktreeManager,
-      agentSpawner,
-      statePersister,
-      emitter,
-    );
+    retryHandler = new RetryHandler(worktreeManager, agentSpawner, statePersister, emitter);
 
     assignment = createAssignment({
       worktreePath: wtPath,
@@ -177,19 +157,10 @@ describe('RetryHandler', () => {
     it('resets worktree on scratch retry', async () => {
       assignment.retryCount = 0;
       // Write a dirty file
-      fs.writeFileSync(
-        path.join(assignment.worktreePath, 'dirty.txt'),
-        'untracked',
-      );
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.AgentCrash,
-      );
+      fs.writeFileSync(path.join(assignment.worktreePath, 'dirty.txt'), 'untracked');
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.AgentCrash);
       // Verify worktree is clean
-      const status = execSync(
-        `git -C "${assignment.worktreePath}" status --porcelain`,
-      )
+      const status = execSync(`git -C "${assignment.worktreePath}" status --porcelain`)
         .toString()
         .trim();
       expect(status).toBe('');
@@ -198,9 +169,7 @@ describe('RetryHandler', () => {
     it('preserves partial work when commits exist', async () => {
       assignment.retryCount = 0;
       // Create a commit in the worktree
-      execSync(
-        `git -C "${assignment.worktreePath}" commit --allow-empty -m "partial work"`,
-      );
+      execSync(`git -C "${assignment.worktreePath}" commit --allow-empty -m "partial work"`);
       const decision = await retryHandler.handleFailure(
         'req-001',
         assignment,
@@ -213,11 +182,7 @@ describe('RetryHandler', () => {
     it('resets turnsUsed on scratch retry', async () => {
       assignment.retryCount = 0;
       assignment.turnsUsed = 25;
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.BudgetExhausted,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.BudgetExhausted);
       expect(assignment.turnsUsed).toBe(0);
     });
 
@@ -225,14 +190,8 @@ describe('RetryHandler', () => {
       assignment.retryCount = 0;
       assignment.turnsUsed = 25;
       // Add partial work
-      execSync(
-        `git -C "${assignment.worktreePath}" commit --allow-empty -m "partial"`,
-      );
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.AgentCrash,
-      );
+      execSync(`git -C "${assignment.worktreePath}" commit --allow-empty -m "partial"`);
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.AgentCrash);
       expect(assignment.turnsUsed).toBe(25);
     });
   });
@@ -257,21 +216,13 @@ describe('RetryHandler', () => {
       assignment.retryCount = 1;
       const events: any[] = [];
       emitter.on('agent.failed', (e) => events.push(e));
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.PersistentTestFailures,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.PersistentTestFailures);
       expect(events[0].action).toBe('escalated');
     });
 
     it('sets lifecycle phase to Failed on escalation', async () => {
       assignment.retryCount = 1;
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.AgentCrash,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.AgentCrash);
       expect(assignment.lifecyclePhase).toBe(AgentLifecyclePhase.Failed);
     });
   });
@@ -319,11 +270,7 @@ describe('RetryHandler', () => {
       const events: any[] = [];
       emitter.on('agent.failed', (e) => events.push(e));
 
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.AgentCrash,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.AgentCrash);
 
       expect(events.length).toBe(1);
       expect(events[0].type).toBe('agent.failed');
@@ -336,17 +283,11 @@ describe('RetryHandler', () => {
 
     it('emits agent.failed with retry_continue action on partial work retry', async () => {
       assignment.retryCount = 0;
-      execSync(
-        `git -C "${assignment.worktreePath}" commit --allow-empty -m "partial"`,
-      );
+      execSync(`git -C "${assignment.worktreePath}" commit --allow-empty -m "partial"`);
       const events: any[] = [];
       emitter.on('agent.failed', (e) => events.push(e));
 
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.AgentCrash,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.AgentCrash);
 
       expect(events.length).toBe(1);
       expect(events[0].action).toBe('retry_continue');
@@ -358,11 +299,7 @@ describe('RetryHandler', () => {
       const events: any[] = [];
       emitter.on('agent.failed', (e) => events.push(e));
 
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.PersistentTestFailures,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.PersistentTestFailures);
 
       expect(events.length).toBe(1);
       expect(events[0].action).toBe('escalated');
@@ -381,49 +318,32 @@ describe('RetryHandler', () => {
       assignment.retryCount = 0;
 
       // Make the worktree dirty: add tracked and untracked files
-      fs.writeFileSync(
-        path.join(assignment.worktreePath, 'untracked.txt'),
-        'untracked content',
-      );
+      fs.writeFileSync(path.join(assignment.worktreePath, 'untracked.txt'), 'untracked content');
       fs.mkdirSync(path.join(assignment.worktreePath, 'src'), {
         recursive: true,
       });
-      fs.writeFileSync(
-        path.join(assignment.worktreePath, 'src', 'code.ts'),
-        'export const x = 1;',
-      );
+      fs.writeFileSync(path.join(assignment.worktreePath, 'src', 'code.ts'), 'export const x = 1;');
       execSync(
         `git -C "${assignment.worktreePath}" add . && ` +
           `git -C "${assignment.worktreePath}" commit -m "agent work"`,
       );
-      fs.writeFileSync(
-        path.join(assignment.worktreePath, 'more-untracked.txt'),
-        'more stuff',
-      );
+      fs.writeFileSync(path.join(assignment.worktreePath, 'more-untracked.txt'), 'more stuff');
 
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.AgentCrash,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.AgentCrash);
 
       // Verify: no untracked files, no staged changes
-      const status = execSync(
-        `git -C "${assignment.worktreePath}" status --porcelain`,
-      )
+      const status = execSync(`git -C "${assignment.worktreePath}" status --porcelain`)
         .toString()
         .trim();
       expect(status).toBe('');
 
       // Verify: HEAD matches integration branch
-      const headSHA = execSync(
-        `git -C "${assignment.worktreePath}" rev-parse HEAD`,
-        { encoding: 'utf-8' },
-      ).trim();
-      const integrationSHA = execSync(
-        `git -C "${repoRoot}" rev-parse auto/req-001/integration`,
-        { encoding: 'utf-8' },
-      ).trim();
+      const headSHA = execSync(`git -C "${assignment.worktreePath}" rev-parse HEAD`, {
+        encoding: 'utf-8',
+      }).trim();
+      const integrationSHA = execSync(`git -C "${repoRoot}" rev-parse auto/req-001/integration`, {
+        encoding: 'utf-8',
+      }).trim();
       expect(headSHA).toBe(integrationSHA);
     });
 
@@ -434,11 +354,7 @@ describe('RetryHandler', () => {
       assignment.startedAt = '2024-01-01T00:00:00Z';
       assignment.lifecyclePhase = AgentLifecyclePhase.Executing;
 
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.AgentCrash,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.AgentCrash);
 
       expect(assignment.lifecyclePhase).toBe(AgentLifecyclePhase.Spawning);
       expect(assignment.turnsUsed).toBe(0);
@@ -453,15 +369,9 @@ describe('RetryHandler', () => {
       assignment.lifecyclePhase = AgentLifecyclePhase.Executing;
 
       // Add partial work
-      execSync(
-        `git -C "${assignment.worktreePath}" commit --allow-empty -m "partial"`,
-      );
+      execSync(`git -C "${assignment.worktreePath}" commit --allow-empty -m "partial"`);
 
-      await retryHandler.handleFailure(
-        'req-001',
-        assignment,
-        FailureMode.AgentCrash,
-      );
+      await retryHandler.handleFailure('req-001', assignment, FailureMode.AgentCrash);
 
       expect(assignment.lifecyclePhase).toBe(AgentLifecyclePhase.Spawning);
       expect(assignment.turnsUsed).toBe(15); // preserved

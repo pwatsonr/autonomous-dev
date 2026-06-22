@@ -61,11 +61,7 @@ export function createNotificationFramework(
 
   const dndFilter = new DndFilter(config.dnd, clock);
   const fatigueDetector = new FatigueDetector(config.fatigue, clock);
-  const systemicDetector = new SystemicFailureDetector(
-    config.cross_request,
-    auditTrail,
-    clock,
-  );
+  const systemicDetector = new SystemicFailureDetector(config.cross_request, auditTrail, clock);
 
   // Build adapter map with at least CLI
   const adapters = new Map<DeliveryMethod, DeliveryAdapter>();
@@ -74,11 +70,10 @@ export function createNotificationFramework(
   const deliveryManager = new DeliveryManager(
     adapters,
     config.default_method,
-    new Map(
-      Object.entries(config.per_type_overrides) as Array<
-        [string, DeliveryMethod]
-      >,
-    ) as Map<import('./types').NotificationEventType, DeliveryMethod>,
+    new Map(Object.entries(config.per_type_overrides) as Array<[string, DeliveryMethod]>) as Map<
+      import('./types').NotificationEventType,
+      DeliveryMethod
+    >,
     () => {
       console.error(
         '[NotificationFramework] All delivery methods failed. Pipeline should be paused.',
@@ -86,11 +81,7 @@ export function createNotificationFramework(
     },
   );
 
-  const batcher = new NotificationBatcher(
-    config.batching,
-    deliveryManager,
-    timer,
-  );
+  const batcher = new NotificationBatcher(config.batching, deliveryManager, timer);
 
   return new NotificationFramework(
     dndFilter,

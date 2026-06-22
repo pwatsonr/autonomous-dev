@@ -6,7 +6,11 @@ import * as fsp from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { executeDefer } from '../../../src/triage/actions/defer';
-import type { TriageDecision, TriageAuditEntry, TriageAuditLogger } from '../../../src/triage/types';
+import type {
+  TriageDecision,
+  TriageAuditEntry,
+  TriageAuditLogger,
+} from '../../../src/triage/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -49,9 +53,13 @@ function createMockAuditLog(): TriageAuditLogger & { entries: TriageAuditEntry[]
   const entries: TriageAuditEntry[] = [];
   return {
     entries,
-    log(entry: TriageAuditEntry) { entries.push(entry); },
+    log(entry: TriageAuditEntry) {
+      entries.push(entry);
+    },
     logError() {},
-    getEntries() { return entries; },
+    getEntries() {
+      return entries;
+    },
     async flush() {},
   };
 }

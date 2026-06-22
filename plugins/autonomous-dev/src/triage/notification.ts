@@ -21,7 +21,7 @@ export interface NotificationConfig {
   enabled: boolean;
   channel: 'slack' | 'discord';
   webhook_url: string;
-  notify_on: string[];               // Severity levels: ["P0", "P1"]
+  notify_on: string[]; // Severity levels: ["P0", "P1"]
   health_check_timeout_ms: number;
   retry_attempts: number;
   retry_delay_ms: number;
@@ -36,7 +36,7 @@ export interface NotificationPayload {
   baseline: string;
   confidence: number;
   recommended_action: string;
-  commands: string[];                // Formatted command strings
+  commands: string[]; // Formatted command strings
 }
 
 export interface ChannelHealth {
@@ -64,7 +64,7 @@ function sleep(ms: number): Promise<void> {
 export async function postObservationNotification(
   observation: NotificationPayload,
   config: NotificationConfig,
-  logger: AuditLogger
+  logger: AuditLogger,
 ): Promise<{ posted: boolean; error?: string }> {
   if (!config.enabled) {
     return { posted: false, error: 'Notifications disabled' };
@@ -78,7 +78,9 @@ export async function postObservationNotification(
   // Health check
   const health = await checkChannelHealth(config);
   if (!health.reachable) {
-    logger.warn(`Notification channel unreachable: ${health.error}. Falling back to file-only triage.`);
+    logger.warn(
+      `Notification channel unreachable: ${health.error}. Falling back to file-only triage.`,
+    );
     return { posted: false, error: `Channel unreachable: ${health.error}` };
   }
 
@@ -129,9 +131,7 @@ export async function postObservationNotification(
  * Check whether the notification channel is reachable.
  * Sends a lightweight probe (empty payload) or uses the webhook's health endpoint.
  */
-export async function checkChannelHealth(
-  config: NotificationConfig
-): Promise<ChannelHealth> {
+export async function checkChannelHealth(config: NotificationConfig): Promise<ChannelHealth> {
   const start = Date.now();
   try {
     const response = await fetch(config.webhook_url, {
@@ -175,7 +175,7 @@ export async function checkChannelHealth(
 export async function postToWebhook(
   webhookUrl: string,
   message: object,
-  timeoutMs: number = 5000
+  timeoutMs: number = 5000,
 ): Promise<void> {
   await fetch(webhookUrl, {
     method: 'POST',

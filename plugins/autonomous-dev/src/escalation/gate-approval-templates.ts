@@ -16,7 +16,7 @@
  * overrides to add, remove, or modify options per gate type.
  */
 
-import type { EscalationOption } from "./types";
+import type { EscalationOption } from './types';
 
 // ---------------------------------------------------------------------------
 // Gate template type
@@ -24,10 +24,10 @@ import type { EscalationOption } from "./types";
 
 /** The supported gate approval template types. */
 export type GateTemplateType =
-  | "prd_approval"
-  | "code_review"
-  | "deployment_approval"
-  | "security_review";
+  | 'prd_approval'
+  | 'code_review'
+  | 'deployment_approval'
+  | 'security_review';
 
 // ---------------------------------------------------------------------------
 // Custom config type
@@ -37,9 +37,7 @@ export type GateTemplateType =
  * Configuration for customizing gate approval templates.
  * Maps gate types to custom option sets that override defaults.
  */
-export type GateTemplateConfig = Partial<
-  Record<GateTemplateType, EscalationOption[]>
->;
+export type GateTemplateConfig = Partial<Record<GateTemplateType, EscalationOption[]>>;
 
 // ---------------------------------------------------------------------------
 // Default templates
@@ -47,85 +45,85 @@ export type GateTemplateConfig = Partial<
 
 const PRD_APPROVAL_TEMPLATE: EscalationOption[] = [
   {
-    option_id: "opt-1",
-    label: "Approve PRD",
-    action: "approve",
-    description: "Approve the PRD as-is and proceed to implementation",
+    option_id: 'opt-1',
+    label: 'Approve PRD',
+    action: 'approve',
+    description: 'Approve the PRD as-is and proceed to implementation',
   },
   {
-    option_id: "opt-2",
-    label: "Approve with conditions",
-    action: "approve_with_conditions",
-    description: "Approve with specified modifications",
+    option_id: 'opt-2',
+    label: 'Approve with conditions',
+    action: 'approve_with_conditions',
+    description: 'Approve with specified modifications',
   },
   {
-    option_id: "opt-3",
-    label: "Reject PRD",
-    action: "reject",
-    description: "Reject the PRD; pipeline will be cancelled",
+    option_id: 'opt-3',
+    label: 'Reject PRD',
+    action: 'reject',
+    description: 'Reject the PRD; pipeline will be cancelled',
   },
 ];
 
 const CODE_REVIEW_TEMPLATE: EscalationOption[] = [
   {
-    option_id: "opt-1",
-    label: "Approve code",
-    action: "approve",
-    description: "Code passes review; proceed to next phase",
+    option_id: 'opt-1',
+    label: 'Approve code',
+    action: 'approve',
+    description: 'Code passes review; proceed to next phase',
   },
   {
-    option_id: "opt-2",
-    label: "Request changes",
-    action: "retry_with_changes",
-    description: "Code needs modifications; provide feedback for retry",
+    option_id: 'opt-2',
+    label: 'Request changes',
+    action: 'retry_with_changes',
+    description: 'Code needs modifications; provide feedback for retry',
   },
   {
-    option_id: "opt-3",
-    label: "Reject code",
-    action: "reject",
-    description: "Code is fundamentally flawed; cancel the request",
+    option_id: 'opt-3',
+    label: 'Reject code',
+    action: 'reject',
+    description: 'Code is fundamentally flawed; cancel the request',
   },
 ];
 
 const DEPLOYMENT_APPROVAL_TEMPLATE: EscalationOption[] = [
   {
-    option_id: "opt-1",
-    label: "Approve deployment",
-    action: "approve",
-    description: "Proceed with deployment",
+    option_id: 'opt-1',
+    label: 'Approve deployment',
+    action: 'approve',
+    description: 'Proceed with deployment',
   },
   {
-    option_id: "opt-2",
-    label: "Reject deployment",
-    action: "reject",
-    description: "Do not deploy; cancel the request",
+    option_id: 'opt-2',
+    label: 'Reject deployment',
+    action: 'reject',
+    description: 'Do not deploy; cancel the request',
   },
   {
-    option_id: "opt-3",
-    label: "Defer deployment",
-    action: "cancel",
-    description: "Defer deployment to a later time",
+    option_id: 'opt-3',
+    label: 'Defer deployment',
+    action: 'cancel',
+    description: 'Defer deployment to a later time',
   },
 ];
 
 const SECURITY_REVIEW_TEMPLATE: EscalationOption[] = [
   {
-    option_id: "opt-1",
-    label: "Approve (no findings)",
-    action: "approve",
-    description: "Security review passed; no issues found",
+    option_id: 'opt-1',
+    label: 'Approve (no findings)',
+    action: 'approve',
+    description: 'Security review passed; no issues found',
   },
   {
-    option_id: "opt-2",
-    label: "Remediate and retry",
-    action: "retry_with_changes",
-    description: "Security issues found; provide remediation guidance",
+    option_id: 'opt-2',
+    label: 'Remediate and retry',
+    action: 'retry_with_changes',
+    description: 'Security issues found; provide remediation guidance',
   },
   {
-    option_id: "opt-3",
-    label: "Reject (critical findings)",
-    action: "reject",
-    description: "Critical security issues; cancel the request",
+    option_id: 'opt-3',
+    label: 'Reject (critical findings)',
+    action: 'reject',
+    description: 'Critical security issues; cancel the request',
   },
 ];
 
@@ -150,9 +148,7 @@ const DEFAULT_TEMPLATES: Record<GateTemplateType, EscalationOption[]> = {
  * @param gateType  The type of gate approval template to retrieve.
  * @returns An array of EscalationOption objects for the gate type.
  */
-export function getGateApprovalTemplate(
-  gateType: GateTemplateType,
-): EscalationOption[] {
+export function getGateApprovalTemplate(gateType: GateTemplateType): EscalationOption[] {
   const template = DEFAULT_TEMPLATES[gateType];
   return template.map((opt) => ({ ...opt }));
 }

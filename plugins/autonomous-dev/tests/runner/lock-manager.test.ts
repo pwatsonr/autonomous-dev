@@ -39,10 +39,7 @@ describe('LockManager', () => {
   }
 
   /** Helper: write a lock file directly. */
-  async function writeLockDirect(
-    serviceName: string,
-    content: LockFileContent,
-  ): Promise<void> {
+  async function writeLockDirect(serviceName: string, content: LockFileContent): Promise<void> {
     const lockFile = path.join(lockDir, `.lock-${serviceName}`);
     await fs.writeFile(lockFile, JSON.stringify(content), 'utf-8');
   }

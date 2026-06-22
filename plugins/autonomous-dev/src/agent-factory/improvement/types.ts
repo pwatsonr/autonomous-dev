@@ -168,9 +168,7 @@ export class WeaknessReportStore {
         const isBun = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined';
         if (!isBun) {
           const message = err instanceof Error ? err.message : String(err);
-          this.logger?.warn?.(
-            `Failed to initialize SQLite index for weakness reports: ${message}`,
-          );
+          this.logger?.warn?.(`Failed to initialize SQLite index for weakness reports: ${message}`);
         }
       }
     }
@@ -194,7 +192,9 @@ export class WeaknessReportStore {
     // SQLite: insert metadata (secondary index, best-effort).
     if (this.db) {
       try {
-        this.db.prepare(`
+        this.db
+          .prepare(
+            `
           INSERT INTO weakness_reports (
             report_id, agent_name, agent_version, analysis_date,
             overall_assessment, recommendation, weakness_count, strength_count
@@ -202,16 +202,18 @@ export class WeaknessReportStore {
             @report_id, @agent_name, @agent_version, @analysis_date,
             @overall_assessment, @recommendation, @weakness_count, @strength_count
           )
-        `).run({
-          report_id: report.report_id,
-          agent_name: report.agent_name,
-          agent_version: report.agent_version,
-          analysis_date: report.analysis_date,
-          overall_assessment: report.overall_assessment,
-          recommendation: report.recommendation,
-          weakness_count: report.weaknesses.length,
-          strength_count: report.strengths.length,
-        });
+        `,
+          )
+          .run({
+            report_id: report.report_id,
+            agent_name: report.agent_name,
+            agent_version: report.agent_version,
+            analysis_date: report.analysis_date,
+            overall_assessment: report.overall_assessment,
+            recommendation: report.recommendation,
+            weakness_count: report.weaknesses.length,
+            strength_count: report.strengths.length,
+          });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         this.logger?.warn?.(`Failed to insert weakness report into SQLite: ${message}`);
@@ -443,11 +445,7 @@ export interface AnalysisInput {
 // ---------------------------------------------------------------------------
 
 /** The next action determined by the decision engine. */
-export type NextAction =
-  | 'no_action'
-  | 'propose_modification'
-  | 'log_domain_gap'
-  | 'error';
+export type NextAction = 'no_action' | 'propose_modification' | 'log_domain_gap' | 'error';
 
 /** Result of a performance analysis pass. */
 export interface AnalysisResult {
@@ -486,10 +484,10 @@ export type FindingSeverity = 'info' | 'warning' | 'blocker';
 
 /** A finding from the meta-reviewer's 6-point security checklist. */
 export interface MetaReviewFinding {
-  checklist_item: number;         // 1-6
+  checklist_item: number; // 1-6
   severity: FindingSeverity;
   description: string;
-  evidence: string;               // specific text from the proposal that triggered the finding
+  evidence: string; // specific text from the proposal that triggered the finding
 }
 
 /** Result of evaluating a single checklist item. */
@@ -502,13 +500,13 @@ export interface ChecklistResult {
 
 /** Complete result of a meta-review of a proposal. */
 export interface MetaReviewResult {
-  review_id: string;              // UUID v4
+  review_id: string; // UUID v4
   proposal_id: string;
   verdict: MetaReviewVerdict;
   findings: MetaReviewFinding[];
   checklist_results: ChecklistResult[];
-  reviewed_at: string;            // ISO 8601
-  bypassed: boolean;              // true if self-review bypass
+  reviewed_at: string; // ISO 8601
+  bypassed: boolean; // true if self-review bypass
   bypass_reason?: string;
 }
 
@@ -520,14 +518,14 @@ export interface MetaReviewResult {
 export interface RateLimitResult {
   allowed: boolean;
   reason?: string;
-  nextAllowedAt?: string;         // ISO 8601, when rate limit resets
+  nextAllowedAt?: string; // ISO 8601, when rate limit resets
   currentCount: number;
   maxPerWeek: number;
 }
 
 /** A single modification record for rate limit tracking. */
 export interface ModificationRecord {
-  timestamp: string;              // ISO 8601
+  timestamp: string; // ISO 8601
   proposal_id: string;
 }
 
@@ -566,16 +564,16 @@ export interface RunResult {
 /** Pair of run results for both agent versions on the same input. */
 export interface RunPair {
   input: SelectedInput;
-  version_a: RunResult;             // current agent
-  version_b: RunResult;             // proposed agent
+  version_a: RunResult; // current agent
+  version_b: RunResult; // proposed agent
 }
 
 /** Randomized output pair with no version information exposed. */
 export interface RandomizedPair {
   input: SelectedInput;
-  output_1: string;                 // could be version_a or version_b
-  output_2: string;                 // the other one
-  mapping_id: string;               // UUID for the mapping record
+  output_1: string; // could be version_a or version_b
+  output_2: string; // the other one
+  mapping_id: string; // UUID for the mapping record
 }
 
 /** Mapping between randomized labels and actual versions. */
@@ -591,8 +589,8 @@ export interface RandomizationMapping {
 
 /** Per-dimension scores for a single output. */
 export interface DimensionScores {
-  scores: Record<string, number>;   // dimension_name -> score (1.0-5.0)
-  overall: number;                  // weighted mean of dimension scores
+  scores: Record<string, number>; // dimension_name -> score (1.0-5.0)
+  overall: number; // weighted mean of dimension scores
 }
 
 /** Median scores across all scoring rounds. */
@@ -603,7 +601,7 @@ export interface MedianScores {
 
 /** A single scoring round from one reviewer invocation. */
 export interface ScoringRound {
-  round_number: number;             // 1, 2, 3
+  round_number: number; // 1, 2, 3
   reviewer_invocation_id: string;
   output_1_scores: DimensionScores;
   output_2_scores: DimensionScores;
@@ -615,9 +613,9 @@ export interface ScoringRound {
 /** Complete scoring result for a single input pair. */
 export interface ScoringResult {
   input_id: string;
-  rounds: ScoringRound[];           // up to 3 rounds
+  rounds: ScoringRound[]; // up to 3 rounds
   median_scores: MedianScores;
-  scoring_variance: number;         // variance across rounds
+  scoring_variance: number; // variance across rounds
   error?: string;
 }
 
@@ -628,10 +626,10 @@ export interface ScoringResult {
 /** De-randomized comparison result mapping scores to actual versions. */
 export interface ComparisonResult {
   input_id: string;
-  version_a_scores: DimensionScores;    // current agent
-  version_b_scores: DimensionScores;    // proposed agent
-  per_dimension_delta: Record<string, number>;  // proposed - current per dimension
-  overall_delta: number;                 // mean of dimension deltas
+  version_a_scores: DimensionScores; // current agent
+  version_b_scores: DimensionScores; // proposed agent
+  per_dimension_delta: Record<string, number>; // proposed - current per dimension
+  overall_delta: number; // mean of dimension deltas
   outcome: 'proposed_wins' | 'current_wins' | 'tie';
   scoring_variance: number;
 }
@@ -646,7 +644,7 @@ export type ABVerdict = 'positive' | 'negative' | 'inconclusive';
 /** Per-dimension summary within the aggregate decision. */
 export interface DimensionSummary {
   mean_delta: number;
-  improved: boolean;                    // mean_delta > 0
+  improved: boolean; // mean_delta > 0
   dimension_name: string;
 }
 
@@ -659,7 +657,7 @@ export interface ABAggregate {
   total_inputs: number;
   mean_delta: number;
   per_dimension_summary: Record<string, DimensionSummary>;
-  recommendation: string;               // human-readable summary
+  recommendation: string; // human-readable summary
 }
 
 /** A single A/B input record within an evaluation result. */
@@ -686,7 +684,7 @@ export interface TokenConsumption {
 
 /** Complete A/B evaluation result stored per validation run. */
 export interface ABEvaluationResult {
-  evaluation_id: string;                // UUID v4
+  evaluation_id: string; // UUID v4
   proposal_id: string;
   agent_name: string;
   started_at: string;

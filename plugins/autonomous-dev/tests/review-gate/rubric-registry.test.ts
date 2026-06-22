@@ -4,7 +4,12 @@ import {
   RubricNotFoundError,
   RubricValidationError,
 } from '../../src/review-gate/rubric-registry';
-import type { DocumentType, Rubric, RubricCategory, CalibrationExamples } from '../../src/review-gate/types';
+import type {
+  DocumentType,
+  Rubric,
+  RubricCategory,
+  CalibrationExamples,
+} from '../../src/review-gate/types';
 import { PRD_RUBRIC } from '../../src/review-gate/rubrics/prd-rubric';
 import { TDD_RUBRIC } from '../../src/review-gate/rubrics/tdd-rubric';
 import { PLAN_RUBRIC } from '../../src/review-gate/rubrics/plan-rubric';
@@ -106,7 +111,7 @@ describe('RubricRegistry', () => {
   test('getRubric throws RubricNotFoundError for invalid document type', () => {
     expect(() => registry.getRubric('Invalid' as DocumentType)).toThrow(RubricNotFoundError);
     expect(() => registry.getRubric('Invalid' as DocumentType)).toThrow(
-      'No rubric registered for document type: Invalid'
+      'No rubric registered for document type: Invalid',
     );
   });
 
@@ -182,7 +187,7 @@ describe('RubricRegistry', () => {
     ];
     const customRubric = makeRubric(
       { document_type: 'PRD', version: '2.0.0', approval_threshold: 90 },
-      customCategories
+      customCategories,
     );
 
     registry.registerRubric(customRubric);
@@ -322,10 +327,7 @@ describe('RubricRegistry', () => {
     const customCategories: RubricCategory[] = [
       makeCategory({ id: 'override_cat', weight: 100, name: 'Override' }),
     ];
-    const override = makeRubric(
-      { document_type: 'PRD', version: '3.0.0' },
-      customCategories
-    );
+    const override = makeRubric({ document_type: 'PRD', version: '3.0.0' }, customCategories);
     const overrides = new Map<DocumentType, Rubric>([['PRD', override]]);
     const customRegistry = new RubricRegistry(overrides);
 

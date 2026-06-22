@@ -9,12 +9,7 @@
  * Based on SPEC-004-4-2 section 3.
  */
 
-import {
-  ReviewGateRecord,
-  ReviewOutput,
-  MergedFinding,
-  CategoryAggregate,
-} from '../types';
+import { ReviewGateRecord, ReviewOutput, MergedFinding, CategoryAggregate } from '../types';
 import { ReviewMetricsRecord, ReviewerMetric } from './metrics-types';
 import { MetricsStore, writeWithRetry } from './metrics-store';
 
@@ -36,7 +31,7 @@ export interface ReviewGateEventListener {
  * Build a category_id -> aggregate_score map from category aggregates.
  */
 export function buildCategoryScoreMap(
-  categoryAggregates: CategoryAggregate[]
+  categoryAggregates: CategoryAggregate[],
 ): Record<string, number> {
   const map: Record<string, number> = {};
   for (const cat of categoryAggregates) {
@@ -48,9 +43,12 @@ export function buildCategoryScoreMap(
 /**
  * Count findings by severity level.
  */
-export function countFindingsBySeverity(
-  findings: MergedFinding[]
-): { critical: number; major: number; minor: number; suggestion: number } {
+export function countFindingsBySeverity(findings: MergedFinding[]): {
+  critical: number;
+  major: number;
+  minor: number;
+  suggestion: number;
+} {
   const counts = { critical: 0, major: 0, minor: 0, suggestion: 0 };
   for (const finding of findings) {
     if (finding.severity in counts) {
@@ -87,7 +85,7 @@ export function computeWeightedScore(output: ReviewOutput): number {
  */
 export function buildReviewerMetrics(
   reviewerOutputs: ReviewOutput[],
-  aggregateScore: number
+  aggregateScore: number,
 ): ReviewerMetric[] {
   if (reviewerOutputs.length === 0) {
     return [];
@@ -96,8 +94,7 @@ export function buildReviewerMetrics(
   const weightedScores = reviewerOutputs.map((r) => computeWeightedScore(r));
   const mean = weightedScores.reduce((a, b) => a + b, 0) / weightedScores.length;
   const stdDev = Math.sqrt(
-    weightedScores.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) /
-      weightedScores.length
+    weightedScores.reduce((sum, s) => sum + Math.pow(s - mean, 2), 0) / weightedScores.length,
   );
 
   return reviewerOutputs.map((output, i) => {
@@ -111,9 +108,7 @@ export function buildReviewerMetrics(
       weighted_score: Math.round(weightedScore * 100) / 100,
       score_vs_aggregate_delta: Math.round(delta * 100) / 100,
       finding_count: output.findings.length,
-      critical_finding_count: output.findings.filter(
-        (f) => f.severity === 'critical'
-      ).length,
+      critical_finding_count: output.findings.filter((f) => f.severity === 'critical').length,
       is_outlier: deviation > 1.5,
     };
   });
@@ -124,7 +119,7 @@ export function buildReviewerMetrics(
  */
 export function buildMetricsRecord(
   gateRecord: ReviewGateRecord,
-  executionTimeMs: number
+  executionTimeMs: number,
 ): ReviewMetricsRecord {
   return {
     gate_id: gateRecord.gate_id,
@@ -145,10 +140,7 @@ export function buildMetricsRecord(
 
     category_scores: buildCategoryScoreMap(gateRecord.category_aggregates),
     finding_counts: countFindingsBySeverity(gateRecord.merged_findings),
-    reviewer_metrics: buildReviewerMetrics(
-      gateRecord.reviewer_outputs,
-      gateRecord.aggregate_score
-    ),
+    reviewer_metrics: buildReviewerMetrics(gateRecord.reviewer_outputs, gateRecord.aggregate_score),
   };
 }
 
@@ -171,10 +163,7 @@ export class MetricsCollector implements ReviewGateEventListener {
    * Assembles a ReviewMetricsRecord and writes it to the store with retry logic.
    * Write failures are handled gracefully and never block the pipeline.
    */
-  async recordGateMetrics(
-    gateRecord: ReviewGateRecord,
-    executionTimeMs: number
-  ): Promise<void> {
+  async recordGateMetrics(gateRecord: ReviewGateRecord, executionTimeMs: number): Promise<void> {
     const record = buildMetricsRecord(gateRecord, executionTimeMs);
     await writeWithRetry(this.store, record);
   }

@@ -22,16 +22,10 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import {
-  ChainExecutor,
-  type ChainHookInvoker,
-} from '../../intake/chains/executor';
+import { ChainExecutor, type ChainHookInvoker } from '../../intake/chains/executor';
 import { ArtifactRegistry } from '../../intake/chains/artifact-registry';
 import { recoverPending, StateStore } from '../../intake/chains/state-store';
-import {
-  ChainNotApprovedError,
-  ChainStateMissingError,
-} from '../../intake/chains/errors';
+import { ChainNotApprovedError, ChainStateMissingError } from '../../intake/chains/errors';
 import {
   buildGraphFrom,
   buildManifest,
@@ -72,15 +66,11 @@ function approvalGateManifests(): HookManifest[] {
   return [
     buildManifest({
       id: 'security-reviewer',
-      produces: [
-        { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-      ],
+      produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
     }),
     buildManifest({
       id: 'code-fixer',
-      consumes: [
-        { artifact_type: 'security-findings', schema_version: '^1.0' },
-      ],
+      consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
       produces: [
         {
           artifact_type: 'code-patches',
@@ -92,9 +82,7 @@ function approvalGateManifests(): HookManifest[] {
     }),
     buildManifest({
       id: 'downstream-consumer',
-      consumes: [
-        { artifact_type: 'code-patches', schema_version: '^1.0' },
-      ],
+      consumes: [{ artifact_type: 'code-patches', schema_version: '^1.0' }],
     }),
   ];
 }
@@ -125,9 +113,7 @@ describe('SPEC-022-2-03: approval-gate pause behavior', () => {
     const invoker: ChainHookInvoker = async (pid) => {
       downstreamCalls.push(pid);
       if (pid === 'code-fixer') {
-        return [
-          { artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample }];
       }
       return [];
     };
@@ -197,9 +183,7 @@ describe('SPEC-022-2-03: approval-gate pause behavior', () => {
     const invoker: ChainHookInvoker = async (pid) => {
       calls.push(pid);
       if (pid === 'code-fixer') {
-        return [
-          { artifactType: 'code-patches', scanId: 's2', payload: patchesExample },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 's2', payload: patchesExample }];
       }
       return [];
     };
@@ -276,9 +260,7 @@ describe('SPEC-022-2-03: resume() entry point', () => {
   it('throws ChainNotApprovedError when no marker exists; state file preserved', async () => {
     const { exec, chainId } = await pauseChain();
     const statePath = StateStore.statePathFor(tempRoot, chainId);
-    await expect(exec.resume(chainId, tempRoot)).rejects.toBeInstanceOf(
-      ChainNotApprovedError,
-    );
+    await expect(exec.resume(chainId, tempRoot)).rejects.toBeInstanceOf(ChainNotApprovedError);
     // State file still present.
     const stat = await fs.stat(statePath);
     expect(stat.isFile()).toBe(true);
@@ -306,20 +288,14 @@ describe('SPEC-022-2-03: resume() entry point', () => {
       () => undefined,
       async () => [],
     );
-    await expect(exec.resume('any', tempRoot)).rejects.toBeInstanceOf(
-      ChainStateMissingError,
-    );
+    await expect(exec.resume('any', tempRoot)).rejects.toBeInstanceOf(ChainStateMissingError);
   });
 
   it('runs remaining plugins when an approval marker exists and removes the state file', async () => {
     const { exec, stateStore, chainId } = await pauseChain();
 
     // Write the approval marker beside the persisted patches artifact.
-    const markerPath = StateStore.approvalMarkerPathFor(
-      tempRoot,
-      'code-patches',
-      'patches-resume',
-    );
+    const markerPath = StateStore.approvalMarkerPathFor(tempRoot, 'code-patches', 'patches-resume');
     await stateStore.writeApprovalMarker(markerPath, {
       chain_id: chainId,
       artifact_id: 'patches-resume',
@@ -340,11 +316,7 @@ describe('SPEC-022-2-03: resume() entry point', () => {
   it('resume marks failure when a prior artifact was removed', async () => {
     const { exec, stateStore, chainId } = await pauseChain();
     // Write approval marker.
-    const markerPath = StateStore.approvalMarkerPathFor(
-      tempRoot,
-      'code-patches',
-      'patches-resume',
-    );
+    const markerPath = StateStore.approvalMarkerPathFor(tempRoot, 'code-patches', 'patches-resume');
     await stateStore.writeApprovalMarker(markerPath, {
       chain_id: chainId,
       artifact_id: 'patches-resume',
@@ -506,12 +478,8 @@ describe('SPEC-022-2-03: StateStore primitives', () => {
   });
 
   it('rejects path computation for invalid chain ids', () => {
-    expect(() =>
-      StateStore.statePathFor(tempRoot, '../etc/passwd'),
-    ).toThrow(/invalid chainId/);
-    expect(() =>
-      StateStore.statePathFor(tempRoot, 'with/slash'),
-    ).toThrow(/invalid chainId/);
+    expect(() => StateStore.statePathFor(tempRoot, '../etc/passwd')).toThrow(/invalid chainId/);
+    expect(() => StateStore.statePathFor(tempRoot, 'with/slash')).toThrow(/invalid chainId/);
   });
 
   it('writeState then readState round-trips and chmod 0600 holds', async () => {

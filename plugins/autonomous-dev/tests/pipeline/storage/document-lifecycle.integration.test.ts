@@ -56,12 +56,7 @@ describe('Document Lifecycle Integration', () => {
   it('create document -> read back -> content matches', async () => {
     const handle = await createDocument(makeRequest(), dm, templateEngine, idCounter);
 
-    const content = await readDocument(
-      pipelineId,
-      DocumentType.PRD,
-      handle.documentId,
-      dm,
-    );
+    const content = await readDocument(pipelineId, DocumentType.PRD, handle.documentId, dm);
 
     // Verify the read content matches what was written
     expect(content.frontmatter.id).toBe(handle.documentId);
@@ -78,13 +73,7 @@ describe('Document Lifecycle Integration', () => {
   it('create document -> read specific version v1.0 -> content matches', async () => {
     const handle = await createDocument(makeRequest(), dm, templateEngine, idCounter);
 
-    const content = await readVersion(
-      pipelineId,
-      DocumentType.PRD,
-      handle.documentId,
-      '1.0',
-      dm,
-    );
+    const content = await readVersion(pipelineId, DocumentType.PRD, handle.documentId, '1.0', dm);
 
     expect(content.frontmatter.id).toBe(handle.documentId);
     expect(content.frontmatter.title).toBe('Test PRD');
@@ -93,17 +82,18 @@ describe('Document Lifecycle Integration', () => {
   });
 
   it('create 3 documents -> list all -> returns 3 sorted by ID', async () => {
-    await createDocument(
-      makeRequest({ title: 'PRD 1' }),
-      dm, templateEngine, idCounter,
-    );
+    await createDocument(makeRequest({ title: 'PRD 1' }), dm, templateEngine, idCounter);
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD 1', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({ type: DocumentType.PLAN, title: 'Plan 1', depth: 2 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     const results = await listDocuments(pipelineId, dm);
@@ -112,24 +102,23 @@ describe('Document Lifecycle Integration', () => {
 
     // Verify sorted by document ID
     for (let i = 1; i < results.length; i++) {
-      expect(
-        results[i - 1].documentId.localeCompare(results[i].documentId),
-      ).toBeLessThanOrEqual(0);
+      expect(results[i - 1].documentId.localeCompare(results[i].documentId)).toBeLessThanOrEqual(0);
     }
   });
 
   it('create PRD + 2 TDDs -> list with type=TDD -> returns 2', async () => {
-    await createDocument(
-      makeRequest({ title: 'Root PRD' }),
-      dm, templateEngine, idCounter,
-    );
+    await createDocument(makeRequest({ title: 'Root PRD' }), dm, templateEngine, idCounter);
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD Alpha', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD Beta', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     const results = await listDocuments(pipelineId, dm, {
@@ -145,7 +134,9 @@ describe('Document Lifecycle Integration', () => {
   it('create PRD + 2 TDDs -> list with parentId=PRD_ID -> returns 2', async () => {
     const prdHandle = await createDocument(
       makeRequest({ title: 'Root PRD' }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({
@@ -154,7 +145,9 @@ describe('Document Lifecycle Integration', () => {
         depth: 1,
         parentId: prdHandle.documentId,
       }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({
@@ -163,7 +156,9 @@ describe('Document Lifecycle Integration', () => {
         depth: 1,
         parentId: prdHandle.documentId,
       }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     const results = await listDocuments(pipelineId, dm, {

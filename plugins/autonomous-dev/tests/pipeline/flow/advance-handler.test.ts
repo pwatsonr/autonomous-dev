@@ -7,8 +7,15 @@ import {
   AdvanceRequest,
   AdvanceResult,
 } from '../../../src/pipeline/flow/advance-handler';
-import { createInitialPipelineState, PipelineState, DocumentState } from '../../../src/pipeline/flow/pipeline-state';
-import { writePipelineState, readPipelineState } from '../../../src/pipeline/flow/pipeline-state-io';
+import {
+  createInitialPipelineState,
+  PipelineState,
+  DocumentState,
+} from '../../../src/pipeline/flow/pipeline-state';
+import {
+  writePipelineState,
+  readPipelineState,
+} from '../../../src/pipeline/flow/pipeline-state-io';
 import { InvalidTransitionError } from '../../../src/pipeline/flow/document-state-machine';
 import { ProgressionError } from '../../../src/pipeline/flow/progression-rules';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
@@ -68,7 +75,9 @@ describe('advance-handler', () => {
     return state;
   }
 
-  function makeRequest(overrides: Partial<AdvanceRequest> & { action: AdvanceRequest['action']; documentId: string }): AdvanceRequest {
+  function makeRequest(
+    overrides: Partial<AdvanceRequest> & { action: AdvanceRequest['action']; documentId: string },
+  ): AdvanceRequest {
     return {
       pipelineId,
       actorId: 'test-agent',
@@ -78,9 +87,7 @@ describe('advance-handler', () => {
 
   describe('submit_for_review', () => {
     it('draft -> in-review', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'draft' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'draft' })]);
 
       const result = await advancePipeline(
         makeRequest({ action: 'submit_for_review', documentId: 'PRD-001' }),
@@ -96,9 +103,7 @@ describe('advance-handler', () => {
     });
 
     it('revision-requested -> in-review', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'revision-requested' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'revision-requested' })]);
 
       const result = await advancePipeline(
         makeRequest({ action: 'submit_for_review', documentId: 'PRD-001' }),
@@ -113,9 +118,7 @@ describe('advance-handler', () => {
     });
 
     it('rejects if document is approved', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'approved' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'approved' })]);
 
       await expect(
         advancePipeline(
@@ -154,9 +157,7 @@ describe('advance-handler', () => {
     });
 
     it('changes_requested: in-review -> revision-requested', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'in-review' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'in-review' })]);
 
       const result = await advancePipeline(
         makeRequest({
@@ -176,9 +177,7 @@ describe('advance-handler', () => {
     });
 
     it('rejected: in-review -> rejected', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'in-review' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'in-review' })]);
 
       const result = await advancePipeline(
         makeRequest({
@@ -199,7 +198,12 @@ describe('advance-handler', () => {
 
     it('updates reviewIteration and lastReviewScore', async () => {
       await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'in-review', reviewIteration: 1, lastReviewScore: null }),
+        makeDocState({
+          documentId: 'PRD-001',
+          status: 'in-review',
+          reviewIteration: 1,
+          lastReviewScore: null,
+        }),
       ]);
 
       const result = await advancePipeline(
@@ -242,9 +246,7 @@ describe('advance-handler', () => {
     });
 
     it('increments totalReviews metric', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'in-review' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'in-review' })]);
 
       const result = await advancePipeline(
         makeRequest({
@@ -262,9 +264,7 @@ describe('advance-handler', () => {
     });
 
     it('throws when reviewOutcome not provided', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'in-review' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'in-review' })]);
 
       await expect(
         advancePipeline(
@@ -282,9 +282,7 @@ describe('advance-handler', () => {
 
   describe('decompose', () => {
     it('validates gate (approved required)', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'approved' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'approved' })]);
 
       const result = await advancePipeline(
         makeRequest({ action: 'decompose', documentId: 'PRD-001' }),
@@ -298,9 +296,7 @@ describe('advance-handler', () => {
     });
 
     it('rejects draft document', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'draft' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'draft' })]);
 
       await expect(
         advancePipeline(
@@ -313,9 +309,7 @@ describe('advance-handler', () => {
     });
 
     it('rejects in-review document', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'in-review' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'in-review' })]);
 
       await expect(
         advancePipeline(
@@ -330,9 +324,7 @@ describe('advance-handler', () => {
 
   describe('revision_submitted', () => {
     it('revision-requested -> in-review', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'revision-requested' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'revision-requested' })]);
 
       const result = await advancePipeline(
         makeRequest({ action: 'revision_submitted', documentId: 'PRD-001' }),
@@ -348,9 +340,7 @@ describe('advance-handler', () => {
     });
 
     it('rejects if document is draft', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'draft' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'draft' })]);
 
       // draft -> in-review is valid for submit_for_review, but revision_submitted
       // should still use validateTransition which allows draft -> in-review
@@ -368,9 +358,7 @@ describe('advance-handler', () => {
     });
 
     it('rejects if document is approved', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'approved' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'approved' })]);
 
       await expect(
         advancePipeline(
@@ -385,9 +373,7 @@ describe('advance-handler', () => {
 
   describe('all actions', () => {
     it('write pipeline.yaml after state change', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'draft' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'draft' })]);
 
       await advancePipeline(
         makeRequest({ action: 'submit_for_review', documentId: 'PRD-001' }),
@@ -403,9 +389,7 @@ describe('advance-handler', () => {
     });
 
     it('emit at least one event', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'draft' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'draft' })]);
 
       const result = await advancePipeline(
         makeRequest({ action: 'submit_for_review', documentId: 'PRD-001' }),
@@ -469,9 +453,7 @@ describe('advance-handler', () => {
     });
 
     it('metrics persisted to pipeline.yaml', async () => {
-      await setupPipeline([
-        makeDocState({ documentId: 'PRD-001', status: 'draft' }),
-      ]);
+      await setupPipeline([makeDocState({ documentId: 'PRD-001', status: 'draft' })]);
 
       await advancePipeline(
         makeRequest({ action: 'submit_for_review', documentId: 'PRD-001' }),

@@ -71,10 +71,18 @@ function makeDocContent(overrides?: {
 /**
  * Builds a DecompositionRecord.
  */
-function makeRecord(overrides: Partial<DecompositionRecord> & {
-  parentId: string;
-  children: Array<{ id: string; title: string; tracesFrom: string[]; executionMode: 'parallel' | 'sequential'; dependsOn: string[] }>;
-}): DecompositionRecord {
+function makeRecord(
+  overrides: Partial<DecompositionRecord> & {
+    parentId: string;
+    children: Array<{
+      id: string;
+      title: string;
+      tracesFrom: string[];
+      executionMode: 'parallel' | 'sequential';
+      dependsOn: string[];
+    }>;
+  },
+): DecompositionRecord {
   return {
     parentType: DocumentType.PRD,
     parentVersion: '1.0',
@@ -100,14 +108,14 @@ function mockStorage(opts: {
 
   return {
     listDocuments: jest.fn().mockResolvedValue(opts.handles),
-    readDocument: jest.fn().mockImplementation(
-      async (_pipelineId: string, _type: DocumentType, docId: string) => {
+    readDocument: jest
+      .fn()
+      .mockImplementation(async (_pipelineId: string, _type: DocumentType, docId: string) => {
         const content = docContents.get(docId);
         if (content) return content;
         // Return a default content
         return makeDocContent({ id: docId });
-      },
-    ),
+      }),
     getDirectoryManager: jest.fn().mockReturnValue({
       getDecompositionDir: jest.fn().mockReturnValue('/mock/decomposition'),
     }),
@@ -136,9 +144,7 @@ describe('Tree Reconstructor', () => {
   });
 
   test('reconstructs tree with single PRD (root only)', async () => {
-    const handles = [
-      makeHandle({ documentId: 'PRD-001', type: DocumentType.PRD, depth: 0 }),
-    ];
+    const handles = [makeHandle({ documentId: 'PRD-001', type: DocumentType.PRD, depth: 0 })];
     mockRecords = [];
     const storage = mockStorage({ handles, records: [] });
 
@@ -158,36 +164,90 @@ describe('Tree Reconstructor', () => {
   test('reconstructs tree with PRD + 3 TDDs', async () => {
     const handles = [
       makeHandle({ documentId: 'PRD-001', type: DocumentType.PRD, depth: 0 }),
-      makeHandle({ documentId: 'TDD-001-01', type: DocumentType.TDD, depth: 1, parentId: 'PRD-001' }),
-      makeHandle({ documentId: 'TDD-001-02', type: DocumentType.TDD, depth: 1, parentId: 'PRD-001' }),
-      makeHandle({ documentId: 'TDD-001-03', type: DocumentType.TDD, depth: 1, parentId: 'PRD-001' }),
+      makeHandle({
+        documentId: 'TDD-001-01',
+        type: DocumentType.TDD,
+        depth: 1,
+        parentId: 'PRD-001',
+      }),
+      makeHandle({
+        documentId: 'TDD-001-02',
+        type: DocumentType.TDD,
+        depth: 1,
+        parentId: 'PRD-001',
+      }),
+      makeHandle({
+        documentId: 'TDD-001-03',
+        type: DocumentType.TDD,
+        depth: 1,
+        parentId: 'PRD-001',
+      }),
     ];
 
     mockRecords = [
       makeRecord({
         parentId: 'PRD-001',
         children: [
-          { id: 'TDD-001-01', title: 'TDD A', tracesFrom: ['overview'], executionMode: 'parallel', dependsOn: [] },
-          { id: 'TDD-001-02', title: 'TDD B', tracesFrom: ['requirements'], executionMode: 'parallel', dependsOn: [] },
-          { id: 'TDD-001-03', title: 'TDD C', tracesFrom: ['nfr'], executionMode: 'parallel', dependsOn: [] },
+          {
+            id: 'TDD-001-01',
+            title: 'TDD A',
+            tracesFrom: ['overview'],
+            executionMode: 'parallel',
+            dependsOn: [],
+          },
+          {
+            id: 'TDD-001-02',
+            title: 'TDD B',
+            tracesFrom: ['requirements'],
+            executionMode: 'parallel',
+            dependsOn: [],
+          },
+          {
+            id: 'TDD-001-03',
+            title: 'TDD C',
+            tracesFrom: ['nfr'],
+            executionMode: 'parallel',
+            dependsOn: [],
+          },
         ],
       }),
     ];
 
     const docContents = new Map<string, DocumentContent>();
     docContents.set('PRD-001', makeDocContent({ id: 'PRD-001', sibling_count: 1 }));
-    docContents.set('TDD-001-01', makeDocContent({
-      id: 'TDD-001-01', type: DocumentType.TDD, depth: 1, parent_id: 'PRD-001',
-      sibling_index: 0, sibling_count: 3,
-    }));
-    docContents.set('TDD-001-02', makeDocContent({
-      id: 'TDD-001-02', type: DocumentType.TDD, depth: 1, parent_id: 'PRD-001',
-      sibling_index: 1, sibling_count: 3,
-    }));
-    docContents.set('TDD-001-03', makeDocContent({
-      id: 'TDD-001-03', type: DocumentType.TDD, depth: 1, parent_id: 'PRD-001',
-      sibling_index: 2, sibling_count: 3,
-    }));
+    docContents.set(
+      'TDD-001-01',
+      makeDocContent({
+        id: 'TDD-001-01',
+        type: DocumentType.TDD,
+        depth: 1,
+        parent_id: 'PRD-001',
+        sibling_index: 0,
+        sibling_count: 3,
+      }),
+    );
+    docContents.set(
+      'TDD-001-02',
+      makeDocContent({
+        id: 'TDD-001-02',
+        type: DocumentType.TDD,
+        depth: 1,
+        parent_id: 'PRD-001',
+        sibling_index: 1,
+        sibling_count: 3,
+      }),
+    );
+    docContents.set(
+      'TDD-001-03',
+      makeDocContent({
+        id: 'TDD-001-03',
+        type: DocumentType.TDD,
+        depth: 1,
+        parent_id: 'PRD-001',
+        sibling_index: 2,
+        sibling_count: 3,
+      }),
+    );
 
     const storage = mockStorage({ handles, records: mockRecords, docContents });
     const tree = await reconstructTree('pipeline-1', storage);
@@ -212,16 +272,37 @@ describe('Tree Reconstructor', () => {
   test('reconstructs tree with PRD + TDDs + Plans (3 levels)', async () => {
     const handles = [
       makeHandle({ documentId: 'PRD-001', type: DocumentType.PRD, depth: 0 }),
-      makeHandle({ documentId: 'TDD-001-01', type: DocumentType.TDD, depth: 1, parentId: 'PRD-001' }),
-      makeHandle({ documentId: 'PLAN-001-01', type: DocumentType.PLAN, depth: 2, parentId: 'TDD-001-01' }),
-      makeHandle({ documentId: 'PLAN-001-02', type: DocumentType.PLAN, depth: 2, parentId: 'TDD-001-01' }),
+      makeHandle({
+        documentId: 'TDD-001-01',
+        type: DocumentType.TDD,
+        depth: 1,
+        parentId: 'PRD-001',
+      }),
+      makeHandle({
+        documentId: 'PLAN-001-01',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parentId: 'TDD-001-01',
+      }),
+      makeHandle({
+        documentId: 'PLAN-001-02',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parentId: 'TDD-001-01',
+      }),
     ];
 
     mockRecords = [
       makeRecord({
         parentId: 'PRD-001',
         children: [
-          { id: 'TDD-001-01', title: 'TDD A', tracesFrom: ['overview'], executionMode: 'parallel', dependsOn: [] },
+          {
+            id: 'TDD-001-01',
+            title: 'TDD A',
+            tracesFrom: ['overview'],
+            executionMode: 'parallel',
+            dependsOn: [],
+          },
         ],
       }),
       makeRecord({
@@ -230,25 +311,59 @@ describe('Tree Reconstructor', () => {
         childType: DocumentType.PLAN,
         strategy: 'phase',
         children: [
-          { id: 'PLAN-001-01', title: 'Plan A', tracesFrom: ['api'], executionMode: 'parallel', dependsOn: [] },
-          { id: 'PLAN-001-02', title: 'Plan B', tracesFrom: ['ui'], executionMode: 'sequential', dependsOn: ['PLAN-001-01'] },
+          {
+            id: 'PLAN-001-01',
+            title: 'Plan A',
+            tracesFrom: ['api'],
+            executionMode: 'parallel',
+            dependsOn: [],
+          },
+          {
+            id: 'PLAN-001-02',
+            title: 'Plan B',
+            tracesFrom: ['ui'],
+            executionMode: 'sequential',
+            dependsOn: ['PLAN-001-01'],
+          },
         ],
       }),
     ];
 
     const docContents = new Map<string, DocumentContent>();
     docContents.set('PRD-001', makeDocContent({ id: 'PRD-001' }));
-    docContents.set('TDD-001-01', makeDocContent({
-      id: 'TDD-001-01', type: DocumentType.TDD, depth: 1, parent_id: 'PRD-001',
-    }));
-    docContents.set('PLAN-001-01', makeDocContent({
-      id: 'PLAN-001-01', type: DocumentType.PLAN, depth: 2, parent_id: 'TDD-001-01',
-      sibling_index: 0, sibling_count: 2,
-    }));
-    docContents.set('PLAN-001-02', makeDocContent({
-      id: 'PLAN-001-02', type: DocumentType.PLAN, depth: 2, parent_id: 'TDD-001-01',
-      sibling_index: 1, sibling_count: 2, depends_on: ['PLAN-001-01'], execution_mode: 'sequential',
-    }));
+    docContents.set(
+      'TDD-001-01',
+      makeDocContent({
+        id: 'TDD-001-01',
+        type: DocumentType.TDD,
+        depth: 1,
+        parent_id: 'PRD-001',
+      }),
+    );
+    docContents.set(
+      'PLAN-001-01',
+      makeDocContent({
+        id: 'PLAN-001-01',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parent_id: 'TDD-001-01',
+        sibling_index: 0,
+        sibling_count: 2,
+      }),
+    );
+    docContents.set(
+      'PLAN-001-02',
+      makeDocContent({
+        id: 'PLAN-001-02',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parent_id: 'TDD-001-01',
+        sibling_index: 1,
+        sibling_count: 2,
+        depends_on: ['PLAN-001-01'],
+        execution_mode: 'sequential',
+      }),
+    );
 
     const storage = mockStorage({ handles, records: mockRecords, docContents });
     const tree = await reconstructTree('pipeline-1', storage);
@@ -269,14 +384,25 @@ describe('Tree Reconstructor', () => {
   test('nodes have correct parent-child relationships', async () => {
     const handles = [
       makeHandle({ documentId: 'PRD-001', type: DocumentType.PRD, depth: 0 }),
-      makeHandle({ documentId: 'TDD-001-01', type: DocumentType.TDD, depth: 1, parentId: 'PRD-001' }),
+      makeHandle({
+        documentId: 'TDD-001-01',
+        type: DocumentType.TDD,
+        depth: 1,
+        parentId: 'PRD-001',
+      }),
     ];
 
     mockRecords = [
       makeRecord({
         parentId: 'PRD-001',
         children: [
-          { id: 'TDD-001-01', title: 'TDD A', tracesFrom: ['overview'], executionMode: 'parallel', dependsOn: [] },
+          {
+            id: 'TDD-001-01',
+            title: 'TDD A',
+            tracesFrom: ['overview'],
+            executionMode: 'parallel',
+            dependsOn: [],
+          },
         ],
       }),
     ];
@@ -317,30 +443,66 @@ describe('Tree Reconstructor', () => {
   test('nodes have correct dependsOn and executionMode', async () => {
     const handles = [
       makeHandle({ documentId: 'PRD-001', type: DocumentType.PRD, depth: 0 }),
-      makeHandle({ documentId: 'TDD-001-01', type: DocumentType.TDD, depth: 1, parentId: 'PRD-001' }),
-      makeHandle({ documentId: 'TDD-001-02', type: DocumentType.TDD, depth: 1, parentId: 'PRD-001' }),
+      makeHandle({
+        documentId: 'TDD-001-01',
+        type: DocumentType.TDD,
+        depth: 1,
+        parentId: 'PRD-001',
+      }),
+      makeHandle({
+        documentId: 'TDD-001-02',
+        type: DocumentType.TDD,
+        depth: 1,
+        parentId: 'PRD-001',
+      }),
     ];
 
     mockRecords = [
       makeRecord({
         parentId: 'PRD-001',
         children: [
-          { id: 'TDD-001-01', title: 'TDD A', tracesFrom: ['overview'], executionMode: 'parallel', dependsOn: [] },
-          { id: 'TDD-001-02', title: 'TDD B', tracesFrom: ['requirements'], executionMode: 'sequential', dependsOn: ['TDD-001-01'] },
+          {
+            id: 'TDD-001-01',
+            title: 'TDD A',
+            tracesFrom: ['overview'],
+            executionMode: 'parallel',
+            dependsOn: [],
+          },
+          {
+            id: 'TDD-001-02',
+            title: 'TDD B',
+            tracesFrom: ['requirements'],
+            executionMode: 'sequential',
+            dependsOn: ['TDD-001-01'],
+          },
         ],
       }),
     ];
 
     const docContents = new Map<string, DocumentContent>();
     docContents.set('PRD-001', makeDocContent({ id: 'PRD-001' }));
-    docContents.set('TDD-001-01', makeDocContent({
-      id: 'TDD-001-01', type: DocumentType.TDD, depth: 1, parent_id: 'PRD-001',
-      execution_mode: 'parallel', depends_on: [],
-    }));
-    docContents.set('TDD-001-02', makeDocContent({
-      id: 'TDD-001-02', type: DocumentType.TDD, depth: 1, parent_id: 'PRD-001',
-      execution_mode: 'sequential', depends_on: ['TDD-001-01'],
-    }));
+    docContents.set(
+      'TDD-001-01',
+      makeDocContent({
+        id: 'TDD-001-01',
+        type: DocumentType.TDD,
+        depth: 1,
+        parent_id: 'PRD-001',
+        execution_mode: 'parallel',
+        depends_on: [],
+      }),
+    );
+    docContents.set(
+      'TDD-001-02',
+      makeDocContent({
+        id: 'TDD-001-02',
+        type: DocumentType.TDD,
+        depth: 1,
+        parent_id: 'PRD-001',
+        execution_mode: 'sequential',
+        depends_on: ['TDD-001-01'],
+      }),
+    );
 
     const storage = mockStorage({ handles, records: mockRecords, docContents });
     const tree = await reconstructTree('pipeline-1', storage);
@@ -366,9 +528,7 @@ describe('Tree Reconstructor', () => {
   });
 
   test('handles pipeline with no decomposition records (single root document)', async () => {
-    const handles = [
-      makeHandle({ documentId: 'PRD-001', type: DocumentType.PRD, depth: 0 }),
-    ];
+    const handles = [makeHandle({ documentId: 'PRD-001', type: DocumentType.PRD, depth: 0 })];
     mockRecords = [];
     const storage = mockStorage({ handles, records: [] });
 

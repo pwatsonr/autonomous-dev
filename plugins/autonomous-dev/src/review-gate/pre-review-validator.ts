@@ -15,10 +15,7 @@ import type { DocumentSectionMappings } from './section-mappings';
 /**
  * Required frontmatter fields and their expected types for each document type.
  */
-const FRONTMATTER_SCHEMAS: Record<
-  string,
-  { field: string; expected_type: string }[]
-> = {
+const FRONTMATTER_SCHEMAS: Record<string, { field: string; expected_type: string }[]> = {
   PRD: [
     { field: 'title', expected_type: 'string' },
     { field: 'status', expected_type: 'string' },
@@ -84,7 +81,7 @@ type GetSectionMappingsFn = (documentType: DocumentType) => DocumentSectionMappi
 export class PreReviewValidator {
   constructor(
     private sectionMappings: GetSectionMappingsFn,
-    private documentStore: DocumentStoreInterface
+    private documentStore: DocumentStoreInterface,
   ) {}
 
   /**
@@ -98,7 +95,7 @@ export class PreReviewValidator {
    */
   async validate(
     document: DocumentForValidation,
-    documentType: DocumentType
+    documentType: DocumentType,
   ): Promise<PreReviewValidationResult> {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];

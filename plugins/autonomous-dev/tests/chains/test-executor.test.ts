@@ -51,18 +51,12 @@ describe('ChainExecutor', () => {
     return [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
-        consumes: [
-          { artifact_type: 'security-findings', schema_version: '^1.0' },
-        ],
-        produces: [
-          { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
-        ],
+        consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+        produces: [{ artifact_type: 'code-patches', schema_version: '1.0', format: 'json' }],
       }),
     ];
   }
@@ -102,9 +96,7 @@ describe('ChainExecutor', () => {
   it('seed artifact failing schema validation: returns ok:false with 1 step (validation error); no downstream invocation', async () => {
     const manifests = twoPluginManifests();
     const graph = buildGraphFrom(manifests);
-    const invokerMock = jest.fn<Promise<ChainHookOutput[]>, [string, unknown]>(
-      async () => [],
-    );
+    const invokerMock = jest.fn<Promise<ChainHookOutput[]>, [string, unknown]>(async () => []);
     const exec = buildExecutor(graph, registry, manifests, {
       invoker: invokerMock as unknown as ChainHookInvoker,
     });
@@ -217,16 +209,12 @@ describe('ChainExecutor', () => {
     const manifests: HookManifest[] = [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
         consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
-        produces: [
-          { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'code-patches', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'indep-consumer',
@@ -260,9 +248,7 @@ describe('ChainExecutor', () => {
     const manifests: HookManifest[] = [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       // Wants code-patches; nothing in this run produces it. The id sorts
       // lex-after 'security-reviewer' so it appears AFTER the trigger in
@@ -319,15 +305,11 @@ describe('ChainExecutor', () => {
         payload: securityExample,
       },
     );
-    expect(result.steps.find((s) => s.pluginId === 'code-fixer')?.status).toBe(
-      'error',
-    );
-    expect(result.steps.find((s) => s.pluginId === 'audit-logger')?.status).toBe(
-      'skipped',
-    );
+    expect(result.steps.find((s) => s.pluginId === 'code-fixer')?.status).toBe('error');
+    expect(result.steps.find((s) => s.pluginId === 'audit-logger')?.status).toBe('skipped');
   });
 
-  it('each successful step\'s durationMs > 0', async () => {
+  it("each successful step's durationMs > 0", async () => {
     const manifests = twoPluginManifests();
     const graph = buildGraphFrom(manifests);
     const invoker: ChainHookInvoker = async () => [
@@ -353,9 +335,7 @@ describe('ChainExecutor', () => {
     const graph = buildGraphFrom(manifests);
     const invoker: ChainHookInvoker = async (pid) => {
       if (pid === 'code-fixer') {
-        return [
-          { artifactType: 'code-patches', scanId: 'p1', payload: patchesExample },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 'p1', payload: patchesExample }];
       }
       return [];
     };
@@ -371,19 +351,11 @@ describe('ChainExecutor', () => {
     );
     await expect(
       fs.stat(
-        path.join(
-          tempRoot,
-          '.autonomous-dev',
-          'artifacts',
-          'security-findings',
-          'scan-1.json',
-        ),
+        path.join(tempRoot, '.autonomous-dev', 'artifacts', 'security-findings', 'scan-1.json'),
       ),
     ).resolves.toBeDefined();
     await expect(
-      fs.stat(
-        path.join(tempRoot, '.autonomous-dev', 'artifacts', 'code-patches', 'p1.json'),
-      ),
+      fs.stat(path.join(tempRoot, '.autonomous-dev', 'artifacts', 'code-patches', 'p1.json')),
     ).resolves.toBeDefined();
   });
 

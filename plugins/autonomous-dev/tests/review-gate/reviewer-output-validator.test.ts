@@ -8,15 +8,13 @@ import type { Rubric } from '../../src/review-gate/types';
 /**
  * Creates a minimal rubric with the given category definitions.
  */
-function makeRubric(
-  categories: { id: string; name: string; weight: number }[],
-): Rubric {
+function makeRubric(categories: { id: string; name: string; weight: number }[]): Rubric {
   return {
     document_type: 'PRD',
     version: '1.0.0',
     approval_threshold: 85,
     total_weight: 100,
-    categories: categories.map(c => ({
+    categories: categories.map((c) => ({
       id: c.id,
       name: c.name,
       weight: c.weight,
@@ -155,7 +153,11 @@ describe('ReviewerOutputValidator', () => {
       "summary": "Fine overall.",
     }`;
 
-    const result = validator.validateAndParse(jsonWithTrailingComma, DEFAULT_RUBRIC, SYSTEM_REVIEWER_ID);
+    const result = validator.validateAndParse(
+      jsonWithTrailingComma,
+      DEFAULT_RUBRIC,
+      SYSTEM_REVIEWER_ID,
+    );
     expect(result.success).toBe(true);
     expect(result.review_output).not.toBeNull();
   });
@@ -231,7 +233,7 @@ describe('ReviewerOutputValidator', () => {
     expect(result.review_output).not.toBeNull();
 
     const clarityScore = result.review_output!.category_scores.find(
-      cs => cs.category_id === 'clarity',
+      (cs) => cs.category_id === 'clarity',
     );
     expect(clarityScore!.score).toBe(100);
     expect(result.warnings).toContainEqual(
@@ -264,7 +266,7 @@ describe('ReviewerOutputValidator', () => {
     expect(result.review_output).not.toBeNull();
 
     const clarityScore = result.review_output!.category_scores.find(
-      cs => cs.category_id === 'clarity',
+      (cs) => cs.category_id === 'clarity',
     );
     expect(clarityScore!.score).toBe(0);
     expect(result.warnings).toContainEqual(
@@ -291,7 +293,7 @@ describe('ReviewerOutputValidator', () => {
     expect(result.review_output!.category_scores).toHaveLength(3);
 
     const consistencyScore = result.review_output!.category_scores.find(
-      cs => cs.category_id === 'consistency',
+      (cs) => cs.category_id === 'consistency',
     );
     expect(consistencyScore).toBeDefined();
     expect(consistencyScore!.score).toBe(0);
@@ -299,7 +301,7 @@ describe('ReviewerOutputValidator', () => {
 
     // Should have auto-generated finding
     const sysFinding = result.review_output!.findings.find(
-      f => f.id === 'sys-missing-consistency',
+      (f) => f.id === 'sys-missing-consistency',
     );
     expect(sysFinding).toBeDefined();
     expect(sysFinding!.severity).toBe('critical');
@@ -327,12 +329,12 @@ describe('ReviewerOutputValidator', () => {
     expect(result.success).toBe(true);
 
     // 3 auto-generated findings (for consistency, testability, risk)
-    const sysFindings = result.review_output!.findings.filter(f =>
+    const sysFindings = result.review_output!.findings.filter((f) =>
       f.id.startsWith('sys-missing-'),
     );
     expect(sysFindings).toHaveLength(3);
 
-    expect(sysFindings.map(f => f.category_id).sort()).toEqual([
+    expect(sysFindings.map((f) => f.category_id).sort()).toEqual([
       'consistency',
       'risk',
       'testability',
@@ -360,9 +362,7 @@ describe('ReviewerOutputValidator', () => {
     const result = validator.validateAndParse(output, DEFAULT_RUBRIC, SYSTEM_REVIEWER_ID);
 
     expect(result.success).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining("'evidence'"),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining("'evidence'"));
   });
 
   // 12. Critical finding missing critical_sub
@@ -386,11 +386,9 @@ describe('ReviewerOutputValidator', () => {
     const result = validator.validateAndParse(output, DEFAULT_RUBRIC, SYSTEM_REVIEWER_ID);
 
     expect(result.success).toBe(true);
-    const finding = result.review_output!.findings.find(f => f.id === 'f-001');
+    const finding = result.review_output!.findings.find((f) => f.id === 'f-001');
     expect(finding!.critical_sub).toBe('blocking');
-    expect(result.warnings).toContainEqual(
-      expect.stringContaining("no critical_sub"),
-    );
+    expect(result.warnings).toContainEqual(expect.stringContaining('no critical_sub'));
   });
 
   // 13. Major finding missing suggested_resolution
@@ -414,9 +412,7 @@ describe('ReviewerOutputValidator', () => {
     const result = validator.validateAndParse(output, DEFAULT_RUBRIC, SYSTEM_REVIEWER_ID);
 
     expect(result.success).toBe(true);
-    expect(result.warnings).toContainEqual(
-      expect.stringContaining("no suggested_resolution"),
-    );
+    expect(result.warnings).toContainEqual(expect.stringContaining('no suggested_resolution'));
   });
 
   // 14. Invalid severity value
@@ -440,9 +436,7 @@ describe('ReviewerOutputValidator', () => {
     const result = validator.validateAndParse(output, DEFAULT_RUBRIC, SYSTEM_REVIEWER_ID);
 
     expect(result.success).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining("invalid severity"),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('invalid severity'));
   });
 
   // 15. Reviewer ID override
@@ -463,9 +457,7 @@ describe('ReviewerOutputValidator', () => {
     const result = validator.validateAndParse(output, DEFAULT_RUBRIC, SYSTEM_REVIEWER_ID);
 
     expect(result.success).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('category_scores'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('category_scores'));
   });
 
   // 17. Invalid timestamp format
@@ -475,9 +467,7 @@ describe('ReviewerOutputValidator', () => {
     const result = validator.validateAndParse(output, DEFAULT_RUBRIC, SYSTEM_REVIEWER_ID);
 
     expect(result.success).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('timestamp'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('timestamp'));
   });
 
   // 18. Missing summary
@@ -489,8 +479,6 @@ describe('ReviewerOutputValidator', () => {
     const result = validator.validateAndParse(output, DEFAULT_RUBRIC, SYSTEM_REVIEWER_ID);
 
     expect(result.success).toBe(false);
-    expect(result.errors).toContainEqual(
-      expect.stringContaining('summary'),
-    );
+    expect(result.errors).toContainEqual(expect.stringContaining('summary'));
   });
 });

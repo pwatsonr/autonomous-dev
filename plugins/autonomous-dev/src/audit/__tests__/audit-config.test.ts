@@ -78,9 +78,7 @@ describe('loadAuditConfig', () => {
     });
 
     expect(config.retention.active_days).toBe(90);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('active_days'),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('active_days'));
 
     warnSpy.mockRestore();
   });
@@ -109,9 +107,7 @@ describe('loadAuditConfig', () => {
     });
 
     expect(config.integrity.hash_chain_enabled).toBe(false);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('hash_chain_enabled'),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('hash_chain_enabled'));
 
     warnSpy.mockRestore();
   });

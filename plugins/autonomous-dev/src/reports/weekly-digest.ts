@@ -96,9 +96,7 @@ export function computeIsoWeek(date: Date): string {
   // Set to nearest Thursday (ISO 8601 week date algorithm)
   d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
   const yearStart = new Date(d.getFullYear(), 0, 1);
-  const weekNum = Math.ceil(
-    ((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
-  );
+  const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
   return `${d.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
 }
 
@@ -244,7 +242,11 @@ export function computeSummaryMetrics(observations: ObservationForDigest[]): Dig
 
   // Triage decision counts
   const triageDecisions: Record<string, number> = {
-    promote: 0, dismiss: 0, defer: 0, investigate: 0, pending: 0,
+    promote: 0,
+    dismiss: 0,
+    defer: 0,
+    investigate: 0,
+    pending: 0,
   };
   for (const obs of observations) {
     const decision = obs.triage_decision ?? 'pending';
@@ -278,12 +280,14 @@ export function computeSummaryMetrics(observations: ObservationForDigest[]): Dig
     }
   }
 
-  const avgTriageP0P1 = latenciesP0P1.length > 0
-    ? round(latenciesP0P1.reduce((a, b) => a + b, 0) / latenciesP0P1.length, 1)
-    : null;
-  const avgTriageP2P3 = latenciesP2P3.length > 0
-    ? round(latenciesP2P3.reduce((a, b) => a + b, 0) / latenciesP2P3.length, 1)
-    : null;
+  const avgTriageP0P1 =
+    latenciesP0P1.length > 0
+      ? round(latenciesP0P1.reduce((a, b) => a + b, 0) / latenciesP0P1.length, 1)
+      : null;
+  const avgTriageP2P3 =
+    latenciesP2P3.length > 0
+      ? round(latenciesP2P3.reduce((a, b) => a + b, 0) / latenciesP2P3.length, 1)
+      : null;
 
   // Average tokens per run
   // Collect unique run IDs and their total tokens
@@ -293,9 +297,10 @@ export function computeSummaryMetrics(observations: ObservationForDigest[]): Dig
     const existing = tokensByRun.get(obs.observation_run_id) ?? 0;
     tokensByRun.set(obs.observation_run_id, existing + obs.tokens_consumed);
   }
-  const avgTokens = tokensByRun.size > 0
-    ? Math.round([...tokensByRun.values()].reduce((a, b) => a + b, 0) / tokensByRun.size)
-    : 0;
+  const avgTokens =
+    tokensByRun.size > 0
+      ? Math.round([...tokensByRun.values()].reduce((a, b) => a + b, 0) / tokensByRun.size)
+      : 0;
 
   return {
     total_observations: total,
@@ -318,12 +323,15 @@ export function computeSummaryMetrics(observations: ObservationForDigest[]): Dig
  * Compute per-service breakdown of observations.
  */
 export function computeServiceBreakdown(observations: ObservationForDigest[]): ServiceBreakdown[] {
-  const byService = new Map<string, {
-    total: number;
-    p0p1: number;
-    promoted: number;
-    dismissed: number;
-  }>();
+  const byService = new Map<
+    string,
+    {
+      total: number;
+      p0p1: number;
+      promoted: number;
+      dismissed: number;
+    }
+  >();
 
   for (const obs of observations) {
     const entry = byService.get(obs.service) ?? { total: 0, p0p1: 0, promoted: 0, dismissed: 0 };
@@ -417,12 +425,15 @@ export function detectRecurringPatterns(
   _now: Date,
 ): RecurringPattern[] {
   // Group by service + error_class (or type if no error_class)
-  const groups = new Map<string, {
-    service: string;
-    pattern: string;
-    count: number;
-    hasOscillation: boolean;
-  }>();
+  const groups = new Map<
+    string,
+    {
+      service: string;
+      pattern: string;
+      count: number;
+      hasOscillation: boolean;
+    }
+  >();
 
   for (const obs of observations) {
     const pattern = obs.error_class ?? obs.type;
@@ -471,8 +482,8 @@ export function generateRecommendations(
     if (pattern.status === 'OSCILLATING') {
       recs.push(
         `**${pattern.service} ${pattern.pattern}**: Oscillation detected ` +
-        `(${pattern.occurrences_30d} in 30d). Recommend architectural review ` +
-        `of ${pattern.pattern.toLowerCase().replace(/error$/i, '')} strategy.`,
+          `(${pattern.occurrences_30d} in 30d). Recommend architectural review ` +
+          `of ${pattern.pattern.toLowerCase().replace(/error$/i, '')} strategy.`,
       );
     }
   }
@@ -482,7 +493,7 @@ export function generateRecommendations(
   if (summary.signal_to_noise_ratio !== null && summary.signal_to_noise_ratio < TARGET_SNR) {
     recs.push(
       `**Signal-to-noise ratio below target (${summary.signal_to_noise_ratio.toFixed(1)}% vs ${TARGET_SNR}%)**: ` +
-      `Consider tightening P2/P3 thresholds or adding more exclusion patterns.`,
+        `Consider tightening P2/P3 thresholds or adding more exclusion patterns.`,
     );
   }
 
@@ -490,7 +501,7 @@ export function generateRecommendations(
   if ((summary.by_severity['P0'] ?? 0) > 3) {
     recs.push(
       `**High P0 count (${summary.by_severity['P0']})**: ` +
-      `Multiple critical issues detected. Consider an incident review.`,
+        `Multiple critical issues detected. Consider an incident review.`,
     );
   }
 
@@ -498,7 +509,7 @@ export function generateRecommendations(
   if (summary.avg_triage_latency_p0p1_hours !== null && summary.avg_triage_latency_p0p1_hours > 4) {
     recs.push(
       `**P0/P1 triage latency (${summary.avg_triage_latency_p0p1_hours}h) exceeds 4h target**: ` +
-      `Consider enabling notification-based triage or adding backup triagers.`,
+        `Consider enabling notification-based triage or adding backup triagers.`,
     );
   }
 
@@ -545,7 +556,9 @@ export function renderDigest(
   sections.push(`| Observations by type | ${formatTypeCounts(data.summary.by_type)} |`);
   sections.push(`| Triage decisions | ${formatTriageCounts(data.summary.triage_decisions)} |`);
   sections.push(`| Signal-to-noise ratio | ${data.summary.signal_to_noise_display} |`);
-  sections.push(`| Average triage latency | P0/P1: ${formatLatency(data.summary.avg_triage_latency_p0p1_hours)}, P2/P3: ${formatLatency(data.summary.avg_triage_latency_p2p3_hours)} |`);
+  sections.push(
+    `| Average triage latency | P0/P1: ${formatLatency(data.summary.avg_triage_latency_p0p1_hours)}, P2/P3: ${formatLatency(data.summary.avg_triage_latency_p2p3_hours)} |`,
+  );
   sections.push(`| Average tokens per run | ${data.summary.avg_tokens_per_run.toLocaleString()} |`);
   sections.push('');
 
@@ -555,7 +568,9 @@ export function renderDigest(
   sections.push('| Service | Observations | P0/P1 | Promoted | Dismissed |');
   sections.push('|---------|-------------|-------|----------|-----------|');
   for (const svc of data.byService) {
-    sections.push(`| ${svc.service} | ${svc.total_observations} | ${svc.p0_p1_count} | ${svc.promoted} | ${svc.dismissed} |`);
+    sections.push(
+      `| ${svc.service} | ${svc.total_observations} | ${svc.p0_p1_count} | ${svc.promoted} | ${svc.dismissed} |`,
+    );
   }
   sections.push('');
 
@@ -566,7 +581,9 @@ export function renderDigest(
     sections.push('| Observation | PRD | Deployed | Pre-Fix | Post-Fix | Result |');
     sections.push('|-------------|-----|----------|---------|----------|--------|');
     for (const e of data.effectiveness) {
-      sections.push(`| ${e.observation_id} | ${e.prd_id} | ${e.deployed_date} | ${e.pre_fix_summary} | ${e.post_fix_summary} | ${e.result} |`);
+      sections.push(
+        `| ${e.observation_id} | ${e.prd_id} | ${e.deployed_date} | ${e.pre_fix_summary} | ${e.post_fix_summary} | ${e.result} |`,
+      );
     }
   } else {
     sections.push('No effectiveness results this period.');
@@ -618,9 +635,7 @@ export function formatDate(d: Date): string {
  * Example: "P0: 1, P1: 3, P2: 7, P3: 3"
  */
 export function formatSeverityCounts(counts: Record<string, number>): string {
-  return ['P0', 'P1', 'P2', 'P3']
-    .map((k) => `${k}: ${counts[k] ?? 0}`)
-    .join(', ');
+  return ['P0', 'P1', 'P2', 'P3'].map((k) => `${k}: ${counts[k] ?? 0}`).join(', ');
 }
 
 /**

@@ -37,7 +37,10 @@ import {
   PanelAssemblyService,
   ReviewerAssignment,
 } from '../../src/review-gate/panel-assembly-service';
-import { BlindScoringContextFilter, DocumentForReview } from '../../src/review-gate/blind-scoring-context-filter';
+import {
+  BlindScoringContextFilter,
+  DocumentForReview,
+} from '../../src/review-gate/blind-scoring-context-filter';
 import { ReviewerPromptAssembler } from '../../src/review-gate/reviewer-prompt-assembler';
 import {
   ReviewerExecutor,
@@ -83,19 +86,15 @@ interface MockReviewerResponse {
 }
 
 function createMockLLMAdapter(
-  responses: Map<number, MockReviewerResponse> | MockReviewerResponse
+  responses: Map<number, MockReviewerResponse> | MockReviewerResponse,
 ): LLMAdapter {
   const defaultResponse: MockReviewerResponse =
-    responses instanceof Map
-      ? { scores: {} }
-      : responses;
+    responses instanceof Map ? { scores: {} } : responses;
 
   return {
     invoke: jest.fn(async (_prompt: any, agentSeed: number) => {
       const response =
-        responses instanceof Map
-          ? responses.get(agentSeed) ?? defaultResponse
-          : defaultResponse;
+        responses instanceof Map ? (responses.get(agentSeed) ?? defaultResponse) : defaultResponse;
 
       if (response.shouldFail) {
         throw new Error('LLM invocation failed');
@@ -181,15 +180,13 @@ function createMockExecutorPool(): ExecutorAgentPool & { instances: Map<string, 
 // Mock Score Aggregator
 // ---------------------------------------------------------------------------
 
-function createMockScoreAggregator(
-  scorePerIteration?: number[]
-): ScoreAggregatorInterface {
+function createMockScoreAggregator(scorePerIteration?: number[]): ScoreAggregatorInterface {
   let callCount = 0;
   return {
     aggregateScores(
       reviewOutputs: ReviewOutput[],
       rubric: Rubric,
-      method: 'mean' | 'median' | 'min'
+      method: 'mean' | 'median' | 'min',
     ): AggregationResult {
       let aggregateScore: number;
 
@@ -203,56 +200,44 @@ function createMockScoreAggregator(
           const perReviewer = reviewOutputs.map((output) => {
             let totalWeighted = 0;
             for (const cat of rubric.categories) {
-              const catScore = output.category_scores.find(
-                (cs) => cs.category_id === cat.id
-              );
+              const catScore = output.category_scores.find((cs) => cs.category_id === cat.id);
               totalWeighted += (catScore?.score ?? 0) * (cat.weight / 100);
             }
             return totalWeighted;
           });
 
           if (method === 'mean') {
-            aggregateScore =
-              perReviewer.reduce((a, b) => a + b, 0) / perReviewer.length;
+            aggregateScore = perReviewer.reduce((a, b) => a + b, 0) / perReviewer.length;
           } else if (method === 'min') {
             aggregateScore = Math.min(...perReviewer);
           } else {
             const sorted = [...perReviewer].sort((a, b) => a - b);
             const mid = Math.floor(sorted.length / 2);
             aggregateScore =
-              sorted.length % 2 === 0
-                ? (sorted[mid - 1] + sorted[mid]) / 2
-                : sorted[mid];
+              sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
           }
         }
       }
       callCount++;
 
-      const categoryAggregates: CategoryAggregateResult[] = rubric.categories.map(
-        (cat) => {
-          const perReviewerScores = reviewOutputs.map((output) => {
-            const cs = output.category_scores.find(
-              (c) => c.category_id === cat.id
-            );
-            return { reviewer_id: output.reviewer_id, score: cs?.score ?? 0 };
-          });
-          const scores = perReviewerScores.map((s) => s.score);
-          const catAgg = scores.length > 0
-            ? scores.reduce((a, b) => a + b, 0) / scores.length
-            : 0;
+      const categoryAggregates: CategoryAggregateResult[] = rubric.categories.map((cat) => {
+        const perReviewerScores = reviewOutputs.map((output) => {
+          const cs = output.category_scores.find((c) => c.category_id === cat.id);
+          return { reviewer_id: output.reviewer_id, score: cs?.score ?? 0 };
+        });
+        const scores = perReviewerScores.map((s) => s.score);
+        const catAgg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
 
-          return {
-            category_id: cat.id,
-            category_name: cat.name,
-            weight: cat.weight,
-            aggregate_score: catAgg,
-            per_reviewer_scores: perReviewerScores,
-            min_threshold: cat.min_threshold,
-            threshold_violated:
-              cat.min_threshold !== null && catAgg < cat.min_threshold,
-          };
-        }
-      );
+        return {
+          category_id: cat.id,
+          category_name: cat.name,
+          weight: cat.weight,
+          aggregate_score: catAgg,
+          per_reviewer_scores: perReviewerScores,
+          min_threshold: cat.min_threshold,
+          threshold_violated: cat.min_threshold !== null && catAgg < cat.min_threshold,
+        };
+      });
 
       return {
         aggregate_score: Math.round(aggregateScore * 100) / 100,
@@ -271,7 +256,7 @@ function createMockScoreAggregator(
 // ---------------------------------------------------------------------------
 
 function createMockApprovalEvaluator(
-  outcomePerIteration?: ('approved' | 'changes_requested' | 'rejected')[]
+  outcomePerIteration?: ('approved' | 'changes_requested' | 'rejected')[],
 ): ApprovalEvaluatorInterface {
   let callCount = 0;
   return {
@@ -280,7 +265,7 @@ function createMockApprovalEvaluator(
       reviewerOutputs: ReviewOutput[],
       rubric: Rubric,
       iterationCount: number,
-      maxIterations: number
+      maxIterations: number,
     ): ApprovalDecision {
       let outcome: 'approved' | 'changes_requested' | 'rejected';
 
@@ -297,9 +282,7 @@ function createMockApprovalEvaluator(
 
       // Check for critical:reject findings
       const hasCriticalReject = reviewerOutputs.some((o) =>
-        o.findings.some(
-          (f) => f.severity === 'critical' && f.critical_sub === 'reject'
-        )
+        o.findings.some((f) => f.severity === 'critical' && f.critical_sub === 'reject'),
       );
       if (hasCriticalReject) {
         outcome = 'rejected';
@@ -307,9 +290,7 @@ function createMockApprovalEvaluator(
 
       // Check for critical:blocking findings
       const hasCriticalBlocking = reviewerOutputs.some((o) =>
-        o.findings.some(
-          (f) => f.severity === 'critical' && f.critical_sub === 'blocking'
-        )
+        o.findings.some((f) => f.severity === 'critical' && f.critical_sub === 'blocking'),
       );
 
       // Max iterations check
@@ -338,7 +319,7 @@ function createMockFeedbackFormatter(): FeedbackFormatter {
   return {
     formatFindings(
       reviewOutputs: ReviewOutput[],
-      previousFindings: MergedFinding[] | null
+      previousFindings: MergedFinding[] | null,
     ): FeedbackFormatterResult {
       const merged: MergedFinding[] = [];
       for (const output of reviewOutputs) {
@@ -376,19 +357,15 @@ function createMockFindingTracker(): FindingTracker {
     trackFindings(
       currentFindings: MergedFinding[],
       previousFindings: MergedFinding[] | null,
-      allPriorFindings: MergedFinding[]
+      allPriorFindings: MergedFinding[],
     ): FindingTrackingResult {
       const previousKeys = new Set(
-        (previousFindings ?? []).map(
-          (f) => `${f.section_id}::${f.category_id}`
-        )
+        (previousFindings ?? []).map((f) => `${f.section_id}::${f.category_id}`),
       );
       const allResolvedKeys = new Set<string>();
 
       // Determine resolved keys: findings in allPrior but not in current
-      const currentKeys = new Set(
-        currentFindings.map((f) => `${f.section_id}::${f.category_id}`)
-      );
+      const currentKeys = new Set(currentFindings.map((f) => `${f.section_id}::${f.category_id}`));
       for (const f of allPriorFindings) {
         const key = `${f.section_id}::${f.category_id}`;
         if (!currentKeys.has(key)) {
@@ -436,12 +413,12 @@ function createMockFindingTracker(): FindingTracker {
 // ---------------------------------------------------------------------------
 
 function createMockTrustLevelManager(
-  trustLevel: 'full_auto' | 'approve_roots' | 'approve_phase_1' | 'approve_all' | 'human_only'
+  trustLevel: 'full_auto' | 'approve_roots' | 'approve_phase_1' | 'approve_all' | 'human_only',
 ): TrustLevelManager {
   return {
     requiresHumanApproval(
       documentType: DocTypeStr,
-      aiOutcome: 'approved' | 'changes_requested' | 'rejected'
+      aiOutcome: 'approved' | 'changes_requested' | 'rejected',
     ): TrustLevelCheckResult {
       if (trustLevel === 'full_auto') {
         return { human_approval_required: false, reason: 'Full auto mode.' };
@@ -457,10 +434,7 @@ function createMockTrustLevelManager(
         return { human_approval_required: false, reason: 'Non-root document.' };
       }
       if (trustLevel === 'approve_phase_1') {
-        if (
-          (documentType === 'PRD' || documentType === 'TDD') &&
-          aiOutcome === 'approved'
-        ) {
+        if ((documentType === 'PRD' || documentType === 'TDD') && aiOutcome === 'approved') {
           return {
             human_approval_required: true,
             reason: 'Phase 1 document requires human approval.',
@@ -499,7 +473,7 @@ function createMockHumanEscalationGateway(): HumanEscalationGateway {
       reason: string,
       reviewResults: GateReviewResult[],
       totalIterations: number,
-      finalScore: number
+      finalScore: number,
     ): EscalationPackage {
       return {
         gate_id: gateId,
@@ -556,7 +530,7 @@ function buildService(options: ServiceBuildOptions = {}): {
   const documentStore = createMockDocumentStore();
   const preReviewValidator = new PreReviewValidator(
     (docType: any) => getSectionMappings(docType),
-    documentStore
+    documentStore,
   );
 
   const panelSizes = options.panelSizes ?? {
@@ -577,17 +551,11 @@ function buildService(options: ServiceBuildOptions = {}): {
   const llmAdapter = options.llmAdapter ?? createMockLLMAdapter({ scores: {} });
   const outputValidator = new ReviewerOutputValidator();
   const executorPool = createMockExecutorPool();
-  const reviewerExecutor = new ReviewerExecutor(
-    llmAdapter,
-    outputValidator,
-    executorPool
-  );
+  const reviewerExecutor = new ReviewerExecutor(llmAdapter, outputValidator, executorPool);
 
   const scoreAggregator = createMockScoreAggregator(options.scorePerIteration);
   const disagreementDetector = new DisagreementDetector();
-  const approvalEvaluator = createMockApprovalEvaluator(
-    options.outcomePerIteration
-  );
+  const approvalEvaluator = createMockApprovalEvaluator(options.outcomePerIteration);
   const feedbackFormatter = createMockFeedbackFormatter();
   const findingTracker = createMockFindingTracker();
 
@@ -596,9 +564,7 @@ function buildService(options: ServiceBuildOptions = {}): {
   });
   const convergenceTracker = createMockConvergenceTracker();
   const regressionDetector = new QualityRegressionDetector();
-  const trustLevelManager = createMockTrustLevelManager(
-    options.trustLevel ?? 'full_auto'
-  );
+  const trustLevelManager = createMockTrustLevelManager(options.trustLevel ?? 'full_auto');
   const humanEscalationGateway = createMockHumanEscalationGateway();
   const rubricRegistry = new RubricRegistry();
 
@@ -634,7 +600,7 @@ function buildService(options: ServiceBuildOptions = {}): {
     trustLevelManager,
     humanEscalationGateway,
     rubricRegistry,
-    config
+    config,
   );
 
   return { service, llmAdapter };
@@ -644,10 +610,7 @@ function buildService(options: ServiceBuildOptions = {}): {
 // Document fixtures
 // ---------------------------------------------------------------------------
 
-function makePRDDocument(
-  contentOverride?: string,
-  idOverride?: string
-): DocumentForValidation {
+function makePRDDocument(contentOverride?: string, idOverride?: string): DocumentForValidation {
   return {
     id: idOverride ?? 'prd-001',
     content:
@@ -720,14 +683,10 @@ function makePRDDocument(
   };
 }
 
-function makePlanDocument(
-  contentOverride?: string,
-  idOverride?: string
-): DocumentForValidation {
+function makePlanDocument(contentOverride?: string, idOverride?: string): DocumentForValidation {
   return {
     id: idOverride ?? 'plan-001',
-    content:
-      contentOverride ?? 'Plan document content with tasks and dependencies.',
+    content: contentOverride ?? 'Plan document content with tasks and dependencies.',
     frontmatter: {
       title: 'Implementation Plan',
       author: 'eng-agent',
@@ -761,14 +720,10 @@ function makePlanDocument(
   };
 }
 
-function makeTDDDocument(
-  contentOverride?: string,
-  idOverride?: string
-): DocumentForValidation {
+function makeTDDDocument(contentOverride?: string, idOverride?: string): DocumentForValidation {
   return {
     id: idOverride ?? 'tdd-001',
-    content:
-      contentOverride ?? 'TDD document with architecture and design details.',
+    content: contentOverride ?? 'TDD document with architecture and design details.',
     frontmatter: {
       title: 'Technical Design Document',
       author: 'eng-agent',
@@ -792,16 +747,11 @@ function makeTDDDocument(
       { id: 'trade_offs', title: 'Trade-offs', content: 'Trade-offs.' },
     ],
     word_count: 1200,
-    traces_from: [
-      { document_id: 'prd-001', section_ids: ['functional_requirements'] },
-    ],
+    traces_from: [{ document_id: 'prd-001', section_ids: ['functional_requirements'] }],
   };
 }
 
-function makeCodeDocument(
-  contentOverride?: string,
-  idOverride?: string
-): DocumentForValidation {
+function makeCodeDocument(contentOverride?: string, idOverride?: string): DocumentForValidation {
   return {
     id: idOverride ?? 'code-001',
     content: contentOverride ?? 'Code implementation content.',
@@ -842,9 +792,7 @@ function makeCodeDocument(
       },
     ],
     word_count: 900,
-    traces_from: [
-      { document_id: 'spec-001', section_ids: ['acceptance_criteria'] },
-    ],
+    traces_from: [{ document_id: 'spec-001', section_ids: ['acceptance_criteria'] }],
   };
 }
 
@@ -869,11 +817,7 @@ describe('ReviewGateService', () => {
       });
 
       const doc = makePRDDocument();
-      const outcome = await service.submitForReview(
-        doc,
-        'PRD',
-        'pm-agent'
-      );
+      const outcome = await service.submitForReview(doc, 'PRD', 'pm-agent');
 
       expect(outcome.final_outcome).toBe('approved');
       expect(outcome.total_iterations).toBe(1);
@@ -906,11 +850,7 @@ describe('ReviewGateService', () => {
       });
 
       const doc = makePlanDocument();
-      const outcome = await service.submitForReview(
-        doc,
-        'Plan' as DocTypeStr,
-        'eng-agent'
-      );
+      const outcome = await service.submitForReview(doc, 'Plan' as DocTypeStr, 'eng-agent');
 
       expect(outcome.final_outcome).toBe('approved');
       expect(outcome.total_iterations).toBe(1);
@@ -936,11 +876,7 @@ describe('ReviewGateService', () => {
       const doc = makePRDDocument(undefined, 'prd-revision-001');
 
       // Iteration 1
-      const outcome1 = await service.submitForReview(
-        doc,
-        'PRD',
-        'pm-agent'
-      );
+      const outcome1 = await service.submitForReview(doc, 'PRD', 'pm-agent');
 
       expect(outcome1.final_outcome).toBe('changes_requested');
       expect(outcome1.total_iterations).toBe(1);
@@ -948,13 +884,9 @@ describe('ReviewGateService', () => {
       // Iteration 2 -- revised document
       const revisedDoc = makePRDDocument(
         'Revised content with improvements for iteration 2.',
-        'prd-revision-001'
+        'prd-revision-001',
       );
-      const outcome2 = await service.submitForReview(
-        revisedDoc,
-        'PRD',
-        'pm-agent'
-      );
+      const outcome2 = await service.submitForReview(revisedDoc, 'PRD', 'pm-agent');
 
       expect(outcome2.final_outcome).toBe('approved');
       expect(outcome2.total_iterations).toBe(2);
@@ -967,11 +899,7 @@ describe('ReviewGateService', () => {
     it.skip('4. Approved on third pass: fails iterations 1 and 2, passes iteration 3', async () => {
       const { service } = buildService({
         scorePerIteration: [60, 75, 92],
-        outcomePerIteration: [
-          'changes_requested',
-          'changes_requested',
-          'approved',
-        ],
+        outcomePerIteration: ['changes_requested', 'changes_requested', 'approved'],
         trustLevel: 'full_auto',
       });
 
@@ -1006,11 +934,7 @@ describe('ReviewGateService', () => {
     it.skip('5. Max iteration escalation: fails all 3 iterations', async () => {
       const { service } = buildService({
         scorePerIteration: [60, 65, 68],
-        outcomePerIteration: [
-          'changes_requested',
-          'changes_requested',
-          'changes_requested',
-        ],
+        outcomePerIteration: ['changes_requested', 'changes_requested', 'changes_requested'],
         trustLevel: 'full_auto',
         maxIterations: 3,
       });
@@ -1130,10 +1054,7 @@ describe('ReviewGateService', () => {
       const doc1 = makePRDDocument('Original content for regression test.', baseId);
       await service.submitForReview(doc1, 'PRD', 'pm-agent');
 
-      const doc2 = makePRDDocument(
-        'Worse revision that regresses quality.',
-        baseId
-      );
+      const doc2 = makePRDDocument('Worse revision that regresses quality.', baseId);
       const outcome2 = await service.submitForReview(doc2, 'PRD', 'pm-agent');
 
       expect(outcome2.review_result.quality_regression).not.toBeNull();
@@ -1176,11 +1097,7 @@ describe('ReviewGateService', () => {
     it.skip('10. Stagnation forced rejection: score declines on iterations 2 and 3', async () => {
       const { service } = buildService({
         scorePerIteration: [80, 75, 70],
-        outcomePerIteration: [
-          'changes_requested',
-          'changes_requested',
-          'changes_requested',
-        ],
+        outcomePerIteration: ['changes_requested', 'changes_requested', 'changes_requested'],
         trustLevel: 'full_auto',
         maxIterations: 5,
       });
@@ -1299,11 +1216,7 @@ describe('ReviewGateService', () => {
       });
 
       const doc = makeCodeDocument(undefined, 'code-approve-all-001');
-      const outcome = await service.submitForReview(
-        doc,
-        'Code' as DocTypeStr,
-        'eng-agent'
-      );
+      const outcome = await service.submitForReview(doc, 'Code' as DocTypeStr, 'eng-agent');
 
       expect(outcome.final_outcome).toBe('awaiting_human');
       expect(outcome.human_approval_required).toBe(true);
@@ -1393,9 +1306,7 @@ describe('ReviewGateService', () => {
       // Verify that the finding tracker was exercised
       expect(o2.review_result).toBeDefined();
       // The tracked_findings from iteration 2 should have fewer findings
-      expect(o2.review_result.findings.length).toBeLessThan(
-        o1.review_result.findings.length
-      );
+      expect(o2.review_result.findings.length).toBeLessThan(o1.review_result.findings.length);
     });
 
     // -----------------------------------------------------------------------
@@ -1446,9 +1357,13 @@ describe('ReviewGateService', () => {
           }
 
           const rubricCategories = [
-            'problem_clarity', 'goals_measurability', 'user_story_coverage',
-            'requirements_completeness', 'requirements_testability',
-            'risk_identification', 'internal_consistency',
+            'problem_clarity',
+            'goals_measurability',
+            'user_story_coverage',
+            'requirements_completeness',
+            'requirements_testability',
+            'risk_identification',
+            'internal_consistency',
           ];
 
           return JSON.stringify({
@@ -1458,7 +1373,7 @@ describe('ReviewGateService', () => {
             document_version: '1.0',
             timestamp: new Date().toISOString(),
             scoring_mode: 'document_level',
-            category_scores: rubricCategories.map(id => ({
+            category_scores: rubricCategories.map((id) => ({
               category_id: id,
               score: 80,
               section_scores: null,
@@ -1473,11 +1388,7 @@ describe('ReviewGateService', () => {
       const { service } = buildService({
         llmAdapter: multiAdapter,
         scorePerIteration: [70, 82, 78],
-        outcomePerIteration: [
-          'changes_requested',
-          'changes_requested',
-          'changes_requested',
-        ],
+        outcomePerIteration: ['changes_requested', 'changes_requested', 'changes_requested'],
         trustLevel: 'full_auto',
         maxIterations: 5,
       });
@@ -1497,7 +1408,7 @@ describe('ReviewGateService', () => {
       expect(o3.review_result).toBeDefined();
       // The finding tracker should have detected recurrence
       const recurredFindings = o3.review_result.findings.filter(
-        (f) => f.resolution_status === 'recurred'
+        (f) => f.resolution_status === 'recurred',
       );
       expect(recurredFindings.length).toBeGreaterThan(0);
     });
@@ -1526,9 +1437,13 @@ describe('ReviewGateService', () => {
 
           // Categories for TDD rubric
           const tddCategories = [
-            'prd_alignment', 'architecture_soundness', 'data_model_integrity',
-            'api_contract_completeness', 'integration_robustness',
-            'security_depth', 'tradeoff_rigor',
+            'prd_alignment',
+            'architecture_soundness',
+            'data_model_integrity',
+            'api_contract_completeness',
+            'integration_robustness',
+            'security_depth',
+            'tradeoff_rigor',
           ];
 
           // First reviewer: security_depth = 75
@@ -1568,9 +1483,7 @@ describe('ReviewGateService', () => {
       const disagreements = outcome.review_result.disagreements;
       expect(disagreements.length).toBeGreaterThan(0);
 
-      const securityDisagreement = disagreements.find(
-        (d) => d.category_id === 'security_depth'
-      );
+      const securityDisagreement = disagreements.find((d) => d.category_id === 'security_depth');
       expect(securityDisagreement).toBeDefined();
       expect(securityDisagreement!.variance).toBeGreaterThanOrEqual(15);
     });
@@ -1653,10 +1566,7 @@ describe('ReviewGateService', () => {
         trustLevel: 'full_auto',
       });
 
-      const doc = makePRDDocument(
-        'Content for crash recovery test.',
-        'prd-crash-recovery-001'
-      );
+      const doc = makePRDDocument('Content for crash recovery test.', 'prd-crash-recovery-001');
 
       const outcome = await service.submitForReview(doc, 'PRD', 'pm-agent');
 
@@ -1670,14 +1580,10 @@ describe('ReviewGateService', () => {
       // where it left off
       const revisedDoc = makePRDDocument(
         'Revised content after recovery.',
-        'prd-crash-recovery-001'
+        'prd-crash-recovery-001',
       );
 
-      const recoveryOutcome = await service.submitForReview(
-        revisedDoc,
-        'PRD',
-        'pm-agent'
-      );
+      const recoveryOutcome = await service.submitForReview(revisedDoc, 'PRD', 'pm-agent');
 
       // Should have continued to iteration 2
       expect(recoveryOutcome.total_iterations).toBe(2);
@@ -1767,7 +1673,7 @@ describe('ReviewGateService', () => {
       expect(outcome.document_id).toBe('prd-structure-001');
       expect(outcome.document_type).toBe('PRD');
       expect(['approved', 'rejected', 'escalated', 'awaiting_human']).toContain(
-        outcome.final_outcome
+        outcome.final_outcome,
       );
       expect(typeof outcome.final_score).toBe('number');
       expect(typeof outcome.total_iterations).toBe('number');

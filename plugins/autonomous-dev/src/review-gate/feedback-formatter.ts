@@ -56,14 +56,65 @@ export const SEVERITY_ORDER: Record<FindingSeverity, number> = {
 
 /** Stop words removed during tokenization. */
 export const STOP_WORDS = new Set([
-  'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all',
-  'can', 'has', 'her', 'was', 'one', 'our', 'out', 'his',
-  'how', 'its', 'may', 'who', 'did', 'get', 'let', 'say',
-  'she', 'too', 'use', 'this', 'that', 'with', 'have', 'from',
-  'they', 'been', 'said', 'each', 'which', 'their', 'will',
-  'other', 'about', 'many', 'then', 'them', 'these', 'some',
-  'would', 'make', 'like', 'into', 'could', 'than', 'been',
-  'what', 'when', 'where', 'should', 'does', 'also',
+  'the',
+  'and',
+  'for',
+  'are',
+  'but',
+  'not',
+  'you',
+  'all',
+  'can',
+  'has',
+  'her',
+  'was',
+  'one',
+  'our',
+  'out',
+  'his',
+  'how',
+  'its',
+  'may',
+  'who',
+  'did',
+  'get',
+  'let',
+  'say',
+  'she',
+  'too',
+  'use',
+  'this',
+  'that',
+  'with',
+  'have',
+  'from',
+  'they',
+  'been',
+  'said',
+  'each',
+  'which',
+  'their',
+  'will',
+  'other',
+  'about',
+  'many',
+  'then',
+  'them',
+  'these',
+  'some',
+  'would',
+  'make',
+  'like',
+  'into',
+  'could',
+  'than',
+  'been',
+  'what',
+  'when',
+  'where',
+  'should',
+  'does',
+  'also',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -158,9 +209,7 @@ interface AttributedFinding {
 export class FeedbackFormatter {
   private config: FeedbackFormatterConfig;
 
-  constructor(
-    config: Partial<FeedbackFormatterConfig> = {},
-  ) {
+  constructor(config: Partial<FeedbackFormatterConfig> = {}) {
     this.config = {
       similarity_threshold: config.similarity_threshold ?? 0.85,
       similarity_function: config.similarity_function ?? null,
@@ -302,11 +351,12 @@ export class FeedbackFormatter {
 
     // Pick representative for description/evidence/suggested_resolution:
     // highest severity; if tied, longest suggested_resolution
-    const representative = maxSeverityFindings.length === 1
-      ? maxSeverityFindings[0]
-      : maxSeverityFindings.reduce((best, f) =>
-          f.suggested_resolution.length > best.suggested_resolution.length ? f : best,
-        );
+    const representative =
+      maxSeverityFindings.length === 1
+        ? maxSeverityFindings[0]
+        : maxSeverityFindings.reduce((best, f) =>
+            f.suggested_resolution.length > best.suggested_resolution.length ? f : best,
+          );
 
     // reported_by: all reviewer IDs (deduplicated, preserving order)
     const reportedBy: string[] = [];
@@ -335,9 +385,12 @@ export class FeedbackFormatter {
   }
 
   /** Counts findings by severity. */
-  private countSeverities(
-    findings: MergedFinding[],
-  ): { critical: number; major: number; minor: number; suggestion: number } {
+  private countSeverities(findings: MergedFinding[]): {
+    critical: number;
+    major: number;
+    minor: number;
+    suggestion: number;
+  } {
     const counts = { critical: 0, major: 0, minor: 0, suggestion: 0 };
     for (const f of findings) {
       counts[f.severity]++;

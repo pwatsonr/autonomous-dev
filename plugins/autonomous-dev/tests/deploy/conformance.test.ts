@@ -86,23 +86,11 @@ function makeCases(): BackendCase[] {
       setupMock: (m) => {
         m.expect(/^git$/, (a) => a[0] === 'status', { stdout: '' });
         m.expect(/^git$/, (a) => a[0] === 'push', { stdout: '' });
-        m.expect(
-          /^gh$/,
-          (a) => a[0] === 'pr' && a[1] === 'create',
-          {
-            stdout: 'https://github.com/example/repo/pull/42\n',
-          },
-        );
-        m.expect(
-          /^gh$/,
-          (a) => a[0] === 'pr' && a[1] === 'view',
-          { stdout: '{"state":"OPEN"}' },
-        );
-        m.expect(
-          /^gh$/,
-          (a) => a[0] === 'pr' && a[1] === 'close',
-          { stdout: 'closed' },
-        );
+        m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'create', {
+          stdout: 'https://github.com/example/repo/pull/42\n',
+        });
+        m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'view', { stdout: '{"state":"OPEN"}' });
+        m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'close', { stdout: 'closed' });
       },
       expectsTamperFailure: true,
     },
@@ -124,16 +112,10 @@ function makeCases(): BackendCase[] {
       params: dockerLocalValidParams,
       setupMock: (m) => {
         m.expect(/^docker$/, (a) => a[0] === 'build', { stdout: '' });
-        m.expect(
-          /^docker$/,
-          (a) => a[0] === 'image' && a[1] === 'inspect',
-          { stdout: 'sha256:deadbeef\n' },
-        );
-        m.expect(
-          /^docker$/,
-          (a) => a[0] === 'run',
-          { stdout: 'container-abc\n' },
-        );
+        m.expect(/^docker$/, (a) => a[0] === 'image' && a[1] === 'inspect', {
+          stdout: 'sha256:deadbeef\n',
+        });
+        m.expect(/^docker$/, (a) => a[0] === 'run', { stdout: 'container-abc\n' });
         m.expect(/^docker$/, (a) => a[0] === 'stop', { stdout: '' });
         m.expect(/^docker$/, (a) => a[0] === 'rm', { stdout: '' });
         m.expect(/^docker$/, (a) => a[0] === 'inspect', { stdout: 'running\n' });
@@ -146,16 +128,10 @@ function makeCases(): BackendCase[] {
       params: githubPagesValidParams,
       setupMock: (m) => {
         m.expect(/^echo$/, () => true, { stdout: '' });
-        m.expect(
-          /^git$/,
-          (a) => a[0] === 'ls-remote',
-          { stdout: 'a'.repeat(40) + '\trefs/heads/gh-pages\n' },
-        );
-        m.expect(
-          /^git$/,
-          (a) => a[0] === 'subtree' && a[1] === 'push',
-          { stdout: '' },
-        );
+        m.expect(/^git$/, (a) => a[0] === 'ls-remote', {
+          stdout: 'a'.repeat(40) + '\trefs/heads/gh-pages\n',
+        });
+        m.expect(/^git$/, (a) => a[0] === 'subtree' && a[1] === 'push', { stdout: '' });
       },
       expectsTamperFailure: true,
     },

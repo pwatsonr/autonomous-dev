@@ -76,7 +76,10 @@ describe('fix-recipe schema', () => {
   });
 
   it('rejects a recipe missing violation_id', async () => {
-    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<string, unknown>;
+    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<
+      string,
+      unknown
+    >;
     delete fixture.violation_id;
     expect(validate(fixture)).toBe(false);
     const text = (validate.errors ?? []).map((e: any) => e.message).join(';');
@@ -84,7 +87,10 @@ describe('fix-recipe schema', () => {
   });
 
   it('rejects a recipe with an invalid fix_type', async () => {
-    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<string, unknown>;
+    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<
+      string,
+      unknown
+    >;
     fixture.fix_type = 'magic-fix';
     expect(validate(fixture)).toBe(false);
     const text = (validate.errors ?? []).map((e: any) => e.keyword).join(';');
@@ -92,31 +98,46 @@ describe('fix-recipe schema', () => {
   });
 
   it('rejects confidence > 1', async () => {
-    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<string, unknown>;
+    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<
+      string,
+      unknown
+    >;
     fixture.confidence = 1.5;
     expect(validate(fixture)).toBe(false);
   });
 
   it('rejects confidence < 0', async () => {
-    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<string, unknown>;
+    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<
+      string,
+      unknown
+    >;
     fixture.confidence = -0.1;
     expect(validate(fixture)).toBe(false);
   });
 
   it('rejects malformed violation_id', async () => {
-    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<string, unknown>;
+    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<
+      string,
+      unknown
+    >;
     fixture.violation_id = 'VIO-bad';
     expect(validate(fixture)).toBe(false);
   });
 
   it('rejects malformed rule_id (missing namespace separator)', async () => {
-    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<string, unknown>;
+    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<
+      string,
+      unknown
+    >;
     fixture.rule_id = 'no-namespace';
     expect(validate(fixture)).toBe(false);
   });
 
   it('rejects extra root fields under additionalProperties: false', async () => {
-    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<string, unknown>;
+    const fixture = (await readJson(path.join(FIXTURE_DIR, 'code-replacement-sql.json'))) as Record<
+      string,
+      unknown
+    >;
     (fixture as any).extra_field = 'x';
     expect(validate(fixture)).toBe(false);
     const keywords = (validate.errors ?? []).map((e: any) => e.keyword);

@@ -14,21 +14,21 @@
 
 /** The 6 escalation categories that classify every pipeline failure. */
 export type EscalationType =
-  | "product"
-  | "technical"
-  | "infrastructure"
-  | "security"
-  | "cost"
-  | "quality";
+  | 'product'
+  | 'technical'
+  | 'infrastructure'
+  | 'security'
+  | 'cost'
+  | 'quality';
 
 /** How urgently a human must respond to the escalation. */
-export type EscalationUrgency = "immediate" | "soon" | "informational";
+export type EscalationUrgency = 'immediate' | 'soon' | 'informational';
 
 /** What happens when a human does not respond within the timeout window. */
-export type TimeoutBehavior = "pause" | "retry" | "skip" | "cancel";
+export type TimeoutBehavior = 'pause' | 'retry' | 'skip' | 'cancel';
 
 /** Routing complexity mode: default uses a single target, advanced routes per-type. */
-export type RoutingMode = "default" | "advanced";
+export type RoutingMode = 'default' | 'advanced';
 
 // ---------------------------------------------------------------------------
 // v1 JSON schema -- EscalationMessage
@@ -42,7 +42,7 @@ export type RoutingMode = "default" | "advanced";
  */
 export interface EscalationMessage {
   /** Schema version identifier. Always "v1" for this release. */
-  schema_version: "v1";
+  schema_version: 'v1';
 
   /** Unique escalation identifier. Format: esc-YYYYMMDD-NNN */
   escalation_id: string;
@@ -112,7 +112,7 @@ export interface EscalationOption {
 /** An artifact attached to an escalation for additional context. */
 export interface EscalationArtifact {
   /** The kind of artifact. */
-  type: "log" | "diff" | "report" | "screenshot";
+  type: 'log' | 'diff' | 'report' | 'screenshot';
 
   /** Workspace-relative path to the artifact. */
   path: string;
@@ -179,7 +179,7 @@ export interface EscalationConfig {
   };
 
   /** How much detail to include in escalation messages. */
-  verbosity: "terse" | "standard" | "verbose";
+  verbosity: 'terse' | 'standard' | 'verbose';
 
   /** Maximum number of retries before escalation is forced. */
   retry_budget: number;
@@ -195,10 +195,10 @@ export interface EscalationConfig {
  * to the escalation.
  */
 export type PipelineBehavior =
-  | "halt_immediately"       // security: stop all execution now
-  | "pause_immediately"      // infrastructure: stop at current point
-  | "pause_before_incurring" // cost: stop before the costly operation
-  | "pause_at_boundary";     // product/technical/quality: stop at next gate
+  | 'halt_immediately' // security: stop all execution now
+  | 'pause_immediately' // infrastructure: stop at current point
+  | 'pause_before_incurring' // cost: stop before the costly operation
+  | 'pause_at_boundary'; // product/technical/quality: stop at next gate
 
 // ---------------------------------------------------------------------------
 // Resolved route (output of RoutingEngine)
@@ -221,11 +221,11 @@ export interface ChainState {
   escalationId: string;
   requestId: string;
   status:
-    | "primary_dispatched"
-    | "secondary_dispatched"
-    | "timeout_behavior_applied"
-    | "resolved"
-    | "cancelled";
+    | 'primary_dispatched'
+    | 'secondary_dispatched'
+    | 'timeout_behavior_applied'
+    | 'resolved'
+    | 'cancelled';
   primaryTarget: RoutingTarget;
   secondaryTarget?: RoutingTarget;
   primaryDispatchedAt: Date;
@@ -304,10 +304,7 @@ export interface DeliveryAdapter {
  * Compatible with the trust subsystem's AuditTrail interface.
  */
 export interface AuditTrail {
-  append(event: {
-    event_type: string;
-    payload: Record<string, unknown>;
-  }): Promise<void>;
+  append(event: { event_type: string; payload: Record<string, unknown> }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

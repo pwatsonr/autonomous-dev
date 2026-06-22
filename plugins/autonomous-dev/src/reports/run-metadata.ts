@@ -90,10 +90,7 @@ export interface RunMetadata {
  * @param rootDir   The project root directory.
  * @returns The absolute path where the metadata file was written.
  */
-export async function writeRunMetadata(
-  metadata: RunMetadata,
-  rootDir: string,
-): Promise<string> {
+export async function writeRunMetadata(metadata: RunMetadata, rootDir: string): Promise<string> {
   const logDir = path.join(rootDir, '.autonomous-dev', 'logs', 'intelligence');
   const logPath = path.join(logDir, `${metadata.run_id}.log`);
 
@@ -118,17 +115,8 @@ export async function writeRunMetadata(
  * @param rootDir  The project root directory.
  * @returns Parsed RunMetadata or null if the file does not exist.
  */
-export async function readRunMetadata(
-  runId: string,
-  rootDir: string,
-): Promise<RunMetadata | null> {
-  const logPath = path.join(
-    rootDir,
-    '.autonomous-dev',
-    'logs',
-    'intelligence',
-    `${runId}.log`,
-  );
+export async function readRunMetadata(runId: string, rootDir: string): Promise<RunMetadata | null> {
+  const logPath = path.join(rootDir, '.autonomous-dev', 'logs', 'intelligence', `${runId}.log`);
 
   try {
     const content = await fs.readFile(logPath, 'utf-8');

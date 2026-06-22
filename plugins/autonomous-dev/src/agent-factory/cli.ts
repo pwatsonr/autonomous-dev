@@ -172,14 +172,10 @@ export function commandInspect(registry: IAgentRegistry, name: string): string {
     `  risk_tier:         ${a.risk_tier ?? 'none'}`,
     '',
     `  evaluation_rubric:`,
-    ...a.evaluation_rubric.map(
-      (d) => `    - ${d.name} (weight: ${d.weight}): ${d.description}`,
-    ),
+    ...a.evaluation_rubric.map((d) => `    - ${d.name} (weight: ${d.weight}): ${d.description}`),
     '',
     `  version_history:`,
-    ...a.version_history.map(
-      (h) => `    - ${h.version} (${h.date}): ${h.change}`,
-    ),
+    ...a.version_history.map((h) => `    - ${h.version} (${h.date}): ${h.change}`),
     '',
     `Registry:`,
     `  state:             ${record.state}`,
@@ -230,10 +226,7 @@ export function formatReloadResult(result: RegistryLoadResult): string {
  * @param agentsDir  Path to the agents directory.
  * @returns          Formatted result string.
  */
-export async function commandReload(
-  registry: IAgentRegistry,
-  agentsDir: string,
-): Promise<string> {
+export async function commandReload(registry: IAgentRegistry, agentsDir: string): Promise<string> {
   const result = await registry.reload(agentsDir);
   return formatReloadResult(result);
 }
@@ -424,10 +417,7 @@ function formatMetricsOutput(
  * @param metricsEngine  The metrics engine for querying data.
  * @returns              Formatted dashboard output.
  */
-export function commandDashboard(
-  registry: IAgentRegistry,
-  metricsEngine: IMetricsEngine,
-): string {
+export function commandDashboard(registry: IAgentRegistry, metricsEngine: IMetricsEngine): string {
   const agents = registry.list();
 
   if (agents.length === 0) {
@@ -514,10 +504,7 @@ export function commandDashboard(
 
   lines.push('\u2500'.repeat(63));
 
-  const alertSummary =
-    totalAlerts > 0
-      ? `${totalAlerts} (${criticalAlerts} critical)`
-      : '0';
+  const alertSummary = totalAlerts > 0 ? `${totalAlerts} (${criticalAlerts} critical)` : '0';
   lines.push(
     `Agents: ${agents.length} | Active Alerts: ${alertSummary} | Last update: ${formatTimestamp(new Date())}`,
   );
@@ -660,7 +647,9 @@ export interface CliContext {
    * Optional meta-review invoker. Takes a proposal and returns a
    * MetaReviewResult. Injected for testability.
    */
-  invokeMetaReview?: (proposal: import('./improvement/types').AgentProposal) => Promise<MetaReviewResult>;
+  invokeMetaReview?: (
+    proposal: import('./improvement/types').AgentProposal,
+  ) => Promise<MetaReviewResult>;
   // Phase 2 dependencies (SPEC-005-4-5)
   /** Promoter for the `agent promote` command. */
   promoter?: Promoter;
@@ -1087,10 +1076,15 @@ export async function commandAnalyze(
       const violationLines = proposalResult.constraintViolations.map(
         (v) => `  - ${v.field}: ${v.rule}`,
       );
-      return output.join('\n') + `\nProposal rejected (constraint violations):\n${violationLines.join('\n')}`;
+      return (
+        output.join('\n') +
+        `\nProposal rejected (constraint violations):\n${violationLines.join('\n')}`
+      );
     }
 
-    return output.join('\n') + `\nProposal generation failed: ${proposalResult.error ?? 'unknown error'}`;
+    return (
+      output.join('\n') + `\nProposal generation failed: ${proposalResult.error ?? 'unknown error'}`
+    );
   }
 
   const proposal = proposalResult.proposal;
@@ -1112,9 +1106,7 @@ export async function commandAnalyze(
     },
   });
 
-  output.push(
-    `  Proposal ID: ${proposal.proposal_id}`,
-  );
+  output.push(`  Proposal ID: ${proposal.proposal_id}`);
   output.push(
     `  Version bump: ${proposal.version_bump} (${proposal.current_version} -> ${proposal.proposed_version})`,
   );
@@ -1154,9 +1146,7 @@ export async function commandAnalyze(
   const metaReviewResult: MetaReviewResult = await invokeMetaReview(proposal);
 
   const findingsCount = metaReviewResult.findings.length;
-  const blockersCount = metaReviewResult.findings.filter(
-    (f) => f.severity === 'blocker',
-  ).length;
+  const blockersCount = metaReviewResult.findings.filter((f) => f.severity === 'blocker').length;
   const warningsCount = findingsCount - blockersCount;
   const verdict = metaReviewResult.verdict;
   const approved = verdict === 'approved';
@@ -1386,7 +1376,9 @@ export async function commandImprove(
       return output.join('\n');
     }
 
-    return output.join('\n') + `\nProposal generation failed: ${proposalResult.error ?? 'unknown error'}`;
+    return (
+      output.join('\n') + `\nProposal generation failed: ${proposalResult.error ?? 'unknown error'}`
+    );
   }
 
   const proposal = proposalResult.proposal;
@@ -1700,9 +1692,7 @@ export async function commandCompare(
           ? `v${versionA}`
           : 'TIE';
 
-    output.push(
-      `Input ${i + 1} (${input.selection_reason}):`,
-    );
+    output.push(`Input ${i + 1} (${input.selection_reason}):`);
     output.push(
       `  v${versionA}: ${scoreA.toFixed(1)}   v${versionB}: ${scoreB.toFixed(1)}   delta: ${delta >= 0 ? '+' : ''}${delta.toFixed(1)}   Winner: ${winner}`,
     );
@@ -1724,8 +1714,8 @@ export async function commandCompare(
   output.push('\u2500'.repeat(47));
   output.push(
     `Aggregate: v${versionB} wins ${agg.proposed_wins}/${agg.total_inputs}, ` +
-    `v${versionA} wins ${agg.current_wins}/${agg.total_inputs}, ` +
-    `ties ${agg.ties}/${agg.total_inputs}`,
+      `v${versionA} wins ${agg.current_wins}/${agg.total_inputs}, ` +
+      `ties ${agg.ties}/${agg.total_inputs}`,
   );
   output.push(`Mean delta: ${agg.mean_delta >= 0 ? '+' : ''}${agg.mean_delta.toFixed(1)}`);
   output.push(`Verdict: ${agg.verdict.toUpperCase()}`);
@@ -1789,9 +1779,7 @@ export async function commandPromote(
 
   // Find the proposal for this agent/version
   const proposals = proposalStore.getByAgent(name);
-  const proposal = proposals.find(
-    (p) => p.proposed_version === version,
-  );
+  const proposal = proposals.find((p) => p.proposed_version === version);
 
   if (!proposal) {
     return `Error: No proposal found for '${name}' version ${version}.`;
@@ -1855,9 +1843,7 @@ export function commandReject(
 
   // Find the proposal for this agent/version
   const proposals = proposalStore.getByAgent(name);
-  const proposal = proposals.find(
-    (p) => p.proposed_version === version,
-  );
+  const proposal = proposals.find((p) => p.proposed_version === version);
 
   if (!proposal) {
     return `Error: No proposal found for '${name}' version ${version}.`;
@@ -1887,10 +1873,7 @@ export function commandReject(
  * @param ctx   Extended CLI context.
  * @returns     Formatted result string.
  */
-export function commandAccept(
-  name: string,
-  ctx: Partial<CliContext>,
-): string {
+export function commandAccept(name: string, ctx: Partial<CliContext>): string {
   const proposedDir = ctx.proposedAgentsDir ?? 'data/proposed-agents';
   // Use dynamic require to avoid top-level import side effects in test environments
   // eslint-disable-next-line @typescript-eslint/no-require-imports

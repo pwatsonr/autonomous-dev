@@ -120,10 +120,7 @@ export function validateFrontmatter(
 
   // pipeline_id: string matching pattern
   if (fm.pipeline_id !== undefined && fm.pipeline_id !== null) {
-    if (
-      typeof fm.pipeline_id !== 'string' ||
-      !PIPELINE_ID_PATTERN.test(fm.pipeline_id)
-    ) {
+    if (typeof fm.pipeline_id !== 'string' || !PIPELINE_ID_PATTERN.test(fm.pipeline_id)) {
       errors.push({
         field: 'pipeline_id',
         code: 'INVALID_FORMAT',
@@ -135,8 +132,7 @@ export function validateFrontmatter(
 
   // version: string matching pattern (coerce numbers to string for ergonomics)
   if (fm.version !== undefined && fm.version !== null) {
-    const versionStr =
-      typeof fm.version === 'number' ? String(fm.version) : fm.version;
+    const versionStr = typeof fm.version === 'number' ? String(fm.version) : fm.version;
     if (typeof versionStr !== 'string' || !VERSION_PATTERN.test(versionStr)) {
       errors.push({
         field: 'version',
@@ -370,11 +366,7 @@ export function validateFrontmatter(
   }
 
   // traces_to empty for non-CODE (informational warning)
-  if (
-    fm.type !== undefined &&
-    fm.type !== null &&
-    fm.type !== DocumentType.CODE
-  ) {
+  if (fm.type !== undefined && fm.type !== null && fm.type !== DocumentType.CODE) {
     const tracesTo = fm.traces_to as unknown[] | undefined;
     if (Array.isArray(tracesTo) && tracesTo.length === 0) {
       warnings.push({

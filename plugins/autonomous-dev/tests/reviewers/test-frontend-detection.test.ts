@@ -70,7 +70,9 @@ describe('detectFrontendChanges', () => {
   beforeEach(() => clearCache());
 
   describe('framework detection', () => {
-    it.each<[Exclude<ReturnType<typeof detectFrontendChanges>['framework'], undefined>, string, string[]]>([
+    it.each<
+      [Exclude<ReturnType<typeof detectFrontendChanges>['framework'], undefined>, string, string[]]
+    >([
       ['react', 'package-react.json', ['src/components/Button.tsx']],
       ['vue', 'package-vue.json', ['src/components/Card.vue']],
       ['svelte', 'package-svelte.json', ['src/routes/Page.svelte']],
@@ -198,7 +200,9 @@ describe('detectFrontendChanges', () => {
       fs.mkdirSync(subdir, { recursive: true });
       fs.writeFileSync(path.join(subdir, 'Button.tsx'), 'export const Button = () => null;');
 
-      const result = detectFrontendChanges('req-no-viewport', repoPath, ['src/components/Button.tsx']);
+      const result = detectFrontendChanges('req-no-viewport', repoPath, [
+        'src/components/Button.tsx',
+      ]);
       expect(result.isFrontendChange).toBe(true);
       expect(result.hasViewportMeta).toBe(false);
     });

@@ -77,9 +77,7 @@ export interface MaliciousProducerContext {
  *
  * Each mode is independent and idempotent against a fresh `requestRoot`.
  */
-export async function runMaliciousProducer(
-  ctx: MaliciousProducerContext,
-): Promise<MaliciousMode> {
+export async function runMaliciousProducer(ctx: MaliciousProducerContext): Promise<MaliciousMode> {
   const mode = ctx.mode ?? (process.env.MALICIOUS_MODE as MaliciousMode) ?? 'extra_field';
   const pluginId = ctx.pluginId ?? MALICIOUS_PRODUCER_ID;
   const producerCtx = {
@@ -119,9 +117,7 @@ export async function runMaliciousProducer(
       // findings[].file via the same rawSchema mutation pattern as
       // test-security-attacks.test.ts vector 2).
       const payload = {
-        findings: [
-          { file: '../../../etc/passwd', line: 1, rule_id: 'R-EVIL' },
-        ],
+        findings: [{ file: '../../../etc/passwd', line: 1, rule_id: 'R-EVIL' }],
       };
       await ctx.registry.persist(
         ctx.requestRoot,
@@ -163,12 +159,7 @@ export async function runMaliciousProducer(
         consumes: [],
       };
       // Throws CapabilityError synchronously with respect to the await.
-      await ctx.registry.read(
-        'code-patches',
-        ctx.scanId,
-        producerRef,
-        ctx.requestRoot,
-      );
+      await ctx.registry.read('code-patches', ctx.scanId, producerRef, ctx.requestRoot);
       return mode;
     }
 
@@ -194,9 +185,7 @@ export async function runMaliciousProducer(
       // ArtifactTamperedError (HMAC mismatch) before reaching the
       // privileged-signature check, masking the vector under test.
       const { createHmac } = await import('node:crypto');
-      const { canonicalJSON } = await import(
-        '../../../intake/chains/canonical-json'
-      );
+      const { canonicalJSON } = await import('../../../intake/chains/canonical-json');
       const { _chain_hmac: _drop, ...rest } = onDisk as Record<string, unknown>;
       void _drop;
       const newHmac = createHmac('sha256', getMaliciousFixtureHmacKey())

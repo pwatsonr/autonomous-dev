@@ -3,3 +3,17 @@ dist/
 coverage/
 *.tsbuildinfo
 package-lock.json
+
+# #570 — excluded from auto-format (NOT a formatting decision):
+# - tests/safety/ holds intentional secret/PII FIXTURES for the detector/scrubber
+#   suites. The repo's gitleaks allowlist (.github/security/gitleaks.toml,
+#   `.*/tests/safety/.*`) is meant to cover them but isn't firing in the action's
+#   diff-scan, so re-formatting them surfaces false-positive "leaks". Tracked
+#   separately; until fixed these stay unformatted to avoid the scanner churn.
+# - tests/integration/ — the `kind scope-enforcement` job triggers on
+#   `tests/integration/**` and runs test-cred-proxy-scope.test.ts, which
+#   ts-jest-crashes on the ESM-only @kubernetes/client-node (pre-existing
+#   transform gap, #573). Formatting ANY file in this dir would trigger that
+#   job, so the whole dir is left untouched by the format pass.
+tests/safety/
+tests/integration/

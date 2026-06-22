@@ -87,10 +87,7 @@ export function loadNotificationConfig(
   const config = deepClone(DEFAULT_NOTIFICATION_CONFIG);
 
   // default_method
-  if (
-    typeof raw.default_method === 'string' &&
-    VALID_DELIVERY_METHODS.has(raw.default_method)
-  ) {
+  if (typeof raw.default_method === 'string' && VALID_DELIVERY_METHODS.has(raw.default_method)) {
     config.default_method = raw.default_method as DeliveryMethod;
   } else if (raw.default_method !== undefined) {
     console.warn(
@@ -103,8 +100,7 @@ export function loadNotificationConfig(
   if (overrides && typeof overrides === 'object') {
     for (const [eventType, method] of Object.entries(overrides)) {
       if (VALID_DELIVERY_METHODS.has(method)) {
-        config.per_type_overrides[eventType as NotificationEventType] =
-          method as DeliveryMethod;
+        config.per_type_overrides[eventType as NotificationEventType] = method as DeliveryMethod;
       }
     }
   }
@@ -112,21 +108,14 @@ export function loadNotificationConfig(
   // batching
   const batching = raw.batching as Record<string, unknown> | undefined;
   if (batching && typeof batching === 'object') {
-    if (
-      typeof batching.flushIntervalMinutes === 'number' &&
-      batching.flushIntervalMinutes > 0
-    ) {
+    if (typeof batching.flushIntervalMinutes === 'number' && batching.flushIntervalMinutes > 0) {
       config.batching.flushIntervalMinutes = batching.flushIntervalMinutes;
     }
-    if (
-      typeof batching.maxBufferSize === 'number' &&
-      batching.maxBufferSize > 0
-    ) {
+    if (typeof batching.maxBufferSize === 'number' && batching.maxBufferSize > 0) {
       config.batching.maxBufferSize = batching.maxBufferSize;
     }
     if (Array.isArray(batching.exemptTypes)) {
-      config.batching.exemptTypes =
-        batching.exemptTypes as NotificationEventType[];
+      config.batching.exemptTypes = batching.exemptTypes as NotificationEventType[];
     }
   }
 
@@ -153,16 +142,10 @@ export function loadNotificationConfig(
     if (typeof fatigue.enabled === 'boolean') {
       config.fatigue.enabled = fatigue.enabled;
     }
-    if (
-      typeof fatigue.thresholdPerHour === 'number' &&
-      fatigue.thresholdPerHour > 0
-    ) {
+    if (typeof fatigue.thresholdPerHour === 'number' && fatigue.thresholdPerHour > 0) {
       config.fatigue.thresholdPerHour = fatigue.thresholdPerHour;
     }
-    if (
-      typeof fatigue.cooldownMinutes === 'number' &&
-      fatigue.cooldownMinutes > 0
-    ) {
+    if (typeof fatigue.cooldownMinutes === 'number' && fatigue.cooldownMinutes > 0) {
       config.fatigue.cooldownMinutes = fatigue.cooldownMinutes;
     }
   }
@@ -173,33 +156,21 @@ export function loadNotificationConfig(
     if (typeof crossRequest.enabled === 'boolean') {
       config.cross_request.enabled = crossRequest.enabled;
     }
-    if (
-      typeof crossRequest.windowMinutes === 'number' &&
-      crossRequest.windowMinutes > 0
-    ) {
+    if (typeof crossRequest.windowMinutes === 'number' && crossRequest.windowMinutes > 0) {
       config.cross_request.windowMinutes = crossRequest.windowMinutes;
     }
-    if (
-      typeof crossRequest.threshold === 'number' &&
-      crossRequest.threshold > 0
-    ) {
+    if (typeof crossRequest.threshold === 'number' && crossRequest.threshold > 0) {
       config.cross_request.threshold = crossRequest.threshold;
     }
   }
 
   // daily_digest_time
-  if (
-    typeof raw.daily_digest_time === 'string' &&
-    isValidHHMM(raw.daily_digest_time)
-  ) {
+  if (typeof raw.daily_digest_time === 'string' && isValidHHMM(raw.daily_digest_time)) {
     config.daily_digest_time = raw.daily_digest_time;
   }
 
   // daily_digest_timezone
-  if (
-    typeof raw.daily_digest_timezone === 'string' &&
-    raw.daily_digest_timezone.length > 0
-  ) {
+  if (typeof raw.daily_digest_timezone === 'string' && raw.daily_digest_timezone.length > 0) {
     config.daily_digest_timezone = raw.daily_digest_timezone;
   }
 

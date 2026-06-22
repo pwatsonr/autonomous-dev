@@ -9,15 +9,8 @@
  */
 
 import type { Finding } from '../../../src/review-gate/types';
-import {
-  AdversarialRunner,
-  ADVERSARIAL_TESTS,
-  validateResult,
-} from './adversarial-runner';
-import type {
-  AdversarialTestCase,
-  ReviewerExecutorAdapter,
-} from './adversarial-runner';
+import { AdversarialRunner, ADVERSARIAL_TESTS, validateResult } from './adversarial-runner';
+import type { AdversarialTestCase, ReviewerExecutorAdapter } from './adversarial-runner';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -100,9 +93,7 @@ describe('Adversarial Traceability Tests', () => {
       const result = validateResult(testCase, 40, 'changes_requested', []);
       expect(result.pass).toBe(false);
       expect(result.failures).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining('traceability gap'),
-        ]),
+        expect.arrayContaining([expect.stringContaining('traceability gap')]),
       );
     });
 
@@ -171,8 +162,7 @@ describe('Adversarial Traceability Tests', () => {
       const findings = [
         makeFinding({
           category_id: 'prd_alignment',
-          description:
-            'TDD omits FR-004, FR-006, FR-008 from parent PRD-042 without justification',
+          description: 'TDD omits FR-004, FR-006, FR-008 from parent PRD-042 without justification',
           severity: 'critical',
         }),
         makeFinding({
@@ -217,9 +207,7 @@ describe('Adversarial Traceability Tests', () => {
       const result = validateResult(testCase, 55, 'changes_requested', findings);
       expect(result.pass).toBe(false);
       expect(result.failures).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("severity 'major'"),
-        ]),
+        expect.arrayContaining([expect.stringContaining("severity 'major'")]),
       );
     });
 

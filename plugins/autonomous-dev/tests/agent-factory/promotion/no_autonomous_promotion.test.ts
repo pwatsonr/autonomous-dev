@@ -82,9 +82,9 @@ describe('#541: autonomous promotion stays dormant', () => {
       // The flag must NOT be honored from YAML.
       expect(config.autonomousPromotion?.enabled).not.toBe(true);
       // And eligibility still blocks.
-      expect(
-        isEligibleForAutoPromotion(lowRiskAgent(), patchProposal(), config).eligible,
-      ).toBe(false);
+      expect(isEligibleForAutoPromotion(lowRiskAgent(), patchProposal(), config).eligible).toBe(
+        false,
+      );
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }

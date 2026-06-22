@@ -134,10 +134,7 @@ describe('loadStandardsFile — security defenses', () => {
 
 describe('loadStandardsFile — IO + error surfacing', () => {
   it('returns io_error for a non-existent path', async () => {
-    const missing = path.join(
-      os.tmpdir(),
-      `does-not-exist-${Date.now()}-${Math.random()}.yaml`,
-    );
+    const missing = path.join(os.tmpdir(), `does-not-exist-${Date.now()}-${Math.random()}.yaml`);
     const r = await loadStandardsFile(missing);
     expect(r.artifact).toBeNull();
     expect(r.errors).toHaveLength(1);

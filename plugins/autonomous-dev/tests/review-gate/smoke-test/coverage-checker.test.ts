@@ -19,7 +19,7 @@ function makeParent(id: string, sectionIds: string[]): ParentDocument {
 function makeChild(
   id: string,
   sectionIds: string[],
-  tracesFrom: { document_id: string; section_ids: string[] }[]
+  tracesFrom: { document_id: string; section_ids: string[] }[],
 ): ChildDocument {
   return {
     id,
@@ -85,10 +85,7 @@ describe('CoverageChecker', () => {
   // -----------------------------------------------------------------------
   test('Zero coverage: no children reference any parent section', () => {
     const parent = makeParent('p1', ['s1', 's2', 's3']);
-    const children = [
-      makeChild('c1', ['cs1'], []),
-      makeChild('c2', ['cs2'], []),
-    ];
+    const children = [makeChild('c1', ['cs1'], []), makeChild('c2', ['cs2'], [])];
 
     const result = checker.check(parent, children);
 
@@ -139,9 +136,7 @@ describe('CoverageChecker', () => {
   test('Child traces to nonexistent parent section: warning logged, not counted', () => {
     const parent = makeParent('p1', ['s1', 's2']);
     const children = [
-      makeChild('c1', ['cs1'], [
-        { document_id: 'p1', section_ids: ['s1', 'nonexistent'] },
-      ]),
+      makeChild('c1', ['cs1'], [{ document_id: 'p1', section_ids: ['s1', 'nonexistent'] }]),
       makeChild('c2', ['cs2'], [{ document_id: 'p1', section_ids: ['s2'] }]),
     ];
 
@@ -149,9 +144,7 @@ describe('CoverageChecker', () => {
 
     const result = checker.check(parent, children);
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('nonexistent')
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent'));
     expect(result.coverage_percentage).toBe(100);
     expect(result.pass).toBe(true);
     // The nonexistent section is not in parent_sections at all
@@ -166,9 +159,11 @@ describe('CoverageChecker', () => {
   test('Single child covers all 5 parent sections', () => {
     const parent = makeParent('p1', ['s1', 's2', 's3', 's4', 's5']);
     const children = [
-      makeChild('c1', ['cs1'], [
-        { document_id: 'p1', section_ids: ['s1', 's2', 's3', 's4', 's5'] },
-      ]),
+      makeChild(
+        'c1',
+        ['cs1'],
+        [{ document_id: 'p1', section_ids: ['s1', 's2', 's3', 's4', 's5'] }],
+      ),
     ];
 
     const result = checker.check(parent, children);
@@ -188,15 +183,9 @@ describe('CoverageChecker', () => {
   test('Full coverage matrix: 5 parent sections, 3 children, all sections covered', () => {
     const parent = makeParent('p1', ['s1', 's2', 's3', 's4', 's5']);
     const children = [
-      makeChild('c1', ['cs1'], [
-        { document_id: 'p1', section_ids: ['s1', 's2'] },
-      ]),
-      makeChild('c2', ['cs2'], [
-        { document_id: 'p1', section_ids: ['s3', 's4'] },
-      ]),
-      makeChild('c3', ['cs3'], [
-        { document_id: 'p1', section_ids: ['s5'] },
-      ]),
+      makeChild('c1', ['cs1'], [{ document_id: 'p1', section_ids: ['s1', 's2'] }]),
+      makeChild('c2', ['cs2'], [{ document_id: 'p1', section_ids: ['s3', 's4'] }]),
+      makeChild('c3', ['cs3'], [{ document_id: 'p1', section_ids: ['s5'] }]),
     ];
 
     const result = checker.check(parent, children);

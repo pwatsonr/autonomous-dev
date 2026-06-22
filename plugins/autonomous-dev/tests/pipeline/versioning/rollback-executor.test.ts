@@ -13,13 +13,16 @@ const type = DocumentType.PRD;
 const documentId = 'PRD-001';
 
 /** Content for v1.0 */
-const v10Content = '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Original Content\n\nThis is the original v1.0 content.\n';
+const v10Content =
+  '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Original Content\n\nThis is the original v1.0 content.\n';
 
 /** Content for v1.1 (modified) */
-const v11Content = '---\nid: PRD-001\nversion: "1.1"\nupdated_at: "2026-01-02T00:00:00.000Z"\n---\n# Modified Content\n\nThis is the modified v1.1 content.\n';
+const v11Content =
+  '---\nid: PRD-001\nversion: "1.1"\nupdated_at: "2026-01-02T00:00:00.000Z"\n---\n# Modified Content\n\nThis is the modified v1.1 content.\n';
 
 /** Content for v1.2 (further modified) */
-const v12Content = '---\nid: PRD-001\nversion: "1.2"\nupdated_at: "2026-01-03T00:00:00.000Z"\n---\n# Further Modified\n\nThis is the v1.2 content.\n';
+const v12Content =
+  '---\nid: PRD-001\nversion: "1.2"\nupdated_at: "2026-01-03T00:00:00.000Z"\n---\n# Further Modified\n\nThis is the v1.2 content.\n';
 
 function makeDocumentContent(rawContent: string, version: string): DocumentContent {
   return {
@@ -31,7 +34,11 @@ function makeDocumentContent(rawContent: string, version: string): DocumentConte
   };
 }
 
-function makeVersionRecord(version: string, reason: string, overrides: Partial<VersionRecord> = {}): VersionRecord {
+function makeVersionRecord(
+  version: string,
+  reason: string,
+  overrides: Partial<VersionRecord> = {},
+): VersionRecord {
   return {
     version,
     reason: reason as any,
@@ -43,10 +50,13 @@ function makeVersionRecord(version: string, reason: string, overrides: Partial<V
   };
 }
 
-function createMockStorage(options: {
-  versions?: VersionRecord[];
-  versionContents?: Record<string, string>;
-} = {}): jest.Mocked<Pick<DocumentStorage, 'readVersion' | 'listVersions' | 'writeVersion'>> & DocumentStorage {
+function createMockStorage(
+  options: {
+    versions?: VersionRecord[];
+    versionContents?: Record<string, string>;
+  } = {},
+): jest.Mocked<Pick<DocumentStorage, 'readVersion' | 'listVersions' | 'writeVersion'>> &
+  DocumentStorage {
   const versions = options.versions ?? [
     makeVersionRecord('1.0', 'INITIAL'),
     makeVersionRecord('1.1', 'REVIEW_REVISION'),
@@ -60,20 +70,25 @@ function createMockStorage(options: {
   };
 
   const mock = {
-    readVersion: jest.fn().mockImplementation(async (_pId: string, _t: DocumentType, _dId: string, version: string) => {
-      const content = versionContents[version];
-      if (!content) throw new Error(`Version ${version} not found`);
-      return makeDocumentContent(content, version);
-    }),
+    readVersion: jest
+      .fn()
+      .mockImplementation(async (_pId: string, _t: DocumentType, _dId: string, version: string) => {
+        const content = versionContents[version];
+        if (!content) throw new Error(`Version ${version} not found`);
+        return makeDocumentContent(content, version);
+      }),
     listVersions: jest.fn().mockResolvedValue(versions),
-    writeVersion: jest.fn().mockImplementation(async (req) => ({
-      version: req.version,
-      reason: req.reason,
-      timestamp: new Date().toISOString(),
-      author: req.authorAgent,
-      contentHash: `hash-${req.version}`,
-      filePath: `/tmp/test/v${req.version}.md`,
-    } as VersionRecord)),
+    writeVersion: jest.fn().mockImplementation(
+      async (req) =>
+        ({
+          version: req.version,
+          reason: req.reason,
+          timestamp: new Date().toISOString(),
+          author: req.authorAgent,
+          contentHash: `hash-${req.version}`,
+          filePath: `/tmp/test/v${req.version}.md`,
+        }) as VersionRecord,
+    ),
   };
   return mock as any;
 }
@@ -84,9 +99,7 @@ describe('rollback', () => {
 
     await rollback(pipelineId, type, documentId, '1.0', 'rollback-agent', storage);
 
-    expect(storage.readVersion).toHaveBeenCalledWith(
-      pipelineId, type, documentId, '1.0',
-    );
+    expect(storage.readVersion).toHaveBeenCalledWith(pipelineId, type, documentId, '1.0');
   });
 
   it('rollback creates new version with ROLLBACK reason', async () => {

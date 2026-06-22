@@ -18,12 +18,7 @@
 import { CoverageChecker } from './coverage-checker';
 import { ScopeContainmentChecker } from './scope-containment-checker';
 import { ContradictionDetector } from './contradiction-detector';
-import {
-  ParentDocument,
-  ChildDocument,
-  SmokeTestConfig,
-  SmokeTestResult,
-} from './types';
+import { ParentDocument, ChildDocument, SmokeTestConfig, SmokeTestResult } from './types';
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -46,7 +41,7 @@ export class SmokeTestExecutor {
   constructor(
     coverageChecker?: CoverageChecker,
     scopeContainmentChecker?: ScopeContainmentChecker,
-    contradictionDetector?: ContradictionDetector
+    contradictionDetector?: ContradictionDetector,
   ) {
     this.coverageChecker = coverageChecker ?? new CoverageChecker();
     this.scopeContainmentChecker = scopeContainmentChecker ?? new ScopeContainmentChecker();
@@ -67,7 +62,7 @@ export class SmokeTestExecutor {
     parent: ParentDocument,
     children: ChildDocument[],
     parentVersion: string,
-    config?: Partial<SmokeTestConfig>
+    config?: Partial<SmokeTestConfig>,
   ): Promise<SmokeTestResult> {
     const mergedConfig: SmokeTestConfig = {
       ...DEFAULT_CONFIG,

@@ -242,7 +242,8 @@ function baseAgent(version = '1.0.0'): ParsedAgent {
     risk_tier: 'medium',
     frozen: false,
     description: 'Executes code changes based on specs',
-    system_prompt: '# System Prompt\n\nYou are a code executor agent.\nYou write clean, tested code.',
+    system_prompt:
+      '# System Prompt\n\nYou are a code executor agent.\nYou write clean, tested code.',
   };
 }
 
@@ -355,7 +356,13 @@ function makeAggregate(overrides?: Partial<AggregateMetrics>): AggregateMetrics 
     avg_wall_clock_ms: 5000,
     avg_turns: 8,
     total_tokens: 120000,
-    trend: { direction: 'declining', slope: -0.05, confidence: 0.7, sample_size: 25, low_confidence: false },
+    trend: {
+      direction: 'declining',
+      slope: -0.05,
+      confidence: 0.7,
+      sample_size: 25,
+      low_confidence: false,
+    },
     domain_breakdown: {
       typescript: { invocation_count: 15, approval_rate: 0.9, avg_quality_score: 4.1 },
       python: { invocation_count: 10, approval_rate: 0.6, avg_quality_score: 2.8 },
@@ -421,7 +428,10 @@ class FakeMetricsEngine implements IMetricsEngine {
 class MockRuntime {
   public lastInput = '';
   public invokeCount = 0;
-  constructor(private output: string, private success = true) {}
+  constructor(
+    private output: string,
+    private success = true,
+  ) {}
   async invoke(input: string, _ctx: RuntimeContext): Promise<RuntimeResult> {
     this.lastInput = input;
     this.invokeCount++;
@@ -479,7 +489,11 @@ function metaApprovedJson(): string {
   return JSON.stringify({
     verdict: 'approved',
     findings: [],
-    checklist_results: [1, 2, 3, 4, 5, 6].map((item) => ({ item, name: `Item ${item}`, passed: true })),
+    checklist_results: [1, 2, 3, 4, 5, 6].map((item) => ({
+      item,
+      name: `Item ${item}`,
+      passed: true,
+    })),
   });
 }
 
@@ -504,7 +518,9 @@ function metaBlockedJson(): string {
 }
 
 function makeConfig(): AgentFactoryConfig {
-  return { observation: { defaultThreshold: 10, perAgentOverrides: {} } } as unknown as AgentFactoryConfig;
+  return {
+    observation: { defaultThreshold: 10, perAgentOverrides: {} },
+  } as unknown as AgentFactoryConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -552,7 +568,10 @@ function createHarness(opts: {
     makeAgentRecord(metaReviewerAgent(), 'FROZEN', path.join(agentsDir, 'agent-meta-reviewer.md')),
   ]);
 
-  const reportStore = new WeaknessReportStore(path.join(tmpDir, 'weakness-reports.jsonl'), silentLogger);
+  const reportStore = new WeaknessReportStore(
+    path.join(tmpDir, 'weakness-reports.jsonl'),
+    silentLogger,
+  );
   const proposalStore = new ProposalStore(
     path.join(tmpDir, 'proposals.jsonl'),
     path.join(tmpDir, 'agent-metrics.db'),
@@ -649,8 +668,12 @@ async function test_improve_happy_path_parks_without_promoting(): Promise<void> 
     assert(out.includes('Both gates PASSED'), `should report both gates passed:\n${out}`);
     assert(out.includes('meta_approved'), 'should report the parked status');
     assert(out.includes('Unified diff:'), 'should include the unified diff section');
-    assert(out.includes('version_history') || out.includes('comprehensive test coverage') || out.includes('@@'),
-      'diff body should be present');
+    assert(
+      out.includes('version_history') ||
+        out.includes('comprehensive test coverage') ||
+        out.includes('@@'),
+      'diff body should be present',
+    );
     assert(out.includes('agent accept'), 'should include the accept next-step command');
     assert(out.includes('agent reject'), 'should include the reject next-step command');
 
@@ -658,11 +681,17 @@ async function test_improve_happy_path_parks_without_promoting(): Promise<void> 
     // separate human gate — NOT terminal).
     const proposals = h.proposalStore.getByAgent('code-executor');
     assert(proposals.length === 1, `expected exactly 1 proposal, got ${proposals.length}`);
-    assert(proposals[0].status === 'meta_approved', `expected meta_approved, got ${proposals[0].status}`);
+    assert(
+      proposals[0].status === 'meta_approved',
+      `expected meta_approved, got ${proposals[0].status}`,
+    );
     assert(out.includes(proposals[0].proposal_id), 'next-step commands name the proposal id');
 
     // SAFETY: the agent file on disk is UNCHANGED and NO git commit was made.
-    assert(fs.readFileSync(h.agentFilePath, 'utf-8') === originalOnDisk, 'agent .md must be unchanged by improve');
+    assert(
+      fs.readFileSync(h.agentFilePath, 'utf-8') === originalOnDisk,
+      'agent .md must be unchanged by improve',
+    );
     assert(gitHead(h.projectRoot) === headBefore, 'improve must NOT create a git commit');
 
     // The agent is parked UNDER_REVIEW (analyzer transition) awaiting the human.
@@ -686,9 +715,15 @@ async function test_improve_no_action_creates_no_proposal(): Promise<void> {
   try {
     const out = await commandImprove(h.registry, 'code-executor', h.ctx);
 
-    assert(out.includes('no_action') || out.includes('healthy'), `should report no_action:\n${out}`);
+    assert(
+      out.includes('no_action') || out.includes('healthy'),
+      `should report no_action:\n${out}`,
+    );
     assert(out.includes('Nothing parked'), 'should state nothing was parked');
-    assert(h.proposalStore.getByAgent('code-executor').length === 0, 'no proposal should be created');
+    assert(
+      h.proposalStore.getByAgent('code-executor').length === 0,
+      'no proposal should be created',
+    );
     // Healthy path leaves the agent ACTIVE (analyzer does not move to UNDER_REVIEW).
     assert(h.registry.getState('code-executor') === 'ACTIVE', 'agent stays ACTIVE on no_action');
     console.log('PASS: test_improve_no_action_creates_no_proposal');
@@ -710,11 +745,17 @@ async function test_improve_constraint_violation_not_parked(): Promise<void> {
   try {
     const out = await commandImprove(h.registry, 'code-executor', h.ctx);
 
-    assert(out.includes('BLOCKED by constraint enforcement'), `should report constraint block:\n${out}`);
+    assert(
+      out.includes('BLOCKED by constraint enforcement'),
+      `should report constraint block:\n${out}`,
+    );
     assert(out.includes('NOT parked'), 'should state the proposal was not parked');
     assert(out.includes('IMMUTABLE_TOOLS'), 'should surface the specific constraint rule');
     // No proposal persisted at all (constraint gate rejects before append).
-    assert(h.proposalStore.getByAgent('code-executor').length === 0, 'no proposal should be persisted');
+    assert(
+      h.proposalStore.getByAgent('code-executor').length === 0,
+      'no proposal should be persisted',
+    );
     console.log('PASS: test_improve_constraint_violation_not_parked');
   } finally {
     teardown(h);
@@ -747,7 +788,10 @@ async function test_improve_meta_blocked_is_not_promotable(): Promise<void> {
     assert(blocked.status === 'meta_rejected', `expected meta_rejected, got ${blocked.status}`);
 
     // SAFETY: nothing on disk changed, no commit made.
-    assert(fs.readFileSync(h.agentFilePath, 'utf-8') === originalOnDisk, 'agent .md unchanged on meta block');
+    assert(
+      fs.readFileSync(h.agentFilePath, 'utf-8') === originalOnDisk,
+      'agent .md unchanged on meta block',
+    );
     assert(gitHead(h.projectRoot) === headBefore, 'no commit on meta block');
 
     // KEY REGRESSION: a blocked proposal is NOT promotable. The Promoter must
@@ -755,9 +799,15 @@ async function test_improve_meta_blocked_is_not_promotable(): Promise<void> {
     // no file/commit change.
     const promoteResult = await h.promoter.promote('code-executor', blocked.proposal_id);
     assert(promoteResult.success === false, 'blocked proposal must NOT promote');
-    assert(fs.readFileSync(h.agentFilePath, 'utf-8') === originalOnDisk, 'agent .md still unchanged after refused promote');
+    assert(
+      fs.readFileSync(h.agentFilePath, 'utf-8') === originalOnDisk,
+      'agent .md still unchanged after refused promote',
+    );
     assert(gitHead(h.projectRoot) === headBefore, 'still no commit after refused promote');
-    assert(h.proposalStore.getById(blocked.proposal_id)!.status === 'meta_rejected', 'status remains meta_rejected');
+    assert(
+      h.proposalStore.getById(blocked.proposal_id)!.status === 'meta_rejected',
+      'status remains meta_rejected',
+    );
     console.log('PASS: test_improve_meta_blocked_is_not_promotable');
   } finally {
     teardown(h);
@@ -789,17 +839,32 @@ async function test_improve_then_human_promote_succeeds(): Promise<void> {
     // The SEPARATE human gate: the existing Promoter promotes the parked proposal.
     const result = await h.promoter.promote('code-executor', parked.proposal_id);
 
-    assert(result.success === true, `human-approved promotion should succeed, got error: ${result.error}`);
-    assert(result.newVersion === expectedVersion, `expected v${expectedVersion}, got ${result.newVersion}`);
+    assert(
+      result.success === true,
+      `human-approved promotion should succeed, got error: ${result.error}`,
+    );
+    assert(
+      result.newVersion === expectedVersion,
+      `expected v${expectedVersion}, got ${result.newVersion}`,
+    );
 
     // Now (and only now) the file is updated and a commit was made. The
     // Promoter writes the proposal's proposed_definition verbatim.
     const onDisk = fs.readFileSync(h.agentFilePath, 'utf-8');
     assert(onDisk === parked.proposed_definition, 'agent .md should equal the proposed definition');
-    assert(onDisk.includes('comprehensive test coverage'), 'agent .md should contain the proposed body');
-    assert(gitHead(h.projectRoot) !== headBefore, 'a commit should be made by the human-approved promotion');
+    assert(
+      onDisk.includes('comprehensive test coverage'),
+      'agent .md should contain the proposed body',
+    );
+    assert(
+      gitHead(h.projectRoot) !== headBefore,
+      'a commit should be made by the human-approved promotion',
+    );
 
-    assert(h.proposalStore.getById(parked.proposal_id)!.status === 'promoted', 'proposal should reach promoted');
+    assert(
+      h.proposalStore.getById(parked.proposal_id)!.status === 'promoted',
+      'proposal should reach promoted',
+    );
     assert(h.registry.getState('code-executor') === 'ACTIVE', 'agent should end ACTIVE');
     console.log('PASS: test_improve_then_human_promote_succeeds');
   } finally {
@@ -822,7 +887,10 @@ async function test_improve_frozen_guard(): Promise<void> {
     const out = await commandImprove(h.registry, 'code-executor', h.ctx);
     assert(out.startsWith('Error:'), `expected an error, got:\n${out}`);
     assert(out.includes('FROZEN'), 'error should mention FROZEN');
-    assert(h.proposalStore.getByAgent('code-executor').length === 0, 'no proposal for a frozen agent');
+    assert(
+      h.proposalStore.getByAgent('code-executor').length === 0,
+      'no proposal for a frozen agent',
+    );
     console.log('PASS: test_improve_frozen_guard');
   } finally {
     teardown(h);
@@ -844,7 +912,10 @@ async function test_improve_missing_deps_guard(): Promise<void> {
     ]);
     const out = await commandImprove(registry, 'code-executor', {});
     assert(out.startsWith('Error:'), `expected an error, got:\n${out}`);
-    assert(out.includes('Improvement subsystem not available'), 'should report the subsystem guard');
+    assert(
+      out.includes('Improvement subsystem not available'),
+      'should report the subsystem guard',
+    );
     console.log('PASS: test_improve_missing_deps_guard');
   } finally {
     cleanupDir(tmpDir);
@@ -856,11 +927,17 @@ async function test_improve_missing_deps_guard(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 describe('agent improve (human-gated self-improvement, #529)', () => {
-  it('happy path: parks at human gate without promoting', async () => await test_improve_happy_path_parks_without_promoting());
-  it('no_action: creates no proposal', async () => await test_improve_no_action_creates_no_proposal());
-  it('enforceConstraints rejection: not parked, surfaced', async () => await test_improve_constraint_violation_not_parked());
-  it('adversarial: meta-review BLOCK -> meta_rejected, not promotable', async () => await test_improve_meta_blocked_is_not_promotable());
-  it('approval path: existing promote promotes the parked proposal', async () => await test_improve_then_human_promote_succeeds());
+  it('happy path: parks at human gate without promoting', async () =>
+    await test_improve_happy_path_parks_without_promoting());
+  it('no_action: creates no proposal', async () =>
+    await test_improve_no_action_creates_no_proposal());
+  it('enforceConstraints rejection: not parked, surfaced', async () =>
+    await test_improve_constraint_violation_not_parked());
+  it('adversarial: meta-review BLOCK -> meta_rejected, not promotable', async () =>
+    await test_improve_meta_blocked_is_not_promotable());
+  it('approval path: existing promote promotes the parked proposal', async () =>
+    await test_improve_then_human_promote_succeeds());
   it('guard: FROZEN agent cannot be improved', async () => await test_improve_frozen_guard());
-  it('guard: missing deps returns a clear error', async () => await test_improve_missing_deps_guard());
+  it('guard: missing deps returns a clear error', async () =>
+    await test_improve_missing_deps_guard());
 });

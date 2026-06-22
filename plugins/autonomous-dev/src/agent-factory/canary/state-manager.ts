@@ -107,11 +107,7 @@ export class CanaryStateManager {
   /** In-memory canary states keyed by agent name. */
   private canaries: Map<string, CanaryState> = new Map();
 
-  constructor(
-    config: AgentFactoryConfig,
-    auditLogger: AuditLogger,
-    registry?: IAgentRegistry,
-  ) {
+  constructor(config: AgentFactoryConfig, auditLogger: AuditLogger, registry?: IAgentRegistry) {
     this.config = config;
     this.auditLogger = auditLogger;
     this.registry = registry ?? null;
@@ -234,9 +230,7 @@ export class CanaryStateManager {
   addComparison(agentName: string, comparison: CanaryComparison): void {
     const state = this.canaries.get(agentName);
     if (!state || state.status !== 'active') {
-      throw new Error(
-        `Cannot add comparison: no active canary for '${agentName}'`,
-      );
+      throw new Error(`Cannot add comparison: no active canary for '${agentName}'`);
     }
 
     state.comparisons.push(comparison);
@@ -252,15 +246,10 @@ export class CanaryStateManager {
    * @param status     The final status: 'completed_positive' or 'completed_negative'.
    * @throws           Error if no active canary exists for this agent.
    */
-  completeCanary(
-    agentName: string,
-    status: 'completed_positive' | 'completed_negative',
-  ): void {
+  completeCanary(agentName: string, status: 'completed_positive' | 'completed_negative'): void {
     const state = this.canaries.get(agentName);
     if (!state || state.status !== 'active') {
-      throw new Error(
-        `Cannot complete canary: no active canary for '${agentName}'`,
-      );
+      throw new Error(`Cannot complete canary: no active canary for '${agentName}'`);
     }
 
     state.status = status;
@@ -290,9 +279,7 @@ export class CanaryStateManager {
   terminateCanary(agentName: string): void {
     const state = this.canaries.get(agentName);
     if (!state || state.status !== 'active') {
-      throw new Error(
-        `Cannot terminate canary: no active canary for '${agentName}'`,
-      );
+      throw new Error(`Cannot terminate canary: no active canary for '${agentName}'`);
     }
 
     state.status = 'terminated_regression';
@@ -353,9 +340,7 @@ export class CanaryStateManager {
       typeof configAny['canary'] === 'object' &&
       (configAny['canary'] as Record<string, unknown>)['durationDays'] !== undefined
     ) {
-      const days = Number(
-        (configAny['canary'] as Record<string, unknown>)['durationDays'],
-      );
+      const days = Number((configAny['canary'] as Record<string, unknown>)['durationDays']);
       if (!isNaN(days) && days > 0) {
         return days;
       }
@@ -403,11 +388,9 @@ export class CanaryStateManager {
     }
 
     try {
-      fs.writeFileSync(
-        this.statePath,
-        JSON.stringify(persisted, null, 2) + '\n',
-        { encoding: 'utf-8' },
-      );
+      fs.writeFileSync(this.statePath, JSON.stringify(persisted, null, 2) + '\n', {
+        encoding: 'utf-8',
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       process.stderr.write(

@@ -16,7 +16,7 @@
  * AuditTrail interface.
  */
 
-import type { StateSnapshotCapture } from "./state-snapshot";
+import type { StateSnapshotCapture } from './state-snapshot';
 import type {
   KillMode,
   SystemState,
@@ -24,7 +24,7 @@ import type {
   KillResult,
   CancelResult,
   StateSnapshot,
-} from "./types";
+} from './types';
 
 // ---------------------------------------------------------------------------
 // Types (supplementary -- core types imported from ./types)
@@ -71,10 +71,7 @@ export interface AbortManagerPort {
  * Compatible with both trust and escalation subsystem AuditTrail interfaces.
  */
 export interface AuditTrail {
-  append(event: {
-    event_type: string;
-    payload: Record<string, unknown>;
-  }): Promise<void>;
+  append(event: { event_type: string; payload: Record<string, unknown> }): Promise<void>;
 }
 
 /**
@@ -114,7 +111,7 @@ export interface Notifier {
  * All dependencies are constructor-injected for testability.
  */
 export class KillSwitch {
-  private state: SystemState = "running";
+  private state: SystemState = 'running';
   private lastKill: KillResult | null = null;
 
   constructor(
@@ -138,9 +135,9 @@ export class KillSwitch {
    */
   async kill(mode: KillMode, issuedBy: string): Promise<KillResult> {
     // Step 1: Idempotency check
-    if (this.state === "halted") {
+    if (this.state === 'halted') {
       this.auditTrail.append({
-        event_type: "kill_issued_duplicate",
+        event_type: 'kill_issued_duplicate',
         payload: { mode, issuedBy },
       });
       return this.lastKill!;
@@ -153,22 +150,17 @@ export class KillSwitch {
     const snapshots = this.snapshotCapture.captureAll(activeIds);
 
     // Step 4: Persist kill snapshot atomically
-    const snapshotPath = await this.snapshotCapture.persistKillSnapshot(
-      snapshots,
-      mode,
-      issuedBy,
-    );
+    const snapshotPath = await this.snapshotCapture.persistKillSnapshot(snapshots, mode, issuedBy);
 
     // Step 5: Signal abort
-    const abortReason: AbortReason =
-      mode === "graceful" ? "KILL_GRACEFUL" : "KILL_HARD";
+    const abortReason: AbortReason = mode === 'graceful' ? 'KILL_GRACEFUL' : 'KILL_HARD';
     this.abortManager.abortAll(abortReason);
 
     // Step 6: Cancel all pending escalations
     this.escalationEngine.cancelAllPending();
 
     // Step 7: Update state
-    this.state = "halted";
+    this.state = 'halted';
 
     // Step 8: Build result
     const result: KillResult = {
@@ -184,7 +176,7 @@ export class KillSwitch {
 
     // Step 10: Audit
     this.auditTrail.append({
-      event_type: "kill_issued",
+      event_type: 'kill_issued',
       payload: {
         mode,
         issuedBy,
@@ -195,8 +187,8 @@ export class KillSwitch {
 
     // Step 11: Notification
     this.notifier.emit({
-      type: "kill_switch_activated",
-      urgency: "immediate",
+      type: 'kill_switch_activated',
+      urgency: 'immediate',
       mode,
       issuedBy,
       issuedAt: result.issuedAt,
@@ -219,11 +211,11 @@ export class KillSwitch {
     const snapshot = this.snapshotCapture.captureOne(requestId);
 
     // Step 2: Abort the single request
-    this.abortManager.abortRequest(requestId, "CANCEL");
+    this.abortManager.abortRequest(requestId, 'CANCEL');
 
     // Step 3: Audit
     this.auditTrail.append({
-      event_type: "cancel_issued",
+      event_type: 'cancel_issued',
       payload: { requestId, issuedBy },
     });
 
@@ -240,7 +232,7 @@ export class KillSwitch {
    * Returns true if the system is in the "halted" state.
    */
   isHalted(): boolean {
-    return this.state === "halted";
+    return this.state === 'halted';
   }
 
   /**
@@ -251,7 +243,7 @@ export class KillSwitch {
    */
   getLastKillResult(): KillResult {
     if (!this.lastKill) {
-      throw new Error("No kill result available: system has not been killed");
+      throw new Error('No kill result available: system has not been killed');
     }
     return this.lastKill;
   }
@@ -271,22 +263,22 @@ export class KillSwitch {
    */
   reenable(issuedBy: string): void {
     // Step 1: Guard -- must be halted
-    if (this.state !== "halted") {
-      throw new Error("Cannot re-enable: system is not halted");
+    if (this.state !== 'halted') {
+      throw new Error('Cannot re-enable: system is not halted');
     }
 
     // Step 2: Reset abort manager (fresh controllers for new registrations)
     this.abortManager.reset();
 
     // Step 3: Restore running state
-    this.state = "running";
+    this.state = 'running';
 
     // Step 4: Clear last kill for idempotency
     this.lastKill = null;
 
     // Step 5: Audit
     this.auditTrail.append({
-      event_type: "system_reenabled",
+      event_type: 'system_reenabled',
       payload: { issuedBy },
     });
   }

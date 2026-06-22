@@ -12,10 +12,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fc from 'fast-check';
 
-import {
-  FilesystemIsolationHook,
-  IsolationHookContext,
-} from '../../src/parallel/isolation-hook';
+import { FilesystemIsolationHook, IsolationHookContext } from '../../src/parallel/isolation-hook';
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -56,11 +53,7 @@ describe('FilesystemIsolationHook', () => {
 
   describe('path validation', () => {
     it('allows files within worktree', () => {
-      expect(
-        hook.isPathAllowed(
-          path.join(worktreePath, 'src', 'index.ts'),
-        ),
-      ).toBe(true);
+      expect(hook.isPathAllowed(path.join(worktreePath, 'src', 'index.ts'))).toBe(true);
     });
 
     it('allows relative paths within worktree', () => {
@@ -85,32 +78,19 @@ describe('FilesystemIsolationHook', () => {
 
     it('blocks paths to other worktrees', () => {
       // Create a sibling worktree directory
-      const otherWorktree = path.join(
-        tmpDir,
-        'test-repo',
-        '.worktrees',
-        'req-001',
-        'track-b',
-      );
+      const otherWorktree = path.join(tmpDir, 'test-repo', '.worktrees', 'req-001', 'track-b');
       fs.mkdirSync(otherWorktree, { recursive: true });
       fs.mkdirSync(path.join(otherWorktree, 'src'), { recursive: true });
-      fs.writeFileSync(
-        path.join(otherWorktree, 'src', 'index.ts'),
-        '// other',
-      );
+      fs.writeFileSync(path.join(otherWorktree, 'src', 'index.ts'), '// other');
 
-      expect(
-        hook.isPathAllowed(path.join(otherWorktree, 'src', 'index.ts')),
-      ).toBe(false);
+      expect(hook.isPathAllowed(path.join(otherWorktree, 'src', 'index.ts'))).toBe(false);
     });
 
     it('blocks paths to repo root', () => {
       const repoRoot = path.join(tmpDir, 'test-repo');
       fs.writeFileSync(path.join(repoRoot, 'README.md'), '# repo');
 
-      expect(
-        hook.isPathAllowed(path.join(repoRoot, 'README.md')),
-      ).toBe(false);
+      expect(hook.isPathAllowed(path.join(repoRoot, 'README.md'))).toBe(false);
     });
 
     it('blocks symlinks pointing outside worktree', () => {
@@ -388,25 +368,20 @@ describe('FilesystemIsolationHook', () => {
 
     it('traversal attempts are always blocked', () => {
       fc.assert(
-        fc.property(
-          fc.integer({ min: 1, max: 20 }),
-          fc.string(),
-          (depth, suffix) => {
-            const traversal =
-              '../'.repeat(depth) + suffix.replace(/[/\x00]/g, '');
-            // If this resolves outside the worktree, it should be blocked
-            const absoluteResolved = path.resolve(worktreePath, traversal);
-            const normalizedResolved = path.normalize(absoluteResolved);
-            const resolvedWorktree = fs.realpathSync(worktreePath);
+        fc.property(fc.integer({ min: 1, max: 20 }), fc.string(), (depth, suffix) => {
+          const traversal = '../'.repeat(depth) + suffix.replace(/[/\x00]/g, '');
+          // If this resolves outside the worktree, it should be blocked
+          const absoluteResolved = path.resolve(worktreePath, traversal);
+          const normalizedResolved = path.normalize(absoluteResolved);
+          const resolvedWorktree = fs.realpathSync(worktreePath);
 
-            if (
-              !normalizedResolved.startsWith(resolvedWorktree + path.sep) &&
-              normalizedResolved !== resolvedWorktree
-            ) {
-              expect(hook.isPathAllowed(traversal)).toBe(false);
-            }
-          },
-        ),
+          if (
+            !normalizedResolved.startsWith(resolvedWorktree + path.sep) &&
+            normalizedResolved !== resolvedWorktree
+          ) {
+            expect(hook.isPathAllowed(traversal)).toBe(false);
+          }
+        }),
         { numRuns: 100 },
       );
     });

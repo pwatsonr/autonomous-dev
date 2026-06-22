@@ -19,7 +19,11 @@ function defaultConfig(overrides?: Partial<GovernanceConfig>): GovernanceConfig 
   };
 }
 
-function makeDeployment(daysAgo: number, now: Date, overrides?: Partial<FixDeployment>): FixDeployment {
+function makeDeployment(
+  daysAgo: number,
+  now: Date,
+  overrides?: Partial<FixDeployment>,
+): FixDeployment {
   const deployDate = new Date(now);
   deployDate.setDate(deployDate.getDate() - daysAgo);
   return {
@@ -44,9 +48,18 @@ function test_cooldown_active_within_window(): void {
 
   assert(result.active === true, `expected active=true, got ${result.active}`);
   assert(result.reason !== undefined, 'expected reason to be set');
-  assert(result.reason!.includes('Fix deployed on'), `reason should mention deployment: ${result.reason}`);
-  assert(result.reason!.includes('cooldown until'), `reason should mention cooldown end: ${result.reason}`);
-  assert(result.linked_deployment === 'deploy-001', `expected deploy-001, got ${result.linked_deployment}`);
+  assert(
+    result.reason!.includes('Fix deployed on'),
+    `reason should mention deployment: ${result.reason}`,
+  );
+  assert(
+    result.reason!.includes('cooldown until'),
+    `reason should mention cooldown end: ${result.reason}`,
+  );
+  assert(
+    result.linked_deployment === 'deploy-001',
+    `expected deploy-001, got ${result.linked_deployment}`,
+  );
   assert(result.cooldown_end !== undefined, 'expected cooldown_end to be set');
   assert(result.deploy_date !== undefined, 'expected deploy_date to be set');
   console.log('PASS: TC-5-1-01 cooldown active within window');
@@ -117,8 +130,14 @@ function test_multiple_deployments_uses_most_recent(): void {
 
   const result = checkCooldown('api-gateway', 'timeout', defaultConfig(), finder, now);
 
-  assert(result.active === true, `expected active=true for most recent deploy, got ${result.active}`);
-  assert(result.linked_deployment === 'deploy-recent', `expected deploy-recent, got ${result.linked_deployment}`);
+  assert(
+    result.active === true,
+    `expected active=true for most recent deploy, got ${result.active}`,
+  );
+  assert(
+    result.linked_deployment === 'deploy-recent',
+    `expected deploy-recent, got ${result.linked_deployment}`,
+  );
   console.log('PASS: TC-5-1-05 multiple deployments uses most recent');
 }
 
@@ -132,7 +151,10 @@ function test_deployment_metadata_unreadable(): void {
 
   const result = checkCooldown('api-gateway', 'timeout', defaultConfig(), finder, now);
 
-  assert(result.active === false, `expected active=false when metadata unreadable, got ${result.active}`);
+  assert(
+    result.active === false,
+    `expected active=false when metadata unreadable, got ${result.active}`,
+  );
   console.log('PASS: TC-5-1-06 deployment metadata unreadable returns active=false');
 }
 
@@ -151,7 +173,13 @@ function test_cooldown_days_zero(): void {
   };
   const finder = () => deployment;
 
-  const result = checkCooldown('api-gateway', 'timeout', defaultConfig({ cooldown_days: 0 }), finder, now);
+  const result = checkCooldown(
+    'api-gateway',
+    'timeout',
+    defaultConfig({ cooldown_days: 0 }),
+    finder,
+    now,
+  );
 
   assert(result.active === false, `cooldown_days=0: expected active=false, got ${result.active}`);
   console.log('PASS: cooldown_days=0 is never active');
@@ -193,13 +221,29 @@ function assert(condition: boolean, message: string): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-describe("CooldownGovernance", () => {
-  it("treats cooldown as active within window", () => { test_cooldown_active_within_window(); });
-  it("treats cooldown as expired after window", () => { test_cooldown_expired(); });
-  it("handles cooldown exact boundary", () => { test_cooldown_exact_boundary(); });
-  it("handles no deployment found", () => { test_no_deployment_found(); });
-  it("uses most recent of multiple deployments", () => { test_multiple_deployments_uses_most_recent(); });
-  it("handles unreadable deployment metadata", () => { test_deployment_metadata_unreadable(); });
-  it("handles cooldown days zero", () => { test_cooldown_days_zero(); });
-  it("treats cooldown active just before expiry", () => { test_cooldown_active_just_before_expiry(); });
+describe('CooldownGovernance', () => {
+  it('treats cooldown as active within window', () => {
+    test_cooldown_active_within_window();
+  });
+  it('treats cooldown as expired after window', () => {
+    test_cooldown_expired();
+  });
+  it('handles cooldown exact boundary', () => {
+    test_cooldown_exact_boundary();
+  });
+  it('handles no deployment found', () => {
+    test_no_deployment_found();
+  });
+  it('uses most recent of multiple deployments', () => {
+    test_multiple_deployments_uses_most_recent();
+  });
+  it('handles unreadable deployment metadata', () => {
+    test_deployment_metadata_unreadable();
+  });
+  it('handles cooldown days zero', () => {
+    test_cooldown_days_zero();
+  });
+  it('treats cooldown active just before expiry', () => {
+    test_cooldown_active_just_before_expiry();
+  });
 });

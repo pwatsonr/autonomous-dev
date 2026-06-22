@@ -31,10 +31,10 @@ function defaultConfig(overrides?: Partial<AgentFactoryConfig['rateLimits']>): A
       ...overrides,
     },
     anomalyThresholds: {
-      approvalRateDrop: 0.70,
+      approvalRateDrop: 0.7,
       qualityDeclinePoints: 0.5,
       qualityDeclineWindow: 10,
-      escalationRate: 0.30,
+      escalationRate: 0.3,
       tokenBudgetMultiplier: 2.0,
     },
     modelRegistry: ['claude-sonnet-4-20250514'],
@@ -150,9 +150,7 @@ function test_first_modification_allowed(): void {
 function test_second_modification_blocked(): void {
   const state: RateLimitState = {
     modifications: {
-      'code-executor': [
-        { timestamp: thisWeekTimestamp(), proposal_id: 'prop-001' },
-      ],
+      'code-executor': [{ timestamp: thisWeekTimestamp(), proposal_id: 'prop-001' }],
     },
   };
   const { limiter, auditLogger, tmpDir } = createTestSetup(undefined, state);
@@ -164,8 +162,14 @@ function test_second_modification_blocked(): void {
   assert(result.nextAllowedAt !== undefined, 'nextAllowedAt should be set');
   // Next allowed should be a Monday
   const nextDate = new Date(result.nextAllowedAt!);
-  assert(nextDate.getUTCDay() === 1, `nextAllowedAt should be Monday, got day ${nextDate.getUTCDay()}`);
-  assert(nextDate.getUTCHours() === 0, `nextAllowedAt should be 00:00, got hour ${nextDate.getUTCHours()}`);
+  assert(
+    nextDate.getUTCDay() === 1,
+    `nextAllowedAt should be Monday, got day ${nextDate.getUTCDay()}`,
+  );
+  assert(
+    nextDate.getUTCHours() === 0,
+    `nextAllowedAt should be 00:00, got hour ${nextDate.getUTCHours()}`,
+  );
 
   auditLogger.close();
   cleanupTmpDir(tmpDir);
@@ -175,9 +179,7 @@ function test_second_modification_blocked(): void {
 function test_modification_allowed_next_week(): void {
   const state: RateLimitState = {
     modifications: {
-      'code-executor': [
-        { timestamp: lastWeekTimestamp(), proposal_id: 'prop-old' },
-      ],
+      'code-executor': [{ timestamp: lastWeekTimestamp(), proposal_id: 'prop-old' }],
     },
   };
   const { limiter, auditLogger, tmpDir } = createTestSetup(undefined, state);
@@ -185,7 +187,10 @@ function test_modification_allowed_next_week(): void {
   const result = limiter.checkLimit('code-executor');
 
   assert(result.allowed === true, `expected allowed=true, got ${result.allowed}`);
-  assert(result.currentCount === 0, `expected currentCount=0 (old record not counted), got ${result.currentCount}`);
+  assert(
+    result.currentCount === 0,
+    `expected currentCount=0 (old record not counted), got ${result.currentCount}`,
+  );
 
   auditLogger.close();
   cleanupTmpDir(tmpDir);
@@ -205,9 +210,7 @@ function test_calendar_week_boundary_monday(): void {
 
   const state: RateLimitState = {
     modifications: {
-      'code-executor': [
-        { timestamp: lastSunday.toISOString(), proposal_id: 'prop-sunday' },
-      ],
+      'code-executor': [{ timestamp: lastSunday.toISOString(), proposal_id: 'prop-sunday' }],
     },
   };
   const { limiter, auditLogger, tmpDir } = createTestSetup(undefined, state);
@@ -249,9 +252,7 @@ function test_configurable_limit(): void {
 function test_rate_limit_logged(): void {
   const state: RateLimitState = {
     modifications: {
-      'code-executor': [
-        { timestamp: thisWeekTimestamp(), proposal_id: 'prop-001' },
-      ],
+      'code-executor': [{ timestamp: thisWeekTimestamp(), proposal_id: 'prop-001' }],
     },
   };
   const { limiter, auditLogger, auditLogPath, tmpDir } = createTestSetup(undefined, state);
@@ -260,7 +261,10 @@ function test_rate_limit_logged(): void {
   auditLogger.close();
 
   const logContent = readAuditLog(auditLogPath);
-  assert(logContent.includes('modification_rate_limited'), 'audit log should contain modification_rate_limited');
+  assert(
+    logContent.includes('modification_rate_limited'),
+    'audit log should contain modification_rate_limited',
+  );
 
   cleanupTmpDir(tmpDir);
   console.log('PASS: test_rate_limit_logged');
@@ -269,9 +273,7 @@ function test_rate_limit_logged(): void {
 function test_deferred_not_rejected(): void {
   const state: RateLimitState = {
     modifications: {
-      'code-executor': [
-        { timestamp: thisWeekTimestamp(), proposal_id: 'prop-001' },
-      ],
+      'code-executor': [{ timestamp: thisWeekTimestamp(), proposal_id: 'prop-001' }],
     },
   };
   const { limiter, auditLogger, tmpDir } = createTestSetup(undefined, state);
@@ -282,7 +284,10 @@ function test_deferred_not_rejected(): void {
   // (the result is a check, not an action on the proposal)
   assert(result.allowed === false, 'expected rate limited');
   assert(result.reason !== undefined, 'reason should be set');
-  assert(result.reason!.includes('Rate limit exceeded'), `reason should mention rate limit: ${result.reason}`);
+  assert(
+    result.reason!.includes('Rate limit exceeded'),
+    `reason should mention rate limit: ${result.reason}`,
+  );
   // The result does not have a "rejected" status -- it's "deferred"
 
   auditLogger.close();
@@ -293,9 +298,7 @@ function test_deferred_not_rejected(): void {
 function test_rate_limit_per_agent(): void {
   const state: RateLimitState = {
     modifications: {
-      'code-executor': [
-        { timestamp: thisWeekTimestamp(), proposal_id: 'prop-001' },
-      ],
+      'code-executor': [{ timestamp: thisWeekTimestamp(), proposal_id: 'prop-001' }],
     },
   };
   const { limiter, auditLogger, tmpDir } = createTestSetup(undefined, state);
@@ -303,7 +306,10 @@ function test_rate_limit_per_agent(): void {
   // Check a different agent
   const result = limiter.checkLimit('prd-author');
 
-  assert(result.allowed === true, `expected allowed=true for different agent, got ${result.allowed}`);
+  assert(
+    result.allowed === true,
+    `expected allowed=true for different agent, got ${result.allowed}`,
+  );
   assert(result.currentCount === 0, `expected currentCount=0, got ${result.currentCount}`);
 
   auditLogger.close();
@@ -333,7 +339,10 @@ function test_rate_limit_persistence(): void {
 
   const result = limiter2.checkLimit('code-executor');
 
-  assert(result.allowed === false, `expected allowed=false (persisted record), got ${result.allowed}`);
+  assert(
+    result.allowed === false,
+    `expected allowed=false (persisted record), got ${result.allowed}`,
+  );
   assert(result.currentCount === 1, `expected currentCount=1, got ${result.currentCount}`);
 
   auditLogger.close();
@@ -353,7 +362,10 @@ function test_record_modification(): void {
 
   assert(state.modifications['code-executor'] !== undefined, 'should have code-executor entry');
   assert(state.modifications['code-executor'].length === 1, 'should have 1 record');
-  assert(state.modifications['code-executor'][0].proposal_id === 'prop-123', 'proposal_id should match');
+  assert(
+    state.modifications['code-executor'][0].proposal_id === 'prop-123',
+    'proposal_id should match',
+  );
 
   auditLogger.close();
   cleanupTmpDir(tmpDir);

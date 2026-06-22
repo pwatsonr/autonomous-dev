@@ -97,7 +97,8 @@ export const PII_PATTERNS: PatternDefinition[] = [
   {
     name: 'uuid_user_context',
     type: 'user_id',
-    regex: /(?<=(?:user_id|customer_id|account_id)\s*[=:]\s*)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g,
+    regex:
+      /(?<=(?:user_id|customer_id|account_id)\s*[=:]\s*)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g,
     replacement: '[REDACTED:user_id]',
     contextRequired: {
       fieldNames: ['user_id', 'customer_id', 'account_id'],
@@ -177,16 +178,11 @@ function applyPattern(
  *                         built-in patterns.
  * @returns  A `ScrubStageResult` with the scrubbed text and redaction metadata.
  */
-export function scrubPii(
-  input: string,
-  customPatterns?: PatternDefinition[],
-): ScrubStageResult {
+export function scrubPii(input: string, customPatterns?: PatternDefinition[]): ScrubStageResult {
   let text = input;
   const allRedactions: Redaction[] = [];
 
-  const patterns = customPatterns
-    ? [...PII_PATTERNS, ...customPatterns]
-    : PII_PATTERNS;
+  const patterns = customPatterns ? [...PII_PATTERNS, ...customPatterns] : PII_PATTERNS;
 
   for (const pattern of patterns) {
     const result = applyPattern(text, pattern);

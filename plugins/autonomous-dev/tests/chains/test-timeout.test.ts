@@ -49,18 +49,12 @@ describe('ChainExecutor timeout enforcement (SPEC-022-2-01)', () => {
     const manifests: HookManifest[] = [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
-        consumes: [
-          { artifact_type: 'security-findings', schema_version: '^1.0' },
-        ],
-        produces: [
-          { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
-        ],
+        consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+        produces: [{ artifact_type: 'code-patches', schema_version: '1.0', format: 'json' }],
       }),
     ];
     return { manifests, graph: buildGraphFrom(manifests) };
@@ -138,15 +132,11 @@ describe('ChainExecutor timeout enforcement (SPEC-022-2-01)', () => {
     const manifests: HookManifest[] = [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
-        consumes: [
-          { artifact_type: 'security-findings', schema_version: '^1.0' },
-        ],
+        consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
         produces: [
           {
             artifact_type: 'code-patches',

@@ -13,10 +13,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeChild(
-  id: string,
-  contentParts: string[]
-): ChildDocument {
+function makeChild(id: string, contentParts: string[]): ChildDocument {
   return {
     id,
     sections: contentParts.map((content, i) => ({
@@ -52,12 +49,8 @@ describe('ContradictionDetector', () => {
   // Test 16: Clear technology conflict
   // -----------------------------------------------------------------------
   test('Clear technology conflict: PostgreSQL vs MongoDB for database', async () => {
-    const childA = makeChild('cA', [
-      'We will use PostgreSQL for the database layer.',
-    ]);
-    const childB = makeChild('cB', [
-      'We will use MongoDB for the database layer.',
-    ]);
+    const childA = makeChild('cA', ['We will use PostgreSQL for the database layer.']);
+    const childB = makeChild('cB', ['We will use MongoDB for the database layer.']);
 
     const result = await detector.detect([childA, childB]);
 
@@ -73,12 +66,8 @@ describe('ContradictionDetector', () => {
   // Test 17: Same technology, no conflict
   // -----------------------------------------------------------------------
   test('Same technology, no conflict: both mention PostgreSQL', async () => {
-    const childA = makeChild('cA', [
-      'We will use PostgreSQL for the user database.',
-    ]);
-    const childB = makeChild('cB', [
-      'We will use PostgreSQL for the order database.',
-    ]);
+    const childA = makeChild('cA', ['We will use PostgreSQL for the user database.']);
+    const childB = makeChild('cB', ['We will use PostgreSQL for the order database.']);
 
     const result = await detector.detect([childA, childB]);
 
@@ -92,18 +81,12 @@ describe('ContradictionDetector', () => {
   // Test 18: Numeric value conflict
   // -----------------------------------------------------------------------
   test('Numeric value conflict: timeout 30s vs timeout 60s', async () => {
-    const childA = makeChild('cA', [
-      'Redis timeout: 30s for all cache operations.',
-    ]);
-    const childB = makeChild('cB', [
-      'Redis timeout: 60s for all cache operations.',
-    ]);
+    const childA = makeChild('cA', ['Redis timeout: 30s for all cache operations.']);
+    const childB = makeChild('cB', ['Redis timeout: 60s for all cache operations.']);
 
     const result = await detector.detect([childA, childB]);
 
-    const numericConflicts = result.contradictions.filter(
-      (c) => c.confidence >= 0.7
-    );
+    const numericConflicts = result.contradictions.filter((c) => c.confidence >= 0.7);
     expect(numericConflicts.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -143,15 +126,9 @@ describe('ContradictionDetector', () => {
   // Test 20: Three children, one pair conflicts
   // -----------------------------------------------------------------------
   test('Three children, only A and B conflict', async () => {
-    const childA = makeChild('cA', [
-      'We will use PostgreSQL for the database.',
-    ]);
-    const childB = makeChild('cB', [
-      'We will use MongoDB for the database.',
-    ]);
-    const childC = makeChild('cC', [
-      'The notification service uses email templates.',
-    ]);
+    const childA = makeChild('cA', ['We will use PostgreSQL for the database.']);
+    const childB = makeChild('cB', ['We will use MongoDB for the database.']);
+    const childC = makeChild('cC', ['The notification service uses email templates.']);
 
     const result = await detector.detect([childA, childB, childC]);
 
@@ -170,12 +147,8 @@ describe('ContradictionDetector', () => {
   // Test 21: No shared entities at all
   // -----------------------------------------------------------------------
   test('No shared entities at all: children discuss completely different topics', async () => {
-    const childA = makeChild('cA', [
-      'The payment processing handles credit card validation.',
-    ]);
-    const childB = makeChild('cB', [
-      'The inventory tracking manages warehouse stock levels.',
-    ]);
+    const childA = makeChild('cA', ['The payment processing handles credit card validation.']);
+    const childB = makeChild('cB', ['The inventory tracking manages warehouse stock levels.']);
 
     const result = await detector.detect([childA, childB]);
 
@@ -197,9 +170,7 @@ describe('ContradictionDetector', () => {
   // Test 23: Entity extraction -- use pattern
   // -----------------------------------------------------------------------
   test('Entity extraction: "The system adopts GraphQL for API layer" extracts GraphQL', () => {
-    const entities = extractEntities(
-      'The system adopts GraphQL for API layer.'
-    );
+    const entities = extractEntities('The system adopts GraphQL for API layer.');
 
     expect(entities.has('GraphQL')).toBe(true);
     expect(entities.get('GraphQL')!.length).toBeGreaterThanOrEqual(1);
@@ -255,9 +226,7 @@ describe('ContradictionDetector', () => {
   // SPEC-004-4-4 Test 15: No false positives on similar tech
   // -----------------------------------------------------------------------
   test('No false positives: two children both using PostgreSQL do not conflict', async () => {
-    const childA = makeChild('cA', [
-      'We use PostgreSQL for the user database with JSONB columns.',
-    ]);
+    const childA = makeChild('cA', ['We use PostgreSQL for the user database with JSONB columns.']);
     const childB = makeChild('cB', [
       'We use PostgreSQL for the order database with JSONB columns.',
     ]);

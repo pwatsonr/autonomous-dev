@@ -13,11 +13,7 @@ import {
   parseSeverityOverrideResponse,
   buildOverridePrompt,
 } from '../../src/engine/severity-scorer';
-import type {
-  SeverityResult,
-  Severity,
-  LlmQueryFn,
-} from '../../src/engine/severity-scorer';
+import type { SeverityResult, Severity, LlmQueryFn } from '../../src/engine/severity-scorer';
 import type { ServiceConfig } from '../../src/config/intelligence-config.schema';
 import type { CandidateObservation } from '../../src/engine/types';
 
@@ -37,9 +33,7 @@ function buildService(overrides: Partial<ServiceConfig> = {}): ServiceConfig {
   };
 }
 
-function buildCandidate(
-  overrides: Partial<CandidateObservation> = {},
-): CandidateObservation {
+function buildCandidate(overrides: Partial<CandidateObservation> = {}): CandidateObservation {
   return {
     type: 'error',
     error_type: 'error_rate',
@@ -427,7 +421,7 @@ describe('sub-score thresholds', () => {
     it('error rate > 5% but <= 20% gives sub_score 0.50', () => {
       const candidate = buildCandidate({ metric_value: 6 });
       const result = computeSeverity(candidate, service, 0);
-      expect(result.breakdown.error_rate.sub_score).toBe(0.50);
+      expect(result.breakdown.error_rate.sub_score).toBe(0.5);
     });
 
     it('error rate > 1% but <= 5% gives sub_score 0.25', () => {
@@ -452,7 +446,7 @@ describe('sub-score thresholds', () => {
     it('error rate exactly 20% gives sub_score 0.50 (not 0.75)', () => {
       const candidate = buildCandidate({ metric_value: 20 });
       const result = computeSeverity(candidate, service, 0);
-      expect(result.breakdown.error_rate.sub_score).toBe(0.50);
+      expect(result.breakdown.error_rate.sub_score).toBe(0.5);
     });
 
     it('error rate exactly 5% gives sub_score 0.25 (not 0.50)', () => {
@@ -492,7 +486,7 @@ describe('sub-score thresholds', () => {
       // 5 * 10 * 60 * 0.123 / 3 = 123
       expect(result.breakdown.affected_users.value).toBeGreaterThan(100);
       expect(result.breakdown.affected_users.value).toBeLessThanOrEqual(1000);
-      expect(result.breakdown.affected_users.sub_score).toBe(0.50);
+      expect(result.breakdown.affected_users.sub_score).toBe(0.5);
     });
 
     it('users <= 100 gives sub_score 0.25', () => {
@@ -516,7 +510,7 @@ describe('sub-score thresholds', () => {
 
     it('medium gives sub_score 0.50', () => {
       const result = computeSeverity(baseCandidate, buildService({ criticality: 'medium' }), 0);
-      expect(result.breakdown.service_criticality.sub_score).toBe(0.50);
+      expect(result.breakdown.service_criticality.sub_score).toBe(0.5);
     });
 
     it('low gives sub_score 0.25', () => {
@@ -541,7 +535,7 @@ describe('sub-score thresholds', () => {
     it('duration > 10 min but <= 30 gives sub_score 0.50', () => {
       const candidate = buildCandidate({ sustained_minutes: 11 });
       const result = computeSeverity(candidate, service, 0);
-      expect(result.breakdown.duration.sub_score).toBe(0.50);
+      expect(result.breakdown.duration.sub_score).toBe(0.5);
     });
 
     it('duration <= 10 min gives sub_score 0.25', () => {
@@ -680,9 +674,9 @@ describe('buildOverridePrompt', () => {
       severity: 'P2',
       score: 0.45,
       breakdown: {
-        error_rate: { value: 12.3, sub_score: 0.50, weighted: 0.15 },
+        error_rate: { value: 12.3, sub_score: 0.5, weighted: 0.15 },
         affected_users: { value: 2400, sub_score: 0.75, weighted: 0.1875 },
-        service_criticality: { value: 'critical', sub_score: 1.0, weighted: 0.20 },
+        service_criticality: { value: 'critical', sub_score: 1.0, weighted: 0.2 },
         duration: { value: 45, sub_score: 0.75, weighted: 0.1125 },
         data_integrity: { value: 'no_data_risk', sub_score: 0.0, weighted: 0.0 },
       },
@@ -713,9 +707,9 @@ describe('requestLlmOverride', () => {
     severity: 'P2',
     score: 0.45,
     breakdown: {
-      error_rate: { value: 12.3, sub_score: 0.50, weighted: 0.15 },
+      error_rate: { value: 12.3, sub_score: 0.5, weighted: 0.15 },
       affected_users: { value: 2400, sub_score: 0.75, weighted: 0.1875 },
-      service_criticality: { value: 'critical', sub_score: 1.0, weighted: 0.20 },
+      service_criticality: { value: 'critical', sub_score: 1.0, weighted: 0.2 },
       duration: { value: 45, sub_score: 0.75, weighted: 0.1125 },
       data_integrity: { value: 'no_data_risk', sub_score: 0.0, weighted: 0.0 },
     },
@@ -745,7 +739,7 @@ describe('requestLlmOverride', () => {
 
   // TC-3-2-09: Override one level down
   it('TC-3-2-09: accepts override one level down (P1 -> P2)', async () => {
-    const p1Result: SeverityResult = { ...baseResult, severity: 'P1', score: 0.60 };
+    const p1Result: SeverityResult = { ...baseResult, severity: 'P1', score: 0.6 };
     const mockLlm = buildMockLlm(
       `OVERRIDE: yes\nNEW_SEVERITY: P2\nJUSTIFICATION: Error is transient and self-recovering.`,
     );
@@ -765,17 +759,12 @@ describe('requestLlmOverride', () => {
 
   // TC-3-2-10: Override two levels rejected
   it('TC-3-2-10: rejects override more than one level (P3 -> P1)', async () => {
-    const p3Result: SeverityResult = { ...baseResult, severity: 'P3', score: 0.20 };
+    const p3Result: SeverityResult = { ...baseResult, severity: 'P3', score: 0.2 };
     const mockLlm = buildMockLlm(
       `OVERRIDE: yes\nNEW_SEVERITY: P1\nJUSTIFICATION: This is actually quite severe.`,
     );
 
-    const override = await requestLlmOverride(
-      p3Result,
-      baseCandidate,
-      'Possibly severe',
-      mockLlm,
-    );
+    const override = await requestLlmOverride(p3Result, baseCandidate, 'Possibly severe', mockLlm);
 
     expect(override).not.toBeNull();
     expect(override!.original_severity).toBe('P3');
@@ -802,62 +791,40 @@ describe('requestLlmOverride', () => {
   it('returns null when LLM response is unparseable', async () => {
     const mockLlm = buildMockLlm('I think the severity is fine.');
 
-    const override = await requestLlmOverride(
-      baseResult,
-      baseCandidate,
-      'Some evidence',
-      mockLlm,
-    );
+    const override = await requestLlmOverride(baseResult, baseCandidate, 'Some evidence', mockLlm);
 
     expect(override).toBeNull();
   });
 
   it('rejects P0 -> P2 override (two levels down)', async () => {
-    const p0Result: SeverityResult = { ...baseResult, severity: 'P0', score: 0.80 };
-    const mockLlm = buildMockLlm(
-      `OVERRIDE: yes\nNEW_SEVERITY: P2\nJUSTIFICATION: Not that bad.`,
-    );
+    const p0Result: SeverityResult = { ...baseResult, severity: 'P0', score: 0.8 };
+    const mockLlm = buildMockLlm(`OVERRIDE: yes\nNEW_SEVERITY: P2\nJUSTIFICATION: Not that bad.`);
 
-    const override = await requestLlmOverride(
-      p0Result,
-      baseCandidate,
-      'Some evidence',
-      mockLlm,
-    );
+    const override = await requestLlmOverride(p0Result, baseCandidate, 'Some evidence', mockLlm);
 
     expect(override).not.toBeNull();
     expect(override!.accepted).toBe(false);
   });
 
   it('rejects P3 -> P0 override (three levels up)', async () => {
-    const p3Result: SeverityResult = { ...baseResult, severity: 'P3', score: 0.10 };
+    const p3Result: SeverityResult = { ...baseResult, severity: 'P3', score: 0.1 };
     const mockLlm = buildMockLlm(
       `OVERRIDE: yes\nNEW_SEVERITY: P0\nJUSTIFICATION: Everything is on fire.`,
     );
 
-    const override = await requestLlmOverride(
-      p3Result,
-      baseCandidate,
-      'Fire detected',
-      mockLlm,
-    );
+    const override = await requestLlmOverride(p3Result, baseCandidate, 'Fire detected', mockLlm);
 
     expect(override).not.toBeNull();
     expect(override!.accepted).toBe(false);
   });
 
   it('accepts P0 -> P1 override (one level down)', async () => {
-    const p0Result: SeverityResult = { ...baseResult, severity: 'P0', score: 0.80 };
+    const p0Result: SeverityResult = { ...baseResult, severity: 'P0', score: 0.8 };
     const mockLlm = buildMockLlm(
       `OVERRIDE: yes\nNEW_SEVERITY: P1\nJUSTIFICATION: Impact is contained to non-critical users.`,
     );
 
-    const override = await requestLlmOverride(
-      p0Result,
-      baseCandidate,
-      'Contained impact',
-      mockLlm,
-    );
+    const override = await requestLlmOverride(p0Result, baseCandidate, 'Contained impact', mockLlm);
 
     expect(override).not.toBeNull();
     expect(override!.accepted).toBe(true);
@@ -886,12 +853,7 @@ describe('requestLlmOverride', () => {
       `OVERRIDE: yes\nNEW_SEVERITY: P1\nJUSTIFICATION: Revenue-impacting endpoint affected.`,
     );
 
-    const override = await requestLlmOverride(
-      baseResult,
-      baseCandidate,
-      'Revenue impact',
-      mockLlm,
-    );
+    const override = await requestLlmOverride(baseResult, baseCandidate, 'Revenue impact', mockLlm);
 
     expect(override).not.toBeNull();
     expect(override!.justification).toBe('Revenue-impacting endpoint affected.');
@@ -927,7 +889,7 @@ describe('TDD example verification (SPEC-007-3-6)', () => {
 
     expect(result.severity).toBe('P1');
     expect(result.score).toBeCloseTo(0.65, 1);
-    expect(result.breakdown.error_rate.sub_score).toBe(0.50);
+    expect(result.breakdown.error_rate.sub_score).toBe(0.5);
     expect(result.breakdown.affected_users.sub_score).toBe(0.75);
     expect(result.breakdown.service_criticality.sub_score).toBe(1.0);
     expect(result.breakdown.duration.sub_score).toBe(0.75);

@@ -5,7 +5,12 @@ import { VersioningEngine } from '../versioning/versioning-engine';
 import { PipelineState } from '../flow/pipeline-state';
 import { readPipelineState, writePipelineState } from '../flow/pipeline-state-io';
 import { DirectoryManager } from '../storage/directory-manager';
-import { BackwardCascadeEvent, CascadeStatus, generateCascadeId, AffectedDocument } from './cascade-event';
+import {
+  BackwardCascadeEvent,
+  CascadeStatus,
+  generateCascadeId,
+  AffectedDocument,
+} from './cascade-event';
 import { scopeCascade, CascadeScopeResult } from './cascade-scoper';
 import { checkCascadeDepth, DepthLimitResult } from './depth-limiter';
 import { PipelineEventEmitter } from '../flow/event-emitter';
@@ -110,7 +115,7 @@ export class BackwardCascadeController {
     const circuitBreakerKey = `${request.pipelineId}:${request.targetDocumentId}`;
     const previouslyCascaded = this.cascadedSections.get(circuitBreakerKey);
     if (previouslyCascaded) {
-      const repeatedSections = request.affectedSections.filter(s => previouslyCascaded.has(s));
+      const repeatedSections = request.affectedSections.filter((s) => previouslyCascaded.has(s));
       if (repeatedSections.length > 0) {
         const escalatedEvent = this.createEscalatedEvent(request, {
           action: 'escalate',
@@ -221,10 +226,7 @@ export class BackwardCascadeController {
   /**
    * Returns the current status of a cascade.
    */
-  async getStatus(
-    pipelineId: string,
-    cascadeId: string,
-  ): Promise<BackwardCascadeEvent | null> {
+  async getStatus(pipelineId: string, cascadeId: string): Promise<BackwardCascadeEvent | null> {
     // Read from stored cascade events
     // For MVP: cascade events stored alongside pipeline state
     return null; // placeholder
@@ -242,7 +244,7 @@ export class BackwardCascadeController {
     if (!state) throw new Error(`Pipeline ${pipelineId} not found`);
 
     // Remove from active cascades
-    state.activeCascades = state.activeCascades.filter(id => id !== cascadeId);
+    state.activeCascades = state.activeCascades.filter((id) => id !== cascadeId);
 
     // Re-evaluate stale children
     if (this.config.backwardCascade.autoApproveUnaffected) {
@@ -252,12 +254,7 @@ export class BackwardCascadeController {
 
     await writePipelineState(state, this.directoryManager);
 
-    await this.eventEmitter.emit(
-      pipelineId,
-      'cascade_resolved',
-      { cascadeId },
-      actorId,
-    );
+    await this.eventEmitter.emit(pipelineId, 'cascade_resolved', { cascadeId }, actorId);
 
     return {
       id: cascadeId,
@@ -284,12 +281,7 @@ export class BackwardCascadeController {
     reason: string,
     actorId: string,
   ): Promise<void> {
-    await this.eventEmitter.emit(
-      pipelineId,
-      'human_escalation',
-      { cascadeId, reason },
-      actorId,
-    );
+    await this.eventEmitter.emit(pipelineId, 'human_escalation', { cascadeId, reason }, actorId);
   }
 
   /**
@@ -310,7 +302,7 @@ export class BackwardCascadeController {
       documentSections.add(sectionId);
     }
 
-    const missingSections = affectedSections.filter(s => !documentSections.has(s));
+    const missingSections = affectedSections.filter((s) => !documentSections.has(s));
     if (missingSections.length > 0) {
       throw new Error(
         `Affected sections not found in target document: [${missingSections.join(', ')}]`,

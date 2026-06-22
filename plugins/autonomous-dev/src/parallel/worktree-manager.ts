@@ -47,9 +47,7 @@ export class MaxWorktreesExceededError extends Error {
 /** Thrown when creating a worktree while disk pressure is critical. */
 export class DiskPressureCriticalError extends Error {
   constructor(totalBytes: number, limitBytes: number) {
-    super(
-      `Disk pressure critical: ${totalBytes} bytes used, hard limit is ${limitBytes} bytes`,
-    );
+    super(`Disk pressure critical: ${totalBytes} bytes used, hard limit is ${limitBytes} bytes`);
     this.name = 'DiskPressureCriticalError';
   }
 }
@@ -85,11 +83,7 @@ export interface CleanupReport {
 // .gitignore management (SPEC-006-1-3 Section 3)
 // ---------------------------------------------------------------------------
 
-const GITIGNORE_ENTRIES = [
-  '.worktrees/',
-  '.autonomous-dev/state/',
-  '.autonomous-dev/archive/',
-];
+const GITIGNORE_ENTRIES = ['.worktrees/', '.autonomous-dev/state/', '.autonomous-dev/archive/'];
 
 // ---------------------------------------------------------------------------
 // Logger (lightweight, no external deps)
@@ -145,10 +139,7 @@ async function calculateDirectorySize(dirPath: string): Promise<number> {
  * Execute a git command in the given repository root directory.
  * Returns stdout trimmed.
  */
-async function git(
-  repoRoot: string,
-  args: string[],
-): Promise<string> {
+async function git(repoRoot: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync('git', ['-C', repoRoot, ...args]);
   return stdout.trim();
 }
@@ -248,10 +239,7 @@ export class WorktreeManager {
    *
    * @returns The integration branch name (e.g. "auto/req-001/integration")
    */
-  async createIntegrationBranch(
-    requestId: string,
-    baseBranch: string,
-  ): Promise<string> {
+  async createIntegrationBranch(requestId: string, baseBranch: string): Promise<string> {
     const branchName = integrationBranchName(requestId);
     const fullRef = `refs/heads/${branchName}`;
 
@@ -282,10 +270,7 @@ export class WorktreeManager {
    * Idempotency: if the worktree directory already exists and the branch
    * matches, returns the existing WorktreeInfo.
    */
-  async createTrackWorktree(
-    requestId: string,
-    trackName: string,
-  ): Promise<WorktreeInfo> {
+  async createTrackWorktree(requestId: string, trackName: string): Promise<WorktreeInfo> {
     const branchName = trackBranchName(requestId, trackName);
     const integrationBranch = integrationBranchName(requestId);
     const wtPath = buildWorktreePath(this.worktreeRoot, requestId, trackName);
@@ -293,10 +278,7 @@ export class WorktreeManager {
     // Idempotency: if worktree directory already exists and branch matches
     if (fsSync.existsSync(wtPath)) {
       try {
-        const currentBranch = await git(wtPath, [
-          'branch',
-          '--show-current',
-        ]);
+        const currentBranch = await git(wtPath, ['branch', '--show-current']);
         if (currentBranch === branchName) {
           return {
             requestId,
@@ -429,10 +411,7 @@ export class WorktreeManager {
    * Get a single worktree by requestId and trackName.
    * Returns null if not found.
    */
-  async getWorktree(
-    requestId: string,
-    trackName: string,
-  ): Promise<WorktreeInfo | null> {
+  async getWorktree(requestId: string, trackName: string): Promise<WorktreeInfo | null> {
     const worktrees = await this.listWorktrees(requestId);
     return worktrees.find((wt) => wt.trackName === trackName) ?? null;
   }
@@ -716,11 +695,7 @@ export class WorktreeManager {
     // 2. Worktree is registered in git
     let registeredInGit = false;
     try {
-      const output = await git(this.repoRoot, [
-        'worktree',
-        'list',
-        '--porcelain',
-      ]);
+      const output = await git(this.repoRoot, ['worktree', 'list', '--porcelain']);
       const entries = parseWorktreeList(output);
       registeredInGit = entries.some((e) => e.worktree === wtPath);
     } catch {
@@ -777,10 +752,7 @@ export class WorktreeManager {
     const worktrees = await this.listWorktrees();
     const reports: WorktreeHealthReport[] = [];
     for (const wt of worktrees) {
-      const report = await this.validateWorktreeHealth(
-        wt.requestId,
-        wt.trackName,
-      );
+      const report = await this.validateWorktreeHealth(wt.requestId, wt.trackName);
       reports.push(report);
     }
     return reports;
@@ -817,14 +789,9 @@ export class WorktreeManager {
 
     if (toAdd.length > 0) {
       // Ensure we start on a new line
-      const separator =
-        content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+      const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
       const addition = toAdd.join('\n') + '\n';
-      await fs.writeFile(
-        gitignorePath,
-        content + separator + addition,
-        'utf-8',
-      );
+      await fs.writeFile(gitignorePath, content + separator + addition, 'utf-8');
       logger.info(`Updated .gitignore with ${toAdd.length} entries`);
     }
   }
@@ -846,9 +813,7 @@ export class WorktreeManager {
    *
    * All cleanup actions are logged with the worktree path and branch name.
    */
-  async cleanupOrphanedWorktrees(
-    persister: StatePersister,
-  ): Promise<CleanupReport> {
+  async cleanupOrphanedWorktrees(persister: StatePersister): Promise<CleanupReport> {
     const report: CleanupReport = {
       removedWorktrees: [],
       removedBranches: [],
@@ -858,11 +823,7 @@ export class WorktreeManager {
     // 1. Get all git-registered worktrees under our root
     let porcelainOutput: string;
     try {
-      porcelainOutput = await git(this.repoRoot, [
-        'worktree',
-        'list',
-        '--porcelain',
-      ]);
+      porcelainOutput = await git(this.repoRoot, ['worktree', 'list', '--porcelain']);
     } catch {
       porcelainOutput = '';
     }
@@ -881,9 +842,7 @@ export class WorktreeManager {
       if (!inFlightIds.has(requestId)) {
         // Orphaned: no active state file
         const branchShort = wt.branch.replace('refs/heads/', '');
-        logger.info(
-          `Removing orphaned worktree: ${wt.worktree} (branch: ${branchShort})`,
-        );
+        logger.info(`Removing orphaned worktree: ${wt.worktree} (branch: ${branchShort})`);
         try {
           await this.removeWorktree(requestId, trackName, true /* force */);
           report.removedWorktrees.push(wt.worktree);

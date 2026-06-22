@@ -266,7 +266,7 @@ export function createMockSummaries(count: number): ObservationSummary[] {
     summaries.push({
       id: `OBS-${(i + 1).toString().padStart(3, '0')}`,
       triage_status: isLast ? 'pending' : 'promoted',
-      effectiveness: isLast ? null : (i % 2 === 0 ? 'degraded' : 'unchanged'),
+      effectiveness: isLast ? null : i % 2 === 0 ? 'degraded' : 'unchanged',
       is_current: isLast,
     });
   }
@@ -304,7 +304,7 @@ export async function updateMockObservation(
       if (dashCount === 2) {
         // Add any new keys not yet in frontmatter
         for (const [key, value] of Object.entries(updates)) {
-          const exists = updatedLines.some(l => l.startsWith(`${key}:`));
+          const exists = updatedLines.some((l) => l.startsWith(`${key}:`));
           if (!exists) {
             updatedLines.push(`${key}: ${formatValue(value)}`);
           }
@@ -353,18 +353,20 @@ function formatValue(value: unknown): string {
 /**
  * List all observation files in the rootDir and return parsed frontmatter.
  */
-export async function listObservations(rootDir: string): Promise<Array<{
-  id: string;
-  filePath: string;
-  severity: string;
-  triage_status: string;
-  triage_decision: string | null;
-  triage_by: string | null;
-  oscillation_warning: boolean;
-  effectiveness: string | null;
-  effectiveness_detail: Record<string, unknown> | null;
-  [key: string]: unknown;
-}>> {
+export async function listObservations(rootDir: string): Promise<
+  Array<{
+    id: string;
+    filePath: string;
+    severity: string;
+    triage_status: string;
+    triage_decision: string | null;
+    triage_by: string | null;
+    oscillation_warning: boolean;
+    effectiveness: string | null;
+    effectiveness_detail: Record<string, unknown> | null;
+    [key: string]: unknown;
+  }>
+> {
   const obsDir = path.join(rootDir, '.autonomous-dev', 'observations');
   const results: any[] = [];
 
@@ -402,7 +404,7 @@ export async function listObservations(rootDir: string): Promise<Array<{
  */
 export async function readObservation(rootDir: string, id: string): Promise<any> {
   const observations = await listObservations(rootDir);
-  return observations.find(o => o.id === id) ?? null;
+  return observations.find((o) => o.id === id) ?? null;
 }
 
 function parseFrontmatter(content: string): Record<string, any> | null {
@@ -430,8 +432,10 @@ function parseFrontmatter(content: string): Record<string, any> | null {
     else if (value.startsWith('[') && value.endsWith(']')) {
       const inner = value.substring(1, value.length - 1).trim();
       value = inner ? inner.split(',').map((s: string) => s.trim()) : [];
-    } else if ((value.startsWith('"') && value.endsWith('"')) ||
-               (value.startsWith("'") && value.endsWith("'"))) {
+    } else if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.substring(1, value.length - 1);
     } else if (/^-?\d+$/.test(value)) {
       value = parseInt(value, 10);

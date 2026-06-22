@@ -48,9 +48,12 @@ export type { TrackAssignment, AgentSession, ContextBundle, InterfaceContract } 
  */
 export function defaultTurnBudget(complexity: 'small' | 'medium' | 'large'): number {
   switch (complexity) {
-    case 'small': return 30;
-    case 'medium': return 60;
-    case 'large': return 120;
+    case 'small':
+      return 30;
+    case 'medium':
+      return 60;
+    case 'large':
+      return 120;
   }
 }
 
@@ -120,9 +123,7 @@ export async function readAndTruncate(
 
   for (let i = 1; i < sections.length; i++) {
     const headingLower = sections[i].heading.toLowerCase();
-    const isRelevant = relevantHeadings.some(
-      (rh) => headingLower.includes(rh),
-    );
+    const isRelevant = relevantHeadings.some((rh) => headingLower.includes(rh));
     if (isRelevant) {
       relevantSections.push(sections[i].body);
     }
@@ -208,7 +209,7 @@ export function buildAgentSystemPrompt(assignment: TrackAssignment): string {
     '2. Do NOT access files outside your worktree.',
     '3. Do NOT modify files on other branches.',
     `4. Turn budget: ${assignment.turnBudget} turns. You are currently on turn ${assignment.turnsUsed}.`,
-    '5. After implementation, run the project\'s test suite.',
+    "5. After implementation, run the project's test suite.",
     '6. After tests pass, perform a self-review of your changes.',
     `7. Commit with the format: feat(${assignment.trackName}): <description>`,
     '',
@@ -244,9 +245,7 @@ export async function prepareContextBundle(
   repoRoot: string,
 ): Promise<ContextBundle> {
   // 1. Read the spec file
-  const specContent = assignment.spec.path
-    ? await fs.readFile(assignment.spec.path, 'utf-8')
-    : '';
+  const specContent = assignment.spec.path ? await fs.readFile(assignment.spec.path, 'utf-8') : '';
 
   // 2. Read and truncate parent documents
   const planContent = await readAndTruncate(assignment.parentPlan, 4000, assignment.spec.name);
@@ -254,10 +253,7 @@ export async function prepareContextBundle(
   const prdContent = await readAndTruncate(assignment.parentPRD, 2000, assignment.spec.name);
 
   // 3. Read shared type definitions from integration branch
-  const sharedTypes = await readSharedTypesFromIntegration(
-    repoRoot,
-    assignment.branchName,
-  );
+  const sharedTypes = await readSharedTypesFromIntegration(repoRoot, assignment.branchName);
 
   // 4. Turn budget (already set from config)
   const turnBudget = assignment.turnBudget;
@@ -478,8 +474,7 @@ export class AgentSpawner {
     const session = await this.createSubagentSession({
       workingDirectory: bundle.workingDirectory,
       initialPrompt: this.formatInitialPrompt(bundle),
-      postToolUse: (toolName, toolInput) =>
-        isolationHook.validate(toolName, toolInput),
+      postToolUse: (toolName, toolInput) => isolationHook.validate(toolName, toolInput),
     });
 
     const sessionId = session.id;
@@ -571,10 +566,7 @@ export class AgentSpawner {
    */
   startLivenessMonitor(intervalMs: number = 30_000): void {
     this.stopLivenessMonitor();
-    this.livenessInterval = setInterval(
-      () => this.checkAllAgents(),
-      intervalMs,
-    );
+    this.livenessInterval = setInterval(() => this.checkAllAgents(), intervalMs);
   }
 
   /** Stop the liveness monitor. */
@@ -716,14 +708,9 @@ export class AgentSpawner {
     assignment.lifecyclePhase = AgentLifecyclePhase.Failed;
   }
 
-  private async checkForPartialWork(
-    assignment: TrackAssignment,
-  ): Promise<boolean> {
+  private async checkForPartialWork(assignment: TrackAssignment): Promise<boolean> {
     try {
-      const integrationBranch = assignment.branchName.replace(
-        /\/[^/]+$/,
-        '/integration',
-      );
+      const integrationBranch = assignment.branchName.replace(/\/[^/]+$/, '/integration');
       const result = execSync(
         `git -C "${assignment.worktreePath}" log --oneline ${integrationBranch}..HEAD`,
         { encoding: 'utf-8' },

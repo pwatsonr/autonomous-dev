@@ -18,10 +18,7 @@ import {
   readObservation,
   updateMockObservation,
 } from '../helpers/mock-observations';
-import {
-  createMockDeployment,
-  mockLogger,
-} from '../helpers/mock-deployments';
+import { createMockDeployment, mockLogger } from '../helpers/mock-deployments';
 import { checkCooldown } from '../../src/governance/cooldown';
 import { evaluateEffectiveness } from '../../src/governance/effectiveness';
 import { writeEffectivenessResult } from '../../src/governance/effectiveness-writeback';
@@ -109,18 +106,22 @@ async function generateMockPrd(
   await fs.mkdir(prdDir, { recursive: true });
   const filePath = path.join(prdDir, `${prdId}.md`);
 
-  await fs.writeFile(filePath, [
-    '---',
-    `id: ${prdId}`,
-    `observation_id: ${observationId}`,
-    `service: api-gateway`,
-    `status: active`,
-    '---',
-    '',
-    `# PRD: Fix ConnectionPoolExhausted`,
-    '',
-    'Generated from observation.',
-  ].join('\n'), 'utf-8');
+  await fs.writeFile(
+    filePath,
+    [
+      '---',
+      `id: ${prdId}`,
+      `observation_id: ${observationId}`,
+      `service: api-gateway`,
+      `status: active`,
+      '---',
+      '',
+      `# PRD: Fix ConnectionPoolExhausted`,
+      '',
+      'Generated from observation.',
+    ].join('\n'),
+    'utf-8',
+  );
 
   return { prdId, filePath };
 }
@@ -176,12 +177,20 @@ describe('E2E: full feedback loop', () => {
     // Step 1: Inject mock error data -- high error rate
     prometheus.setErrorRate('api-gateway', 12.3);
     opensearch.setErrorLogs('api-gateway', [
-      { message: 'ConnectionPoolExhaustedError: pool drained', timestamp: clock.now().toISOString() },
+      {
+        message: 'ConnectionPoolExhaustedError: pool drained',
+        timestamp: clock.now().toISOString(),
+      },
     ]);
 
     // Step 2: Run observation -- should detect the error
     clock.set('2026-04-01T14:00:00Z');
-    const { observationId, filePath } = await runObservationCycle(rootDir, prometheus, opensearch, clock);
+    const { observationId, filePath } = await runObservationCycle(
+      rootDir,
+      prometheus,
+      opensearch,
+      clock,
+    );
 
     const observations = await listObservations(rootDir);
     expect(observations).toHaveLength(1);
@@ -203,7 +212,11 @@ describe('E2E: full feedback loop', () => {
     // Step 5: Simulate deployment
     clock.advanceDays(2);
     const deploymentId = await simulateDeployment(
-      rootDir, observationId, prd.prdId, clock, filePath,
+      rootDir,
+      observationId,
+      prd.prdId,
+      clock,
+      filePath,
     );
 
     // Step 6: Fix the error in mock data
@@ -236,7 +249,7 @@ describe('E2E: full feedback loop', () => {
     const effResult = await evaluateEffectiveness(
       candidate,
       config,
-      (id) => id === deploymentId ? deployInfo : null,
+      (id) => (id === deploymentId ? deployInfo : null),
       prometheus,
       clock.now(),
     );
@@ -261,7 +274,12 @@ describe('E2E: full feedback loop', () => {
     prometheus.setErrorRate('api-gateway', 12.3);
     opensearch.setErrorLogs('api-gateway', []);
 
-    const { observationId, filePath } = await runObservationCycle(rootDir, prometheus, opensearch, clock);
+    const { observationId, filePath } = await runObservationCycle(
+      rootDir,
+      prometheus,
+      opensearch,
+      clock,
+    );
 
     await processTriageDecision(filePath, {
       decision: 'promote',
@@ -271,7 +289,11 @@ describe('E2E: full feedback loop', () => {
 
     clock.advanceDays(2);
     const deploymentId = await simulateDeployment(
-      rootDir, observationId, 'PRD-test', clock, filePath,
+      rootDir,
+      observationId,
+      'PRD-test',
+      clock,
+      filePath,
     );
 
     // Only advance 5 days (not enough for cooldown + comparison)
@@ -295,7 +317,7 @@ describe('E2E: full feedback loop', () => {
     const result = await evaluateEffectiveness(
       candidate,
       config,
-      (id) => id === deploymentId ? deployInfo : null,
+      (id) => (id === deploymentId ? deployInfo : null),
       prometheus,
       clock.now(),
     );

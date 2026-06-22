@@ -26,9 +26,7 @@ import type { BaselineMetrics, MetricBaseline } from '../../src/engine/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildMetricBaseline(
-  overrides: Partial<MetricBaseline> = {},
-): MetricBaseline {
+function buildMetricBaseline(overrides: Partial<MetricBaseline> = {}): MetricBaseline {
   return {
     mean_7d: 0,
     stddev_7d: 0,
@@ -43,9 +41,7 @@ function buildMetricBaseline(
   };
 }
 
-function buildBaseline(
-  overrides: Partial<BaselineMetrics> = {},
-): BaselineMetrics {
+function buildBaseline(overrides: Partial<BaselineMetrics> = {}): BaselineMetrics {
   return {
     service: 'api-gateway',
     learning_mode: true,

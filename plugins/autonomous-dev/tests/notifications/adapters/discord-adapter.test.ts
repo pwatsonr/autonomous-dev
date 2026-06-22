@@ -64,10 +64,12 @@ describe('DiscordDeliveryAdapter', () => {
 
   // Test Case 7: Single: fields include repo and request
   it('embed fields contain repository and request values', () => {
-    const result = adapter.deliver(makePayload({
-      repository: 'my-cool-repo',
-      request_id: 'req-xyz-123',
-    }));
+    const result = adapter.deliver(
+      makePayload({
+        repository: 'my-cool-repo',
+        request_id: 'req-xyz-123',
+      }),
+    );
     const output = result.formattedOutput as {
       embeds: Array<{
         fields: Array<{ name: string; value: string; inline: boolean }>;
@@ -75,8 +77,8 @@ describe('DiscordDeliveryAdapter', () => {
     };
 
     const fields = output.embeds[0].fields;
-    const repoField = fields.find(f => f.name === 'Repository');
-    const requestField = fields.find(f => f.name === 'Request');
+    const repoField = fields.find((f) => f.name === 'Repository');
+    const requestField = fields.find((f) => f.name === 'Request');
 
     expect(repoField).toBeDefined();
     expect(repoField!.value).toBe('my-cool-repo');
@@ -88,10 +90,12 @@ describe('DiscordDeliveryAdapter', () => {
   });
 
   it('embed includes title and description from payload', () => {
-    const result = adapter.deliver(makePayload({
-      title: 'My Title',
-      body: 'My Description',
-    }));
+    const result = adapter.deliver(
+      makePayload({
+        title: 'My Title',
+        body: 'My Description',
+      }),
+    );
     const output = result.formattedOutput as {
       embeds: Array<{ title: string; description: string }>;
     };
@@ -100,9 +104,11 @@ describe('DiscordDeliveryAdapter', () => {
   });
 
   it('embed includes timestamp', () => {
-    const result = adapter.deliver(makePayload({
-      timestamp: '2026-04-08T10:30:00Z',
-    }));
+    const result = adapter.deliver(
+      makePayload({
+        timestamp: '2026-04-08T10:30:00Z',
+      }),
+    );
     const output = result.formattedOutput as {
       embeds: Array<{ timestamp: string }>;
     };
@@ -116,7 +122,7 @@ describe('DiscordDeliveryAdapter', () => {
         fields: Array<{ name: string; value: string }>;
       }>;
     };
-    const urgencyField = output.embeds[0].fields.find(f => f.name === 'Urgency');
+    const urgencyField = output.embeds[0].fields.find((f) => f.name === 'Urgency');
     expect(urgencyField).toBeDefined();
     expect(urgencyField!.value).toBe('immediate');
   });
@@ -137,7 +143,7 @@ describe('DiscordDeliveryAdapter', () => {
 
     // The single embed should have fields for all 3 notifications
     const embed = output.embeds[0] as { fields: Array<{ name: string }> };
-    const repoFields = embed.fields.filter(f => f.name === 'Repository');
+    const repoFields = embed.fields.filter((f) => f.name === 'Repository');
     expect(repoFields).toHaveLength(3);
   });
 

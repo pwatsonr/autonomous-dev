@@ -27,21 +27,12 @@ describe('Notification types', () => {
   });
 
   it('NotificationUrgency enumerates all 3 values', () => {
-    const urgencies: NotificationUrgency[] = [
-      'immediate',
-      'soon',
-      'informational',
-    ];
+    const urgencies: NotificationUrgency[] = ['immediate', 'soon', 'informational'];
     expect(urgencies).toHaveLength(3);
   });
 
   it('DeliveryMethod enumerates all 4 values', () => {
-    const methods: DeliveryMethod[] = [
-      'cli',
-      'discord',
-      'slack',
-      'file_drop',
-    ];
+    const methods: DeliveryMethod[] = ['cli', 'discord', 'slack', 'file_drop'];
     expect(methods).toHaveLength(4);
   });
 

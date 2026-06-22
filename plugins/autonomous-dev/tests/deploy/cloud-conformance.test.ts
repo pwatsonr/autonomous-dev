@@ -45,10 +45,7 @@ import type {
 import type { EcsLikeClient } from '../../../autonomous-dev-deploy-aws/src/ecs-deployer';
 import type { ElbV2LikeClient } from '../../../autonomous-dev-deploy-aws/src/health-checker';
 import { AzureBackend } from '../../../autonomous-dev-deploy-azure/src/backend';
-import type {
-  AcrLikeClient,
-  AcrRun,
-} from '../../../autonomous-dev-deploy-azure/src/acr-builder';
+import type { AcrLikeClient, AcrRun } from '../../../autonomous-dev-deploy-azure/src/acr-builder';
 import type {
   ContainerAppResource,
   ContainerAppsLikeClient,
@@ -209,8 +206,7 @@ function gcpClients(): {
       return [revisions, {}, {}];
     },
   };
-  const fetchImpl = (async () =>
-    new Response('ok', { status: 200 })) as unknown as typeof fetch;
+  const fetchImpl = (async () => new Response('ok', { status: 200 })) as unknown as typeof fetch;
   return { cloudBuild, cloudRun, fetchImpl };
 }
 
@@ -226,8 +222,7 @@ function awsClients(): {
         authorizationData: [
           {
             authorizationToken: Buffer.from('AWS:test-pw').toString('base64'),
-            proxyEndpoint:
-              'https://123456789012.dkr.ecr.us-east-1.amazonaws.com',
+            proxyEndpoint: 'https://123456789012.dkr.ecr.us-east-1.amazonaws.com',
             expiresAt: new Date(),
           },
         ],
@@ -243,9 +238,7 @@ function awsClients(): {
       return {
         Id: 'sha256:imageid',
         Size: 1234,
-        RepoDigests: [
-          `123456789012.dkr.ecr.us-east-1.amazonaws.com/web@sha256:${'b'.repeat(64)}`,
-        ],
+        RepoDigests: [`123456789012.dkr.ecr.us-east-1.amazonaws.com/web@sha256:${'b'.repeat(64)}`],
       };
     },
   };
@@ -267,11 +260,9 @@ function awsClients(): {
           return {
             services: [
               {
-                serviceArn:
-                  'arn:aws:ecs:us-east-1:123456789012:service/web-cluster/web-svc',
+                serviceArn: 'arn:aws:ecs:us-east-1:123456789012:service/web-cluster/web-svc',
                 serviceName: 'web-svc',
-                taskDefinition:
-                  'arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:7',
+                taskDefinition: 'arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:7',
                 desiredCount: 2,
               },
             ],
@@ -280,8 +271,7 @@ function awsClients(): {
           return {
             taskDefinition: {
               family: 'web-svc',
-              taskDefinitionArn:
-                'arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:7',
+              taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:7',
               taskRoleArn: 'arn:aws:iam::123456789012:role/ecs-task-role',
               executionRoleArn: 'arn:aws:iam::123456789012:role/ecs-exec-role',
               networkMode: 'awsvpc',
@@ -291,8 +281,7 @@ function awsClients(): {
               containerDefinitions: [
                 {
                   name: 'web',
-                  image:
-                    '123456789012.dkr.ecr.us-east-1.amazonaws.com/web:old-sha',
+                  image: '123456789012.dkr.ecr.us-east-1.amazonaws.com/web:old-sha',
                   cpu: 512,
                   memory: 1024,
                 },
@@ -303,15 +292,13 @@ function awsClients(): {
           return {
             taskDefinition: {
               family: 'web-svc',
-              taskDefinitionArn:
-                'arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:8',
+              taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/web-svc:8',
             },
           };
         case 'UpdateService':
           return {
             service: {
-              serviceArn:
-                'arn:aws:ecs:us-east-1:123456789012:service/web-cluster/web-svc',
+              serviceArn: 'arn:aws:ecs:us-east-1:123456789012:service/web-cluster/web-svc',
               taskDefinition: cmd.taskDefinition,
             },
           };
@@ -409,8 +396,7 @@ function azureClients(): {
       return updatedApp;
     },
   };
-  const fetchImpl = (async () =>
-    new Response('ok', { status: 200 })) as unknown as typeof fetch;
+  const fetchImpl = (async () => new Response('ok', { status: 200 })) as unknown as typeof fetch;
   return { acr, containerApps, fetchImpl };
 }
 
@@ -431,7 +417,7 @@ function k8sClients(): {
   const state: K8sStubResolverState = { readDeploymentCalls: 0 };
   const kubeConfig: KubeConfigLike = {
     getCurrentContext: () => 'test',
-    makeApiClient: () => ({} as never),
+    makeApiClient: () => ({}) as never,
   };
   const deployment: ManifestDoc & {
     status?: { replicas?: number; readyReplicas?: number; observedGeneration?: number };
@@ -495,7 +481,9 @@ function k8sClients(): {
     for (const chunk of text.split(/^---\s*$/m)) {
       const trimmed = chunk.trim();
       if (!trimmed) continue;
-      const m = trimmed.match(/kind:\s*(\w+)[\s\S]*?metadata:\s*\n\s+name:\s*(\S+)\s*\n\s+namespace:\s*(\S+)/);
+      const m = trimmed.match(
+        /kind:\s*(\w+)[\s\S]*?metadata:\s*\n\s+name:\s*(\S+)\s*\n\s+namespace:\s*(\S+)/,
+      );
       if (m) {
         docs.push({
           apiVersion: 'apps/v1',

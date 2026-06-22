@@ -5,10 +5,7 @@ import {
   trackBranchName,
   worktreePath,
 } from '../../src/parallel/naming';
-import {
-  loadConfig,
-  validateConfig,
-} from '../../src/parallel/config';
+import { loadConfig, validateConfig } from '../../src/parallel/config';
 
 describe('isValidName', () => {
   it('accepts lowercase alphanumeric with hyphens', () => {
@@ -159,13 +156,13 @@ describe('branch name construction', () => {
 
 describe('worktreePath', () => {
   it('joins root, requestId, and trackName', () => {
-    expect(worktreePath('/repo/.worktrees', 'req-001', 'track-a'))
-      .toBe('/repo/.worktrees/req-001/track-a');
+    expect(worktreePath('/repo/.worktrees', 'req-001', 'track-a')).toBe(
+      '/repo/.worktrees/req-001/track-a',
+    );
   });
 
   it('works with relative root', () => {
-    expect(worktreePath('.worktrees', 'req-001', 'track-a'))
-      .toBe('.worktrees/req-001/track-a');
+    expect(worktreePath('.worktrees', 'req-001', 'track-a')).toBe('.worktrees/req-001/track-a');
   });
 });
 
@@ -220,39 +217,27 @@ describe('config', () => {
   });
 
   it('rejects negative disk_warning_threshold_gb', () => {
-    expect(() =>
-      validateConfig({ ...loadConfig(), disk_warning_threshold_gb: -1 }),
-    ).toThrow();
+    expect(() => validateConfig({ ...loadConfig(), disk_warning_threshold_gb: -1 })).toThrow();
   });
 
   it('rejects zero disk_hard_limit_gb', () => {
-    expect(() =>
-      validateConfig({ ...loadConfig(), disk_hard_limit_gb: 0 }),
-    ).toThrow();
+    expect(() => validateConfig({ ...loadConfig(), disk_hard_limit_gb: 0 })).toThrow();
   });
 
   it('rejects empty worktree_root', () => {
-    expect(() =>
-      validateConfig({ ...loadConfig(), worktree_root: '' }),
-    ).toThrow();
+    expect(() => validateConfig({ ...loadConfig(), worktree_root: '' })).toThrow();
   });
 
   it('rejects empty base_branch', () => {
-    expect(() =>
-      validateConfig({ ...loadConfig(), base_branch: '' }),
-    ).toThrow();
+    expect(() => validateConfig({ ...loadConfig(), base_branch: '' })).toThrow();
   });
 
   it('rejects negative stall_timeout_minutes', () => {
-    expect(() =>
-      validateConfig({ ...loadConfig(), stall_timeout_minutes: 0 }),
-    ).toThrow();
+    expect(() => validateConfig({ ...loadConfig(), stall_timeout_minutes: 0 })).toThrow();
   });
 
   it('rejects negative max_revision_cycles', () => {
-    expect(() =>
-      validateConfig({ ...loadConfig(), max_revision_cycles: -1 }),
-    ).toThrow();
+    expect(() => validateConfig({ ...loadConfig(), max_revision_cycles: -1 })).toThrow();
   });
 
   it('accepts max_revision_cycles of 0', () => {

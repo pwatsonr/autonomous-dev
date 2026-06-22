@@ -75,7 +75,7 @@ export class RevisionLimitExceededError extends Error {
   ) {
     super(
       `Track "${trackName}" exceeded max revision cycles: ` +
-      `cycle ${currentCycle} > limit ${maxCycles}`,
+        `cycle ${currentCycle} > limit ${maxCycles}`,
     );
     this.name = 'RevisionLimitExceededError';
   }
@@ -92,7 +92,7 @@ export class IntegrationTestCircuitBreakerError extends Error {
   ) {
     super(
       `Integration test circuit breaker tripped for request "${requestId}": ` +
-      `${consecutiveFailures} consecutive failures`,
+        `${consecutiveFailures} consecutive failures`,
     );
     this.name = 'IntegrationTestCircuitBreakerError';
   }
@@ -183,10 +183,7 @@ export class ShellTestRunner implements TestRunner {
    * @param integrationBranch The integration branch name to test
    * @returns IntegrationTestResult (compatible with TestRunner interface)
    */
-  async run(
-    repoRoot: string,
-    integrationBranch: string,
-  ): Promise<IntegrationTestResult> {
+  async run(repoRoot: string, integrationBranch: string): Promise<IntegrationTestResult> {
     const result = await this.runWithDetails(repoRoot, integrationBranch);
     return {
       passed: result.passed,
@@ -218,8 +215,8 @@ export class ShellTestRunner implements TestRunner {
     requestId?: string,
   ): Promise<ShellTestRunnerResult> {
     // Extract requestId from branch name if not provided
-    const effectiveRequestId = requestId
-      ?? integrationBranch.replace(/^auto\//, '').replace(/\/integration$/, '');
+    const effectiveRequestId =
+      requestId ?? integrationBranch.replace(/^auto\//, '').replace(/\/integration$/, '');
     const testTrackName = 'integration-test';
 
     this.eventBus.emit('integration.test_started', {
@@ -296,9 +293,7 @@ export class ShellTestRunner implements TestRunner {
       const failedTests = this.parseTestOutput(output);
 
       const passed = exitCode === 0;
-      const eventType = passed
-        ? 'integration.test_passed'
-        : 'integration.test_failed';
+      const eventType = passed ? 'integration.test_passed' : 'integration.test_failed';
 
       this.eventBus.emit(eventType, {
         type: eventType,
@@ -312,11 +307,7 @@ export class ShellTestRunner implements TestRunner {
       return { passed, exitCode, output, failedTests, duration, logPath };
     } finally {
       // Always clean up test worktree, even on failure
-      await this.worktreeManager.removeWorktree(
-        effectiveRequestId,
-        testTrackName,
-        true,
-      );
+      await this.worktreeManager.removeWorktree(effectiveRequestId, testTrackName, true);
     }
   }
 
@@ -434,9 +425,7 @@ export class IntegrationTester {
    * engine orchestrator, which calls this method again after the revised
    * tracks complete.
    */
-  async runIntegrationTestsWithRevision(
-    requestId: string,
-  ): Promise<IntegrationTestResult> {
+  async runIntegrationTestsWithRevision(requestId: string): Promise<IntegrationTestResult> {
     const result = await this.runIntegrationTests(requestId);
 
     if (result.passed) {
@@ -453,10 +442,7 @@ export class IntegrationTester {
         reason: `Integration test circuit breaker: ${this.consecutiveFailures} consecutive failures`,
         timestamp: new Date().toISOString(),
       });
-      throw new IntegrationTestCircuitBreakerError(
-        requestId,
-        this.consecutiveFailures,
-      );
+      throw new IntegrationTestCircuitBreakerError(requestId, this.consecutiveFailures);
     }
 
     // Attribute failures and trigger revisions

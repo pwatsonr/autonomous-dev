@@ -16,7 +16,10 @@ const REJECTED: MetaReviewResult = { status: 'rejected', notes: 'capability cree
 
 describe('validateCloudBackendTrust', () => {
   test('plugin not in privileged_backends → CLOUD_BACKEND_NOT_PRIVILEGED', async () => {
-    const manifest: CloudBackendManifest = { name: 'autonomous-dev-deploy-aws', type: 'cloud-backend' };
+    const manifest: CloudBackendManifest = {
+      name: 'autonomous-dev-deploy-aws',
+      type: 'cloud-backend',
+    };
     const config: CloudBackendTrustConfig = { extensions: { privileged_backends: [] } };
     const r = await validateCloudBackendTrust(manifest, config, APPROVED);
     expect(r.ok).toBe(false);
@@ -27,7 +30,10 @@ describe('validateCloudBackendTrust', () => {
   });
 
   test('plugin in privileged_backends but meta-review rejected → CLOUD_BACKEND_META_REVIEW_FAILED with notes', async () => {
-    const manifest: CloudBackendManifest = { name: 'autonomous-dev-deploy-aws', type: 'cloud-backend' };
+    const manifest: CloudBackendManifest = {
+      name: 'autonomous-dev-deploy-aws',
+      type: 'cloud-backend',
+    };
     const config: CloudBackendTrustConfig = {
       extensions: { privileged_backends: ['autonomous-dev-deploy-aws'] },
     };
@@ -41,7 +47,10 @@ describe('validateCloudBackendTrust', () => {
   });
 
   test('plugin in privileged_backends AND meta-review approved → ok:true', async () => {
-    const manifest: CloudBackendManifest = { name: 'autonomous-dev-deploy-aws', type: 'cloud-backend' };
+    const manifest: CloudBackendManifest = {
+      name: 'autonomous-dev-deploy-aws',
+      type: 'cloud-backend',
+    };
     const config: CloudBackendTrustConfig = {
       extensions: { privileged_backends: ['autonomous-dev-deploy-aws'] },
     };
@@ -58,7 +67,11 @@ describe('validateCloudBackendTrust', () => {
 
   test('reason strings include the plugin name verbatim', async () => {
     const m: CloudBackendManifest = { name: 'my-cloud-backend-x', type: 'cloud-backend' };
-    const r1 = await validateCloudBackendTrust(m, { extensions: { privileged_backends: [] } }, APPROVED);
+    const r1 = await validateCloudBackendTrust(
+      m,
+      { extensions: { privileged_backends: [] } },
+      APPROVED,
+    );
     const r2 = await validateCloudBackendTrust(
       m,
       { extensions: { privileged_backends: ['my-cloud-backend-x'] } },

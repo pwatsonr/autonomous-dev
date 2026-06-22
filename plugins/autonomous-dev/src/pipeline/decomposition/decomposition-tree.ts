@@ -63,7 +63,7 @@ export class DecompositionTree {
    */
   getChildren(documentId: string): DecompositionNode[] {
     const node = this.getNode(documentId);
-    return node.childIds.map(id => this.getNode(id));
+    return node.childIds.map((id) => this.getNode(id));
   }
 
   /**

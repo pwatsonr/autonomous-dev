@@ -308,9 +308,7 @@ describe('generatePrdFromObservation', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  async function writeObservation(
-    overrides: Record<string, string> = {},
-  ): Promise<string> {
+  async function writeObservation(overrides: Record<string, string> = {}): Promise<string> {
     const obsDir = path.join(rootDir, '.autonomous-dev', 'observations');
     await fs.mkdir(obsDir, { recursive: true });
     const obsPath = path.join(obsDir, `${OBSERVATION_ID}.md`);
@@ -321,12 +319,7 @@ describe('generatePrdFromObservation', () => {
   // TC-4-3-01: PRD file created with correct YAML frontmatter
   it('TC-4-3-01: creates PRD file with correct YAML frontmatter', async () => {
     const obsPath = await writeObservation();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const prdContent = await fs.readFile(result.file_path, 'utf-8');
     expect(prdContent).toMatch(/^---\n/);
@@ -338,12 +331,7 @@ describe('generatePrdFromObservation', () => {
   // TC-4-3-03: observation_id link in PRD frontmatter
   it('TC-4-3-03: links observation_id in PRD frontmatter', async () => {
     const obsPath = await writeObservation();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const prdContent = await fs.readFile(result.file_path, 'utf-8');
     expect(prdContent).toContain(`observation_id: ${OBSERVATION_ID}`);
@@ -352,12 +340,7 @@ describe('generatePrdFromObservation', () => {
   // TC-4-3-04: PRD written to correct file path
   it('TC-4-3-04: writes PRD to .autonomous-dev/prd/PRD-OBS-<id>.md', async () => {
     const obsPath = await writeObservation();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const expectedPrdId = 'PRD-OBS-20260408-143022-a7f3';
     expect(result.prd_id).toBe(expectedPrdId);
@@ -372,12 +355,7 @@ describe('generatePrdFromObservation', () => {
   // TC-4-3-05: observation updated with linked_prd
   it('TC-4-3-05: updates observation with linked_prd field', async () => {
     const obsPath = await writeObservation();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const updatedObs = await fs.readFile(obsPath, 'utf-8');
     expect(updatedObs).toContain(`linked_prd: ${result.prd_id}`);
@@ -385,12 +363,7 @@ describe('generatePrdFromObservation', () => {
 
   it('returns correct observation_id in result', async () => {
     const obsPath = await writeObservation();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
     expect(result.observation_id).toBe(OBSERVATION_ID);
   });
 
@@ -402,8 +375,7 @@ describe('generatePrdFromObservation', () => {
       return MOCK_LLM_RESPONSE;
     };
 
-    const getPreviousObs = async (_service: string) =>
-      'OBS-123 on 2026-04-01: error_rate spike';
+    const getPreviousObs = async (_service: string) => 'OBS-123 on 2026-04-01: error_rate spike';
 
     await generatePrdFromObservation(
       obsPath,
@@ -418,12 +390,7 @@ describe('generatePrdFromObservation', () => {
 
   it('creates parent directories for PRD file', async () => {
     const obsPath = await writeObservation();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
     // The .autonomous-dev/prd directory should have been created
     const prdDir = path.dirname(result.file_path);
     const stat = await fs.stat(prdDir);
@@ -433,12 +400,7 @@ describe('generatePrdFromObservation', () => {
   // TC-4-3-06: Success criteria table in generated PRD
   it('TC-4-3-06: PRD contains success criteria table with metric values', async () => {
     const obsPath = await writeObservation();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const prdContent = await fs.readFile(result.file_path, 'utf-8');
     expect(prdContent).toContain('## Success Criteria');
@@ -527,23 +489,13 @@ describe('PRD Generator - SPEC-007-4-4 format and compatibility', () => {
 
   test('PRD ID follows PRD-OBS-<date>-<time>-<hex> convention', async () => {
     const obsPath = await writeObs();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
     expect(result.prd_id).toMatch(/^PRD-OBS-\d{8}-\d{6}-[a-f0-9]{4}$/);
   });
 
   test('PRD contains all required sections', async () => {
     const obsPath = await writeObs();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const prdContent = await fs.readFile(result.file_path, 'utf-8');
     expect(prdContent).toContain('## Problem Statement');
@@ -555,15 +507,20 @@ describe('PRD Generator - SPEC-007-4-4 format and compatibility', () => {
 
   test('PRD frontmatter is pipeline-compatible with required fields', async () => {
     const obsPath = await writeObs();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const prdContent = await fs.readFile(result.file_path, 'utf-8');
-    const requiredFields = ['title', 'version', 'date', 'author', 'status', 'source', 'observation_id', 'severity', 'service'];
+    const requiredFields = [
+      'title',
+      'version',
+      'date',
+      'author',
+      'status',
+      'source',
+      'observation_id',
+      'severity',
+      'service',
+    ];
     for (const field of requiredFields) {
       expect(prdContent).toContain(`${field}:`);
     }
@@ -571,12 +528,7 @@ describe('PRD Generator - SPEC-007-4-4 format and compatibility', () => {
 
   test('PRD severity matches observation severity', async () => {
     const obsPath = await writeObs({ severity: 'P0' });
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const prdContent = await fs.readFile(result.file_path, 'utf-8');
     expect(prdContent).toContain('severity: P0');
@@ -584,12 +536,7 @@ describe('PRD Generator - SPEC-007-4-4 format and compatibility', () => {
 
   test('PRD observation_id links back to source observation', async () => {
     const obsPath = await writeObs();
-    const result = await generatePrdFromObservation(
-      obsPath,
-      PROMOTE_DECISION,
-      rootDir,
-      mockLlmFn,
-    );
+    const result = await generatePrdFromObservation(obsPath, PROMOTE_DECISION, rootDir, mockLlmFn);
 
     const prdContent = await fs.readFile(result.file_path, 'utf-8');
     expect(prdContent).toContain(`observation_id: ${OBSERVATION_ID}`);

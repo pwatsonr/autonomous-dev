@@ -60,13 +60,9 @@ export function getStrategy(
   parentType: DocumentType,
   childType: DocumentType,
 ): DecompositionStrategy {
-  const strategy = STRATEGIES.find(
-    s => s.parentType === parentType && s.childType === childType,
-  );
+  const strategy = STRATEGIES.find((s) => s.parentType === parentType && s.childType === childType);
   if (!strategy) {
-    throw new Error(
-      `No decomposition strategy for transition ${parentType} -> ${childType}`,
-    );
+    throw new Error(`No decomposition strategy for transition ${parentType} -> ${childType}`);
   }
   return strategy;
 }

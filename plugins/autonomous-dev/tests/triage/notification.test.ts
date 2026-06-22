@@ -57,24 +57,15 @@ function test_slack_message_format(): void {
 
   // Header block
   assert(msg.blocks[0].type === 'header', 'First block should be header');
-  assert(
-    msg.blocks[0].text.text.includes(':warning:'),
-    'P1 should use :warning: emoji'
-  );
-  assert(
-    msg.blocks[0].text.text.includes('api-gateway'),
-    'Header should include service name'
-  );
+  assert(msg.blocks[0].text.text.includes(':warning:'), 'P1 should use :warning: emoji');
+  assert(msg.blocks[0].text.text.includes('api-gateway'), 'Header should include service name');
 
   // Section block with details
   const detailText = msg.blocks[1].text.text;
   assert(detailText.includes('12.3%'), 'Should include error rate');
   assert(detailText.includes('0.4%'), 'Should include baseline');
   assert(detailText.includes('0.92'), 'Should include confidence');
-  assert(
-    detailText.includes('Increase connection pool size'),
-    'Should include recommended action'
-  );
+  assert(detailText.includes('Increase connection pool size'), 'Should include recommended action');
 
   // Commands block
   const cmdText = msg.blocks[2].text.text;
@@ -98,11 +89,8 @@ function test_discord_message_format(): void {
   assert(msg.embeds.length === 1, `Expected 1 embed, got ${msg.embeds.length}`);
 
   const embed = msg.embeds[0];
-  assert(
-    embed.title.includes(':rotating_light:'),
-    'P0 should use :rotating_light: emoji'
-  );
-  assert(embed.color === 0xFF0000, `P0 color should be red (0xFF0000), got ${embed.color}`);
+  assert(embed.title.includes(':rotating_light:'), 'P0 should use :rotating_light: emoji');
+  assert(embed.color === 0xff0000, `P0 color should be red (0xFF0000), got ${embed.color}`);
   // Service name appears in title (parity with Slack header), not description
   // (PRD-016 triage batch 3 - aligned assertion with current formatter).
   assert(embed.title.includes('api-gateway'), 'Title should include service');
@@ -131,10 +119,7 @@ function test_notification_wrong_severity(): void {
   // The spec says: P3 observation with notify_on: ["P0", "P1"] should not be sent
   const notify_on = ['P0', 'P1'];
   const severity = 'P3';
-  assert(
-    !notify_on.includes(severity),
-    'P3 should not be in notify_on ["P0", "P1"]'
-  );
+  assert(!notify_on.includes(severity), 'P3 should not be in notify_on ["P0", "P1"]');
   console.log('PASS: TC-5-4-04 Severity filter check');
 }
 
@@ -174,19 +159,14 @@ function test_channel_health_server_error(): void {
 // TC-5-4-10: Parse /promote command
 // ---------------------------------------------------------------------------
 function test_parse_promote(): void {
-  const result = parseTriageCommand(
-    '/promote OBS-20260408-143022-a7f3 Pool issue confirmed'
-  );
+  const result = parseTriageCommand('/promote OBS-20260408-143022-a7f3 Pool issue confirmed');
   assert(result !== null, 'Should parse promote command');
   assert(result!.action === 'promote', `Expected action=promote, got ${result!.action}`);
   assert(
     result!.observation_id === 'OBS-20260408-143022-a7f3',
-    `Wrong observation_id: ${result!.observation_id}`
+    `Wrong observation_id: ${result!.observation_id}`,
   );
-  assert(
-    result!.reason === 'Pool issue confirmed',
-    `Wrong reason: ${result!.reason}`
-  );
+  assert(result!.reason === 'Pool issue confirmed', `Wrong reason: ${result!.reason}`);
   console.log('PASS: TC-5-4-10 Parse /promote command');
 }
 
@@ -194,14 +174,12 @@ function test_parse_promote(): void {
 // TC-5-4-11: Parse /dismiss command
 // ---------------------------------------------------------------------------
 function test_parse_dismiss(): void {
-  const result = parseTriageCommand(
-    '/dismiss OBS-20260408-143022-a7f3 False positive'
-  );
+  const result = parseTriageCommand('/dismiss OBS-20260408-143022-a7f3 False positive');
   assert(result !== null, 'Should parse dismiss command');
   assert(result!.action === 'dismiss', `Expected action=dismiss, got ${result!.action}`);
   assert(
     result!.observation_id === 'OBS-20260408-143022-a7f3',
-    `Wrong observation_id: ${result!.observation_id}`
+    `Wrong observation_id: ${result!.observation_id}`,
   );
   assert(result!.reason === 'False positive', `Wrong reason: ${result!.reason}`);
   console.log('PASS: TC-5-4-11 Parse /dismiss command');
@@ -211,23 +189,15 @@ function test_parse_dismiss(): void {
 // TC-5-4-12: Parse /defer command
 // ---------------------------------------------------------------------------
 function test_parse_defer(): void {
-  const result = parseTriageCommand(
-    '/defer OBS-20260408-143022-a7f3 2026-04-15 Wait for sprint'
-  );
+  const result = parseTriageCommand('/defer OBS-20260408-143022-a7f3 2026-04-15 Wait for sprint');
   assert(result !== null, 'Should parse defer command');
   assert(result!.action === 'defer', `Expected action=defer, got ${result!.action}`);
   assert(
     result!.observation_id === 'OBS-20260408-143022-a7f3',
-    `Wrong observation_id: ${result!.observation_id}`
+    `Wrong observation_id: ${result!.observation_id}`,
   );
-  assert(
-    result!.defer_until === '2026-04-15',
-    `Wrong defer_until: ${result!.defer_until}`
-  );
-  assert(
-    result!.reason === 'Wait for sprint',
-    `Wrong reason: ${result!.reason}`
-  );
+  assert(result!.defer_until === '2026-04-15', `Wrong defer_until: ${result!.defer_until}`);
+  assert(result!.reason === 'Wait for sprint', `Wrong reason: ${result!.reason}`);
   console.log('PASS: TC-5-4-12 Parse /defer command');
 }
 
@@ -235,17 +205,12 @@ function test_parse_defer(): void {
 // TC-5-4-13: Parse /investigate command
 // ---------------------------------------------------------------------------
 function test_parse_investigate(): void {
-  const result = parseTriageCommand(
-    '/investigate OBS-20260408-143022-a7f3'
-  );
+  const result = parseTriageCommand('/investigate OBS-20260408-143022-a7f3');
   assert(result !== null, 'Should parse investigate command');
-  assert(
-    result!.action === 'investigate',
-    `Expected action=investigate, got ${result!.action}`
-  );
+  assert(result!.action === 'investigate', `Expected action=investigate, got ${result!.action}`);
   assert(
     result!.observation_id === 'OBS-20260408-143022-a7f3',
-    `Wrong observation_id: ${result!.observation_id}`
+    `Wrong observation_id: ${result!.observation_id}`,
   );
   assert(result!.reason === undefined, 'investigate should have no reason');
   console.log('PASS: TC-5-4-13 Parse /investigate command');
@@ -264,9 +229,7 @@ function test_parse_invalid(): void {
 // Additional: Parse with leading/trailing whitespace
 // ---------------------------------------------------------------------------
 function test_parse_whitespace(): void {
-  const result = parseTriageCommand(
-    '  /promote OBS-20260408-143022-a7f3 whitespace test  '
-  );
+  const result = parseTriageCommand('  /promote OBS-20260408-143022-a7f3 whitespace test  ');
   assert(result !== null, 'Should parse command with whitespace');
   assert(result!.action === 'promote', `Expected action=promote, got ${result!.action}`);
   assert(result!.reason === 'whitespace test', `Expected trimmed reason, got ${result!.reason}`);
@@ -289,10 +252,10 @@ function test_severity_emoji(): void {
 // Severity color mapping
 // ---------------------------------------------------------------------------
 function test_severity_color(): void {
-  assert(getSeverityColor('P0') === 0xFF0000, 'P0 color = red');
-  assert(getSeverityColor('P1') === 0xFF8C00, 'P1 color = orange');
-  assert(getSeverityColor('P2') === 0xFFD700, 'P2 color = yellow');
-  assert(getSeverityColor('P3') === 0x4169E1, 'P3 color = blue');
+  assert(getSeverityColor('P0') === 0xff0000, 'P0 color = red');
+  assert(getSeverityColor('P1') === 0xff8c00, 'P1 color = orange');
+  assert(getSeverityColor('P2') === 0xffd700, 'P2 color = yellow');
+  assert(getSeverityColor('P3') === 0x4169e1, 'P3 color = blue');
   assert(getSeverityColor('P4') === 0x808080, 'Unknown color = grey');
   console.log('PASS: Severity color mapping');
 }
@@ -307,10 +270,7 @@ function test_build_triage_commands(): void {
   assert(cmds[1].includes('/dismiss'), 'Second should be dismiss');
   assert(cmds[2].includes('/defer'), 'Third should be defer');
   assert(cmds[3].includes('/investigate'), 'Fourth should be investigate');
-  assert(
-    cmds[0].includes('OBS-20260408-143022-a7f3'),
-    'Commands should contain observation ID'
-  );
+  assert(cmds[0].includes('OBS-20260408-143022-a7f3'), 'Commands should contain observation ID');
   console.log('PASS: Build triage commands');
 }
 
@@ -331,7 +291,7 @@ function test_slack_block_structure(): void {
   // P0 header should use rotating_light
   assert(
     msg.blocks[0].text.text.includes(':rotating_light:'),
-    'P0 Slack header should have :rotating_light:'
+    'P0 Slack header should have :rotating_light:',
   );
 
   console.log('PASS: Slack Block Kit structure');
@@ -348,7 +308,7 @@ function test_discord_embed_structure(): void {
   assert(typeof embed.title === 'string', 'Embed should have title');
   assert(typeof embed.description === 'string', 'Embed should have description');
   assert(typeof embed.color === 'number', 'Embed should have color number');
-  assert(embed.color === 0xFF8C00, `P1 color should be orange, got ${embed.color}`);
+  assert(embed.color === 0xff8c00, `P1 color should be orange, got ${embed.color}`);
 
   console.log('PASS: Discord embed structure');
 }
@@ -357,9 +317,7 @@ function test_discord_embed_structure(): void {
 // Parse command case insensitivity for observation ID hex
 // ---------------------------------------------------------------------------
 function test_parse_case_insensitive_hex(): void {
-  const result = parseTriageCommand(
-    '/promote OBS-20260408-143022-A7F3 uppercase hex'
-  );
+  const result = parseTriageCommand('/promote OBS-20260408-143022-A7F3 uppercase hex');
   assert(result !== null, 'Should parse uppercase hex in observation ID');
   assert(result!.observation_id === 'OBS-20260408-143022-A7F3', 'Should preserve case');
   console.log('PASS: Case insensitive hex parsing');
@@ -382,25 +340,65 @@ function test_parse_no_reason(): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-describe("TriageNotification", () => {
-  it("formats slack message", () => { test_slack_message_format(); });
-  it("formats discord message", () => { test_discord_message_format(); });
-  it("respects notification disabled", () => { test_notification_disabled(); });
-  it("respects notification severity threshold", () => { test_notification_wrong_severity(); });
-  it("reports channel health reachable", () => { test_channel_health_reachable(); });
-  it("reports channel health timeout", () => { test_channel_health_timeout(); });
-  it("reports channel health server error", () => { test_channel_health_server_error(); });
-  it("parses promote command", () => { test_parse_promote(); });
-  it("parses dismiss command", () => { test_parse_dismiss(); });
-  it("parses defer command", () => { test_parse_defer(); });
-  it("parses investigate command", () => { test_parse_investigate(); });
-  it("rejects invalid command", () => { test_parse_invalid(); });
-  it("handles whitespace in command", () => { test_parse_whitespace(); });
-  it("returns severity emoji", () => { test_severity_emoji(); });
-  it("returns severity color", () => { test_severity_color(); });
-  it("builds triage commands", () => { test_build_triage_commands(); });
-  it("uses slack block structure", () => { test_slack_block_structure(); });
-  it("uses discord embed structure", () => { test_discord_embed_structure(); });
-  it("parses case-insensitive hex", () => { test_parse_case_insensitive_hex(); });
-  it("rejects commands missing required reason", () => { test_parse_no_reason(); });
+describe('TriageNotification', () => {
+  it('formats slack message', () => {
+    test_slack_message_format();
+  });
+  it('formats discord message', () => {
+    test_discord_message_format();
+  });
+  it('respects notification disabled', () => {
+    test_notification_disabled();
+  });
+  it('respects notification severity threshold', () => {
+    test_notification_wrong_severity();
+  });
+  it('reports channel health reachable', () => {
+    test_channel_health_reachable();
+  });
+  it('reports channel health timeout', () => {
+    test_channel_health_timeout();
+  });
+  it('reports channel health server error', () => {
+    test_channel_health_server_error();
+  });
+  it('parses promote command', () => {
+    test_parse_promote();
+  });
+  it('parses dismiss command', () => {
+    test_parse_dismiss();
+  });
+  it('parses defer command', () => {
+    test_parse_defer();
+  });
+  it('parses investigate command', () => {
+    test_parse_investigate();
+  });
+  it('rejects invalid command', () => {
+    test_parse_invalid();
+  });
+  it('handles whitespace in command', () => {
+    test_parse_whitespace();
+  });
+  it('returns severity emoji', () => {
+    test_severity_emoji();
+  });
+  it('returns severity color', () => {
+    test_severity_color();
+  });
+  it('builds triage commands', () => {
+    test_build_triage_commands();
+  });
+  it('uses slack block structure', () => {
+    test_slack_block_structure();
+  });
+  it('uses discord embed structure', () => {
+    test_discord_embed_structure();
+  });
+  it('parses case-insensitive hex', () => {
+    test_parse_case_insensitive_hex();
+  });
+  it('rejects commands missing required reason', () => {
+    test_parse_no_reason();
+  });
 });

@@ -162,10 +162,7 @@ export class HashChainVerifier {
    * Each failure record is a JSONL line with timestamp, source log path,
    * and the error details.
    */
-  private logIntegrityFailure(
-    errors: IntegrityError[],
-    sourceLogPath: string,
-  ): void {
+  private logIntegrityFailure(errors: IntegrityError[], sourceLogPath: string): void {
     if (!this.integrityLogPath) return;
 
     try {
@@ -184,17 +181,11 @@ export class HashChainVerifier {
         errors,
       };
 
-      appendFileSync(
-        this.integrityLogPath,
-        JSON.stringify(record) + '\n',
-        'utf-8',
-      );
+      appendFileSync(this.integrityLogPath, JSON.stringify(record) + '\n', 'utf-8');
     } catch (err) {
       // Never crash on integrity log write failure -- log to stderr
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(
-        `[INTEGRITY_LOG_ERROR] Failed to write integrity failure: ${message}\n`,
-      );
+      process.stderr.write(`[INTEGRITY_LOG_ERROR] Failed to write integrity failure: ${message}\n`);
     }
   }
 }

@@ -103,7 +103,7 @@ export class ScoreAggregator {
     for (const category of rubric.categories) {
       if (category.weight === 0) {
         console.warn(
-          `ScoreAggregator: Category '${category.id}' has weight 0; skipping in weighted sum.`
+          `ScoreAggregator: Category '${category.id}' has weight 0; skipping in weighted sum.`,
         );
         continue;
       }
@@ -130,7 +130,7 @@ export class ScoreAggregator {
   aggregateScores(
     reviewerOutputs: ReviewOutput[],
     rubric: QualityRubric,
-    method: AggregationMethod
+    method: AggregationMethod,
   ): AggregationResult {
     if (reviewerOutputs.length === 0) {
       return {
@@ -204,7 +204,7 @@ export class ScoreAggregator {
   private computeCategoryAggregates(
     reviewerOutputs: ReviewOutput[],
     rubric: QualityRubric,
-    method: AggregationMethod
+    method: AggregationMethod,
   ): CategoryAggregate[] {
     const aggregates: CategoryAggregate[] = [];
 
@@ -212,9 +212,7 @@ export class ScoreAggregator {
       const perReviewerScores: { reviewer_id: string; score: number }[] = [];
 
       for (const output of reviewerOutputs) {
-        const catScore = output.category_scores.find(
-          (cs) => cs.category_id === category.id
-        );
+        const catScore = output.category_scores.find((cs) => cs.category_id === category.id);
         if (catScore) {
           perReviewerScores.push({
             reviewer_id: output.reviewer_id,

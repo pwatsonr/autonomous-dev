@@ -19,13 +19,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 
-const AGENT_FILE = path.join(
-  __dirname,
-  '..',
-  '..',
-  'agents',
-  'standards-meta-reviewer.md',
-);
+const AGENT_FILE = path.join(__dirname, '..', '..', 'agents', 'standards-meta-reviewer.md');
 
 interface ParsedAgent {
   frontmatter: Record<string, unknown>;

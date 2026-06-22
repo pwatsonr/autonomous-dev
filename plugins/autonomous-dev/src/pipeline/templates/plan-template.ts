@@ -44,7 +44,8 @@ export const PLAN_TEMPLATE: DocumentTemplate = {
       heading: 'Tasks',
       level: 2,
       required: true,
-      description: 'Ordered list of implementation tasks with descriptions, effort estimates, and assignees',
+      description:
+        'Ordered list of implementation tasks with descriptions, effort estimates, and assignees',
       minWordCount: 200,
       subsections: [],
       rubricCategoryId: 'task_granularity',
@@ -64,7 +65,8 @@ export const PLAN_TEMPLATE: DocumentTemplate = {
       heading: 'Testing Strategy',
       level: 2,
       required: true,
-      description: 'How the work in this plan will be tested, including integration and acceptance tests',
+      description:
+        'How the work in this plan will be tested, including integration and acceptance tests',
       minWordCount: 100,
       subsections: [],
       rubricCategoryId: 'acceptance_criteria',

@@ -126,10 +126,7 @@ export class BlindRunner {
    * Execute a single agent version and convert the result.
    * On failure, the error is captured in the RunResult.
    */
-  private async executeVersion(
-    agent: AgentRecord,
-    inputContent: string,
-  ): Promise<RunResult> {
+  private async executeVersion(agent: AgentRecord, inputContent: string): Promise<RunResult> {
     try {
       const result = await this.invoker.invoke(agent, inputContent);
 
@@ -195,10 +192,7 @@ export class BlindRunner {
  * definition string.  The proposed definition replaces the system prompt and
  * increments the version indicator.
  */
-function buildProposedAgentRecord(
-  currentAgent: AgentRecord,
-  proposedDef: string,
-): AgentRecord {
+function buildProposedAgentRecord(currentAgent: AgentRecord, proposedDef: string): AgentRecord {
   const proposedParsed: ParsedAgent = {
     ...currentAgent.agent,
     system_prompt: proposedDef,

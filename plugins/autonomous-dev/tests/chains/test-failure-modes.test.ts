@@ -65,9 +65,7 @@ function buildTrio(
     buildManifest({
       id: 'code-fixer',
       consumes: [consumesEntry],
-      produces: [
-        { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
-      ],
+      produces: [{ artifact_type: 'code-patches', schema_version: '1.0', format: 'json' }],
     }),
     // A pure consumer of code-patches (downstream of code-fixer).
     buildManifest({
@@ -297,9 +295,7 @@ describe('SPEC-022-2-02: on_failure resolution', () => {
     const lookup: ManifestLookup = (id) => manifests.find((m) => m.id === id);
     const invoker: ChainHookInvoker = async (pid) => {
       if (pid === 'code-fixer') {
-        return [
-          { artifactType: 'code-patches', scanId: 'p-ok', payload: patchesExample },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 'p-ok', payload: patchesExample }];
       }
       return [];
     };
@@ -374,7 +370,11 @@ describe('SPEC-022-2-05: failure-mode × error-source matrix', () => {
     const result = await exec.executeChain(
       'security-reviewer',
       { requestRoot: tempRoot, requestId: `MAT-${source}-${mode}` },
-      { artifactType: 'security-findings', scanId: `s-${source}-${mode}`, payload: securityExample },
+      {
+        artifactType: 'security-findings',
+        scanId: `s-${source}-${mode}`,
+        payload: securityExample,
+      },
     );
     return { auditInvoked: auditCalls.length > 0, ok: result.ok };
   }
@@ -435,7 +435,9 @@ describe('SPEC-022-2-05: failure-mode × error-source matrix', () => {
         },
       ];
       // Build a registry with a tiny cap so the patches payload fails persist().
-      const tinyRegistry = new (registry.constructor as unknown as new (opts: { maxArtifactSizeMb: number }) => ArtifactRegistry)({
+      const tinyRegistry = new (registry.constructor as unknown as new (opts: {
+        maxArtifactSizeMb: number;
+      }) => ArtifactRegistry)({
         maxArtifactSizeMb: 1 / 1024, // 1 KB cap
       });
       // Re-load schemas so validate works.

@@ -19,10 +19,7 @@ import type { DndFilter } from './dnd-filter';
 import type { FatigueDetector } from './fatigue-detector';
 import type { NotificationBatcher, Timer, TimerHandle } from './batcher';
 import type { DeliveryManager } from './delivery-manager';
-import type {
-  SystemicFailureDetector,
-  FailureRecord,
-} from './systemic-failure-detector';
+import type { SystemicFailureDetector, FailureRecord } from './systemic-failure-detector';
 import type { NotificationConfig } from './notification-config';
 
 // ---------------------------------------------------------------------------
@@ -61,10 +58,7 @@ export class NotificationFramework {
 
     // Step 2: Fatigue check (per-recipient)
     const recipientId = this.resolveRecipient(payload);
-    if (
-      this.fatigueDetector.isFatigued(recipientId) &&
-      payload.urgency !== 'immediate'
-    ) {
+    if (this.fatigueDetector.isFatigued(recipientId) && payload.urgency !== 'immediate') {
       this.batcher.submit(payload); // Buffer for digest
       return;
     }
@@ -73,13 +67,8 @@ export class NotificationFramework {
     this.fatigueDetector.record(recipientId);
 
     // Step 4: Systemic failure check (for failure-type notifications)
-    if (
-      payload.event_type === 'pipeline_failed' ||
-      payload.event_type === 'escalation'
-    ) {
-      const detection = this.systemicDetector.recordFailure(
-        this.extractFailureRecord(payload),
-      );
+    if (payload.event_type === 'pipeline_failed' || payload.event_type === 'escalation') {
+      const detection = this.systemicDetector.recordFailure(this.extractFailureRecord(payload));
       if (detection.systemic) {
         // Suppress individual notification; deliver systemic alert instead
         this.deliveryManager.deliver(detection.alert);
@@ -179,8 +168,7 @@ export class NotificationFramework {
     return {
       requestId: payload.request_id,
       repository: payload.repository,
-      pipelinePhase:
-        (payload.metadata?.pipeline_phase as string) || 'unknown',
+      pipelinePhase: (payload.metadata?.pipeline_phase as string) || 'unknown',
       failureType: payload.event_type,
       timestamp: new Date(payload.timestamp),
     };

@@ -13,13 +13,9 @@ describe('expandWildcards', () => {
     // constraint); the spec example `ecs.*.amazonaws.com` was a mid-string
     // wildcard that the schema does not currently permit, so the canonical
     // form is `*.amazonaws.com`.
-    const entries: AllowlistEntry[] = [
-      { fqdn: '*.amazonaws.com', port: 443, protocol: 'tcp' },
-    ];
+    const entries: AllowlistEntry[] = [{ fqdn: '*.amazonaws.com', port: 443, protocol: 'tcp' }];
     const out = expandWildcards(entries, 'us-east-1');
-    expect(out).toEqual([
-      { fqdn: 'us-east-1.amazonaws.com', port: 443, protocol: 'tcp' },
-    ]);
+    expect(out).toEqual([{ fqdn: 'us-east-1.amazonaws.com', port: 443, protocol: 'tcp' }]);
   });
 
   test('non-wildcard entries pass through unchanged', () => {
@@ -38,18 +34,14 @@ describe('expandWildcards', () => {
   });
 
   test('throws when region is empty and any entry contains a leading wildcard', () => {
-    const entries: AllowlistEntry[] = [
-      { fqdn: '*.amazonaws.com', port: 443, protocol: 'tcp' },
-    ];
+    const entries: AllowlistEntry[] = [{ fqdn: '*.amazonaws.com', port: 443, protocol: 'tcp' }];
     expect(() => expandWildcards(entries, '')).toThrow(/region required/);
     expect(() => expandWildcards(entries, undefined)).toThrow(/region required/);
     expect(() => expandWildcards(entries, null)).toThrow(/region required/);
   });
 
   test('does not throw for empty region when there are no wildcards', () => {
-    const entries: AllowlistEntry[] = [
-      { fqdn: 'sts.amazonaws.com', port: 443, protocol: 'tcp' },
-    ];
+    const entries: AllowlistEntry[] = [{ fqdn: 'sts.amazonaws.com', port: 443, protocol: 'tcp' }];
     expect(() => expandWildcards(entries, '')).not.toThrow();
   });
 });

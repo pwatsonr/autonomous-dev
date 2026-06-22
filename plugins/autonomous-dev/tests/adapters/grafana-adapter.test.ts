@@ -6,14 +6,8 @@
  */
 
 import { GrafanaAdapter } from '../../src/adapters/grafana-adapter';
-import type {
-  McpToolCaller,
-  ConnectivityReport,
-} from '../../src/adapters/types';
-import {
-  DefaultQueryBudgetTracker,
-  AdapterTimeoutError,
-} from '../../src/adapters/types';
+import type { McpToolCaller, ConnectivityReport } from '../../src/adapters/types';
+import { DefaultQueryBudgetTracker, AdapterTimeoutError } from '../../src/adapters/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -82,7 +76,9 @@ function buildMockAnnotationResponse(): unknown[] {
 
 /** Builds a default query budget tracker. */
 function buildBudget(
-  overrides: Partial<Record<string, { max_queries_per_service: number; timeout_seconds: number }>> = {},
+  overrides: Partial<
+    Record<string, { max_queries_per_service: number; timeout_seconds: number }>
+  > = {},
 ): DefaultQueryBudgetTracker {
   return new DefaultQueryBudgetTracker({
     prometheus: { max_queries_per_service: 20, timeout_seconds: 30 },
@@ -389,41 +385,44 @@ describe('GrafanaAdapter', () => {
   describe('TC-1-3-11: timeout handling', () => {
     test('throws AdapterTimeoutError when alert query exceeds timeout', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       const budget = buildBudget({
         grafana: { max_queries_per_service: 10, timeout_seconds: 0.05 },
       });
       const adapter = new GrafanaAdapter(slowMcp, budget);
 
-      await expect(
-        adapter.listAlerts('abc123', ['alerting'], 'api-gateway'),
-      ).rejects.toThrow(AdapterTimeoutError);
+      await expect(adapter.listAlerts('abc123', ['alerting'], 'api-gateway')).rejects.toThrow(
+        AdapterTimeoutError,
+      );
     });
 
     test('throws AdapterTimeoutError when annotation query exceeds timeout', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       const budget = buildBudget({
         grafana: { max_queries_per_service: 10, timeout_seconds: 0.05 },
       });
       const adapter = new GrafanaAdapter(slowMcp, budget);
 
-      await expect(
-        adapter.getAnnotations('abc123', 4, ['deploy'], 'api-gateway'),
-      ).rejects.toThrow(AdapterTimeoutError);
+      await expect(adapter.getAnnotations('abc123', 4, ['deploy'], 'api-gateway')).rejects.toThrow(
+        AdapterTimeoutError,
+      );
     });
 
     test('timeout error includes source and query name', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       const budget = buildBudget({
         grafana: { max_queries_per_service: 10, timeout_seconds: 0.05 },

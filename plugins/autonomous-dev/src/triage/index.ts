@@ -65,10 +65,7 @@ export {
   PRD_VERSION,
   PRD_GENERATION_PROMPT,
 } from './prd-template';
-export type {
-  ObservationData,
-  LlmPrdContent,
-} from './prd-template';
+export type { ObservationData, LlmPrdContent } from './prd-template';
 
 // SPEC-007-4-3: Triage audit log (file-based JSONL)
 export { TriageAuditLogger as FileTriageAuditLogger } from './audit-log';

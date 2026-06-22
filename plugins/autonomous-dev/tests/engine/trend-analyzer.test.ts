@@ -25,9 +25,7 @@ import type { MetricBaseline } from '../../src/engine/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildMetricBaseline(
-  overrides: Partial<MetricBaseline> = {},
-): MetricBaseline {
+function buildMetricBaseline(overrides: Partial<MetricBaseline> = {}): MetricBaseline {
   return {
     mean_7d: 0,
     stddev_7d: 0,
@@ -42,9 +40,7 @@ function buildMetricBaseline(
   };
 }
 
-function buildTrendConfig(
-  overrides: Partial<TrendAnalysisConfig> = {},
-): TrendAnalysisConfig {
+function buildTrendConfig(overrides: Partial<TrendAnalysisConfig> = {}): TrendAnalysisConfig {
   return {
     windows: ['7d'],
     min_slope_threshold: 5,
@@ -56,11 +52,7 @@ function buildTrendConfig(
  * Generates data points with a linear trend.
  * y = startValue + slope * x, for x in [0, count).
  */
-function generateLinearData(
-  count: number,
-  startValue: number,
-  slope: number,
-): DataPoint[] {
+function generateLinearData(count: number, startValue: number, slope: number): DataPoint[] {
   return Array.from({ length: count }, (_, i) => ({
     x: i,
     y: startValue + slope * i,
@@ -258,14 +250,7 @@ describe('analyzeTrend', () => {
     const config = buildTrendConfig({ min_slope_threshold: 0.1 });
     const thresholds: MetricThresholds = { error_rate_percent: 5.0 };
 
-    const result = analyzeTrend(
-      'error_rate',
-      '7d',
-      simpleData,
-      baseline,
-      config,
-      thresholds,
-    );
+    const result = analyzeTrend('error_rate', '7d', simpleData, baseline, config, thresholds);
 
     expect(result.detected).toBe(true);
     // hoursToBreach = (5 - 3) / 0.1 = 20 hours
@@ -346,12 +331,7 @@ describe('analyzeMetricTrends', () => {
 
     const baseline = buildMetricBaseline({ mean_7d: 5.0 });
 
-    const results = analyzeMetricTrends(
-      'error_rate',
-      windowDataMap,
-      baseline,
-      config,
-    );
+    const results = analyzeMetricTrends('error_rate', windowDataMap, baseline, config);
 
     expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) {
@@ -422,10 +402,7 @@ describe('analyzeAllTrends', () => {
     const results = analyzeAllTrends(metricsData, baselines, config);
 
     expect(results).toHaveLength(2);
-    expect(results.map((r) => r.metric).sort()).toEqual([
-      'error_rate',
-      'latency_p95_ms',
-    ]);
+    expect(results.map((r) => r.metric).sort()).toEqual(['error_rate', 'latency_p95_ms']);
   });
 
   it('skips metrics with no baseline', () => {

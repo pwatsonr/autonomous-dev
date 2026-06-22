@@ -16,14 +16,11 @@ export const SPEC_RUBRIC: Rubric = {
       id: 'acceptance_criteria_precision',
       name: 'Acceptance Criteria Precision',
       weight: 25,
-      description:
-        'Acceptance criteria are precise, unambiguous, and directly testable.',
+      description: 'Acceptance criteria are precise, unambiguous, and directly testable.',
       min_threshold: 70,
       calibration: {
-        score_0:
-          'No acceptance criteria defined, or criteria are subjective and untestable.',
-        score_50:
-          'Acceptance criteria exist but some are vague or lack measurable thresholds.',
+        score_0: 'No acceptance criteria defined, or criteria are subjective and untestable.',
+        score_50: 'Acceptance criteria exist but some are vague or lack measurable thresholds.',
         score_100:
           'Every acceptance criterion is precise, quantified, and directly translatable into automated tests.',
       },
@@ -32,12 +29,10 @@ export const SPEC_RUBRIC: Rubric = {
       id: 'file_path_accuracy',
       name: 'File Path Accuracy',
       weight: 15,
-      description:
-        'File paths referenced in the spec are accurate and follow project conventions.',
+      description: 'File paths referenced in the spec are accurate and follow project conventions.',
       min_threshold: 60,
       calibration: {
-        score_0:
-          'No file paths specified, or paths are incorrect or use non-existent directories.',
+        score_0: 'No file paths specified, or paths are incorrect or use non-existent directories.',
         score_50:
           'File paths are mostly correct but some reference wrong locations or violate naming conventions.',
         score_100:
@@ -52,8 +47,7 @@ export const SPEC_RUBRIC: Rubric = {
         'Test cases cover happy paths, edge cases, error paths, and boundary conditions.',
       min_threshold: 60,
       calibration: {
-        score_0:
-          'No test cases defined.',
+        score_0: 'No test cases defined.',
         score_50:
           'Happy path tests exist but edge cases, error paths, and boundary conditions are missing.',
         score_100:
@@ -68,8 +62,7 @@ export const SPEC_RUBRIC: Rubric = {
         'Code patterns and implementation approaches are clearly described with examples.',
       min_threshold: 50,
       calibration: {
-        score_0:
-          'No guidance on code patterns or implementation approach.',
+        score_0: 'No guidance on code patterns or implementation approach.',
         score_50:
           'Patterns mentioned at a high level but lack concrete examples or implementation detail.',
         score_100:
@@ -80,14 +73,11 @@ export const SPEC_RUBRIC: Rubric = {
       id: 'plan_alignment',
       name: 'Plan Alignment',
       weight: 15,
-      description:
-        'Spec items trace directly to plan tasks with no gaps or orphans.',
+      description: 'Spec items trace directly to plan tasks with no gaps or orphans.',
       min_threshold: 70,
       calibration: {
-        score_0:
-          'No reference to the implementation plan; spec appears disconnected.',
-        score_50:
-          'Spec references the plan but some tasks are missing or mapping is incomplete.',
+        score_0: 'No reference to the implementation plan; spec appears disconnected.',
+        score_50: 'Spec references the plan but some tasks are missing or mapping is incomplete.',
         score_100:
           'Every spec item maps to a plan task with bidirectional traceability and no orphaned items.',
       },
@@ -100,8 +90,7 @@ export const SPEC_RUBRIC: Rubric = {
         'All dependencies (libraries, APIs, services) are identified with version constraints.',
       min_threshold: 50,
       calibration: {
-        score_0:
-          'No dependencies listed or external requirements undocumented.',
+        score_0: 'No dependencies listed or external requirements undocumented.',
         score_50:
           'Major dependencies listed but version constraints or transitive dependencies are missing.',
         score_100:

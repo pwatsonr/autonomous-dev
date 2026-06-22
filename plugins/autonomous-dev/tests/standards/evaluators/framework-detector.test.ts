@@ -97,11 +97,7 @@ describe('framework-detector', () => {
     try {
       writeFileSync(
         join(ws.root, 'pyproject.toml'),
-        [
-          '[project]',
-          'name = "demo"',
-          'dependencies = ["fastapi>=0.100", "uvicorn"]',
-        ].join('\n'),
+        ['[project]', 'name = "demo"', 'dependencies = ["fastapi>=0.100", "uvicorn"]'].join('\n'),
       );
       const r = await frameworkDetector([], { framework_match: 'fastapi' }, ctx(ws.root));
       expect(r.passed).toBe(true);
@@ -115,11 +111,7 @@ describe('framework-detector', () => {
     try {
       writeFileSync(
         join(ws.root, 'pyproject.toml'),
-        [
-          '[tool.poetry.dependencies]',
-          'python = "^3.11"',
-          'fastapi = "^0.100"',
-        ].join('\n'),
+        ['[tool.poetry.dependencies]', 'python = "^3.11"', 'fastapi = "^0.100"'].join('\n'),
       );
       const r = await frameworkDetector([], { framework_match: 'fastapi' }, ctx(ws.root));
       expect(r.passed).toBe(true);
@@ -133,13 +125,7 @@ describe('framework-detector', () => {
     try {
       writeFileSync(
         join(ws.root, 'pyproject.toml'),
-        [
-          '[project]',
-          'dependencies = [',
-          '  "fastapi>=0.100",',
-          '  "uvicorn",',
-          ']',
-        ].join('\n'),
+        ['[project]', 'dependencies = [', '  "fastapi>=0.100",', '  "uvicorn",', ']'].join('\n'),
       );
       const r = await frameworkDetector([], { framework_match: 'fastapi' }, ctx(ws.root));
       expect(r.passed).toBe(true);

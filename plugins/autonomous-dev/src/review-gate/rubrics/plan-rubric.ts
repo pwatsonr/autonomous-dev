@@ -32,12 +32,10 @@ export const PLAN_RUBRIC: Rubric = {
       id: 'dependency_accuracy',
       name: 'Dependency Accuracy',
       weight: 20,
-      description:
-        'Task dependencies and ordering are explicit, correct, and free of cycles.',
+      description: 'Task dependencies and ordering are explicit, correct, and free of cycles.',
       min_threshold: 70,
       calibration: {
-        score_0:
-          'No dependencies documented, or dependencies are circular or contradictory.',
+        score_0: 'No dependencies documented, or dependencies are circular or contradictory.',
         score_50:
           'Some dependencies listed but implicit dependencies are missed or ordering has gaps.',
         score_100:
@@ -48,12 +46,10 @@ export const PLAN_RUBRIC: Rubric = {
       id: 'test_strategy_coverage',
       name: 'Test Strategy Coverage',
       weight: 15,
-      description:
-        'Testing approach covers all layers and is mapped to implementation tasks.',
+      description: 'Testing approach covers all layers and is mapped to implementation tasks.',
       min_threshold: 60,
       calibration: {
-        score_0:
-          'No testing strategy defined or testing is an afterthought.',
+        score_0: 'No testing strategy defined or testing is an afterthought.',
         score_50:
           'Basic test plan exists but lacks mapping to tasks or misses layers (unit, integration, e2e).',
         score_100:
@@ -64,14 +60,11 @@ export const PLAN_RUBRIC: Rubric = {
       id: 'effort_estimation',
       name: 'Effort Estimation',
       weight: 15,
-      description:
-        'Effort estimates are realistic and account for complexity and unknowns.',
+      description: 'Effort estimates are realistic and account for complexity and unknowns.',
       min_threshold: 50,
       calibration: {
-        score_0:
-          'No estimates provided, or estimates are wildly unrealistic.',
-        score_50:
-          'Estimates are present but may be overly optimistic or lack complexity factors.',
+        score_0: 'No estimates provided, or estimates are wildly unrealistic.',
+        score_50: 'Estimates are present but may be overly optimistic or lack complexity factors.',
         score_100:
           'Data-backed estimates with complexity factors, contingency buffers, and historical comparison.',
       },
@@ -80,12 +73,10 @@ export const PLAN_RUBRIC: Rubric = {
       id: 'tdd_alignment',
       name: 'TDD Alignment',
       weight: 15,
-      description:
-        'All TDD components are represented as tasks with explicit traceability.',
+      description: 'All TDD components are represented as tasks with explicit traceability.',
       min_threshold: 70,
       calibration: {
-        score_0:
-          'No reference to the TDD; plan appears disconnected from technical design.',
+        score_0: 'No reference to the TDD; plan appears disconnected from technical design.',
         score_50:
           'Plan mentions the TDD but lacks explicit mapping between tasks and design components.',
         score_100:
@@ -100,10 +91,8 @@ export const PLAN_RUBRIC: Rubric = {
         'Implementation risks are identified with contingency plans and escalation paths.',
       min_threshold: 50,
       calibration: {
-        score_0:
-          'No implementation risks identified.',
-        score_50:
-          'Some risks noted but contingency plans are missing or vague.',
+        score_0: 'No implementation risks identified.',
+        score_50: 'Some risks noted but contingency plans are missing or vague.',
         score_100:
           'Comprehensive risk register with prioritized contingencies, escalation paths, and risk-adjusted estimates.',
       },

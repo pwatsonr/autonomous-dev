@@ -233,8 +233,7 @@ export function parseFrontmatter(content: string): ParseResult {
 
   // Extract body: everything after closing delimiter line
   const closingLineEnd = content.indexOf('\n', closingDelimStart);
-  const body =
-    closingLineEnd === -1 ? '' : content.substring(closingLineEnd + 1);
+  const body = closingLineEnd === -1 ? '' : content.substring(closingLineEnd + 1);
 
   return {
     frontmatter: frontmatter as Partial<DocumentFrontmatter>,
@@ -251,9 +250,7 @@ export function parseFrontmatter(content: string): ParseResult {
  * @param frontmatter The frontmatter object to serialize
  * @returns String with --- delimiters and YAML content
  */
-export function serializeFrontmatter(
-  frontmatter: Partial<DocumentFrontmatter>,
-): string {
+export function serializeFrontmatter(frontmatter: Partial<DocumentFrontmatter>): string {
   const lines: string[] = ['---'];
 
   for (const [key, value] of Object.entries(frontmatter)) {

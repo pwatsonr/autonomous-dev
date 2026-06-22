@@ -59,7 +59,7 @@ export interface OscillationData {
 export function severityRange(subScore: number): string {
   if (subScore >= 1.0) return 'Critical';
   if (subScore >= 0.75) return 'High';
-  if (subScore >= 0.50) return 'Medium';
+  if (subScore >= 0.5) return 'Medium';
   if (subScore >= 0.25) return 'Low';
   return 'None';
 }
@@ -89,9 +89,7 @@ export function buildSeverityRationaleTable(severity: SeverityResult): string {
  * Formats a Prometheus query_name into a human-readable metric name.
  */
 export function formatMetricName(queryName: string): string {
-  return queryName
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return queryName.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
@@ -115,18 +113,13 @@ export function formatMetricValue(metric: PrometheusResult): string {
 /**
  * Builds the metrics evidence table showing current values against baselines.
  */
-export function buildMetricsTable(
-  metrics: PrometheusResult[],
-  baseline: BaselineMetrics,
-): string {
+export function buildMetricsTable(metrics: PrometheusResult[], baseline: BaselineMetrics): string {
   let table = '| Metric | Current | Baseline (7d) | Threshold |\n';
   table += '|--------|---------|---------------|----------|\n';
   for (const m of metrics) {
     if (m.value === null) continue;
     const bl = baseline.metrics[m.query_name];
-    const baselineStr = bl
-      ? `${bl.mean_7d.toFixed(2)} +/- ${bl.stddev_7d.toFixed(2)}`
-      : 'N/A';
+    const baselineStr = bl ? `${bl.mean_7d.toFixed(2)} +/- ${bl.stddev_7d.toFixed(2)}` : 'N/A';
     table += `| ${formatMetricName(m.query_name)} | ${formatMetricValue(m)} | ${baselineStr} | N/A |\n`;
   }
   return table;
@@ -179,13 +172,9 @@ export function buildAlertSection(alerts: GrafanaAlertResult): string {
 export function buildOscillationWarning(data?: OscillationData): string {
   const sections: string[] = [];
   sections.push(`## Oscillation Warning\n`);
-  sections.push(
-    `> **Warning: This observation has been oscillating between states.**\n`,
-  );
+  sections.push(`> **Warning: This observation has been oscillating between states.**\n`);
   if (data) {
-    sections.push(
-      `\nFlap count: ${data.flap_count} in the last ${data.window_minutes} minutes.\n`,
-    );
+    sections.push(`\nFlap count: ${data.flap_count} in the last ${data.window_minutes} minutes.\n`);
     if (data.transitions.length > 0) {
       sections.push(`Transitions: ${data.transitions.join(' -> ')}\n`);
     }

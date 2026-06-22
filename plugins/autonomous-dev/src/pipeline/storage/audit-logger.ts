@@ -110,11 +110,17 @@ export class AuditLogger {
   private async getLastHash(logPath: string): Promise<string> {
     try {
       const content = await fs.readFile(logPath, 'utf-8');
-      const lines = content.trim().split('\n').filter(l => l.length > 0);
+      const lines = content
+        .trim()
+        .split('\n')
+        .filter((l) => l.length > 0);
       if (lines.length === 0) {
         return crypto.createHash('sha256').update('').digest('hex');
       }
-      return crypto.createHash('sha256').update(lines[lines.length - 1]).digest('hex');
+      return crypto
+        .createHash('sha256')
+        .update(lines[lines.length - 1])
+        .digest('hex');
     } catch {
       return crypto.createHash('sha256').update('').digest('hex');
     }
@@ -127,7 +133,9 @@ export class AuditIntegrityError extends Error {
     public readonly expectedHash: string,
     public readonly actualHash: string,
   ) {
-    super(`Audit log integrity violation at line ${lineIndex}: expected ${expectedHash}, got ${actualHash}`);
+    super(
+      `Audit log integrity violation at line ${lineIndex}: expected ${expectedHash}, got ${actualHash}`,
+    );
     this.name = 'AuditIntegrityError';
   }
 }

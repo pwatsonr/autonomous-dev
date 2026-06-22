@@ -10,12 +10,7 @@
  */
 
 import { createHash } from 'crypto';
-import {
-  HashChainComputer,
-  GENESIS_HASH,
-  canonicalize,
-  deepSortKeys,
-} from '../hash-chain';
+import { HashChainComputer, GENESIS_HASH, canonicalize, deepSortKeys } from '../hash-chain';
 import type { AuditEvent } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -160,10 +155,7 @@ describe('deepSortKeys', () => {
     }) as Record<string, unknown>;
 
     expect(Object.keys(result)).toEqual(['a', 'z']);
-    expect(Object.keys(result.z as Record<string, unknown>)).toEqual([
-      'a',
-      'c',
-    ]);
+    expect(Object.keys(result.z as Record<string, unknown>)).toEqual(['a', 'c']);
   });
 
   test('arrays preserve order but sort contained objects', () => {

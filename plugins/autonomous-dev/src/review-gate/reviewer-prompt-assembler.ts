@@ -16,12 +16,7 @@ const CHARS_PER_TOKEN = 4;
 const MAX_CHARS = MAX_TOKENS * CHARS_PER_TOKEN;
 
 /** Optional parent sections that are trimmed first in progressive trimming. */
-const OPTIONAL_PARENT_SECTIONS = [
-  'open_questions',
-  'appendices',
-  'changelog',
-  'references',
-];
+const OPTIONAL_PARENT_SECTIONS = ['open_questions', 'appendices', 'changelog', 'references'];
 
 /** Maximum characters per section after phase 2 trimming (500 tokens * 4 chars). */
 const PHASE_2_SECTION_LIMIT = 500 * CHARS_PER_TOKEN;
@@ -174,22 +169,16 @@ export class ReviewerPromptAssembler {
 
           if (phase2Layer3.length <= remainingBudget) {
             layer3 = phase2Layer3;
-            trimmingDetails.push(
-              `Phase 2: Trimmed remaining parent sections to 500 tokens each`,
-            );
+            trimmingDetails.push(`Phase 2: Trimmed remaining parent sections to 500 tokens each`);
           } else {
-            trimmingDetails.push(
-              `Phase 2: Trimmed remaining parent sections to 500 tokens each`,
-            );
+            trimmingDetails.push(`Phase 2: Trimmed remaining parent sections to 500 tokens each`);
 
             // Phase 3: Only include traces_from sections
             const phase3Content = this.trimPhase3(parentDocument, tracesFrom);
             const phase3Layer3 = this.buildLayer3FromContent(phase3Content, tracesFrom);
 
             layer3 = phase3Layer3;
-            trimmingDetails.push(
-              `Phase 3: Included only traced sections (max 1,000 chars each)`,
-            );
+            trimmingDetails.push(`Phase 3: Included only traced sections (max 1,000 chars each)`);
           }
         }
       }
@@ -197,9 +186,10 @@ export class ReviewerPromptAssembler {
 
     // Assemble final prompts
     const systemPrompt = layer1;
-    const userPrompt = parentDocument !== null
-      ? layer2 + '\n\n' + layer3 + '\n\n' + layer4
-      : layer2 + '\n\n' + layer4;
+    const userPrompt =
+      parentDocument !== null
+        ? layer2 + '\n\n' + layer3 + '\n\n' + layer4
+        : layer2 + '\n\n' + layer4;
 
     const totalChars = systemPrompt.length + userPrompt.length;
     const estimatedTokens = Math.ceil(totalChars / CHARS_PER_TOKEN);
@@ -323,10 +313,7 @@ ${REVIEW_OUTPUT_FORMAT_SPECIFICATION}`;
 
     for (const sectionName of OPTIONAL_PARENT_SECTIONS) {
       // Match markdown headers for optional sections (case-insensitive)
-      const pattern = new RegExp(
-        `^(#{1,3})\\s*${this.escapeRegex(sectionName)}\\s*$`,
-        'gim',
-      );
+      const pattern = new RegExp(`^(#{1,3})\\s*${this.escapeRegex(sectionName)}\\s*$`, 'gim');
 
       let match: RegExpExecArray | null;
       pattern.lastIndex = 0;
@@ -452,9 +439,7 @@ ${REVIEW_OUTPUT_FORMAT_SPECIFICATION}`;
     }
 
     // Filter to only traced sections and trim each to 1,000 chars
-    const tracedSections = sections.filter((section) =>
-      tracedSectionIds.has(section.sectionId),
-    );
+    const tracedSections = sections.filter((section) => tracedSectionIds.has(section.sectionId));
 
     if (tracedSections.length === 0) {
       // Fallback: include first 1,000 chars of whole document

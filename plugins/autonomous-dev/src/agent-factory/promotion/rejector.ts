@@ -66,10 +66,7 @@ function logRejectorEvent(eventType: string, details: Record<string, unknown>): 
 // ---------------------------------------------------------------------------
 
 /** Agent states from which rejection is allowed. */
-const REJECTABLE_STATES: ReadonlySet<AgentState> = new Set([
-  'UNDER_REVIEW',
-  'VALIDATING',
-]);
+const REJECTABLE_STATES: ReadonlySet<AgentState> = new Set(['UNDER_REVIEW', 'VALIDATING']);
 
 // ---------------------------------------------------------------------------
 // Rejector

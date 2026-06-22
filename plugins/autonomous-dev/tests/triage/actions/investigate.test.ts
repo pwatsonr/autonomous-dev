@@ -64,9 +64,13 @@ function createMockAuditLog(): TriageAuditLogger & { entries: TriageAuditEntry[]
   const entries: TriageAuditEntry[] = [];
   return {
     entries,
-    log(entry: TriageAuditEntry) { entries.push(entry); },
+    log(entry: TriageAuditEntry) {
+      entries.push(entry);
+    },
     logError() {},
-    getEntries() { return entries; },
+    getEntries() {
+      return entries;
+    },
     async flush() {},
   };
 }
@@ -173,11 +177,7 @@ describe('executeInvestigate', () => {
 
   it('handles observation without error_class', async () => {
     const filePath = path.join(tmpDir, 'obs-no-class.md');
-    await fsp.writeFile(
-      filePath,
-      buildObservationContent({ error_class: null }),
-      'utf-8',
-    );
+    await fsp.writeFile(filePath, buildObservationContent({ error_class: null }), 'utf-8');
 
     const investigationsDir = path.join(tmpDir, 'investigations');
     const writeRequest = createInvestigationRequestWriter(investigationsDir);

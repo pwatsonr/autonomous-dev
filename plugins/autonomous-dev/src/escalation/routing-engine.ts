@@ -16,12 +16,7 @@
  * Based on SPEC-009-2-3 (TDD-009 Sections 3.2, 3.3).
  */
 
-import type {
-  EscalationConfig,
-  EscalationType,
-  ResolvedRoute,
-  TimeoutBehavior,
-} from "./types";
+import type { EscalationConfig, EscalationType, ResolvedRoute, TimeoutBehavior } from './types';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -31,7 +26,7 @@ import type {
 const DEFAULT_TIMEOUT_MINUTES = 60;
 
 /** Default timeout behavior when no advanced config overrides it. */
-const DEFAULT_TIMEOUT_BEHAVIOR: TimeoutBehavior = "pause";
+const DEFAULT_TIMEOUT_BEHAVIOR: TimeoutBehavior = 'pause';
 
 // ---------------------------------------------------------------------------
 // RoutingEngine
@@ -57,9 +52,7 @@ export class RoutingEngine {
     private readonly config: EscalationConfig,
     knownTargetIds?: string[],
   ) {
-    this.knownTargetIds = knownTargetIds
-      ? new Set(knownTargetIds)
-      : null;
+    this.knownTargetIds = knownTargetIds ? new Set(knownTargetIds) : null;
   }
 
   /**
@@ -78,7 +71,7 @@ export class RoutingEngine {
   resolveRouting(escalationType: EscalationType): ResolvedRoute {
     let route: ResolvedRoute;
 
-    if (this.config.routing.mode === "default") {
+    if (this.config.routing.mode === 'default') {
       route = this.resolveDefault();
     } else {
       route = this.resolveAdvanced(escalationType);
@@ -97,8 +90,8 @@ export class RoutingEngine {
     }
 
     // Step 4: Security invariant -- always force pause
-    if (escalationType === "security") {
-      if (route.timeoutBehavior !== "pause") {
+    if (escalationType === 'security') {
+      if (route.timeoutBehavior !== 'pause') {
         console.warn(
           `[RoutingEngine] Security escalation timeout behavior forced to "pause" ` +
             `(was "${route.timeoutBehavior}").`,
@@ -106,7 +99,7 @@ export class RoutingEngine {
       }
       route = {
         ...route,
-        timeoutBehavior: "pause",
+        timeoutBehavior: 'pause',
       };
     }
 

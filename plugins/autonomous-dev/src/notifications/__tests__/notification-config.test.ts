@@ -89,9 +89,7 @@ describe('loadNotificationConfig', () => {
     });
 
     expect(config.default_method).toBe('cli');
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('default_method'),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('default_method'));
 
     warnSpy.mockRestore();
   });

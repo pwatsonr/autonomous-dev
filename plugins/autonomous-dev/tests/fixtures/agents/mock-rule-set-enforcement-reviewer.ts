@@ -29,9 +29,7 @@ export interface MockReviewerOutput {
 /** The exact SQL fragment the integration test plants in the diff. */
 const SQL_INJECTION_MARKER = `SELECT * FROM users WHERE id = '`;
 
-export default async function mockReviewer(
-  input: MockReviewerInput,
-): Promise<MockReviewerOutput> {
+export default async function mockReviewer(input: MockReviewerInput): Promise<MockReviewerOutput> {
   const findings: MockSecurityFinding[] = input.diff.includes(SQL_INJECTION_MARKER)
     ? [
         {

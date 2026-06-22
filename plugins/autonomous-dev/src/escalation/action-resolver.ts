@@ -23,8 +23,8 @@
  * event. It is used when the human explicitly overrides a system recommendation.
  */
 
-import type { EscalationResponse, ResolvedAction } from "./response-types";
-import type { StoredEscalation } from "./response-validator";
+import type { EscalationResponse, ResolvedAction } from './response-types';
+import type { StoredEscalation } from './response-validator';
 
 // ---------------------------------------------------------------------------
 // ActionResolver
@@ -49,19 +49,19 @@ export class ActionResolver {
    */
   resolve(response: EscalationResponse, escalation: StoredEscalation): ResolvedAction {
     switch (response.response_type) {
-      case "option":
+      case 'option':
         return this.resolveOptionResponse(response, escalation);
 
-      case "freetext":
+      case 'freetext':
         return {
-          action: "retry_with_changes",
-          guidance: response.freetext ?? "",
+          action: 'retry_with_changes',
+          guidance: response.freetext ?? '',
         };
 
-      case "delegate":
+      case 'delegate':
         return {
-          action: "delegate",
-          target: response.delegate_target ?? "",
+          action: 'delegate',
+          target: response.delegate_target ?? '',
         };
 
       default: {
@@ -84,9 +84,7 @@ export class ActionResolver {
     response: EscalationResponse,
     escalation: StoredEscalation,
   ): ResolvedAction {
-    const option = escalation.options.find(
-      (opt) => opt.option_id === response.option_id,
-    );
+    const option = escalation.options.find((opt) => opt.option_id === response.option_id);
 
     if (!option) {
       throw new Error(
@@ -96,30 +94,30 @@ export class ActionResolver {
     }
 
     switch (option.action) {
-      case "approve":
-        return { action: "approve" };
+      case 'approve':
+        return { action: 'approve' };
 
-      case "retry":
-      case "retry_with_changes":
+      case 'retry':
+      case 'retry_with_changes':
         return {
-          action: "retry_with_changes",
-          guidance: option.description ?? "",
+          action: 'retry_with_changes',
+          guidance: option.description ?? '',
         };
 
-      case "cancel":
-      case "reject":
-        return { action: "cancel" };
+      case 'cancel':
+      case 'reject':
+        return { action: 'cancel' };
 
-      case "override":
+      case 'override':
         return {
-          action: "override_proceed",
-          justification: option.description ?? "No justification provided",
+          action: 'override_proceed',
+          justification: option.description ?? 'No justification provided',
         };
 
-      case "approve_with_conditions":
+      case 'approve_with_conditions':
         return {
-          action: "retry_with_changes",
-          guidance: option.description ?? "",
+          action: 'retry_with_changes',
+          guidance: option.description ?? '',
         };
 
       default:
@@ -127,8 +125,8 @@ export class ActionResolver {
         // from description. This provides a sensible fallback for future
         // option actions without breaking existing behavior.
         return {
-          action: "retry_with_changes",
-          guidance: option.description ?? "",
+          action: 'retry_with_changes',
+          guidance: option.description ?? '',
         };
     }
   }

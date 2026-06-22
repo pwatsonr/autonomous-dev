@@ -14,9 +14,7 @@ import { buildManifest } from '../helpers/chain-fixtures';
 import type { HookManifest } from '../../intake/hooks/types';
 
 /** Build a graph from a list of (producer, consumer, type) tuples. */
-function buildFromEdges(
-  pairs: Array<[string, string, string]>,
-): DependencyGraph {
+function buildFromEdges(pairs: Array<[string, string, string]>): DependencyGraph {
   const g = new DependencyGraph();
   // For each unique node, build a manifest that produces every type it
   // appears as `from` for and consumes every type it appears as `to` for.
@@ -207,9 +205,7 @@ describe('cycle detection performance', () => {
     const g = new DependencyGraph();
     for (let i = 0; i < 100; i++) {
       const id = `p${String(i).padStart(3, '0')}`;
-      const produces = [
-        { artifact_type: `t${i}`, schema_version: '1.0', format: 'json' as const },
-      ];
+      const produces = [{ artifact_type: `t${i}`, schema_version: '1.0', format: 'json' as const }];
       const consumes = i > 0 ? [{ artifact_type: `t${i - 1}`, schema_version: '^1.0' }] : undefined;
       g.addPlugin(buildManifest({ id, produces, consumes }));
     }
@@ -230,17 +226,16 @@ describe('cycle detection performance', () => {
     const g = new DependencyGraph();
     for (let i = 0; i < 100; i++) {
       const id = `p${String(i).padStart(3, '0')}`;
-      const produces = [
-        { artifact_type: `t${i}`, schema_version: '1.0', format: 'json' as const },
-      ];
+      const produces = [{ artifact_type: `t${i}`, schema_version: '1.0', format: 'json' as const }];
       const consumes = i > 0 ? [{ artifact_type: `t${i - 1}`, schema_version: '^1.0' }] : undefined;
       g.addPlugin(buildManifest({ id, produces, consumes }));
     }
     // Inject a cycle by giving the LAST node a consume of t0 AND giving p000
     // a consume of t99 — wait, simpler: inject raw back-edge via test hatch.
-    (
-      g as unknown as { _addRawEdgeForTest: (a: string, b: string) => void }
-    )._addRawEdgeForTest('p099', 'p000');
+    (g as unknown as { _addRawEdgeForTest: (a: string, b: string) => void })._addRawEdgeForTest(
+      'p099',
+      'p000',
+    );
     const samples: number[] = [];
     let cyclesFound = 0;
     for (let i = 0; i < 5; i++) {
@@ -259,9 +254,10 @@ describe('cycle detection performance', () => {
     const g = new DependencyGraph();
     // Use raw-edge injection (faster than building 5000 manifests).
     for (let i = 0; i < 4999; i++) {
-      (
-        g as unknown as { _addRawEdgeForTest: (a: string, b: string) => void }
-      )._addRawEdgeForTest(`n${i}`, `n${i + 1}`);
+      (g as unknown as { _addRawEdgeForTest: (a: string, b: string) => void })._addRawEdgeForTest(
+        `n${i}`,
+        `n${i + 1}`,
+      );
     }
     expect(() => g.detectCycles()).not.toThrow();
   });

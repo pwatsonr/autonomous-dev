@@ -68,7 +68,10 @@ CREATE INDEX IF NOT EXISTS idx_proposals_created ON proposals(created_at);
  * have no outgoing transitions.
  */
 const VALID_TRANSITIONS: ReadonlyMap<ProposalStatus, ReadonlySet<ProposalStatus>> = new Map([
-  ['pending_meta_review', new Set<ProposalStatus>(['meta_approved', 'meta_rejected', 'pending_human_review'])],
+  [
+    'pending_meta_review',
+    new Set<ProposalStatus>(['meta_approved', 'meta_rejected', 'pending_human_review']),
+  ],
   // meta_approved → validating (normal path) OR → promoted (#539: the
   // self-review-bypass path the Promoter accepts, where meta-approval alone
   // authorizes promotion without the separate validation gate).
@@ -108,11 +111,7 @@ export class ProposalStore {
    * @param sqliteDbPath Path to the SQLite database file (shared with metrics).
    * @param logger      Optional logger for non-fatal warnings.
    */
-  constructor(
-    jsonlPath: string,
-    sqliteDbPath: string,
-    logger?: ProposalStoreLogger,
-  ) {
+  constructor(jsonlPath: string, sqliteDbPath: string, logger?: ProposalStoreLogger) {
     this.jsonlPath = path.resolve(jsonlPath);
     this.logger = logger ?? defaultLogger;
 
@@ -151,7 +150,9 @@ export class ProposalStore {
     // SQLite: insert metadata
     if (this.db) {
       try {
-        this.db.prepare(`
+        this.db
+          .prepare(
+            `
           INSERT INTO proposals (
             proposal_id, agent_name, current_version, proposed_version,
             version_bump, weakness_report_id, status, created_at,
@@ -161,20 +162,22 @@ export class ProposalStore {
             @version_bump, @weakness_report_id, @status, @created_at,
             @meta_review_id, @evaluation_id, @rationale, @diff
           )
-        `).run({
-          proposal_id: proposal.proposal_id,
-          agent_name: proposal.agent_name,
-          current_version: proposal.current_version,
-          proposed_version: proposal.proposed_version,
-          version_bump: proposal.version_bump,
-          weakness_report_id: proposal.weakness_report_id,
-          status: proposal.status,
-          created_at: proposal.created_at,
-          meta_review_id: proposal.meta_review_id ?? null,
-          evaluation_id: proposal.evaluation_id ?? null,
-          rationale: proposal.rationale,
-          diff: proposal.diff,
-        });
+        `,
+          )
+          .run({
+            proposal_id: proposal.proposal_id,
+            agent_name: proposal.agent_name,
+            current_version: proposal.current_version,
+            proposed_version: proposal.proposed_version,
+            version_bump: proposal.version_bump,
+            weakness_report_id: proposal.weakness_report_id,
+            status: proposal.status,
+            created_at: proposal.created_at,
+            meta_review_id: proposal.meta_review_id ?? null,
+            evaluation_id: proposal.evaluation_id ?? null,
+            rationale: proposal.rationale,
+            diff: proposal.diff,
+          });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(`Failed to insert proposal into SQLite: ${message}`);
@@ -278,9 +281,9 @@ export class ProposalStore {
     // Update SQLite
     if (this.db) {
       try {
-        this.db.prepare(
-          'UPDATE proposals SET status = ? WHERE proposal_id = ?',
-        ).run(newStatus, proposalId);
+        this.db
+          .prepare('UPDATE proposals SET status = ? WHERE proposal_id = ?')
+          .run(newStatus, proposalId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(`Failed to update proposal status in SQLite: ${message}`);
@@ -307,9 +310,9 @@ export class ProposalStore {
     // Update SQLite
     if (this.db) {
       try {
-        this.db.prepare(
-          'UPDATE proposals SET meta_review_id = ? WHERE proposal_id = ?',
-        ).run(reviewId, proposalId);
+        this.db
+          .prepare('UPDATE proposals SET meta_review_id = ? WHERE proposal_id = ?')
+          .run(reviewId, proposalId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(`Failed to update meta_review_id in SQLite: ${message}`);
@@ -336,9 +339,9 @@ export class ProposalStore {
     // Update SQLite
     if (this.db) {
       try {
-        this.db.prepare(
-          'UPDATE proposals SET evaluation_id = ? WHERE proposal_id = ?',
-        ).run(evaluationId, proposalId);
+        this.db
+          .prepare('UPDATE proposals SET evaluation_id = ? WHERE proposal_id = ?')
+          .run(evaluationId, proposalId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(`Failed to update evaluation_id in SQLite: ${message}`);

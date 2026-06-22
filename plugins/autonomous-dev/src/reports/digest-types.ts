@@ -13,11 +13,11 @@
 
 export interface DigestSummary {
   total_observations: number;
-  by_severity: Record<string, number>;       // { P0: 1, P1: 3, P2: 7, P3: 3 }
-  by_type: Record<string, number>;           // { error: 8, anomaly: 4, trend: 2 }
-  triage_decisions: Record<string, number>;  // { promote: 4, dismiss: 5, ... }
-  signal_to_noise_ratio: number | null;      // null if <5 observations
-  signal_to_noise_display: string;           // "(4+1) / 14 = 35.7%" or "N/A (<5 observations)"
+  by_severity: Record<string, number>; // { P0: 1, P1: 3, P2: 7, P3: 3 }
+  by_type: Record<string, number>; // { error: 8, anomaly: 4, trend: 2 }
+  triage_decisions: Record<string, number>; // { promote: 4, dismiss: 5, ... }
+  signal_to_noise_ratio: number | null; // null if <5 observations
+  signal_to_noise_display: string; // "(4+1) / 14 = 35.7%" or "N/A (<5 observations)"
   avg_triage_latency_p0p1_hours: number | null;
   avg_triage_latency_p2p3_hours: number | null;
   avg_tokens_per_run: number;
@@ -43,9 +43,9 @@ export interface EffectivenessEntry {
   observation_id: string;
   prd_id: string;
   deployed_date: string;
-  pre_fix_summary: string;    // "8.2% err"
-  post_fix_summary: string;   // "0.5% err"
-  result: string;             // "improved (93.9%)"
+  pre_fix_summary: string; // "8.2% err"
+  post_fix_summary: string; // "0.5% err"
+  result: string; // "improved (93.9%)"
 }
 
 // ---------------------------------------------------------------------------
@@ -53,10 +53,10 @@ export interface EffectivenessEntry {
 // ---------------------------------------------------------------------------
 
 export interface RecurringPattern {
-  pattern: string;            // Error class or description
+  pattern: string; // Error class or description
   service: string;
   occurrences_30d: number;
-  status: string;             // "OSCILLATING" or "Monitoring"
+  status: string; // "OSCILLATING" or "Monitoring"
 }
 
 // ---------------------------------------------------------------------------
@@ -75,12 +75,12 @@ export interface DigestResult {
 
 export interface ObservationForDigest {
   id: string;
-  timestamp: string;               // ISO 8601
+  timestamp: string; // ISO 8601
   service: string;
-  type: string;                    // "error" | "anomaly" | "trend" | "adoption"
-  severity: string;                // "P0" | "P1" | "P2" | "P3"
-  triage_decision: string | null;  // "promote" | "dismiss" | "defer" | "investigate" | null
-  triage_at: string | null;        // ISO 8601 or null
+  type: string; // "error" | "anomaly" | "trend" | "adoption"
+  severity: string; // "P0" | "P1" | "P2" | "P3"
+  triage_decision: string | null; // "promote" | "dismiss" | "defer" | "investigate" | null
+  triage_at: string | null; // ISO 8601 or null
   observation_run_id: string;
   tokens_consumed: number;
   linked_prd: string | null;
@@ -89,7 +89,7 @@ export interface ObservationForDigest {
   effectiveness_detail: string | null;
   oscillation_warning: boolean;
   cooldown_active: boolean;
-  error_class?: string;            // Extracted from body or frontmatter extensions
+  error_class?: string; // Extracted from body or frontmatter extensions
 }
 
 // ---------------------------------------------------------------------------

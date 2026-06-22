@@ -4,7 +4,11 @@ import * as path from 'path';
 import * as os from 'os';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
-import { writeVersion, normalizeForHash, WriteVersionRequest } from '../../../src/pipeline/storage/version-writer';
+import {
+  writeVersion,
+  normalizeForHash,
+  WriteVersionRequest,
+} from '../../../src/pipeline/storage/version-writer';
 
 describe('writeVersion', () => {
   let tmpDir: string;
@@ -71,7 +75,11 @@ describe('writeVersion', () => {
   });
 
   it('returns VersionRecord with all fields populated', async () => {
-    const request = makeRequest({ version: '2.3', reason: 'REVIEW_REVISION', authorAgent: 'reviewer-1' });
+    const request = makeRequest({
+      version: '2.3',
+      reason: 'REVIEW_REVISION',
+      authorAgent: 'reviewer-1',
+    });
     const result = await writeVersion(request, dm);
 
     expect(result.version).toBe('2.3');
@@ -117,7 +125,10 @@ describe('normalizeForHash', () => {
     const cr = 'line1\rline2\rline3\r';
 
     const hashLf = crypto.createHash('sha256').update(normalizeForHash(lf), 'utf-8').digest('hex');
-    const hashCrlf = crypto.createHash('sha256').update(normalizeForHash(crlf), 'utf-8').digest('hex');
+    const hashCrlf = crypto
+      .createHash('sha256')
+      .update(normalizeForHash(crlf), 'utf-8')
+      .digest('hex');
     const hashCr = crypto.createHash('sha256').update(normalizeForHash(cr), 'utf-8').digest('hex');
 
     expect(hashLf).toBe(hashCrlf);
@@ -128,8 +139,14 @@ describe('normalizeForHash', () => {
     const clean = 'hello\nworld\n';
     const trailing = 'hello   \nworld\t\t\n';
 
-    const hashClean = crypto.createHash('sha256').update(normalizeForHash(clean), 'utf-8').digest('hex');
-    const hashTrailing = crypto.createHash('sha256').update(normalizeForHash(trailing), 'utf-8').digest('hex');
+    const hashClean = crypto
+      .createHash('sha256')
+      .update(normalizeForHash(clean), 'utf-8')
+      .digest('hex');
+    const hashTrailing = crypto
+      .createHash('sha256')
+      .update(normalizeForHash(trailing), 'utf-8')
+      .digest('hex');
 
     expect(hashClean).toBe(hashTrailing);
   });

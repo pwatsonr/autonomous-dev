@@ -1,4 +1,9 @@
-import { validateAgent, validateAgentWithContext, VALIDATION_RULES, TOOL_ALLOWLIST } from '../../src/agent-factory/validator';
+import {
+  validateAgent,
+  validateAgentWithContext,
+  VALIDATION_RULES,
+  TOOL_ALLOWLIST,
+} from '../../src/agent-factory/validator';
 import { ParsedAgent, AgentRole, ValidationContext } from '../../src/agent-factory/types';
 
 /**
@@ -434,10 +439,10 @@ function test_rule_010_temperature_over_one_fail(): void {
 
 function test_validator_returns_all_errors(): void {
   const agent = validAgent({
-    version: 'bad',        // RULE_003
+    version: 'bad', // RULE_003
     role: 'author',
     tools: ['Read', 'Bash'], // RULE_005
-    turn_limit: 200,       // RULE_008
+    turn_limit: 200, // RULE_008
   });
   const result = validateAgent(agent);
 
@@ -491,7 +496,10 @@ function test_valid_agent_passes_all_rules(): void {
   const agent = validAgent();
   const result = validateAgent(agent);
 
-  assert(result.valid === true, `expected valid=true, got valid=${result.valid}; errors: ${JSON.stringify(result.errors)}`);
+  assert(
+    result.valid === true,
+    `expected valid=true, got valid=${result.valid}; errors: ${JSON.stringify(result.errors)}`,
+  );
   assert(result.errors.length === 0, `expected 0 errors, got ${result.errors.length}`);
   console.log('PASS: test_valid_agent_passes_all_rules');
 }
@@ -504,7 +512,10 @@ function test_each_error_has_required_fields(): void {
     assert(typeof err.rule === 'string' && err.rule.length > 0, `error must have rule id`);
     assert(typeof err.field === 'string' && err.field.length > 0, `error must have field name`);
     assert(typeof err.message === 'string' && err.message.length > 0, `error must have message`);
-    assert(err.severity === 'error' || err.severity === 'warning', `severity must be error or warning`);
+    assert(
+      err.severity === 'error' || err.severity === 'warning',
+      `severity must be error or warning`,
+    );
   }
   console.log('PASS: test_each_error_has_required_fields');
 }
@@ -534,12 +545,12 @@ function assertRuleError(
   }
 }
 
-function assertNoRuleError(
-  errors: { rule: string }[],
-  rulePrefix: string,
-): void {
+function assertNoRuleError(errors: { rule: string }[], rulePrefix: string): void {
   const match = errors.find((e) => e.rule.startsWith(rulePrefix));
-  assert(match === undefined, `expected no error starting with '${rulePrefix}', but found: ${JSON.stringify(match)}`);
+  assert(
+    match === undefined,
+    `expected no error starting with '${rulePrefix}', but found: ${JSON.stringify(match)}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -570,8 +581,14 @@ describe('validator', () => {
   it('test_rule_006_rubric_minimum_pass', test_rule_006_rubric_minimum_pass);
   it('test_rule_006_rubric_minimum_fail', test_rule_006_rubric_minimum_fail);
   it('test_rule_006_rubric_empty_fail', test_rule_006_rubric_empty_fail);
-  it('test_rule_007_version_history_consistency_pass', test_rule_007_version_history_consistency_pass);
-  it('test_rule_007_version_history_consistency_fail', test_rule_007_version_history_consistency_fail);
+  it(
+    'test_rule_007_version_history_consistency_pass',
+    test_rule_007_version_history_consistency_pass,
+  );
+  it(
+    'test_rule_007_version_history_consistency_fail',
+    test_rule_007_version_history_consistency_fail,
+  );
   it('test_rule_007_empty_version_history_no_error', test_rule_007_empty_version_history_no_error);
   it('test_rule_008_turn_limit_min_pass', test_rule_008_turn_limit_min_pass);
   it('test_rule_008_turn_limit_max_pass', test_rule_008_turn_limit_max_pass);

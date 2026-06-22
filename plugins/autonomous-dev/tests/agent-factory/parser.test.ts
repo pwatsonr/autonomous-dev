@@ -38,7 +38,8 @@ function validAgentMd(bodyOverride?: string): string {
     '---',
   ].join('\n');
 
-  const body = bodyOverride !== undefined ? bodyOverride : '# System Prompt\n\nYou are a code executor agent.';
+  const body =
+    bodyOverride !== undefined ? bodyOverride : '# System Prompt\n\nYou are a code executor agent.';
   return fm + '\n' + body;
 }
 
@@ -73,17 +74,26 @@ function test_parse_valid_agent_file(): void {
   // evaluation_rubric
   assert(a.evaluation_rubric.length === 2, `rubric length mismatch: ${a.evaluation_rubric.length}`);
   assert(a.evaluation_rubric[0].name === 'correctness', `rubric[0].name mismatch`);
-  assert(a.evaluation_rubric[0].weight === 0.6, `rubric[0].weight mismatch: ${a.evaluation_rubric[0].weight}`);
+  assert(
+    a.evaluation_rubric[0].weight === 0.6,
+    `rubric[0].weight mismatch: ${a.evaluation_rubric[0].weight}`,
+  );
   assert(a.evaluation_rubric[1].name === 'style', `rubric[1].name mismatch`);
 
   // version_history
-  assert(a.version_history.length === 2, `version_history length mismatch: ${a.version_history.length}`);
+  assert(
+    a.version_history.length === 2,
+    `version_history length mismatch: ${a.version_history.length}`,
+  );
   assert(a.version_history[0].version === '1.0.0', `history[0].version mismatch`);
   assert(a.version_history[1].version === '1.2.0', `history[1].version mismatch`);
   assert(a.version_history[1].change === 'Added Write tool access', `history[1].change mismatch`);
 
   // system_prompt = body
-  assert(a.system_prompt.startsWith('# System Prompt'), `system_prompt mismatch: ${a.system_prompt.substring(0, 30)}`);
+  assert(
+    a.system_prompt.startsWith('# System Prompt'),
+    `system_prompt mismatch: ${a.system_prompt.substring(0, 30)}`,
+  );
 
   console.log('PASS: test_parse_valid_agent_file');
 }
@@ -108,24 +118,19 @@ function test_parse_malformed_yaml(): void {
 
   assert(result.success === false, 'expected success=false');
   assert(result.errors.length > 0, 'expected at least one error');
-  assert(
-    result.errors[0].line !== undefined,
-    'error should include a line number',
-  );
+  assert(result.errors[0].line !== undefined, 'error should include a line number');
   console.log('PASS: test_parse_malformed_yaml');
 }
 
 function test_parse_empty_body(): void {
-  const content = [
-    '---',
-    'name: test-agent',
-    'version: 1.0.0',
-    '---',
-  ].join('\n');
+  const content = ['---', 'name: test-agent', 'version: 1.0.0', '---'].join('\n');
   const result = parseAgentString(content);
 
   assert(result.success === true, `expected success=true, got ${result.success}`);
-  assert(result.agent!.system_prompt === '', `system_prompt should be empty, got "${result.agent!.system_prompt}"`);
+  assert(
+    result.agent!.system_prompt === '',
+    `system_prompt should be empty, got "${result.agent!.system_prompt}"`,
+  );
   console.log('PASS: test_parse_empty_body');
 }
 
@@ -135,10 +140,7 @@ function test_parse_extra_delimiters_in_body(): void {
   const result = parseAgentString(content);
 
   assert(result.success === true, 'expected success=true');
-  assert(
-    result.agent!.system_prompt.includes('---'),
-    'body should contain --- as content',
-  );
+  assert(result.agent!.system_prompt.includes('---'), 'body should contain --- as content');
   assert(
     result.agent!.system_prompt.includes('Some content after horizontal rule'),
     'body should contain text after ---',
@@ -176,8 +178,14 @@ function test_parse_missing_optional_fields(): void {
   const result = parseAgentString(content);
 
   assert(result.success === true, 'expected success=true');
-  assert(result.agent!.risk_tier === undefined, `risk_tier should be undefined, got ${result.agent!.risk_tier}`);
-  assert(result.agent!.frozen === undefined, `frozen should be undefined, got ${result.agent!.frozen}`);
+  assert(
+    result.agent!.risk_tier === undefined,
+    `risk_tier should be undefined, got ${result.agent!.risk_tier}`,
+  );
+  assert(
+    result.agent!.frozen === undefined,
+    `frozen should be undefined, got ${result.agent!.frozen}`,
+  );
   console.log('PASS: test_parse_missing_optional_fields');
 }
 
@@ -212,10 +220,22 @@ function test_parse_type_coercion(): void {
 
   const result = parseAgentString(content);
   assert(result.success === true, 'expected success=true');
-  assert(typeof result.agent!.turn_limit === 'number', `turn_limit should be number, got ${typeof result.agent!.turn_limit}`);
-  assert(result.agent!.turn_limit === 50, `turn_limit should be 50, got ${result.agent!.turn_limit}`);
-  assert(typeof result.agent!.temperature === 'number', `temperature should be number, got ${typeof result.agent!.temperature}`);
-  assert(result.agent!.temperature === 0.7, `temperature should be 0.7, got ${result.agent!.temperature}`);
+  assert(
+    typeof result.agent!.turn_limit === 'number',
+    `turn_limit should be number, got ${typeof result.agent!.turn_limit}`,
+  );
+  assert(
+    result.agent!.turn_limit === 50,
+    `turn_limit should be 50, got ${result.agent!.turn_limit}`,
+  );
+  assert(
+    typeof result.agent!.temperature === 'number',
+    `temperature should be number, got ${typeof result.agent!.temperature}`,
+  );
+  assert(
+    result.agent!.temperature === 0.7,
+    `temperature should be 0.7, got ${result.agent!.temperature}`,
+  );
   console.log('PASS: test_parse_type_coercion');
 }
 

@@ -89,9 +89,7 @@ export function diffLines(base: string, modified: string): DiffChange[] {
     return [{ count: m }];
   }
 
-  const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array(n + 1).fill(0),
-  );
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
@@ -163,10 +161,7 @@ export class ConflictClassifier {
    * Extracts base (stage 1), ours (stage 2), theirs (stage 3) via
    * `git show :N:<file>`, then computes hunks and overlap analysis.
    */
-  async classifyConflict(
-    file: string,
-    _requestId: string,
-  ): Promise<ClassificationResult> {
+  async classifyConflict(file: string, _requestId: string): Promise<ClassificationResult> {
     // Extract the three stages from git's index
     const baseContent = await this.getStageContent(file, 1); // common ancestor
     const oursContent = await this.getStageContent(file, 2); // integration branch (ours)
@@ -245,10 +240,7 @@ export class ConflictClassifier {
    * Stage 2 = ours (integration branch)
    * Stage 3 = theirs (track branch)
    */
-  async getStageContent(
-    file: string,
-    stage: 1 | 2 | 3,
-  ): Promise<string | null> {
+  async getStageContent(file: string, stage: 1 | 2 | 3): Promise<string | null> {
     try {
       return execSync(`git -C "${this.repoRoot}" show :${stage}:${file}`, {
         encoding: 'utf-8',
@@ -300,10 +292,7 @@ export class ConflictClassifier {
    * Returns HunkAnalysis entries for overlapping pairs, plus non-overlapping
    * hunks for completeness (these can be auto-resolved independently).
    */
-  analyzeHunkOverlaps(
-    oursHunks: HunkInfo[],
-    theirsHunks: HunkInfo[],
-  ): HunkAnalysis[] {
+  analyzeHunkOverlaps(oursHunks: HunkInfo[], theirsHunks: HunkInfo[]): HunkAnalysis[] {
     const analysis: HunkAnalysis[] = [];
     const matchedOurs = new Set<number>();
     const matchedTheirs = new Set<number>();
@@ -313,8 +302,7 @@ export class ConflictClassifier {
       const ours = oursHunks[oi];
       for (let ti = 0; ti < theirsHunks.length; ti++) {
         const theirs = theirsHunks[ti];
-        const overlaps =
-          ours.baseStart < theirs.baseEnd && theirs.baseStart < ours.baseEnd;
+        const overlaps = ours.baseStart < theirs.baseEnd && theirs.baseStart < ours.baseEnd;
 
         if (overlaps) {
           matchedOurs.add(oi);
@@ -374,9 +362,7 @@ export class ConflictClassifier {
     const theirsLines = theirs.split('\n');
 
     for (const hunk of hunks.filter((h) => h.overlaps)) {
-      const oursSlice = oursLines
-        .slice(hunk.oursRange.start, hunk.oursRange.end)
-        .join('\n');
+      const oursSlice = oursLines.slice(hunk.oursRange.start, hunk.oursRange.end).join('\n');
       const theirsSlice = theirsLines
         .slice(hunk.theirsRange.start, hunk.theirsRange.end)
         .join('\n');

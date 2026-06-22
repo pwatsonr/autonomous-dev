@@ -32,7 +32,10 @@ export interface DocumentHandle {
 }
 
 export class DocumentCreationError extends Error {
-  constructor(message: string, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    public readonly cause?: Error,
+  ) {
     super(message);
     this.name = 'DocumentCreationError';
   }
@@ -60,18 +63,10 @@ export async function createDocument(
 ): Promise<DocumentHandle> {
   try {
     // 1. Generate ID
-    const documentId = await generateDocumentId(
-      request.type,
-      request.pipelineId,
-      idCounter,
-    );
+    const documentId = await generateDocumentId(request.type, request.pipelineId, idCounter);
 
     // 2. Create directory tree
-    await directoryManager.createDocumentDirs(
-      request.pipelineId,
-      request.type,
-      documentId,
-    );
+    await directoryManager.createDocumentDirs(request.pipelineId, request.type, documentId);
 
     // 3. Build frontmatter overrides
     const now = new Date().toISOString();
@@ -128,11 +123,7 @@ export async function createDocument(
       version: '1.0',
       filePath: versionFilePath,
       symlinkPath,
-      documentDir: directoryManager.getDocumentDir(
-        request.pipelineId,
-        request.type,
-        documentId,
-      ),
+      documentDir: directoryManager.getDocumentDir(request.pipelineId, request.type, documentId),
     };
   } catch (err: unknown) {
     if (err instanceof DocumentCreationError) {

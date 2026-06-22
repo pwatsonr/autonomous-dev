@@ -163,16 +163,11 @@ export class LabelRandomizer {
  * @param mappingStore  The MappingStore containing the randomization mapping.
  * @returns             A DerandomizedPair with version labels restored.
  */
-export function derandomize(
-  pair: RandomizedPair,
-  mappingStore: MappingStore,
-): DerandomizedPair {
+export function derandomize(pair: RandomizedPair, mappingStore: MappingStore): DerandomizedPair {
   const mapping = mappingStore.retrieve(pair.mapping_id);
 
-  const versionAOutput =
-    mapping.output_1_is === 'version_a' ? pair.output_1 : pair.output_2;
-  const versionBOutput =
-    mapping.output_1_is === 'version_b' ? pair.output_1 : pair.output_2;
+  const versionAOutput = mapping.output_1_is === 'version_a' ? pair.output_1 : pair.output_2;
+  const versionBOutput = mapping.output_1_is === 'version_b' ? pair.output_1 : pair.output_2;
 
   return {
     input: pair.input,

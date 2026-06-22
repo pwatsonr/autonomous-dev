@@ -77,22 +77,12 @@ export class DirectoryManager {
     documentId: string,
     version: string,
   ): string {
-    return path.join(
-      this.getDocumentDir(pipelineId, type, documentId),
-      `v${version}.md`,
-    );
+    return path.join(this.getDocumentDir(pipelineId, type, documentId), `v${version}.md`);
   }
 
   /** Symlink path: {documentDir}/current.md */
-  getCurrentSymlinkPath(
-    pipelineId: string,
-    type: DocumentType,
-    documentId: string,
-  ): string {
-    return path.join(
-      this.getDocumentDir(pipelineId, type, documentId),
-      'current.md',
-    );
+  getCurrentSymlinkPath(pipelineId: string, type: DocumentType, documentId: string): string {
+    return path.join(this.getDocumentDir(pipelineId, type, documentId), 'current.md');
   }
 
   /** Pipeline state file: {pipelineDir}/pipeline.yaml */

@@ -41,13 +41,9 @@ export async function analyzeImpact(
 
   // Filter to affected children (traces_from intersects affected sections)
   for (const childId of directChildren) {
-    const childDoc = await storage.readDocument(
-      pipelineId,
-      tree.getNode(childId).type,
-      childId,
-    );
+    const childDoc = await storage.readDocument(pipelineId, tree.getNode(childId).type, childId);
     const tracesFrom = (childDoc.frontmatter.traces_from as string[]) ?? [];
-    const isAffected = tracesFrom.some(t => affectedSections.has(t));
+    const isAffected = tracesFrom.some((t) => affectedSections.has(t));
 
     if (isAffected) {
       // This child and ALL its descendants are affected

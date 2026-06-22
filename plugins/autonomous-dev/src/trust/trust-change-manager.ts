@@ -22,7 +22,7 @@
  *   - All transitions emit audit events via the injected AuditTrail.
  */
 
-import type { TrustLevel, TrustLevelChangeRequest } from "./types";
+import type { TrustLevel, TrustLevelChangeRequest } from './types';
 
 // ---------------------------------------------------------------------------
 // AuditTrail interface (minimal, per SPEC-009-5-7)
@@ -36,10 +36,7 @@ import type { TrustLevel, TrustLevelChangeRequest } from "./types";
  * subsystems depend on.
  */
 export interface AuditTrail {
-  append(event: {
-    event_type: string;
-    payload: Record<string, unknown>;
-  }): Promise<void>;
+  append(event: { event_type: string; payload: Record<string, unknown> }): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +50,7 @@ export interface PendingChange {
   requestId: string;
   fromLevel: TrustLevel;
   toLevel: TrustLevel;
-  status: "pending" | "awaiting_confirmation";
+  status: 'pending' | 'awaiting_confirmation';
   requestedBy: string;
   requestedAt: Date;
   reason: string;
@@ -87,14 +84,11 @@ export class TrustChangeManager {
    *
    * @returns The PendingChange created, or null if same-level no-op.
    */
-  requestChange(
-    requestId: string,
-    change: TrustLevelChangeRequest,
-  ): PendingChange | null {
+  requestChange(requestId: string, change: TrustLevelChangeRequest): PendingChange | null {
     // Same-level request is a no-op
     if (change.fromLevel === change.toLevel) {
       this.auditTrail.append({
-        event_type: "trust_level_change_requested",
+        event_type: 'trust_level_change_requested',
         payload: {
           requestId,
           fromLevel: change.fromLevel,
@@ -111,7 +105,7 @@ export class TrustChangeManager {
     const existing = this.pendingChanges.get(requestId);
     if (existing) {
       this.auditTrail.append({
-        event_type: "trust_level_change_superseded",
+        event_type: 'trust_level_change_superseded',
         payload: {
           requestId,
           supersededChange: {
@@ -137,7 +131,7 @@ export class TrustChangeManager {
       requestId,
       fromLevel: change.fromLevel,
       toLevel: change.toLevel,
-      status: isUpgrade ? "awaiting_confirmation" : "pending",
+      status: isUpgrade ? 'awaiting_confirmation' : 'pending',
       requestedBy: change.requestedBy,
       requestedAt: change.requestedAt,
       reason: change.reason,
@@ -146,7 +140,7 @@ export class TrustChangeManager {
     this.pendingChanges.set(requestId, pendingChange);
 
     this.auditTrail.append({
-      event_type: "trust_level_change_requested",
+      event_type: 'trust_level_change_requested',
       payload: {
         requestId,
         fromLevel: change.fromLevel,
@@ -169,10 +163,7 @@ export class TrustChangeManager {
    * @param currentLevel The current effective trust level.
    * @returns The effective trust level after this gate boundary.
    */
-  resolveAtGateBoundary(
-    requestId: string,
-    currentLevel: TrustLevel,
-  ): TrustLevel {
+  resolveAtGateBoundary(requestId: string, currentLevel: TrustLevel): TrustLevel {
     const pending = this.pendingChanges.get(requestId);
 
     if (!pending) {
@@ -180,7 +171,7 @@ export class TrustChangeManager {
     }
 
     // Only apply changes that are in "pending" status
-    if (pending.status !== "pending") {
+    if (pending.status !== 'pending') {
       return currentLevel;
     }
 
@@ -192,7 +183,7 @@ export class TrustChangeManager {
 
     // Emit audit event
     this.auditTrail.append({
-      event_type: "trust_level_changed",
+      event_type: 'trust_level_changed',
       payload: {
         requestId,
         fromLevel: pending.fromLevel,
@@ -217,21 +208,19 @@ export class TrustChangeManager {
     const pending = this.pendingChanges.get(requestId);
 
     if (!pending) {
-      throw new Error(
-        `No pending change found for requestId: ${requestId}`,
-      );
+      throw new Error(`No pending change found for requestId: ${requestId}`);
     }
 
-    if (pending.status !== "awaiting_confirmation") {
+    if (pending.status !== 'awaiting_confirmation') {
       throw new Error(
         `Change for requestId ${requestId} is not awaiting confirmation (status: ${pending.status})`,
       );
     }
 
-    pending.status = "pending";
+    pending.status = 'pending';
 
     this.auditTrail.append({
-      event_type: "trust_upgrade_confirmed",
+      event_type: 'trust_upgrade_confirmed',
       payload: {
         requestId,
         toLevel: pending.toLevel,
@@ -251,12 +240,10 @@ export class TrustChangeManager {
     const pending = this.pendingChanges.get(requestId);
 
     if (!pending) {
-      throw new Error(
-        `No pending change found for requestId: ${requestId}`,
-      );
+      throw new Error(`No pending change found for requestId: ${requestId}`);
     }
 
-    if (pending.status !== "awaiting_confirmation") {
+    if (pending.status !== 'awaiting_confirmation') {
       throw new Error(
         `Change for requestId ${requestId} is not awaiting confirmation (status: ${pending.status})`,
       );
@@ -268,11 +255,11 @@ export class TrustChangeManager {
     this.pendingChanges.delete(requestId);
 
     this.auditTrail.append({
-      event_type: "trust_upgrade_rejected",
+      event_type: 'trust_upgrade_rejected',
       payload: {
         requestId,
         toLevel,
-        reason: "Upgrade rejected",
+        reason: 'Upgrade rejected',
       },
     });
   }

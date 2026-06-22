@@ -33,14 +33,11 @@ export const PRD_RUBRIC: Rubric = {
       id: 'goals_measurability',
       name: 'Goals Measurability',
       weight: 15,
-      description:
-        'Goals are specific, measurable, achievable, relevant, and time-bound (SMART).',
+      description: 'Goals are specific, measurable, achievable, relevant, and time-bound (SMART).',
       min_threshold: 60,
       calibration: {
-        score_0:
-          'No goals defined, or goals are vague aspirations with no measurable criteria.',
-        score_50:
-          'Goals are stated but lack quantified success criteria or timelines.',
+        score_0: 'No goals defined, or goals are vague aspirations with no measurable criteria.',
+        score_50: 'Goals are stated but lack quantified success criteria or timelines.',
         score_100:
           'Every goal has quantified success metrics, clear timelines, and explicit measurement methodology.',
       },
@@ -49,14 +46,11 @@ export const PRD_RUBRIC: Rubric = {
       id: 'user_story_coverage',
       name: 'User Story Coverage',
       weight: 15,
-      description:
-        'User stories cover all personas and key workflows with acceptance criteria.',
+      description: 'User stories cover all personas and key workflows with acceptance criteria.',
       min_threshold: 60,
       calibration: {
-        score_0:
-          'No user stories or personas identified.',
-        score_50:
-          'Some user stories exist but not all personas or key workflows are covered.',
+        score_0: 'No user stories or personas identified.',
+        score_50: 'Some user stories exist but not all personas or key workflows are covered.',
         score_100:
           'Comprehensive user stories for every persona and workflow, each with clear acceptance criteria and edge cases.',
       },
@@ -65,8 +59,7 @@ export const PRD_RUBRIC: Rubric = {
       id: 'requirements_completeness',
       name: 'Requirements Completeness',
       weight: 20,
-      description:
-        'All functional and non-functional requirements are enumerated with no gaps.',
+      description: 'All functional and non-functional requirements are enumerated with no gaps.',
       min_threshold: 70,
       calibration: {
         score_0:
@@ -85,10 +78,8 @@ export const PRD_RUBRIC: Rubric = {
         'Each requirement can be verified through a concrete test or measurable criterion.',
       min_threshold: 60,
       calibration: {
-        score_0:
-          'Requirements are subjective or unmeasurable (e.g., "the system should be fast").',
-        score_50:
-          'Some requirements have testable criteria but others remain vague or subjective.',
+        score_0: 'Requirements are subjective or unmeasurable (e.g., "the system should be fast").',
+        score_50: 'Some requirements have testable criteria but others remain vague or subjective.',
         score_100:
           'Every requirement has an explicit, automatable acceptance test or a quantified metric with a defined measurement method.',
       },
@@ -97,12 +88,10 @@ export const PRD_RUBRIC: Rubric = {
       id: 'risk_identification',
       name: 'Risk Identification',
       weight: 10,
-      description:
-        'Known risks are identified with likelihood, impact, and mitigation strategies.',
+      description: 'Known risks are identified with likelihood, impact, and mitigation strategies.',
       min_threshold: 50,
       calibration: {
-        score_0:
-          'No risks identified or risk section is absent.',
+        score_0: 'No risks identified or risk section is absent.',
         score_50:
           'Some risks listed but without likelihood, impact assessment, or mitigation strategies.',
         score_100:

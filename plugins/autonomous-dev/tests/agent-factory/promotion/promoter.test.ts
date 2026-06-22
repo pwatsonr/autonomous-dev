@@ -33,10 +33,7 @@ import { ProposalStore } from '../../../src/agent-factory/improvement/proposal-s
 import { AuditLogger } from '../../../src/agent-factory/audit';
 import { ObservationTracker } from '../../../src/agent-factory/metrics/observation';
 import type { AgentFactoryConfig } from '../../../src/agent-factory/config';
-import type {
-  AgentProposal,
-  ProposalStatus,
-} from '../../../src/agent-factory/improvement/types';
+import type { AgentProposal, ProposalStatus } from '../../../src/agent-factory/improvement/types';
 import type {
   ParsedAgent,
   IAgentRegistry,
@@ -378,18 +375,31 @@ async function test_promote_happy_path(): Promise<void> {
     // 1) New agent definition written to disk.
     const onDisk = fs.readFileSync(h.agentFilePath, 'utf-8');
     assert(onDisk.includes('version: 1.0.1'), 'agent .md should contain the new version');
-    assert(onDisk.includes('comprehensive test coverage'), 'agent .md should contain the proposed body');
+    assert(
+      onDisk.includes('comprehensive test coverage'),
+      'agent .md should contain the proposed body',
+    );
 
     // 2) A git commit was made (HEAD advanced; file is committed/clean).
     const headAfter = gitHead(h.projectRoot);
     assert(headAfter !== headBefore, 'HEAD should advance after promotion commit');
     assert(headAfter === result.commitHash, 'result.commitHash should match repo HEAD');
-    const status = execSync('git status --porcelain', { cwd: h.projectRoot, encoding: 'utf-8', stdio: 'pipe' }).trim();
+    const status = execSync('git status --porcelain', {
+      cwd: h.projectRoot,
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    }).trim();
     assert(status === '', `working tree should be clean after commit, got: ${status}`);
     // Conventional commit subject (patch -> fix(agents):).
     const subjects = gitLogSubjects(h.projectRoot);
-    assert(subjects[0].startsWith('fix(agents):'), `commit subject should be a fix(agents) message, got: ${subjects[0]}`);
-    assert(subjects[0].includes('v1.0.0 -> v1.0.1'), 'commit subject should reference the version bump');
+    assert(
+      subjects[0].startsWith('fix(agents):'),
+      `commit subject should be a fix(agents) message, got: ${subjects[0]}`,
+    );
+    assert(
+      subjects[0].includes('v1.0.0 -> v1.0.1'),
+      'commit subject should reference the version bump',
+    );
 
     // 3) Proposal advanced to `promoted`.
     const stored = h.proposalStore.getById('prop-promote-1');
@@ -397,7 +407,10 @@ async function test_promote_happy_path(): Promise<void> {
 
     // 4) Registry reloaded (and now reports the new version) + state ACTIVE.
     assert(h.registry.reloadCount >= 1, 'registry.reload should be called during promotion');
-    assert(h.registry.get('code-executor')!.agent.version === '1.0.1', 'registry should report the promoted version');
+    assert(
+      h.registry.get('code-executor')!.agent.version === '1.0.1',
+      'registry should report the promoted version',
+    );
     assert(h.registry.getState('code-executor') === 'ACTIVE', 'agent state should end ACTIVE');
 
     // 5) Observation counter reset for the new version.
@@ -422,13 +435,23 @@ async function test_promote_with_message_uses_custom_subject(): Promise<void> {
   // commit subject is used and the proposal still advances to promoted.
   const h = createHarness({ proposal: makeProposal(), agentState: 'VALIDATING' });
   try {
-    const customMsg = "feat(agents): auto-promote code-executor after A/B win";
-    const result = await h.promoter.promoteWithMessage('code-executor', 'prop-promote-1', customMsg);
+    const customMsg = 'feat(agents): auto-promote code-executor after A/B win';
+    const result = await h.promoter.promoteWithMessage(
+      'code-executor',
+      'prop-promote-1',
+      customMsg,
+    );
 
     assert(result.success === true, `expected success, got error: ${result.error}`);
     const subjects = gitLogSubjects(h.projectRoot);
-    assert(subjects[0] === customMsg, `commit subject should be the custom message, got: ${subjects[0]}`);
-    assert(h.proposalStore.getById('prop-promote-1')!.status === 'promoted', 'proposal should be promoted');
+    assert(
+      subjects[0] === customMsg,
+      `commit subject should be the custom message, got: ${subjects[0]}`,
+    );
+    assert(
+      h.proposalStore.getById('prop-promote-1')!.status === 'promoted',
+      'proposal should be promoted',
+    );
     console.log('PASS: test_promote_with_message_uses_custom_subject');
   } finally {
     teardown(h);
@@ -466,8 +489,14 @@ async function test_guard_rejects_wrong_status(): Promise<void> {
       );
       // No commit, file untouched, proposal status unchanged.
       assert(gitHead(h.projectRoot) === headBefore, `no commit should occur for status ${status}`);
-      assert(fs.readFileSync(h.agentFilePath, 'utf-8').includes('version: 1.0.0'), 'agent file unchanged');
-      assert(h.proposalStore.getById('prop-promote-1')!.status === status, `proposal status should remain ${status}`);
+      assert(
+        fs.readFileSync(h.agentFilePath, 'utf-8').includes('version: 1.0.0'),
+        'agent file unchanged',
+      );
+      assert(
+        h.proposalStore.getById('prop-promote-1')!.status === status,
+        `proposal status should remain ${status}`,
+      );
     } finally {
       teardown(h);
     }
@@ -485,7 +514,10 @@ async function test_guard_rejects_wrong_agent_state(): Promise<void> {
       (result.error ?? '').includes('VALIDATING or UNDER_REVIEW'),
       `error should explain the state guard, got: ${result.error}`,
     );
-    assert(h.proposalStore.getById('prop-promote-1')!.status === 'validated_positive', 'proposal status unchanged');
+    assert(
+      h.proposalStore.getById('prop-promote-1')!.status === 'validated_positive',
+      'proposal status unchanged',
+    );
     console.log('PASS: test_guard_rejects_wrong_agent_state');
   } finally {
     teardown(h);
@@ -497,7 +529,10 @@ async function test_guard_rejects_unknown_proposal(): Promise<void> {
   try {
     const result = await h.promoter.promote('code-executor', 'no-such-proposal');
     assert(result.success === false, 'should reject unknown proposal id');
-    assert((result.error ?? '').includes('not found'), `error should mention not found, got: ${result.error}`);
+    assert(
+      (result.error ?? '').includes('not found'),
+      `error should mention not found, got: ${result.error}`,
+    );
     console.log('PASS: test_guard_rejects_unknown_proposal');
   } finally {
     teardown(h);
@@ -541,9 +576,18 @@ async function test_meta_approved_status_is_promotable(): Promise<void> {
     const result = await h.promoter.promote('code-executor', 'prop-promote-1');
 
     // Promotion reports success and the side effects (file + commit) land.
-    assert(result.success === true, `meta_approved + UNDER_REVIEW should report success, got error: ${result.error}`);
-    assert(gitHead(h.projectRoot) !== headBefore, 'a commit should be made on the meta_approved path');
-    assert(fs.readFileSync(h.agentFilePath, 'utf-8').includes('version: 1.0.1'), 'agent file should be updated');
+    assert(
+      result.success === true,
+      `meta_approved + UNDER_REVIEW should report success, got error: ${result.error}`,
+    );
+    assert(
+      gitHead(h.projectRoot) !== headBefore,
+      'a commit should be made on the meta_approved path',
+    );
+    assert(
+      fs.readFileSync(h.agentFilePath, 'utf-8').includes('version: 1.0.1'),
+      'agent file should be updated',
+    );
     assert(h.registry.getState('code-executor') === 'ACTIVE', 'agent state advances to ACTIVE');
 
     // #539: the proposal now reaches `promoted` (the bypass edge exists).
@@ -578,12 +622,21 @@ async function test_rollback_restores_file_on_git_failure(): Promise<void> {
     const result = await h.promoter.promote('code-executor', 'prop-promote-1');
 
     assert(result.success === false, 'expected failure when git commit fails');
-    assert((result.error ?? '').toLowerCase().includes('git commit failed'), `error should mention git failure, got: ${result.error}`);
+    assert(
+      (result.error ?? '').toLowerCase().includes('git commit failed'),
+      `error should mention git failure, got: ${result.error}`,
+    );
 
     // File restored to original (the v1.0.1 write was rolled back).
     const afterContent = fs.readFileSync(h.agentFilePath, 'utf-8');
-    assert(afterContent === originalContent, 'agent file should be rolled back to original content');
-    assert(!afterContent.includes('version: 1.0.1'), 'rolled-back file must not contain the proposed version');
+    assert(
+      afterContent === originalContent,
+      'agent file should be rolled back to original content',
+    );
+    assert(
+      !afterContent.includes('version: 1.0.1'),
+      'rolled-back file must not contain the proposed version',
+    );
 
     // Proposal status untouched.
     assert(
@@ -614,7 +667,10 @@ async function test_rollback_deletes_new_file_on_git_failure(): Promise<void> {
     const result = await h.promoter.promote('code-executor', 'prop-promote-1');
 
     assert(result.success === false, 'expected failure when git commit fails');
-    assert(!fs.existsSync(h.agentFilePath), 'newly-written agent file should be deleted on rollback');
+    assert(
+      !fs.existsSync(h.agentFilePath),
+      'newly-written agent file should be deleted on rollback',
+    );
     assert(
       h.proposalStore.getById('prop-promote-1')!.status === 'validated_positive',
       'proposal status unchanged after rollback',
@@ -631,12 +687,19 @@ async function test_rollback_deletes_new_file_on_git_failure(): Promise<void> {
 
 describe('promoter', () => {
   it('test_promote_happy_path', async () => await test_promote_happy_path());
-  it('test_promote_with_message_uses_custom_subject', async () => await test_promote_with_message_uses_custom_subject());
+  it('test_promote_with_message_uses_custom_subject', async () =>
+    await test_promote_with_message_uses_custom_subject());
   it('test_guard_rejects_wrong_status', async () => await test_guard_rejects_wrong_status());
-  it('test_guard_rejects_wrong_agent_state', async () => await test_guard_rejects_wrong_agent_state());
-  it('test_guard_rejects_unknown_proposal', async () => await test_guard_rejects_unknown_proposal());
-  it('test_guard_rejects_mismatched_agent', async () => await test_guard_rejects_mismatched_agent());
-  it('test_meta_approved_status_is_promotable', async () => await test_meta_approved_status_is_promotable());
-  it('test_rollback_restores_file_on_git_failure', async () => await test_rollback_restores_file_on_git_failure());
-  it('test_rollback_deletes_new_file_on_git_failure', async () => await test_rollback_deletes_new_file_on_git_failure());
+  it('test_guard_rejects_wrong_agent_state', async () =>
+    await test_guard_rejects_wrong_agent_state());
+  it('test_guard_rejects_unknown_proposal', async () =>
+    await test_guard_rejects_unknown_proposal());
+  it('test_guard_rejects_mismatched_agent', async () =>
+    await test_guard_rejects_mismatched_agent());
+  it('test_meta_approved_status_is_promotable', async () =>
+    await test_meta_approved_status_is_promotable());
+  it('test_rollback_restores_file_on_git_failure', async () =>
+    await test_rollback_restores_file_on_git_failure());
+  it('test_rollback_deletes_new_file_on_git_failure', async () =>
+    await test_rollback_deletes_new_file_on_git_failure());
 });

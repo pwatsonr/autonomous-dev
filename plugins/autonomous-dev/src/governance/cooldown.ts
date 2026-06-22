@@ -15,7 +15,7 @@ export function checkCooldown(
   errorClass: string,
   config: GovernanceConfig,
   findRecentFixDeployment: (service: string, errorClass: string) => FixDeployment | null,
-  now?: Date
+  now?: Date,
 ): CooldownResult {
   const currentTime = now ?? new Date();
   const recentFix = findRecentFixDeployment(service, errorClass);

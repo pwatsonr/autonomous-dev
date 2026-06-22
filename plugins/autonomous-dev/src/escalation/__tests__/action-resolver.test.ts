@@ -14,10 +14,10 @@
  *   9. Option approve_with_conditions -> retry_with_changes
  */
 
-import { ActionResolver } from "../action-resolver";
-import type { EscalationResponse } from "../response-types";
-import type { StoredEscalation } from "../response-validator";
-import type { EscalationOption } from "../types";
+import { ActionResolver } from '../action-resolver';
+import type { EscalationResponse } from '../response-types';
+import type { StoredEscalation } from '../response-validator';
+import type { EscalationOption } from '../types';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -28,23 +28,21 @@ function makeEscalation(
   overrides: Partial<StoredEscalation> = {},
 ): StoredEscalation {
   return {
-    escalationId: "esc-20260408-001",
-    requestId: "req-1",
-    status: "pending",
+    escalationId: 'esc-20260408-001',
+    requestId: 'req-1',
+    status: 'pending',
     options,
-    gate: "code_review",
+    gate: 'code_review',
     ...overrides,
   };
 }
 
-function makeResponse(
-  overrides: Partial<EscalationResponse>,
-): EscalationResponse {
+function makeResponse(overrides: Partial<EscalationResponse>): EscalationResponse {
   return {
-    escalation_id: "esc-20260408-001",
-    responder: "user-1",
+    escalation_id: 'esc-20260408-001',
+    responder: 'user-1',
     timestamp: new Date().toISOString(),
-    response_type: "option",
+    response_type: 'option',
     ...overrides,
   };
 }
@@ -53,7 +51,7 @@ function makeResponse(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("ActionResolver", () => {
+describe('ActionResolver', () => {
   const resolver = new ActionResolver();
 
   // =========================================================================
@@ -61,17 +59,17 @@ describe("ActionResolver", () => {
   // =========================================================================
   test("option with action 'approve' resolves to { action: 'approve' }", () => {
     const escalation = makeEscalation([
-      { option_id: "opt-1", label: "Approve", action: "approve" },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-1', label: 'Approve', action: 'approve' },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-1",
+      response_type: 'option',
+      option_id: 'opt-1',
     });
 
     const result = resolver.resolve(response, escalation);
 
-    expect(result).toEqual({ action: "approve" });
+    expect(result).toEqual({ action: 'approve' });
   });
 
   // =========================================================================
@@ -80,23 +78,23 @@ describe("ActionResolver", () => {
   test("option with action 'retry' resolves to retry_with_changes with guidance", () => {
     const escalation = makeEscalation([
       {
-        option_id: "opt-1",
-        label: "Retry",
-        action: "retry",
-        description: "Use smaller batches",
+        option_id: 'opt-1',
+        label: 'Retry',
+        action: 'retry',
+        description: 'Use smaller batches',
       },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-1",
+      response_type: 'option',
+      option_id: 'opt-1',
     });
 
     const result = resolver.resolve(response, escalation);
 
     expect(result).toEqual({
-      action: "retry_with_changes",
-      guidance: "Use smaller batches",
+      action: 'retry_with_changes',
+      guidance: 'Use smaller batches',
     });
   });
 
@@ -105,17 +103,17 @@ describe("ActionResolver", () => {
   // =========================================================================
   test("option with action 'cancel' resolves to { action: 'cancel' }", () => {
     const escalation = makeEscalation([
-      { option_id: "opt-1", label: "Approve", action: "approve" },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-1', label: 'Approve', action: 'approve' },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-2",
+      response_type: 'option',
+      option_id: 'opt-2',
     });
 
     const result = resolver.resolve(response, escalation);
 
-    expect(result).toEqual({ action: "cancel" });
+    expect(result).toEqual({ action: 'cancel' });
   });
 
   // =========================================================================
@@ -123,17 +121,17 @@ describe("ActionResolver", () => {
   // =========================================================================
   test("option with action 'reject' also resolves to { action: 'cancel' }", () => {
     const escalation = makeEscalation([
-      { option_id: "opt-1", label: "Reject", action: "reject" },
-      { option_id: "opt-2", label: "Approve", action: "approve" },
+      { option_id: 'opt-1', label: 'Reject', action: 'reject' },
+      { option_id: 'opt-2', label: 'Approve', action: 'approve' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-1",
+      response_type: 'option',
+      option_id: 'opt-1',
     });
 
     const result = resolver.resolve(response, escalation);
 
-    expect(result).toEqual({ action: "cancel" });
+    expect(result).toEqual({ action: 'cancel' });
   });
 
   // =========================================================================
@@ -142,23 +140,23 @@ describe("ActionResolver", () => {
   test("option with action 'override' resolves to override_proceed with justification", () => {
     const escalation = makeEscalation([
       {
-        option_id: "opt-1",
-        label: "Override",
-        action: "override",
-        description: "Risk accepted",
+        option_id: 'opt-1',
+        label: 'Override',
+        action: 'override',
+        description: 'Risk accepted',
       },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-1",
+      response_type: 'option',
+      option_id: 'opt-1',
     });
 
     const result = resolver.resolve(response, escalation);
 
     expect(result).toEqual({
-      action: "override_proceed",
-      justification: "Risk accepted",
+      action: 'override_proceed',
+      justification: 'Risk accepted',
     });
   });
 
@@ -167,61 +165,61 @@ describe("ActionResolver", () => {
   // =========================================================================
   test("option override with no description defaults justification to 'No justification provided'", () => {
     const escalation = makeEscalation([
-      { option_id: "opt-1", label: "Override", action: "override" },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-1', label: 'Override', action: 'override' },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-1",
+      response_type: 'option',
+      option_id: 'opt-1',
     });
 
     const result = resolver.resolve(response, escalation);
 
     expect(result).toEqual({
-      action: "override_proceed",
-      justification: "No justification provided",
+      action: 'override_proceed',
+      justification: 'No justification provided',
     });
   });
 
   // =========================================================================
   // Test Case 7: Freetext -> retry_with_changes
   // =========================================================================
-  test("freetext response resolves to retry_with_changes with guidance", () => {
+  test('freetext response resolves to retry_with_changes with guidance', () => {
     const escalation = makeEscalation([
-      { option_id: "opt-1", label: "Approve", action: "approve" },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-1', label: 'Approve', action: 'approve' },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "freetext",
-      freetext: "Try using the v2 API instead",
+      response_type: 'freetext',
+      freetext: 'Try using the v2 API instead',
     });
 
     const result = resolver.resolve(response, escalation);
 
     expect(result).toEqual({
-      action: "retry_with_changes",
-      guidance: "Try using the v2 API instead",
+      action: 'retry_with_changes',
+      guidance: 'Try using the v2 API instead',
     });
   });
 
   // =========================================================================
   // Test Case 8: Delegate -> delegate action
   // =========================================================================
-  test("delegate response resolves to delegate with target", () => {
+  test('delegate response resolves to delegate with target', () => {
     const escalation = makeEscalation([
-      { option_id: "opt-1", label: "Approve", action: "approve" },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-1', label: 'Approve', action: 'approve' },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "delegate",
-      delegate_target: "security-lead",
+      response_type: 'delegate',
+      delegate_target: 'security-lead',
     });
 
     const result = resolver.resolve(response, escalation);
 
     expect(result).toEqual({
-      action: "delegate",
-      target: "security-lead",
+      action: 'delegate',
+      target: 'security-lead',
     });
   });
 
@@ -231,23 +229,23 @@ describe("ActionResolver", () => {
   test("option with action 'approve_with_conditions' resolves to retry_with_changes", () => {
     const escalation = makeEscalation([
       {
-        option_id: "opt-1",
-        label: "Approve with conditions",
-        action: "approve_with_conditions",
-        description: "Add error handling before merging",
+        option_id: 'opt-1',
+        label: 'Approve with conditions',
+        action: 'approve_with_conditions',
+        description: 'Add error handling before merging',
       },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-1",
+      response_type: 'option',
+      option_id: 'opt-1',
     });
 
     const result = resolver.resolve(response, escalation);
 
     expect(result).toEqual({
-      action: "retry_with_changes",
-      guidance: "Add error handling before merging",
+      action: 'retry_with_changes',
+      guidance: 'Add error handling before merging',
     });
   });
 
@@ -257,61 +255,59 @@ describe("ActionResolver", () => {
   test("option with action 'retry_with_changes' resolves same as 'retry'", () => {
     const escalation = makeEscalation([
       {
-        option_id: "opt-1",
-        label: "Retry with changes",
-        action: "retry_with_changes",
-        description: "Increase timeout",
+        option_id: 'opt-1',
+        label: 'Retry with changes',
+        action: 'retry_with_changes',
+        description: 'Increase timeout',
       },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-1",
+      response_type: 'option',
+      option_id: 'opt-1',
     });
 
     const result = resolver.resolve(response, escalation);
 
     expect(result).toEqual({
-      action: "retry_with_changes",
-      guidance: "Increase timeout",
+      action: 'retry_with_changes',
+      guidance: 'Increase timeout',
     });
   });
 
   // =========================================================================
   // Additional: throws on missing option after validation
   // =========================================================================
-  test("throws if option_id not found in escalation options", () => {
+  test('throws if option_id not found in escalation options', () => {
     const escalation = makeEscalation([
-      { option_id: "opt-1", label: "Approve", action: "approve" },
+      { option_id: 'opt-1', label: 'Approve', action: 'approve' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-99",
+      response_type: 'option',
+      option_id: 'opt-99',
     });
 
-    expect(() => resolver.resolve(response, escalation)).toThrow(
-      /Option "opt-99" not found/,
-    );
+    expect(() => resolver.resolve(response, escalation)).toThrow(/Option "opt-99" not found/);
   });
 
   // =========================================================================
   // Additional: retry option with no description uses empty guidance
   // =========================================================================
-  test("retry option with no description uses empty string as guidance", () => {
+  test('retry option with no description uses empty string as guidance', () => {
     const escalation = makeEscalation([
-      { option_id: "opt-1", label: "Retry", action: "retry" },
-      { option_id: "opt-2", label: "Cancel", action: "cancel" },
+      { option_id: 'opt-1', label: 'Retry', action: 'retry' },
+      { option_id: 'opt-2', label: 'Cancel', action: 'cancel' },
     ]);
     const response = makeResponse({
-      response_type: "option",
-      option_id: "opt-1",
+      response_type: 'option',
+      option_id: 'opt-1',
     });
 
     const result = resolver.resolve(response, escalation);
 
     expect(result).toEqual({
-      action: "retry_with_changes",
-      guidance: "",
+      action: 'retry_with_changes',
+      guidance: '',
     });
   });
 });

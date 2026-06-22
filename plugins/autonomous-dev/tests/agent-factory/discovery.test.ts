@@ -93,9 +93,7 @@ function test_exact_match_multiple_tags(): void {
 // ---------------------------------------------------------------------------
 
 function test_exact_match_case_insensitive(): void {
-  const agents = [
-    makeAgent({ name: 'ts-agent', expertise: ['typescript'] }),
-  ];
+  const agents = [makeAgent({ name: 'ts-agent', expertise: ['typescript'] })];
 
   const results = discoverAgents('TypeScript', agents, { similarityThreshold: 0.0 });
 
@@ -128,7 +126,7 @@ function test_semantic_fallback_no_exact_match(): void {
   const results = discoverAgents(
     'web application security vulnerability assessment',
     agents,
-    { similarityThreshold: 0.1 },  // Low threshold to ensure semantic results
+    { similarityThreshold: 0.1 }, // Low threshold to ensure semantic results
   );
 
   assert(results.length >= 1, 'Should return at least one semantic result');
@@ -191,10 +189,12 @@ function test_domain_gap_no_match_above_threshold(): void {
 function test_max_results_limit(): void {
   const agents: AgentRecord[] = [];
   for (let i = 0; i < 10; i++) {
-    agents.push(makeAgent({
-      name: `agent-${i}`,
-      expertise: ['typescript'],
-    }));
+    agents.push(
+      makeAgent({
+        name: `agent-${i}`,
+        expertise: ['typescript'],
+      }),
+    );
   }
 
   const results = discoverAgents('typescript', agents, {
@@ -226,11 +226,9 @@ function test_similarity_threshold_respected(): void {
     }),
   ];
 
-  const results = discoverAgents(
-    'typescript testing nodejs javascript',
-    agents,
-    { similarityThreshold: 0.3 },
-  );
+  const results = discoverAgents('typescript testing nodejs javascript', agents, {
+    similarityThreshold: 0.3,
+  });
 
   // The relevant agent should be included, irrelevant should not
   const names = results.map((r) => r.agent.agent.name);
@@ -289,9 +287,7 @@ function test_compute_similarity_empty(): void {
 // ---------------------------------------------------------------------------
 
 function test_matched_tags_included(): void {
-  const agents = [
-    makeAgent({ name: 'ts-agent', expertise: ['TypeScript', 'NodeJS'] }),
-  ];
+  const agents = [makeAgent({ name: 'ts-agent', expertise: ['TypeScript', 'NodeJS'] })];
 
   const results = discoverAgents('typescript', agents, { similarityThreshold: 0.0 });
 

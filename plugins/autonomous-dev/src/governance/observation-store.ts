@@ -13,7 +13,7 @@ export function findObservationsByServiceAndError(
   rootDir: string,
   service: string,
   errorClass: string,
-  afterDate: Date
+  afterDate: Date,
 ): ObservationSummary[] {
   const obsDir = path.join(rootDir, '.autonomous-dev', 'observations');
   const candidates: ObservationSummary[] = [];
@@ -55,7 +55,7 @@ export function findRecentFixDeployment(
   rootDir: string,
   service: string,
   errorClass: string,
-  readDeploymentMetadata: (deploymentId: string) => FixDeployment | null
+  readDeploymentMetadata: (deploymentId: string) => FixDeployment | null,
 ): FixDeployment | null {
   // Scan all observations for this service+errorClass that were promoted
   // and have a linked_deployment.
@@ -126,14 +126,14 @@ function getAllDirectories(obsDir: string): string[] {
   if (!fs.existsSync(obsDir)) return dirs;
 
   try {
-    const years = fs.readdirSync(obsDir).filter(entry => {
+    const years = fs.readdirSync(obsDir).filter((entry) => {
       const fullPath = path.join(obsDir, entry);
       return fs.statSync(fullPath).isDirectory() && /^\d{4}$/.test(entry);
     });
 
     for (const year of years) {
       const yearPath = path.join(obsDir, year);
-      const months = fs.readdirSync(yearPath).filter(entry => {
+      const months = fs.readdirSync(yearPath).filter((entry) => {
         const fullPath = path.join(yearPath, entry);
         return fs.statSync(fullPath).isDirectory() && /^\d{2}$/.test(entry);
       });
@@ -153,9 +153,10 @@ function getAllDirectories(obsDir: string): string[] {
  */
 function listMarkdownFiles(dir: string): string[] {
   try {
-    return fs.readdirSync(dir)
-      .filter(f => f.endsWith('.md'))
-      .map(f => path.join(dir, f));
+    return fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => path.join(dir, f));
   } catch {
     return [];
   }
@@ -202,8 +203,10 @@ function parseFrontmatterFromFile(filePath: string): Record<string, any> | null 
         value = inner ? inner.split(',').map((s: string) => s.trim()) : [];
       }
       // Handle quoted strings
-      else if ((value.startsWith('"') && value.endsWith('"')) ||
-               (value.startsWith("'") && value.endsWith("'"))) {
+      else if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
         value = value.substring(1, value.length - 1);
       }
 

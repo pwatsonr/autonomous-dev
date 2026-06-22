@@ -41,16 +41,14 @@ export async function readDocument(
   documentId: string,
   directoryManager: DirectoryManager,
 ): Promise<DocumentContent> {
-  const symlinkPath = directoryManager.getCurrentSymlinkPath(
-    pipelineId, type, documentId,
-  );
+  const symlinkPath = directoryManager.getCurrentSymlinkPath(pipelineId, type, documentId);
 
   try {
     const realPath = await fs.realpath(symlinkPath);
     const rawContent = await fs.readFile(realPath, 'utf-8');
     const parseResult = parseFrontmatter(rawContent);
-    const version = parseResult.frontmatter.version
-      ?? extractVersionFromFilename(path.basename(realPath));
+    const version =
+      parseResult.frontmatter.version ?? extractVersionFromFilename(path.basename(realPath));
 
     return {
       frontmatter: parseResult.frontmatter,
@@ -77,9 +75,7 @@ export async function readVersion(
   version: string,
   directoryManager: DirectoryManager,
 ): Promise<DocumentContent> {
-  const versionPath = directoryManager.getVersionFilePath(
-    pipelineId, type, documentId, version,
-  );
+  const versionPath = directoryManager.getVersionFilePath(pipelineId, type, documentId, version);
 
   try {
     const rawContent = await fs.readFile(versionPath, 'utf-8');

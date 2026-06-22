@@ -98,19 +98,13 @@ export function extractNewEndpoints(annotationText: string): string[] {
  * @param _service   The service configuration (for future expansion)
  * @returns A similar endpoint path, or null if none found
  */
-export function findSimilarEndpoint(
-  endpoint: string,
-  _service: ServiceConfig,
-): string | null {
+export function findSimilarEndpoint(endpoint: string, _service: ServiceConfig): string | null {
   // Try to find a versioned path segment and decrement the version
   const versionMatch = endpoint.match(/\/v(\d+)\//);
   if (versionMatch) {
     const currentVersion = parseInt(versionMatch[1], 10);
     if (currentVersion > 1) {
-      return endpoint.replace(
-        `/v${currentVersion}/`,
-        `/v${currentVersion - 1}/`,
-      );
+      return endpoint.replace(`/v${currentVersion}/`, `/v${currentVersion - 1}/`);
     }
   }
   return null;
@@ -216,30 +210,16 @@ export class FeatureAdoptionTracker {
 
       // Step 4: Query Prometheus for traffic to new endpoints
       for (const endpoint of newEndpoints) {
-        const trafficQuery = buildTrafficQuery(
-          service.prometheus_job,
-          endpoint,
-        );
-        const errorQuery = buildErrorRateQuery(
-          service.prometheus_job,
-          endpoint,
-        );
+        const trafficQuery = buildTrafficQuery(service.prometheus_job, endpoint);
+        const errorQuery = buildErrorRateQuery(service.prometheus_job, endpoint);
 
-        const traffic = await this.executeInstantQuery(
-          'adoption_traffic',
-          trafficQuery,
-        );
-        const errors = await this.executeInstantQuery(
-          'adoption_errors',
-          errorQuery,
-        );
+        const traffic = await this.executeInstantQuery('adoption_traffic', trafficQuery);
+        const errors = await this.executeInstantQuery('adoption_errors', errorQuery);
 
         const adoption: EndpointAdoption = {
           endpoint,
           first_traffic_at:
-            traffic.value !== null && traffic.value > 0
-              ? deployDate.toISOString()
-              : null,
+            traffic.value !== null && traffic.value > 0 ? deployDate.toISOString() : null,
           current_rps: traffic.value ?? 0,
           error_rate: errors.value ?? 0,
         };
@@ -281,13 +261,9 @@ export class FeatureAdoptionTracker {
     return {
       detected: true,
       deploy_info: {
-        commit:
-          latestAnnotation.text.match(/commit[:\s]+([a-f0-9]+)/i)?.[1] ??
-          'unknown',
+        commit: latestAnnotation.text.match(/commit[:\s]+([a-f0-9]+)/i)?.[1] ?? 'unknown',
         deployed_at: latestAnnotation.time,
-        days_since_deploy:
-          (Date.now() - latestDeployDate.getTime()) /
-          (24 * 60 * 60 * 1000),
+        days_since_deploy: (Date.now() - latestDeployDate.getTime()) / (24 * 60 * 60 * 1000),
       },
       endpoints: results,
     };

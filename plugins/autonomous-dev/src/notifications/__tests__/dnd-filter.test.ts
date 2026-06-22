@@ -26,9 +26,7 @@ function makeClock(dateString: string): Clock {
   return { now: () => new Date(dateString) };
 }
 
-function makePayload(
-  overrides: Partial<NotificationPayload> = {},
-): NotificationPayload {
+function makePayload(overrides: Partial<NotificationPayload> = {}): NotificationPayload {
   return {
     notification_id: 'notif-001',
     event_type: 'pipeline_completed',
@@ -42,9 +40,7 @@ function makePayload(
   };
 }
 
-function makeOvernightDndConfig(
-  overrides: Partial<DndConfig> = {},
-): DndConfig {
+function makeOvernightDndConfig(overrides: Partial<DndConfig> = {}): DndConfig {
   return {
     enabled: true,
     startTime: '22:00',

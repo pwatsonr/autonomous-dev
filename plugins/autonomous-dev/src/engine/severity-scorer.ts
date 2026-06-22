@@ -58,11 +58,11 @@ export interface SeverityResult {
 
 /** Factor weights as specified in TDD section 3.5.3. */
 const WEIGHTS = {
-  error_rate: 0.30,
+  error_rate: 0.3,
   affected_users: 0.25,
-  service_criticality: 0.20,
+  service_criticality: 0.2,
   duration: 0.15,
-  data_integrity: 0.10,
+  data_integrity: 0.1,
 } as const;
 
 /** Severity order used for level-distance validation. */
@@ -72,7 +72,7 @@ const SEVERITY_ORDER: readonly Severity[] = ['P0', 'P1', 'P2', 'P3'];
 const CRITICALITY_SCORES: Record<string, number> = {
   critical: 1.0,
   high: 0.75,
-  medium: 0.50,
+  medium: 0.5,
   low: 0.25,
 };
 
@@ -114,30 +114,31 @@ export function estimateAffectedUsers(
 // ---------------------------------------------------------------------------
 
 function computeErrorRateSubScore(errorRate: number): number {
-  if (errorRate > 50)  return 1.0;
-  if (errorRate > 20)  return 0.75;
-  if (errorRate > 5)   return 0.50;
-  if (errorRate > 1)   return 0.25;
+  if (errorRate > 50) return 1.0;
+  if (errorRate > 20) return 0.75;
+  if (errorRate > 5) return 0.5;
+  if (errorRate > 1) return 0.25;
   return 0.0;
 }
 
 function computeUserSubScore(affected: number): number {
   if (affected > 10000) return 1.0;
-  if (affected > 1000)  return 0.75;
-  if (affected > 100)   return 0.50;
+  if (affected > 1000) return 0.75;
+  if (affected > 100) return 0.5;
   return 0.25;
 }
 
 function computeDurationSubScore(durationMinutes: number): number {
-  if (durationMinutes > 60)  return 1.0;
-  if (durationMinutes > 30)  return 0.75;
-  if (durationMinutes > 10)  return 0.50;
+  if (durationMinutes > 60) return 1.0;
+  if (durationMinutes > 30) return 0.75;
+  if (durationMinutes > 10) return 0.5;
   return 0.25;
 }
 
-function computeDataIntegritySubScore(
-  candidate: CandidateObservation,
-): { sub_score: number; label: string } {
+function computeDataIntegritySubScore(candidate: CandidateObservation): {
+  sub_score: number;
+  label: string;
+} {
   if (candidate.has_data_loss_indicator) {
     return { sub_score: 1.0, label: 'data_loss_confirmed' };
   }
@@ -148,9 +149,9 @@ function computeDataIntegritySubScore(
 }
 
 function mapScoreToSeverity(score: number): Severity {
-  if (score >= 0.75)  return 'P0';
-  if (score >= 0.55)  return 'P1';
-  if (score >= 0.35)  return 'P2';
+  if (score >= 0.75) return 'P0';
+  if (score >= 0.55) return 'P1';
+  if (score >= 0.35) return 'P2';
   return 'P3';
 }
 
@@ -180,11 +181,7 @@ export function computeSeverity(
   score += errorRateWeighted;
 
   // Factor 2: Affected users (weight 0.25)
-  const affected = estimateAffectedUsers(
-    throughputRps,
-    errorRate,
-    candidate.sustained_minutes,
-  );
+  const affected = estimateAffectedUsers(throughputRps, errorRate, candidate.sustained_minutes);
   const userSubScore = computeUserSubScore(affected);
   const usersWeighted = WEIGHTS.affected_users * userSubScore;
   score += usersWeighted;
@@ -201,8 +198,7 @@ export function computeSeverity(
   score += durationWeighted;
 
   // Factor 5: Data integrity (weight 0.10)
-  const { sub_score: dataSubScore, label: dataLabel } =
-    computeDataIntegritySubScore(candidate);
+  const { sub_score: dataSubScore, label: dataLabel } = computeDataIntegritySubScore(candidate);
   const dataWeighted = WEIGHTS.data_integrity * dataSubScore;
   score += dataWeighted;
 
@@ -253,9 +249,7 @@ export interface ParsedOverrideResponse {
  * Parses the structured LLM response for severity override.
  * Returns null if the response cannot be parsed.
  */
-export function parseSeverityOverrideResponse(
-  response: string,
-): ParsedOverrideResponse | null {
+export function parseSeverityOverrideResponse(response: string): ParsedOverrideResponse | null {
   const overrideMatch = response.match(/OVERRIDE:\s*(yes|no)/i);
   const severityMatch = response.match(/NEW_SEVERITY:\s*(P[0-3])/i);
   const justificationMatch = response.match(/JUSTIFICATION:\s*(.+)/i);
@@ -279,12 +273,8 @@ export function parseSeverityOverrideResponse(
  * Builds the fully-interpolated LLM prompt from a severity result and
  * evidence summary.
  */
-export function buildOverridePrompt(
-  result: SeverityResult,
-  evidenceSummary: string,
-): string {
-  return SEVERITY_OVERRIDE_PROMPT
-    .replace('{severity}', result.severity)
+export function buildOverridePrompt(result: SeverityResult, evidenceSummary: string): string {
+  return SEVERITY_OVERRIDE_PROMPT.replace('{severity}', result.severity)
     .replace('{score}', result.score.toFixed(4))
     .replace('{error_rate_value}', String(result.breakdown.error_rate.value))
     .replace('{error_rate_subscore}', String(result.breakdown.error_rate.sub_score))

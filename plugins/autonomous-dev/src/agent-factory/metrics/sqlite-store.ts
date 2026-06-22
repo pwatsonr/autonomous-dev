@@ -139,8 +139,8 @@ CREATE INDEX IF NOT EXISTS idx_snapshots_computed ON aggregate_snapshots(compute
 // ---------------------------------------------------------------------------
 
 export interface InvocationQueryOptions {
-  since?: string;   // ISO 8601
-  until?: string;   // ISO 8601
+  since?: string; // ISO 8601
+  until?: string; // ISO 8601
   domain?: string;
   limit?: number;
 }
@@ -173,9 +173,7 @@ export class SqliteStore {
    */
   initialize(): void {
     if (!BetterSqlite3) {
-      throw new Error(
-        'better-sqlite3 is not installed. Install it to use SqliteStore.',
-      );
+      throw new Error('better-sqlite3 is not installed. Install it to use SqliteStore.');
     }
 
     // Ensure parent directory exists
@@ -307,10 +305,7 @@ export class SqliteStore {
    * Query invocations for a given agent, with optional time range, domain,
    * and limit filters.
    */
-  getInvocations(
-    agentName: string,
-    opts?: InvocationQueryOptions,
-  ): InvocationMetric[] {
+  getInvocations(agentName: string, opts?: InvocationQueryOptions): InvocationMetric[] {
     this.requireDb();
 
     const clauses: string[] = ['agent_name = @agentName'];
@@ -347,11 +342,9 @@ export class SqliteStore {
   getInvocationsByPipeline(pipelineRunId: string): InvocationMetric[] {
     this.requireDb();
 
-    const rows = this.db!
-      .prepare(
-        'SELECT * FROM agent_invocations WHERE pipeline_run_id = ? ORDER BY timestamp ASC',
-      )
-      .all(pipelineRunId) as Record<string, unknown>[];
+    const rows = this.db!.prepare(
+      'SELECT * FROM agent_invocations WHERE pipeline_run_id = ? ORDER BY timestamp ASC',
+    ).all(pipelineRunId) as Record<string, unknown>[];
 
     return rows.map((row) => this.hydrateInvocation(row));
   }
@@ -364,18 +357,16 @@ export class SqliteStore {
     this.requireDb();
 
     if (sinceVersion) {
-      const row = this.db!
-        .prepare(
-          `SELECT COUNT(*) as cnt FROM agent_invocations
+      const row = this.db!.prepare(
+        `SELECT COUNT(*) as cnt FROM agent_invocations
            WHERE agent_name = ? AND agent_version >= ?`,
-        )
-        .get(agentName, sinceVersion) as { cnt: number };
+      ).get(agentName, sinceVersion) as { cnt: number };
       return row.cnt;
     }
 
-    const row = this.db!
-      .prepare('SELECT COUNT(*) as cnt FROM agent_invocations WHERE agent_name = ?')
-      .get(agentName) as { cnt: number };
+    const row = this.db!.prepare(
+      'SELECT COUNT(*) as cnt FROM agent_invocations WHERE agent_name = ?',
+    ).get(agentName) as { cnt: number };
     return row.cnt;
   }
 
@@ -387,7 +378,8 @@ export class SqliteStore {
   insertAlert(alert: AlertRecord): void {
     this.requireDb();
 
-    this.db!.prepare(`
+    this.db!.prepare(
+      `
       INSERT INTO agent_alerts (
         alert_id, agent_name, rule_id, severity, message, evidence,
         created_at, resolved_at, acknowledged
@@ -395,7 +387,8 @@ export class SqliteStore {
         @alert_id, @agent_name, @rule_id, @severity, @message, @evidence,
         @created_at, @resolved_at, @acknowledged
       )
-    `).run({
+    `,
+    ).run({
       alert_id: alert.alert_id,
       agent_name: alert.agent_name,
       rule_id: alert.rule_id,
@@ -441,17 +434,16 @@ export class SqliteStore {
   resolveAlert(alertId: string): void {
     this.requireDb();
     const now = new Date().toISOString();
-    this.db!
-      .prepare('UPDATE agent_alerts SET resolved_at = ? WHERE alert_id = ?')
-      .run(now, alertId);
+    this.db!.prepare('UPDATE agent_alerts SET resolved_at = ? WHERE alert_id = ?').run(
+      now,
+      alertId,
+    );
   }
 
   /** Mark an alert as acknowledged. */
   acknowledgeAlert(alertId: string): void {
     this.requireDb();
-    this.db!
-      .prepare('UPDATE agent_alerts SET acknowledged = 1 WHERE alert_id = ?')
-      .run(alertId);
+    this.db!.prepare('UPDATE agent_alerts SET acknowledged = 1 WHERE alert_id = ?').run(alertId);
   }
 
   /**
@@ -463,14 +455,12 @@ export class SqliteStore {
   findActiveAlert(agentName: string, ruleId: string): AlertRecord | null {
     this.requireDb();
 
-    const row = this.db!
-      .prepare(
-        `SELECT * FROM agent_alerts
+    const row = this.db!.prepare(
+      `SELECT * FROM agent_alerts
          WHERE agent_name = ? AND rule_id = ? AND resolved_at IS NULL
          ORDER BY created_at DESC
          LIMIT 1`,
-      )
-      .get(agentName, ruleId) as Record<string, unknown> | undefined;
+    ).get(agentName, ruleId) as Record<string, unknown> | undefined;
 
     if (!row) return null;
     return this.hydrateAlert(row);
@@ -493,13 +483,11 @@ export class SqliteStore {
     this.requireDb();
 
     // Fetch invocations since the alert creation timestamp, oldest first
-    const rows = this.db!
-      .prepare(
-        `SELECT * FROM agent_invocations
+    const rows = this.db!.prepare(
+      `SELECT * FROM agent_invocations
          WHERE agent_name = ? AND timestamp >= ?
          ORDER BY timestamp ASC`,
-      )
-      .all(agentName, sinceTimestamp) as Record<string, unknown>[];
+    ).all(agentName, sinceTimestamp) as Record<string, unknown>[];
 
     const metrics = rows.map((row) => this.hydrateInvocation(row));
 
@@ -523,7 +511,8 @@ export class SqliteStore {
   insertSnapshot(snapshot: AggregateSnapshot): void {
     this.requireDb();
 
-    this.db!.prepare(`
+    this.db!.prepare(
+      `
       INSERT INTO aggregate_snapshots (
         snapshot_id, agent_name, computed_at, window_days,
         invocation_count, approval_rate,
@@ -539,7 +528,8 @@ export class SqliteStore {
         @total_tokens, @trend_direction, @trend_slope, @trend_confidence,
         @domain_breakdown
       )
-    `).run({
+    `,
+    ).run({
       snapshot_id: snapshot.snapshot_id,
       agent_name: snapshot.agent_name,
       computed_at: snapshot.computed_at,
@@ -567,14 +557,12 @@ export class SqliteStore {
   getLatestSnapshot(agentName: string): AggregateSnapshot | null {
     this.requireDb();
 
-    const row = this.db!
-      .prepare(
-        `SELECT * FROM aggregate_snapshots
+    const row = this.db!.prepare(
+      `SELECT * FROM aggregate_snapshots
          WHERE agent_name = ?
          ORDER BY computed_at DESC
          LIMIT 1`,
-      )
-      .get(agentName) as Record<string, unknown> | undefined;
+    ).get(agentName) as Record<string, unknown> | undefined;
 
     if (!row) return null;
     return this.hydrateSnapshot(row);
@@ -588,14 +576,12 @@ export class SqliteStore {
   getLatestSnapshots(agentName: string, count: number): AggregateSnapshot[] {
     this.requireDb();
 
-    const rows = this.db!
-      .prepare(
-        `SELECT * FROM aggregate_snapshots
+    const rows = this.db!.prepare(
+      `SELECT * FROM aggregate_snapshots
          WHERE agent_name = ?
          ORDER BY computed_at DESC
          LIMIT ?`,
-      )
-      .all(agentName, count) as Record<string, unknown>[];
+    ).all(agentName, count) as Record<string, unknown>[];
 
     return rows.map((row) => this.hydrateSnapshot(row));
   }
@@ -615,11 +601,9 @@ export class SqliteStore {
 
     const transaction = this.db!.transaction(() => {
       // Collect invocation IDs to delete
-      const ids = this.db!
-        .prepare(
-          'SELECT invocation_id FROM agent_invocations WHERE timestamp < ?',
-        )
-        .all(cutoffDate) as Array<{ invocation_id: string }>;
+      const ids = this.db!.prepare(
+        'SELECT invocation_id FROM agent_invocations WHERE timestamp < ?',
+      ).all(cutoffDate) as Array<{ invocation_id: string }>;
 
       if (ids.length === 0) return 0;
 
@@ -627,18 +611,14 @@ export class SqliteStore {
 
       // Delete child rows first (quality_dimensions and tool_calls)
       for (const id of idList) {
-        this.db!
-          .prepare('DELETE FROM quality_dimensions WHERE invocation_id = ?')
-          .run(id);
-        this.db!
-          .prepare('DELETE FROM tool_calls WHERE invocation_id = ?')
-          .run(id);
+        this.db!.prepare('DELETE FROM quality_dimensions WHERE invocation_id = ?').run(id);
+        this.db!.prepare('DELETE FROM tool_calls WHERE invocation_id = ?').run(id);
       }
 
       // Delete parent rows
-      const result = this.db!
-        .prepare('DELETE FROM agent_invocations WHERE timestamp < ?')
-        .run(cutoffDate);
+      const result = this.db!.prepare('DELETE FROM agent_invocations WHERE timestamp < ?').run(
+        cutoffDate,
+      );
 
       return result.changes;
     });
@@ -664,13 +644,13 @@ export class SqliteStore {
   private hydrateInvocation(row: Record<string, unknown>): InvocationMetric {
     const invocationId = row.invocation_id as string;
 
-    const dimensions = this.db!
-      .prepare('SELECT * FROM quality_dimensions WHERE invocation_id = ?')
-      .all(invocationId) as Array<Record<string, unknown>>;
+    const dimensions = this.db!.prepare(
+      'SELECT * FROM quality_dimensions WHERE invocation_id = ?',
+    ).all(invocationId) as Array<Record<string, unknown>>;
 
-    const toolCalls = this.db!
-      .prepare('SELECT * FROM tool_calls WHERE invocation_id = ?')
-      .all(invocationId) as Array<Record<string, unknown>>;
+    const toolCalls = this.db!.prepare('SELECT * FROM tool_calls WHERE invocation_id = ?').all(
+      invocationId,
+    ) as Array<Record<string, unknown>>;
 
     return {
       invocation_id: invocationId,
@@ -739,9 +719,7 @@ export class SqliteStore {
       trend_direction: row.trend_direction as AggregateSnapshot['trend_direction'],
       trend_slope: row.trend_slope as number,
       trend_confidence: row.trend_confidence as number,
-      domain_breakdown: JSON.parse(
-        row.domain_breakdown as string,
-      ) as Record<string, DomainStats>,
+      domain_breakdown: JSON.parse(row.domain_breakdown as string) as Record<string, DomainStats>,
     };
   }
 }

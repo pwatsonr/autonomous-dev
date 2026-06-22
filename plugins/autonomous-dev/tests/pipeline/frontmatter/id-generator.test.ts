@@ -150,12 +150,24 @@ function assert(condition: boolean, message: string): void {
 
 describe('id generator', () => {
   it('test_generates_prd_id_as_prd_seq_format', test_generates_prd_id_as_prd_seq_format);
-  it('test_generates_tdd_id_as_tdd_seq_docseq_format', test_generates_tdd_id_as_tdd_seq_docseq_format);
+  it(
+    'test_generates_tdd_id_as_tdd_seq_docseq_format',
+    test_generates_tdd_id_as_tdd_seq_docseq_format,
+  );
   it('test_generates_plan_spec_code_ids', test_generates_plan_spec_code_ids);
-  it('test_sequential_calls_produce_incrementing_sequences', test_sequential_calls_produce_incrementing_sequences);
-  it('test_different_types_have_independent_counters', test_different_types_have_independent_counters);
+  it(
+    'test_sequential_calls_produce_incrementing_sequences',
+    test_sequential_calls_produce_incrementing_sequences,
+  );
+  it(
+    'test_different_types_have_independent_counters',
+    test_different_types_have_independent_counters,
+  );
   it('test_pads_sequences_with_leading_zeros', test_pads_sequences_with_leading_zeros);
   it('test_in_memory_counter_starts_at_1', test_in_memory_counter_starts_at_1);
   it('test_no_collisions_across_10000_ids', test_no_collisions_across_10000_ids);
-  it('test_extracts_pipe_seq_from_various_pipeline_ids', test_extracts_pipe_seq_from_various_pipeline_ids);
+  it(
+    'test_extracts_pipe_seq_from_various_pipeline_ids',
+    test_extracts_pipe_seq_from_various_pipeline_ids,
+  );
 });

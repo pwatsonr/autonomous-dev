@@ -63,10 +63,7 @@ export function mockDeployment(
 /**
  * Create a mock DeploymentInfo (minimal deployment reference).
  */
-export function mockDeploymentInfo(
-  deployedAt: string,
-  id?: string,
-): DeploymentInfo {
+export function mockDeploymentInfo(deployedAt: string, id?: string): DeploymentInfo {
   return {
     id: id ?? `DEPLOY-${Date.now().toString(36)}`,
     deployed_at: deployedAt,

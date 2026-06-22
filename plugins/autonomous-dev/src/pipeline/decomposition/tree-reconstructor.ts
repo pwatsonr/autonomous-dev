@@ -27,17 +27,14 @@ export async function reconstructTree(
   const tree = new DecompositionTree();
 
   // 1. Read all decomposition records
-  const records = await readAllDecompositionRecords(
-    pipelineId,
-    storage.getDirectoryManager(),
-  );
+  const records = await readAllDecompositionRecords(pipelineId, storage.getDirectoryManager());
 
   // 2. Build parent->children map from records
   const parentToChildren = new Map<string, string[]>();
   for (const record of records) {
     parentToChildren.set(
       record.parentId,
-      record.children.map(c => c.id),
+      record.children.map((c) => c.id),
     );
   }
 
@@ -65,7 +62,8 @@ export async function reconstructTree(
     try {
       const fullDoc = await storage.readDocument(pipelineId, doc.type, doc.documentId);
       node.dependsOn = (fullDoc.frontmatter.depends_on as string[]) ?? [];
-      node.executionMode = (fullDoc.frontmatter.execution_mode as 'parallel' | 'sequential') ?? 'parallel';
+      node.executionMode =
+        (fullDoc.frontmatter.execution_mode as 'parallel' | 'sequential') ?? 'parallel';
       node.siblingIndex = (fullDoc.frontmatter.sibling_index as number) ?? 0;
       node.siblingCount = (fullDoc.frontmatter.sibling_count as number) ?? 1;
     } catch {

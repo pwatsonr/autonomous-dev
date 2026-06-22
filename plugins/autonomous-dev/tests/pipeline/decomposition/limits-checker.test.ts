@@ -9,7 +9,9 @@ import {
   DecompositionLimitError,
 } from '../../../src/pipeline/decomposition/limits-checker';
 
-function makeNode(overrides: Partial<DecompositionNode> & { documentId: string }): DecompositionNode {
+function makeNode(
+  overrides: Partial<DecompositionNode> & { documentId: string },
+): DecompositionNode {
   return {
     type: DocumentType.PRD,
     status: 'draft',
@@ -38,10 +40,12 @@ function makeConfig(overrides?: Partial<PipelineConfig['decomposition']>): Pipel
 function makeTreeWithNodeCount(count: number): DecompositionTree {
   const tree = new DecompositionTree();
   for (let i = 0; i < count; i++) {
-    tree.addNode(makeNode({
-      documentId: `NODE-${String(i).padStart(3, '0')}`,
-      depth: i === 0 ? 0 : 1,
-    }));
+    tree.addNode(
+      makeNode({
+        documentId: `NODE-${String(i).padStart(3, '0')}`,
+        depth: i === 0 ? 0 : 1,
+      }),
+    );
   }
   return tree;
 }
@@ -60,7 +64,7 @@ describe('Limits Checker', () => {
     const config = makeConfig();
     const result = checkDecompositionLimits(11, 0, tree, config);
     expect(result.passed).toBe(false);
-    const childError = result.errors.find(e => e.code === 'CHILD_LIMIT_EXCEEDED');
+    const childError = result.errors.find((e) => e.code === 'CHILD_LIMIT_EXCEEDED');
     expect(childError).toBeDefined();
     expect(childError!.limit).toBe(10);
     expect(childError!.actual).toBe(11);
@@ -72,7 +76,7 @@ describe('Limits Checker', () => {
     const tree = makeTreeWithNodeCount(1);
     const config = makeConfig();
     const result = checkDecompositionLimits(10, 0, tree, config);
-    const childError = result.errors.find(e => e.code === 'CHILD_LIMIT_EXCEEDED');
+    const childError = result.errors.find((e) => e.code === 'CHILD_LIMIT_EXCEEDED');
     expect(childError).toBeUndefined();
   });
 
@@ -80,7 +84,7 @@ describe('Limits Checker', () => {
     const tree = makeTreeWithNodeCount(1);
     const config = makeConfig();
     const result = checkDecompositionLimits(1, 3, tree, config);
-    const depthError = result.errors.find(e => e.code === 'DEPTH_LIMIT_EXCEEDED');
+    const depthError = result.errors.find((e) => e.code === 'DEPTH_LIMIT_EXCEEDED');
     expect(depthError).toBeUndefined();
   });
 
@@ -89,7 +93,7 @@ describe('Limits Checker', () => {
     const config = makeConfig();
     const result = checkDecompositionLimits(1, 4, tree, config);
     expect(result.passed).toBe(false);
-    const depthError = result.errors.find(e => e.code === 'DEPTH_LIMIT_EXCEEDED');
+    const depthError = result.errors.find((e) => e.code === 'DEPTH_LIMIT_EXCEEDED');
     expect(depthError).toBeDefined();
     expect(depthError!.limit).toBe(4);
     expect(depthError!.actual).toBe(5);
@@ -100,7 +104,7 @@ describe('Limits Checker', () => {
     const tree = makeTreeWithNodeCount(90);
     const config = makeConfig();
     const result = checkDecompositionLimits(9, 0, tree, config);
-    const totalError = result.errors.find(e => e.code === 'TOTAL_NODE_LIMIT_EXCEEDED');
+    const totalError = result.errors.find((e) => e.code === 'TOTAL_NODE_LIMIT_EXCEEDED');
     expect(totalError).toBeUndefined();
   });
 
@@ -110,7 +114,7 @@ describe('Limits Checker', () => {
     const config = makeConfig();
     const result = checkDecompositionLimits(6, 0, tree, config);
     expect(result.passed).toBe(false);
-    const totalError = result.errors.find(e => e.code === 'TOTAL_NODE_LIMIT_EXCEEDED');
+    const totalError = result.errors.find((e) => e.code === 'TOTAL_NODE_LIMIT_EXCEEDED');
     expect(totalError).toBeDefined();
     expect(totalError!.limit).toBe(100);
     expect(totalError!.actual).toBe(101);
@@ -141,7 +145,7 @@ describe('Limits Checker', () => {
     const result = checkDecompositionLimits(10, 0, tree, config);
     expect(result.explosionWarning).toBe(false);
     expect(result.passed).toBe(false);
-    const totalError = result.errors.find(e => e.code === 'TOTAL_NODE_LIMIT_EXCEEDED');
+    const totalError = result.errors.find((e) => e.code === 'TOTAL_NODE_LIMIT_EXCEEDED');
     expect(totalError).toBeDefined();
   });
 
@@ -157,7 +161,7 @@ describe('Limits Checker', () => {
     // 4 children should fail with custom limit of 3
     const result = checkDecompositionLimits(4, 0, tree, config);
     expect(result.passed).toBe(false);
-    const childError = result.errors.find(e => e.code === 'CHILD_LIMIT_EXCEEDED');
+    const childError = result.errors.find((e) => e.code === 'CHILD_LIMIT_EXCEEDED');
     expect(childError).toBeDefined();
     expect(childError!.limit).toBe(3);
     expect(childError!.actual).toBe(4);
@@ -173,16 +177,14 @@ describe('Limits Checker', () => {
     expect(result.passed).toBe(false);
     expect(result.errors.length).toBeGreaterThanOrEqual(3);
 
-    const codes = result.errors.map(e => e.code);
+    const codes = result.errors.map((e) => e.code);
     expect(codes).toContain('CHILD_LIMIT_EXCEEDED');
     expect(codes).toContain('DEPTH_LIMIT_EXCEEDED');
     expect(codes).toContain('TOTAL_NODE_LIMIT_EXCEEDED');
   });
 
   test('DecompositionLimitError has correct name property', () => {
-    const error = new DecompositionLimitError(
-      'CHILD_LIMIT_EXCEEDED', 10, 11, 'test message',
-    );
+    const error = new DecompositionLimitError('CHILD_LIMIT_EXCEEDED', 10, 11, 'test message');
     expect(error.name).toBe('DecompositionLimitError');
     expect(error.message).toBe('test message');
     expect(error.code).toBe('CHILD_LIMIT_EXCEEDED');
@@ -198,11 +200,11 @@ describe('Limits Checker', () => {
     const config = makeConfig();
     // Parent at depth 3 -> child at depth 4 -> allowed
     const resultAllowed = checkDecompositionLimits(1, 3, tree, config);
-    expect(resultAllowed.errors.find(e => e.code === 'DEPTH_LIMIT_EXCEEDED')).toBeUndefined();
+    expect(resultAllowed.errors.find((e) => e.code === 'DEPTH_LIMIT_EXCEEDED')).toBeUndefined();
 
     // Parent at depth 4 -> child at depth 5 -> rejected
     const resultRejected = checkDecompositionLimits(1, 4, tree, config);
-    const depthError = resultRejected.errors.find(e => e.code === 'DEPTH_LIMIT_EXCEEDED');
+    const depthError = resultRejected.errors.find((e) => e.code === 'DEPTH_LIMIT_EXCEEDED');
     expect(depthError).toBeDefined();
     expect(depthError!.limit).toBe(4);
     expect(depthError!.actual).toBe(5);
@@ -233,7 +235,7 @@ describe('Limits Checker', () => {
     const config = makeConfig();
     const result = checkDecompositionLimits(10, 0, tree, config);
     // 100 total: not > 100, so no TOTAL_NODE_LIMIT_EXCEEDED error
-    expect(result.errors.find(e => e.code === 'TOTAL_NODE_LIMIT_EXCEEDED')).toBeUndefined();
+    expect(result.errors.find((e) => e.code === 'TOTAL_NODE_LIMIT_EXCEEDED')).toBeUndefined();
     // 100 > 75 && 100 <= 100, so explosion warning is true
     expect(result.explosionWarning).toBe(true);
     expect(result.passed).toBe(true);

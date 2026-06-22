@@ -13,52 +13,41 @@
 // Imports (for factory function)
 // ---------------------------------------------------------------------------
 
-import { EscalationEngine } from "./escalation-engine";
-import { EscalationClassifier } from "./classifier";
-import { EscalationFormatter, EscalationIdGenerator } from "./formatter";
-import { RoutingEngine } from "./routing-engine";
-import { EscalationChainManager } from "./chain-manager";
-import { EscalationConfigLoader } from "./escalation-config";
-import type {
-  AuditTrail,
-  ConfigProvider,
-  DeliveryAdapter,
-  Timer,
-} from "./types";
+import { EscalationEngine } from './escalation-engine';
+import { EscalationClassifier } from './classifier';
+import { EscalationFormatter, EscalationIdGenerator } from './formatter';
+import { RoutingEngine } from './routing-engine';
+import { EscalationChainManager } from './chain-manager';
+import { EscalationConfigLoader } from './escalation-config';
+import type { AuditTrail, ConfigProvider, DeliveryAdapter, Timer } from './types';
 
 // ---------------------------------------------------------------------------
 // Re-exports
 // ---------------------------------------------------------------------------
 
-export { EscalationEngine, resolvePipelineBehavior } from "./escalation-engine";
-export { EscalationClassifier } from "./classifier";
-export type { FailureContext, ClassificationResult } from "./classifier";
-export { EscalationFormatter, EscalationIdGenerator } from "./formatter";
-export { redactSecrets, sanitizePath, generateSummary } from "./formatter";
-export { RoutingEngine } from "./routing-engine";
-export { EscalationChainManager } from "./chain-manager";
-export type { TimeoutBehaviorResult } from "./chain-manager";
-export { EscalationConfigLoader } from "./escalation-config";
-export * from "./types";
-export * from "./response-types";
-export { ResponseParser } from "./response-parser";
-export { ResponseValidator } from "./response-validator";
-export type { EscalationStore, StoredEscalation, KillSwitchQuery } from "./response-validator";
-export { ActionResolver } from "./action-resolver";
-export { PipelineResumptionCoordinator } from "./pipeline-resumption";
-export type { PipelineExecutor, ResumeResult } from "./pipeline-resumption";
-export { ReEscalationManager } from "./re-escalation-manager";
-export type { GuidanceAttempt, ReEscalationChain } from "./re-escalation-manager";
-export { HumanResponseHandler } from "./human-response-handler";
-export type { HandleResult } from "./human-response-handler";
-export {
-  getGateApprovalTemplate,
-  getCustomTemplate,
-} from "./gate-approval-templates";
-export type {
-  GateTemplateType,
-  GateTemplateConfig,
-} from "./gate-approval-templates";
+export { EscalationEngine, resolvePipelineBehavior } from './escalation-engine';
+export { EscalationClassifier } from './classifier';
+export type { FailureContext, ClassificationResult } from './classifier';
+export { EscalationFormatter, EscalationIdGenerator } from './formatter';
+export { redactSecrets, sanitizePath, generateSummary } from './formatter';
+export { RoutingEngine } from './routing-engine';
+export { EscalationChainManager } from './chain-manager';
+export type { TimeoutBehaviorResult } from './chain-manager';
+export { EscalationConfigLoader } from './escalation-config';
+export * from './types';
+export * from './response-types';
+export { ResponseParser } from './response-parser';
+export { ResponseValidator } from './response-validator';
+export type { EscalationStore, StoredEscalation, KillSwitchQuery } from './response-validator';
+export { ActionResolver } from './action-resolver';
+export { PipelineResumptionCoordinator } from './pipeline-resumption';
+export type { PipelineExecutor, ResumeResult } from './pipeline-resumption';
+export { ReEscalationManager } from './re-escalation-manager';
+export type { GuidanceAttempt, ReEscalationChain } from './re-escalation-manager';
+export { HumanResponseHandler } from './human-response-handler';
+export type { HandleResult } from './human-response-handler';
+export { getGateApprovalTemplate, getCustomTemplate } from './gate-approval-templates';
+export type { GateTemplateType, GateTemplateConfig } from './gate-approval-templates';
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -96,11 +85,5 @@ export function createEscalationEngine(
   const routingEngine = new RoutingEngine(config);
   const chainManager = new EscalationChainManager(timer, deliveryAdapter, auditTrail);
 
-  return new EscalationEngine(
-    classifier,
-    formatter,
-    routingEngine,
-    chainManager,
-    auditTrail,
-  );
+  return new EscalationEngine(classifier, formatter, routingEngine, chainManager, auditTrail);
 }

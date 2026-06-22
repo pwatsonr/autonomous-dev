@@ -29,10 +29,7 @@ import type { AgentRecord, AgentRole, IAgentRegistry, ParsedAgent, RuntimeContex
 import type { IMetricsEngine, InvocationMetric, ToolCallRecord } from '../metrics/types';
 import type { AuditLogger } from '../audit';
 import type { ProposalStore } from '../improvement/proposal-store';
-import type {
-  CanaryStateManager,
-  CanaryComparison,
-} from './state-manager';
+import type { CanaryStateManager, CanaryComparison } from './state-manager';
 import { generateComparisonId } from './state-manager';
 import type { CanaryExitEvaluator, ExitDecision } from './exit-evaluator';
 
@@ -230,11 +227,7 @@ export class CanaryShadowRunner {
         return { canary_active: false, current_output: '' };
       }
 
-      const currentResult = await this.agentInvoker.invoke(
-        currentAgent,
-        input,
-        'production',
-      );
+      const currentResult = await this.agentInvoker.invoke(currentAgent, input, 'production');
 
       return {
         canary_active: false,
@@ -253,11 +246,7 @@ export class CanaryShadowRunner {
         return { canary_active: false, current_output: '', exit_decision: decision };
       }
 
-      const currentResult = await this.agentInvoker.invoke(
-        currentAgent,
-        input,
-        'production',
-      );
+      const currentResult = await this.agentInvoker.invoke(currentAgent, input, 'production');
 
       return {
         canary_active: false,
@@ -273,11 +262,7 @@ export class CanaryShadowRunner {
     }
 
     // Step 2: Run current version (primary)
-    const currentResult = await this.agentInvoker.invoke(
-      currentAgent,
-      input,
-      'production',
-    );
+    const currentResult = await this.agentInvoker.invoke(currentAgent, input, 'production');
 
     // Record current invocation metric with environment: 'production'
     this.recordInvocationMetric(
@@ -290,25 +275,16 @@ export class CanaryShadowRunner {
     );
 
     // Step 3: Run proposed version (shadow)
-    const proposedAgent = this.buildProposedAgentRecord(
-      currentAgent,
-      canaryState.proposed_version,
-    );
+    const proposedAgent = this.buildProposedAgentRecord(currentAgent, canaryState.proposed_version);
 
     let proposedResult: ShadowInvokeResult;
     let shadowFailed = false;
     try {
-      proposedResult = await this.agentInvoker.invoke(
-        proposedAgent,
-        input,
-        'canary',
-      );
+      proposedResult = await this.agentInvoker.invoke(proposedAgent, input, 'canary');
     } catch (err) {
       // Shadow run failure does NOT affect production
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(
-        `[CANARY] Shadow run failed for '${agentName}': ${message}\n`,
-      );
+      process.stderr.write(`[CANARY] Shadow run failed for '${agentName}': ${message}\n`);
       shadowFailed = true;
       proposedResult = {
         success: false,
@@ -372,9 +348,7 @@ export class CanaryShadowRunner {
       this.canaryManager.addComparison(agentName, comparison);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(
-        `[CANARY] Failed to record comparison for '${agentName}': ${message}\n`,
-      );
+      process.stderr.write(`[CANARY] Failed to record comparison for '${agentName}': ${message}\n`);
     }
 
     // Step 7: Call evaluateImmediate for catastrophic regression check (SPEC-005-5-2)
@@ -461,9 +435,7 @@ export class CanaryShadowRunner {
     } catch (err) {
       // Scoring failure: record with default scores
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(
-        `[CANARY] Scoring failed for '${agentName}': ${message}\n`,
-      );
+      process.stderr.write(`[CANARY] Scoring failed for '${agentName}': ${message}\n`);
 
       return {
         comparison_id: generateComparisonId(),
@@ -583,7 +555,7 @@ export class CanaryShadowRunner {
   ): Promise<void> {
     process.stderr.write(
       `[CANARY] CATASTROPHIC REGRESSION detected for '${agentName}': ` +
-      `delta=${comparison.delta.toFixed(2)}\n`,
+        `delta=${comparison.delta.toFixed(2)}\n`,
     );
 
     // Terminate the canary (sets auto_rollback_triggered = true)
@@ -591,9 +563,7 @@ export class CanaryShadowRunner {
       this.canaryManager.terminateCanary(agentName);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(
-        `[CANARY] Failed to terminate canary for '${agentName}': ${message}\n`,
-      );
+      process.stderr.write(`[CANARY] Failed to terminate canary for '${agentName}': ${message}\n`);
     }
 
     // Transition agent to REJECTED state (AC-7)
@@ -644,10 +614,7 @@ export class CanaryShadowRunner {
    * Catches errors since proposal store may enforce state machine rules
    * and the proposal may already be in a terminal state.
    */
-  private safeUpdateProposalStatus(
-    proposalId: string,
-    status: 'rejected',
-  ): void {
+  private safeUpdateProposalStatus(proposalId: string, status: 'rejected'): void {
     try {
       this.proposalStore.updateStatus(proposalId, status);
     } catch (err) {

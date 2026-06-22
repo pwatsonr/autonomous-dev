@@ -16,7 +16,10 @@ import { ProposedChild } from '../../../src/pipeline/decomposition/decomposition
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeConfig(rootDir: string, overrides?: Partial<PipelineConfig['decomposition']>): PipelineConfig {
+function makeConfig(
+  rootDir: string,
+  overrides?: Partial<PipelineConfig['decomposition']>,
+): PipelineConfig {
   return {
     ...DEFAULT_PIPELINE_CONFIG,
     pipeline: {
@@ -85,11 +88,12 @@ describe('Decomposition Integration', () => {
     });
 
     // Read the current content and write a new version with status=approved
-    const currentContent = await storage.readDocument(pipelineId, DocumentType.PRD, handle.documentId);
-    const rawContent = currentContent.rawContent.replace(
-      /status:\s*draft/,
-      'status: approved',
+    const currentContent = await storage.readDocument(
+      pipelineId,
+      DocumentType.PRD,
+      handle.documentId,
     );
+    const rawContent = currentContent.rawContent.replace(/status:\s*draft/, 'status: approved');
 
     await storage.writeVersion({
       pipelineId,
@@ -114,8 +118,11 @@ describe('Decomposition Integration', () => {
     // Build proposed children that trace from actual sections in the PRD template
     // We need to know what sections the template creates. Get all section-like headings.
     const sectionMatches = prdContent.rawContent.match(/^##\s+(.+)$/gm) ?? [];
-    const sectionIds = sectionMatches.map(m =>
-      m.replace(/^##\s+/, '').toLowerCase().replace(/\s+/g, '-'),
+    const sectionIds = sectionMatches.map((m) =>
+      m
+        .replace(/^##\s+/, '')
+        .toLowerCase()
+        .replace(/\s+/g, '-'),
     );
 
     // Create 3 proposed children that cover all sections
@@ -166,7 +173,10 @@ describe('Decomposition Integration', () => {
     const dm = storage.getDirectoryManager();
     const decompDir = dm.getDecompositionDir(pipelineId);
     const recordFile = path.join(decompDir, `${prdId}-decomposition.yaml`);
-    const recordExists = await fs.access(recordFile).then(() => true).catch(() => false);
+    const recordExists = await fs
+      .access(recordFile)
+      .then(() => true)
+      .catch(() => false);
     expect(recordExists).toBe(true);
 
     // Verify tree reconstruction includes all nodes
@@ -186,8 +196,11 @@ describe('Decomposition Integration', () => {
 
     const prdContent = await storage.readDocument(pipelineId, DocumentType.PRD, prdId);
     const sectionMatches = prdContent.rawContent.match(/^##\s+(.+)$/gm) ?? [];
-    const sectionIds = sectionMatches.map(m =>
-      m.replace(/^##\s+/, '').toLowerCase().replace(/\s+/g, '-'),
+    const sectionIds = sectionMatches.map((m) =>
+      m
+        .replace(/^##\s+/, '')
+        .toLowerCase()
+        .replace(/\s+/g, '-'),
     );
 
     // Create 11 proposed children (exceeds default limit of 10)
@@ -242,8 +255,11 @@ describe('Decomposition Integration', () => {
 
     const prdContent = await storage.readDocument(pipelineId, DocumentType.PRD, prdId);
     const sectionMatches = prdContent.rawContent.match(/^##\s+(.+)$/gm) ?? [];
-    const sectionIds = sectionMatches.map(m =>
-      m.replace(/^##\s+/, '').toLowerCase().replace(/\s+/g, '-'),
+    const sectionIds = sectionMatches.map((m) =>
+      m
+        .replace(/^##\s+/, '')
+        .toLowerCase()
+        .replace(/\s+/g, '-'),
     );
 
     // Only cover first section, leaving others uncovered
@@ -327,8 +343,11 @@ describe('Decomposition Integration', () => {
     // Read PRD sections
     const prdContent = await storage.readDocument(pipelineId, DocumentType.PRD, prdId);
     const sectionMatches = prdContent.rawContent.match(/^##\s+(.+)$/gm) ?? [];
-    const sectionIds = sectionMatches.map(m =>
-      m.replace(/^##\s+/, '').toLowerCase().replace(/\s+/g, '-'),
+    const sectionIds = sectionMatches.map((m) =>
+      m
+        .replace(/^##\s+/, '')
+        .toLowerCase()
+        .replace(/\s+/g, '-'),
     );
 
     // Step 1: Decompose PRD into 1 TDD (keep it simple)
@@ -359,10 +378,7 @@ describe('Decomposition Integration', () => {
 
     // Step 2: Approve the TDD by writing new version
     const tddContent = await storage.readDocument(pipelineId, DocumentType.TDD, tddId);
-    const tddApproved = tddContent.rawContent.replace(
-      /status:\s*draft/,
-      'status: approved',
-    );
+    const tddApproved = tddContent.rawContent.replace(/status:\s*draft/, 'status: approved');
     await storage.writeVersion({
       pipelineId,
       type: DocumentType.TDD,
@@ -376,8 +392,11 @@ describe('Decomposition Integration', () => {
     // Read TDD sections
     const tddContentApproved = await storage.readDocument(pipelineId, DocumentType.TDD, tddId);
     const tddSectionMatches = tddContentApproved.rawContent.match(/^##\s+(.+)$/gm) ?? [];
-    const tddSectionIds = tddSectionMatches.map(m =>
-      m.replace(/^##\s+/, '').toLowerCase().replace(/\s+/g, '-'),
+    const tddSectionIds = tddSectionMatches.map((m) =>
+      m
+        .replace(/^##\s+/, '')
+        .toLowerCase()
+        .replace(/\s+/g, '-'),
     );
 
     // Step 3: Decompose TDD into 2 PLANs

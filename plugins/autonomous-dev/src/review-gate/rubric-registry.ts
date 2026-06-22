@@ -142,7 +142,7 @@ export class RubricRegistry {
     // Rule 8: valid document_type
     if (!isDocumentType(rubric.document_type)) {
       errors.push(
-        `document_type "${rubric.document_type}" is not a valid DocumentType. Valid values: ${DOCUMENT_TYPES.join(', ')}.`
+        `document_type "${rubric.document_type}" is not a valid DocumentType. Valid values: ${DOCUMENT_TYPES.join(', ')}.`,
       );
     }
 
@@ -204,13 +204,22 @@ export class RubricRegistry {
       if (!category.calibration) {
         errors.push(`${prefix}: calibration is required.`);
       } else {
-        if (typeof category.calibration.score_0 !== 'string' || category.calibration.score_0.length === 0) {
+        if (
+          typeof category.calibration.score_0 !== 'string' ||
+          category.calibration.score_0.length === 0
+        ) {
           errors.push(`${prefix}: calibration.score_0 must be a non-empty string.`);
         }
-        if (typeof category.calibration.score_50 !== 'string' || category.calibration.score_50.length === 0) {
+        if (
+          typeof category.calibration.score_50 !== 'string' ||
+          category.calibration.score_50.length === 0
+        ) {
           errors.push(`${prefix}: calibration.score_50 must be a non-empty string.`);
         }
-        if (typeof category.calibration.score_100 !== 'string' || category.calibration.score_100.length === 0) {
+        if (
+          typeof category.calibration.score_100 !== 'string' ||
+          category.calibration.score_100.length === 0
+        ) {
           errors.push(`${prefix}: calibration.score_100 must be a non-empty string.`);
         }
       }
@@ -219,9 +228,7 @@ export class RubricRegistry {
     // Rule 4: weights sum to 100 within tolerance
     const weightSum = rubric.categories.reduce((sum, c) => sum + c.weight, 0);
     if (Math.abs(weightSum - 100) > 0.01) {
-      errors.push(
-        `Category weights must sum to 100 (within +/- 0.01). Actual sum: ${weightSum}.`
-      );
+      errors.push(`Category weights must sum to 100 (within +/- 0.01). Actual sum: ${weightSum}.`);
     }
 
     return { valid: errors.length === 0, errors };
@@ -251,13 +258,7 @@ export class RubricRegistry {
    * Registers the hardcoded default rubrics for all 5 document types.
    */
   private registerDefaults(): void {
-    const defaults: Rubric[] = [
-      PRD_RUBRIC,
-      TDD_RUBRIC,
-      PLAN_RUBRIC,
-      SPEC_RUBRIC,
-      CODE_RUBRIC,
-    ];
+    const defaults: Rubric[] = [PRD_RUBRIC, TDD_RUBRIC, PLAN_RUBRIC, SPEC_RUBRIC, CODE_RUBRIC];
 
     for (const rubric of defaults) {
       // Store a deep-frozen clone of each default

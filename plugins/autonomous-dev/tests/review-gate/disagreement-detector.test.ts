@@ -13,7 +13,13 @@
  * - All identical scores
  */
 
-import type { Rubric, RubricCategory, ReviewOutput, CategoryScore, Disagreement } from '../../src/review-gate/types';
+import type {
+  Rubric,
+  RubricCategory,
+  ReviewOutput,
+  CategoryScore,
+  Disagreement,
+} from '../../src/review-gate/types';
 import {
   DisagreementDetector,
   DisagreementConfig,
@@ -54,10 +60,7 @@ function buildRubric(
 /**
  * Build a minimal ReviewOutput with given category scores.
  */
-function buildReviewOutput(
-  reviewerId: string,
-  scores: Record<string, number>,
-): ReviewOutput {
+function buildReviewOutput(reviewerId: string, scores: Record<string, number>): ReviewOutput {
   return {
     reviewer_id: reviewerId,
     reviewer_role: 'test-role',
@@ -138,9 +141,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 2: Below threshold ---
   it('2. Below threshold: problem_clarity [85, 75] variance 10 < 15, not flagged', () => {
-    const rubric = buildRubric([
-      { id: 'problem_clarity', name: 'Problem Clarity' },
-    ]);
+    const rubric = buildRubric([{ id: 'problem_clarity', name: 'Problem Clarity' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { problem_clarity: 85 });
     const reviewerB = buildReviewOutput('reviewer-b', { problem_clarity: 75 });
 
@@ -150,9 +151,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 3: Exactly at threshold ---
   it('3. Exactly at threshold: variance 15 is flagged (>= not >)', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { cat_a: 80 });
     const reviewerB = buildReviewOutput('reviewer-b', { cat_a: 65 });
 
@@ -163,9 +162,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 4: One point below threshold ---
   it('4. One point below threshold: variance 14, not flagged', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { cat_a: 80 });
     const reviewerB = buildReviewOutput('reviewer-b', { cat_a: 66 });
 
@@ -175,9 +172,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 5: Single reviewer returns empty ---
   it('5. Single reviewer returns empty array', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { cat_a: 50 });
 
     const disagreements = detector.detect([reviewerA], rubric);
@@ -186,9 +181,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 6: No reviewers returns empty ---
   it('6. No reviewers returns empty array', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
 
     const disagreements = detector.detect([], rubric);
     expect(disagreements).toEqual([]);
@@ -234,9 +227,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 9: Three reviewers ---
   it('9. Three reviewers: [90, 60, 75] max pairwise = |90-60| = 30, flagged', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { cat_a: 90 });
     const reviewerB = buildReviewOutput('reviewer-b', { cat_a: 60 });
     const reviewerC = buildReviewOutput('reviewer-c', { cat_a: 75 });
@@ -249,9 +240,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 10: Three reviewers -- pairwise, not std ---
   it('10. Three reviewers [80, 60, 70]: max pairwise = |80-60| = 20, flagged', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { cat_a: 80 });
     const reviewerB = buildReviewOutput('reviewer-b', { cat_a: 60 });
     const reviewerC = buildReviewOutput('reviewer-c', { cat_a: 70 });
@@ -263,9 +252,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 11: Low confidence note for panel of 2 ---
   it('11. Low confidence note for panel of 2: note contains "limited data" and "lower confidence"', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { cat_a: 90 });
     const reviewerB = buildReviewOutput('reviewer-b', { cat_a: 70 });
 
@@ -277,9 +264,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 12: No low confidence note for panel of 3 ---
   it('12. No low confidence note for panel of 3', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { cat_a: 90 });
     const reviewerB = buildReviewOutput('reviewer-b', { cat_a: 60 });
     const reviewerC = buildReviewOutput('reviewer-c', { cat_a: 75 });
@@ -291,9 +276,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 13: Significant divergence note ---
   it('13. Significant divergence note: variance 30 includes "significant divergence"', () => {
-    const rubric = buildRubric([
-      { id: 'cat_a', name: 'Category A' },
-    ]);
+    const rubric = buildRubric([{ id: 'cat_a', name: 'Category A' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { cat_a: 90 });
     const reviewerB = buildReviewOutput('reviewer-b', { cat_a: 60 });
 
@@ -305,9 +288,7 @@ describe('DisagreementDetector', () => {
 
   // --- Test case 14: Missing category treated as 0 ---
   it('14. Missing category treated as 0: reviewer B has no security_depth, variance = |75-0| = 75', () => {
-    const rubric = buildRubric([
-      { id: 'security_depth', name: 'Security Depth' },
-    ]);
+    const rubric = buildRubric([{ id: 'security_depth', name: 'Security Depth' }]);
     const reviewerA = buildReviewOutput('reviewer-a', { security_depth: 75 });
     // Reviewer B has no security_depth category score
     const reviewerB: ReviewOutput = {
@@ -342,11 +323,9 @@ describe('DisagreementDetector', () => {
     // cat_a: |80-68| = 12 -> flagged with threshold 10
     // cat_b: |80-72| = 8 -> not flagged
 
-    const disagreements = detector.detect(
-      [reviewerA, reviewerB],
-      rubric,
-      { variance_threshold: 10 },
-    );
+    const disagreements = detector.detect([reviewerA, reviewerB], rubric, {
+      variance_threshold: 10,
+    });
     expect(disagreements).toHaveLength(1);
     expect(disagreements[0].category_id).toBe('cat_a');
     expect(disagreements[0].variance).toBe(12);

@@ -15,9 +15,9 @@
  * Missing files never cause failures -- safe defaults are used instead.
  */
 
-import * as fs from "fs/promises";
-import * as path from "path";
-import type { KillMode, StateSnapshot } from "./types";
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import type { KillMode, StateSnapshot } from './types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,7 +58,7 @@ interface PendingEscalationsFile {
  * Defaults to Node's fs/promises at runtime. Injected in tests.
  */
 export interface FileSystem {
-  readFile(filePath: string, encoding: "utf-8"): Promise<string>;
+  readFile(filePath: string, encoding: 'utf-8'): Promise<string>;
   readdir(dirPath: string): Promise<string[]>;
   writeFile(filePath: string, content: string): Promise<void>;
   rename(oldPath: string, newPath: string): Promise<void>;
@@ -69,7 +69,7 @@ export interface FileSystem {
 export const defaultFs: FileSystem = {
   readFile: (p, enc) => fs.readFile(p, enc),
   readdir: (p) => fs.readdir(p).then((entries) => entries.map(String)),
-  writeFile: (p, c) => fs.writeFile(p, c, "utf-8"),
+  writeFile: (p, c) => fs.writeFile(p, c, 'utf-8'),
   rename: (o, n) => fs.rename(o, n),
   mkdir: (p, opts) => fs.mkdir(p, opts).then(() => undefined),
 };
@@ -133,12 +133,12 @@ export class StateSnapshotCapture {
 
     return {
       requestId,
-      pipelinePhase: pipelineState.pipelinePhase ?? "unknown",
-      phaseStatus: (pipelineState.phaseStatus ?? "unknown") as
-        | "running"
-        | "completed"
-        | "pending"
-        | "unknown",
+      pipelinePhase: pipelineState.pipelinePhase ?? 'unknown',
+      phaseStatus: (pipelineState.phaseStatus ?? 'unknown') as
+        | 'running'
+        | 'completed'
+        | 'pending'
+        | 'unknown',
       artifacts,
       pendingEscalationIds,
       trustLevel: pipelineState.trustLevel ?? 0,
@@ -158,7 +158,7 @@ export class StateSnapshotCapture {
     issuedBy: string,
   ): Promise<string> {
     const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, "-");
+    const timestamp = now.toISOString().replace(/[:.]/g, '-');
     const filename = `kill-snapshot-${timestamp}.json`;
     const targetPath = path.join(this.stateDir, filename);
 
@@ -190,16 +190,12 @@ export class StateSnapshotCapture {
    * Read pipeline.json for a request. Returns safe defaults on any failure.
    */
   private readPipelineStateSafe(requestId: string): PipelineStateFile {
-    const filePath = path.join(
-      this.stateDir,
-      requestId,
-      "pipeline.json",
-    );
+    const filePath = path.join(this.stateDir, requestId, 'pipeline.json');
 
     try {
       // Use synchronous read for sub-millisecond capture
-      const fsSync = require("fs");
-      const content = fsSync.readFileSync(filePath, "utf-8");
+      const fsSync = require('fs');
+      const content = fsSync.readFileSync(filePath, 'utf-8');
       return JSON.parse(content) as PipelineStateFile;
     } catch {
       return {};
@@ -210,15 +206,10 @@ export class StateSnapshotCapture {
    * List artifacts in a request's workspace. Returns empty array on failure.
    */
   private listArtifactsSafe(requestId: string): string[] {
-    const workspacePath = path.join(
-      this.stateDir,
-      "..",
-      "workspaces",
-      requestId,
-    );
+    const workspacePath = path.join(this.stateDir, '..', 'workspaces', requestId);
 
     try {
-      const fsSync = require("fs");
+      const fsSync = require('fs');
       return fsSync.readdirSync(workspacePath).map(String);
     } catch {
       return [];
@@ -230,15 +221,11 @@ export class StateSnapshotCapture {
    * Returns empty array on failure.
    */
   private readPendingEscalationsSafe(requestId: string): string[] {
-    const filePath = path.join(
-      this.stateDir,
-      "escalations",
-      "pending.json",
-    );
+    const filePath = path.join(this.stateDir, 'escalations', 'pending.json');
 
     try {
-      const fsSync = require("fs");
-      const content = fsSync.readFileSync(filePath, "utf-8");
+      const fsSync = require('fs');
+      const content = fsSync.readFileSync(filePath, 'utf-8');
       const data = JSON.parse(content) as PendingEscalationsFile;
 
       return (data.pending ?? [])

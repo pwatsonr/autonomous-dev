@@ -8,18 +8,18 @@
  *   4. Re-enabled: access allowed again
  */
 
-import { HaltedGate } from "../halted-gate";
-import type { GateCheckResult, HaltedError } from "../halted-gate";
-import { KillSwitch } from "../kill-switch";
+import { HaltedGate } from '../halted-gate';
+import type { GateCheckResult, HaltedError } from '../halted-gate';
+import { KillSwitch } from '../kill-switch';
 import type {
   AbortManagerPort,
   AuditTrail,
   EscalationCanceller,
   Notifier,
   NotificationPayload,
-} from "../kill-switch";
-import type { AbortReason, KillResult, StateSnapshot } from "../types";
-import type { StateSnapshotCapture } from "../state-snapshot";
+} from '../kill-switch';
+import type { AbortReason, KillResult, StateSnapshot } from '../types';
+import type { StateSnapshotCapture } from '../state-snapshot';
 
 // ---------------------------------------------------------------------------
 // Mock factories
@@ -27,7 +27,7 @@ import type { StateSnapshotCapture } from "../state-snapshot";
 
 function createMockAbortManager(): AbortManagerPort {
   return {
-    getActiveRequestIds: jest.fn(() => ["req-1", "req-2"]),
+    getActiveRequestIds: jest.fn(() => ['req-1', 'req-2']),
     abortAll: jest.fn(),
     abortRequest: jest.fn(),
     reset: jest.fn(),
@@ -37,8 +37,8 @@ function createMockAbortManager(): AbortManagerPort {
 function createMockSnapshotCapture(): StateSnapshotCapture {
   const makeSnapshot = (requestId: string): StateSnapshot => ({
     requestId,
-    pipelinePhase: "code_review",
-    phaseStatus: "running",
+    pipelinePhase: 'code_review',
+    phaseStatus: 'running',
     artifacts: [],
     pendingEscalationIds: [],
     trustLevel: 2,
@@ -47,7 +47,7 @@ function createMockSnapshotCapture(): StateSnapshotCapture {
   return {
     captureAll: jest.fn((ids: string[]) => ids.map(makeSnapshot)),
     captureOne: jest.fn((id: string) => makeSnapshot(id)),
-    persistKillSnapshot: jest.fn(async () => "/state/kill-snapshot.json"),
+    persistKillSnapshot: jest.fn(async () => '/state/kill-snapshot.json'),
   } as unknown as StateSnapshotCapture;
 }
 
@@ -87,15 +87,15 @@ function createTestSetup() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("HaltedGate", () => {
+describe('HaltedGate', () => {
   // -------------------------------------------------------------------------
   // Test 1: Running -- access allowed
   // -------------------------------------------------------------------------
 
-  it("allows access when system is running", () => {
+  it('allows access when system is running', () => {
     const { gate } = createTestSetup();
 
-    const result = gate.checkAccess("req-1");
+    const result = gate.checkAccess('req-1');
 
     expect(result.allowed).toBe(true);
   });
@@ -104,16 +104,16 @@ describe("HaltedGate", () => {
   // Test 2: Halted -- access denied with SYSTEM_HALTED error
   // -------------------------------------------------------------------------
 
-  it("denies access with SYSTEM_HALTED error when system is halted", async () => {
+  it('denies access with SYSTEM_HALTED error when system is halted', async () => {
     const { killSwitch, gate } = createTestSetup();
 
-    await killSwitch.kill("graceful", "admin@example.com");
+    await killSwitch.kill('graceful', 'admin@example.com');
 
-    const result = gate.checkAccess("req-new");
+    const result = gate.checkAccess('req-new');
 
     expect(result.allowed).toBe(false);
     if (!result.allowed) {
-      expect(result.error.code).toBe("SYSTEM_HALTED");
+      expect(result.error.code).toBe('SYSTEM_HALTED');
     }
   });
 
@@ -121,23 +121,23 @@ describe("HaltedGate", () => {
   // Test 3: Error includes context (killedBy, killedAt, killMode)
   // -------------------------------------------------------------------------
 
-  it("includes kill context in SYSTEM_HALTED error", async () => {
+  it('includes kill context in SYSTEM_HALTED error', async () => {
     const { killSwitch, gate } = createTestSetup();
 
-    await killSwitch.kill("hard", "security-bot");
+    await killSwitch.kill('hard', 'security-bot');
 
-    const result = gate.checkAccess("req-new");
+    const result = gate.checkAccess('req-new');
 
     expect(result.allowed).toBe(false);
     if (!result.allowed) {
       const error: HaltedError = result.error;
-      expect(error.code).toBe("SYSTEM_HALTED");
-      expect(error.killedBy).toBe("security-bot");
+      expect(error.code).toBe('SYSTEM_HALTED');
+      expect(error.killedBy).toBe('security-bot');
       expect(error.killedAt).toBeInstanceOf(Date);
-      expect(error.killMode).toBe("hard");
-      expect(error.message).toContain("security-bot");
-      expect(error.message).toContain("hard");
-      expect(error.message).toContain("Re-enable required");
+      expect(error.killMode).toBe('hard');
+      expect(error.message).toContain('security-bot');
+      expect(error.message).toContain('hard');
+      expect(error.message).toContain('Re-enable required');
     }
   });
 
@@ -145,18 +145,18 @@ describe("HaltedGate", () => {
   // Test 4: Re-enabled -- access allowed again
   // -------------------------------------------------------------------------
 
-  it("allows access again after kill followed by reenable", async () => {
+  it('allows access again after kill followed by reenable', async () => {
     const { killSwitch, gate } = createTestSetup();
 
     // Kill
-    await killSwitch.kill("graceful", "admin");
-    expect(gate.checkAccess("req-1").allowed).toBe(false);
+    await killSwitch.kill('graceful', 'admin');
+    expect(gate.checkAccess('req-1').allowed).toBe(false);
 
     // Re-enable
-    killSwitch.reenable("admin");
+    killSwitch.reenable('admin');
 
     // Access should be allowed again
-    const result = gate.checkAccess("req-1");
+    const result = gate.checkAccess('req-1');
     expect(result.allowed).toBe(true);
   });
 
@@ -164,12 +164,12 @@ describe("HaltedGate", () => {
   // Additional: error message format
   // -------------------------------------------------------------------------
 
-  it("formats error message with kill details", async () => {
+  it('formats error message with kill details', async () => {
     const { killSwitch, gate } = createTestSetup();
 
-    await killSwitch.kill("graceful", "ops-lead");
+    await killSwitch.kill('graceful', 'ops-lead');
 
-    const result = gate.checkAccess("req-42");
+    const result = gate.checkAccess('req-42');
 
     if (!result.allowed) {
       expect(result.error.message).toMatch(

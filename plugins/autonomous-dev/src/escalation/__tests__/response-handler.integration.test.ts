@@ -11,26 +11,23 @@
  *   13. Full lifecycle: Escalation chain timeout -> secondary target responds
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
-import { HumanResponseHandler } from "../human-response-handler";
-import { ResponseParser } from "../response-parser";
-import { ResponseValidator } from "../response-validator";
-import type { EscalationStore, StoredEscalation, KillSwitchQuery } from "../response-validator";
-import { ActionResolver } from "../action-resolver";
-import {
-  PipelineResumptionCoordinator,
-  type PipelineExecutor,
-} from "../pipeline-resumption";
-import { EscalationChainManager } from "../chain-manager";
-import { EscalationEngine } from "../escalation-engine";
-import { EscalationClassifier } from "../classifier";
-import { EscalationFormatter, EscalationIdGenerator } from "../formatter";
-import { RoutingEngine } from "../routing-engine";
-import { ReEscalationManager } from "../re-escalation-manager";
-import type { FailureContext } from "../classifier";
+import { HumanResponseHandler } from '../human-response-handler';
+import { ResponseParser } from '../response-parser';
+import { ResponseValidator } from '../response-validator';
+import type { EscalationStore, StoredEscalation, KillSwitchQuery } from '../response-validator';
+import { ActionResolver } from '../action-resolver';
+import { PipelineResumptionCoordinator, type PipelineExecutor } from '../pipeline-resumption';
+import { EscalationChainManager } from '../chain-manager';
+import { EscalationEngine } from '../escalation-engine';
+import { EscalationClassifier } from '../classifier';
+import { EscalationFormatter, EscalationIdGenerator } from '../formatter';
+import { RoutingEngine } from '../routing-engine';
+import { ReEscalationManager } from '../re-escalation-manager';
+import type { FailureContext } from '../classifier';
 import type {
   AuditTrail,
   DeliveryAdapter,
@@ -39,7 +36,7 @@ import type {
   RoutingTarget,
   Timer,
   TimerHandle,
-} from "../types";
+} from '../types';
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -69,9 +66,7 @@ function createMockTimer(): MockTimer {
     advance(ms: number): void {
       currentTime += ms;
       // Fire all elapsed timers in order
-      for (const [id, fireAt] of Array.from(timings.entries()).sort(
-        (a, b) => a[1] - b[1],
-      )) {
+      for (const [id, fireAt] of Array.from(timings.entries()).sort((a, b) => a[1] - b[1])) {
         if (fireAt <= currentTime && callbacks.has(id)) {
           const cb = callbacks.get(id)!;
           callbacks.delete(id);
@@ -153,15 +148,15 @@ function createMockPipelineExecutor(): PipelineExecutor & {
 // ---------------------------------------------------------------------------
 
 const PRIMARY_TARGET: RoutingTarget = {
-  target_id: "primary-reviewer",
-  display_name: "Primary Reviewer",
-  channel: "slack",
+  target_id: 'primary-reviewer',
+  display_name: 'Primary Reviewer',
+  channel: 'slack',
 };
 
 const SECONDARY_TARGET: RoutingTarget = {
-  target_id: "escalation-manager",
-  display_name: "Escalation Manager",
-  channel: "email",
+  target_id: 'escalation-manager',
+  display_name: 'Escalation Manager',
+  channel: 'email',
 };
 
 // ---------------------------------------------------------------------------
@@ -186,7 +181,7 @@ class InMemoryEscalationStore implements EscalationStore {
   resolve(escalationId: string): void {
     const esc = this.store.get(escalationId);
     if (esc) {
-      esc.status = "resolved";
+      esc.status = 'resolved';
     }
   }
 }
@@ -210,7 +205,7 @@ class InMemoryKillSwitch implements KillSwitchQuery {
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "resp-handler-int-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'resp-handler-int-'));
 });
 
 afterEach(() => {
@@ -221,9 +216,9 @@ afterEach(() => {
 // Integration Scenario 11: Full lifecycle -- escalation -> respond -> resume
 // ---------------------------------------------------------------------------
 
-describe("Integration: Full lifecycle -- escalation -> human responds -> pipeline resumes", () => {
+describe('Integration: Full lifecycle -- escalation -> human responds -> pipeline resumes', () => {
   // SKIP: production behavior changed (PRD-016 triage: SKIP-WITH-NOTE)
-  test.skip("quality escalation raised, approved by pm-lead, pipeline resumes, escalation resolved", () => {
+  test.skip('quality escalation raised, approved by pm-lead, pipeline resumes, escalation resolved', () => {
     // --- Setup ---
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
@@ -232,71 +227,61 @@ describe("Integration: Full lifecycle -- escalation -> human responds -> pipelin
 
     const config: EscalationConfig = {
       routing: {
-        mode: "default",
+        mode: 'default',
         default_target: PRIMARY_TARGET,
       },
-      verbosity: "standard",
+      verbosity: 'standard',
       retry_budget: 3,
     };
 
-    const statePath = path.join(tmpDir, "escalation-counter.json");
+    const statePath = path.join(tmpDir, 'escalation-counter.json');
     const classifier = new EscalationClassifier();
-    const idGen = new EscalationIdGenerator(statePath, () => "20260408");
+    const idGen = new EscalationIdGenerator(statePath, () => '20260408');
     const formatter = new EscalationFormatter(idGen, config.verbosity);
     const routingEngine = new RoutingEngine(config);
     const chainManager = new EscalationChainManager(timer, delivery, audit);
 
-    const engine = new EscalationEngine(
-      classifier,
-      formatter,
-      routingEngine,
-      chainManager,
-      audit,
-    );
+    const engine = new EscalationEngine(classifier, formatter, routingEngine, chainManager, audit);
 
     // --- Step (a): Raise an escalation for a quality failure ---
     const failureContext: FailureContext = {
-      pipelinePhase: "code_review",
-      errorType: "review_gate_failed",
-      errorMessage: "Code review failed: insufficient test coverage",
+      pipelinePhase: 'code_review',
+      errorType: 'review_gate_failed',
+      errorMessage: 'Code review failed: insufficient test coverage',
       retryCount: 3,
       maxRetries: 3,
     };
 
     const escalationResult = engine.raise(failureContext, {
-      requestId: "req-100",
-      repository: "my-app",
-      pipelinePhase: "code_review",
+      requestId: 'req-100',
+      repository: 'my-app',
+      pipelinePhase: 'code_review',
       retryCount: 3,
     });
 
     const escalationId = escalationResult.message.escalation_id;
 
     // --- Step (b): Verify escalation is pending with options ---
-    expect(escalationResult.message.escalation_type).toBe("quality");
+    expect(escalationResult.message.escalation_type).toBe('quality');
     expect(escalationResult.message.options.length).toBeGreaterThanOrEqual(2);
     expect(delivery.deliveries).toHaveLength(1);
-    expect(delivery.deliveries[0].target.target_id).toBe("primary-reviewer");
+    expect(delivery.deliveries[0].target.target_id).toBe('primary-reviewer');
 
     // --- Set up the response handler ---
     const escalationStore = new InMemoryEscalationStore();
     escalationStore.add({
       escalationId,
-      requestId: "req-100",
-      status: "pending",
+      requestId: 'req-100',
+      status: 'pending',
       options: escalationResult.message.options,
-      gate: "code_review",
+      gate: 'code_review',
     });
 
     const killSwitch = new InMemoryKillSwitch();
     const parser = new ResponseParser();
     const validator = new ResponseValidator(escalationStore, config, killSwitch);
     const actionResolver = new ActionResolver();
-    const resumption = new PipelineResumptionCoordinator(
-      executor,
-      chainManager,
-      audit,
-    );
+    const resumption = new PipelineResumptionCoordinator(executor, chainManager, audit);
     const reEscalation = new ReEscalationManager(engine, audit);
 
     const handler = new HumanResponseHandler(
@@ -312,15 +297,11 @@ describe("Integration: Full lifecycle -- escalation -> human responds -> pipelin
     // --- Step (c): Call handleResponse to approve ---
     // Find the approve option
     const approveOption = escalationResult.message.options.find(
-      (opt) => opt.action === "approve" || opt.action === "accept" || opt.action === "review",
+      (opt) => opt.action === 'approve' || opt.action === 'accept' || opt.action === 'review',
     );
     expect(approveOption).toBeDefined();
 
-    const result = handler.handleResponse(
-      approveOption!.option_id,
-      escalationId,
-      "pm-lead",
-    );
+    const result = handler.handleResponse(approveOption!.option_id, escalationId, 'pm-lead');
 
     // --- Step (d): Verify pipeline resumed ---
     expect(result.success).toBe(true);
@@ -331,18 +312,18 @@ describe("Integration: Full lifecycle -- escalation -> human responds -> pipelin
     // --- Step (e): Verify escalation resolved (via audit trail) ---
     escalationStore.resolve(escalationId);
     const storedEsc = escalationStore.getEscalation(escalationId);
-    expect(storedEsc!.status).toBe("resolved");
+    expect(storedEsc!.status).toBe('resolved');
 
     // --- Step (f): Verify audit trail contains expected events ---
     const allEventTypes = audit.events.map((e) => e.event_type);
-    expect(allEventTypes).toContain("escalation_raised");
-    expect(allEventTypes).toContain("escalation_response_received");
-    expect(allEventTypes).toContain("escalation_resolved");
+    expect(allEventTypes).toContain('escalation_raised');
+    expect(allEventTypes).toContain('escalation_response_received');
+    expect(allEventTypes).toContain('escalation_resolved');
 
     // Verify ordering: raised -> response_received -> resolved
-    const raisedIdx = allEventTypes.indexOf("escalation_raised");
-    const responseIdx = allEventTypes.indexOf("escalation_response_received");
-    const resolvedIdx = allEventTypes.indexOf("escalation_resolved");
+    const raisedIdx = allEventTypes.indexOf('escalation_raised');
+    const responseIdx = allEventTypes.indexOf('escalation_response_received');
+    const resolvedIdx = allEventTypes.indexOf('escalation_resolved');
     expect(raisedIdx).toBeLessThan(responseIdx);
     expect(responseIdx).toBeLessThan(resolvedIdx);
   });
@@ -352,9 +333,9 @@ describe("Integration: Full lifecycle -- escalation -> human responds -> pipelin
 // Integration Scenario 12: Re-escalation when guidance fails
 // ---------------------------------------------------------------------------
 
-describe("Integration: Re-escalation when guidance fails", () => {
+describe('Integration: Re-escalation when guidance fails', () => {
   // SKIP: production behavior changed (PRD-016 triage: SKIP-WITH-NOTE)
-  test.skip("freetext guidance applied, phase fails again, re-escalation raised, then cancelled", () => {
+  test.skip('freetext guidance applied, phase fails again, re-escalation raised, then cancelled', () => {
     // --- Setup ---
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
@@ -363,65 +344,55 @@ describe("Integration: Re-escalation when guidance fails", () => {
 
     const config: EscalationConfig = {
       routing: {
-        mode: "default",
+        mode: 'default',
         default_target: PRIMARY_TARGET,
       },
-      verbosity: "standard",
+      verbosity: 'standard',
       retry_budget: 3,
     };
 
-    const statePath = path.join(tmpDir, "escalation-counter.json");
+    const statePath = path.join(tmpDir, 'escalation-counter.json');
     const classifier = new EscalationClassifier();
-    const idGen = new EscalationIdGenerator(statePath, () => "20260408");
+    const idGen = new EscalationIdGenerator(statePath, () => '20260408');
     const formatter = new EscalationFormatter(idGen, config.verbosity);
     const routingEngine = new RoutingEngine(config);
     const chainManager = new EscalationChainManager(timer, delivery, audit);
 
-    const engine = new EscalationEngine(
-      classifier,
-      formatter,
-      routingEngine,
-      chainManager,
-      audit,
-    );
+    const engine = new EscalationEngine(classifier, formatter, routingEngine, chainManager, audit);
 
     const escalationStore = new InMemoryEscalationStore();
     const killSwitch = new InMemoryKillSwitch();
 
     // --- Step (a): Raise initial escalation for a technical failure ---
     const initialFailure: FailureContext = {
-      pipelinePhase: "implementation",
-      errorType: "build_failed",
-      errorMessage: "Compilation error: missing import",
+      pipelinePhase: 'implementation',
+      errorType: 'build_failed',
+      errorMessage: 'Compilation error: missing import',
       retryCount: 3,
       maxRetries: 3,
     };
 
     const initialResult = engine.raise(initialFailure, {
-      requestId: "req-200",
-      repository: "my-app",
-      pipelinePhase: "implementation",
+      requestId: 'req-200',
+      repository: 'my-app',
+      pipelinePhase: 'implementation',
       retryCount: 3,
     });
 
     const escalationId1 = initialResult.message.escalation_id;
     escalationStore.add({
       escalationId: escalationId1,
-      requestId: "req-200",
-      status: "pending",
+      requestId: 'req-200',
+      status: 'pending',
       options: initialResult.message.options,
-      gate: "implementation",
+      gate: 'implementation',
     });
 
     // --- Step (b): Respond with freetext guidance ---
     const parser = new ResponseParser();
     const validator = new ResponseValidator(escalationStore, config, killSwitch);
     const actionResolver = new ActionResolver();
-    const resumption = new PipelineResumptionCoordinator(
-      executor,
-      chainManager,
-      audit,
-    );
+    const resumption = new PipelineResumptionCoordinator(executor, chainManager, audit);
     const reEscalation = new ReEscalationManager(engine, audit);
 
     const handler = new HumanResponseHandler(
@@ -434,32 +405,25 @@ describe("Integration: Re-escalation when guidance fails", () => {
       escalationStore,
     );
 
-    const guidanceResult = handler.handleResponse(
-      "Try batch size 10",
-      escalationId1,
-      "dev-lead",
-    );
+    const guidanceResult = handler.handleResponse('Try batch size 10', escalationId1, 'dev-lead');
 
     expect(guidanceResult.success).toBe(true);
     if (!guidanceResult.success) return;
     expect(guidanceResult.action).toEqual({
-      action: "retry_with_changes",
-      guidance: "Try batch size 10",
+      action: 'retry_with_changes',
+      guidance: 'Try batch size 10',
     });
 
     // Verify guidance was injected
-    expect(executor.injectGuidance).toHaveBeenCalledWith(
-      "req-200",
-      "Try batch size 10",
-    );
-    expect(executor.reExecutePhase).toHaveBeenCalledWith("req-200");
+    expect(executor.injectGuidance).toHaveBeenCalledWith('req-200', 'Try batch size 10');
+    expect(executor.reExecutePhase).toHaveBeenCalledWith('req-200');
 
     // --- Step (c): Pipeline re-executes but fails again ---
     // Simulate: the phase failed again after applying guidance
     const reFailure: FailureContext = {
-      pipelinePhase: "implementation",
-      errorType: "build_failed",
-      errorMessage: "Still failing: batch size 10 causes OOM",
+      pipelinePhase: 'implementation',
+      errorType: 'build_failed',
+      errorMessage: 'Still failing: batch size 10 causes OOM',
       retryCount: 3,
       maxRetries: 3,
     };
@@ -469,28 +433,28 @@ describe("Integration: Re-escalation when guidance fails", () => {
       escalationId1,
       reFailure,
       {
-        requestId: "req-200",
-        repository: "my-app",
-        pipelinePhase: "implementation",
+        requestId: 'req-200',
+        repository: 'my-app',
+        pipelinePhase: 'implementation',
         retryCount: 3,
       },
-      "Try batch size 10",
+      'Try batch size 10',
     );
 
     // --- Step (e): Verify new escalation has previous_escalation_id set ---
     expect(reEscalationMsg.previous_escalation_id).toBeDefined();
 
     // --- Step (f): Verify re-escalation context ---
-    expect(reEscalationMsg.failure_reason).toContain("Still failing");
+    expect(reEscalationMsg.failure_reason).toContain('Still failing');
 
     // Add the new escalation to the store so we can respond to it
     const escalationId2 = reEscalationMsg.escalation_id;
     escalationStore.add({
       escalationId: escalationId2,
-      requestId: "req-200",
-      status: "pending",
+      requestId: 'req-200',
+      status: 'pending',
       options: reEscalationMsg.options,
-      gate: "implementation",
+      gate: 'implementation',
     });
 
     // Ensure the cancel option exists in the new escalation
@@ -498,7 +462,7 @@ describe("Integration: Re-escalation when guidance fails", () => {
     // loop detection was triggered. With just 1 re-escalation, no loop.)
     // Add a cancel option for the test
     const cancelOpt = reEscalationMsg.options.find(
-      (o) => o.action === "cancel" || o.action === "reject",
+      (o) => o.action === 'cancel' || o.action === 'reject',
     );
 
     // --- Step (g): Respond to re-escalation with cancel ---
@@ -508,13 +472,13 @@ describe("Integration: Re-escalation when guidance fails", () => {
     const cancelEscalation = escalationStore.getEscalation(escalationId2)!;
     if (!cancelOpt) {
       cancelEscalation.options.push({
-        option_id: "opt-cancel",
-        label: "Cancel request",
-        action: "cancel",
+        option_id: 'opt-cancel',
+        label: 'Cancel request',
+        action: 'cancel',
       });
     }
 
-    const cancelOptionId = cancelOpt?.option_id ?? "opt-cancel";
+    const cancelOptionId = cancelOpt?.option_id ?? 'opt-cancel';
 
     // Create a fresh handler with the updated store
     const handler2 = new HumanResponseHandler(
@@ -527,20 +491,13 @@ describe("Integration: Re-escalation when guidance fails", () => {
       escalationStore,
     );
 
-    const cancelResult = handler2.handleResponse(
-      cancelOptionId,
-      escalationId2,
-      "dev-lead",
-    );
+    const cancelResult = handler2.handleResponse(cancelOptionId, escalationId2, 'dev-lead');
 
     // --- Step (h): Verify pipeline terminated ---
     expect(cancelResult.success).toBe(true);
     if (!cancelResult.success) return;
-    expect(cancelResult.action).toEqual({ action: "cancel" });
-    expect(executor.terminateRequest).toHaveBeenCalledWith(
-      "req-200",
-      "Cancelled by human",
-    );
+    expect(cancelResult.action).toEqual({ action: 'cancel' });
+    expect(executor.terminateRequest).toHaveBeenCalledWith('req-200', 'Cancelled by human');
   });
 });
 
@@ -548,8 +505,8 @@ describe("Integration: Re-escalation when guidance fails", () => {
 // Integration Scenario 13: Chain timeout -> secondary target responds
 // ---------------------------------------------------------------------------
 
-describe("Integration: Escalation chain timeout -> secondary target responds", () => {
-  test("primary times out, secondary receives escalation, responds with approve, pipeline resumes", () => {
+describe('Integration: Escalation chain timeout -> secondary target responds', () => {
+  test('primary times out, secondary receives escalation, responds with approve, pipeline resumes', () => {
     // --- Setup ---
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
@@ -558,49 +515,43 @@ describe("Integration: Escalation chain timeout -> secondary target responds", (
 
     const config: EscalationConfig = {
       routing: {
-        mode: "advanced",
+        mode: 'advanced',
         default_target: PRIMARY_TARGET,
         advanced: {
           quality: {
             primary: PRIMARY_TARGET,
             secondary: SECONDARY_TARGET,
             timeout_minutes: 30,
-            timeout_behavior: "pause",
+            timeout_behavior: 'pause',
           },
         } as any,
       },
-      verbosity: "standard",
+      verbosity: 'standard',
       retry_budget: 3,
     };
 
-    const statePath = path.join(tmpDir, "escalation-counter.json");
+    const statePath = path.join(tmpDir, 'escalation-counter.json');
     const classifier = new EscalationClassifier();
-    const idGen = new EscalationIdGenerator(statePath, () => "20260408");
+    const idGen = new EscalationIdGenerator(statePath, () => '20260408');
     const formatter = new EscalationFormatter(idGen, config.verbosity);
     const routingEngine = new RoutingEngine(config);
     const chainManager = new EscalationChainManager(timer, delivery, audit);
 
-    const engine = new EscalationEngine(
-      classifier,
-      formatter,
-      routingEngine,
-      chainManager,
-      audit,
-    );
+    const engine = new EscalationEngine(classifier, formatter, routingEngine, chainManager, audit);
 
     // --- Step (a): Raise escalation with primary and secondary targets ---
     const failureContext: FailureContext = {
-      pipelinePhase: "code_review",
-      errorType: "review_gate_failed",
-      errorMessage: "Code review failed: insufficient test coverage",
+      pipelinePhase: 'code_review',
+      errorType: 'review_gate_failed',
+      errorMessage: 'Code review failed: insufficient test coverage',
       retryCount: 3,
       maxRetries: 3,
     };
 
     const escalationResult = engine.raise(failureContext, {
-      requestId: "req-300",
-      repository: "my-app",
-      pipelinePhase: "code_review",
+      requestId: 'req-300',
+      repository: 'my-app',
+      pipelinePhase: 'code_review',
       retryCount: 3,
     });
 
@@ -608,42 +559,36 @@ describe("Integration: Escalation chain timeout -> secondary target responds", (
 
     // Verify initial dispatch to primary
     expect(delivery.deliveries).toHaveLength(1);
-    expect(delivery.deliveries[0].target.target_id).toBe("primary-reviewer");
+    expect(delivery.deliveries[0].target.target_id).toBe('primary-reviewer');
 
     // --- Step (b): Advance mock timer past primary timeout ---
     timer.advance(30 * 60 * 1000); // 30 minutes
 
     // --- Step (c): Verify secondary target received the escalation ---
     expect(delivery.deliveries).toHaveLength(2);
-    expect(delivery.deliveries[1].target.target_id).toBe("escalation-manager");
+    expect(delivery.deliveries[1].target.target_id).toBe('escalation-manager');
 
     // Verify timeout event in audit trail
-    const timeoutEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_timeout",
-    );
+    const timeoutEvents = audit.events.filter((e) => e.event_type === 'escalation_timeout');
     expect(timeoutEvents.length).toBeGreaterThanOrEqual(1);
-    expect(timeoutEvents[0].payload.target).toBe("primary");
-    expect(timeoutEvents[0].payload.chainedTo).toBe("secondary");
+    expect(timeoutEvents[0].payload.target).toBe('primary');
+    expect(timeoutEvents[0].payload.chainedTo).toBe('secondary');
 
     // --- Set up the response handler ---
     const escalationStore = new InMemoryEscalationStore();
     escalationStore.add({
       escalationId,
-      requestId: "req-300",
-      status: "pending",
+      requestId: 'req-300',
+      status: 'pending',
       options: escalationResult.message.options,
-      gate: "code_review",
+      gate: 'code_review',
     });
 
     const killSwitch = new InMemoryKillSwitch();
     const parser = new ResponseParser();
     const validator = new ResponseValidator(escalationStore, config, killSwitch);
     const actionResolver = new ActionResolver();
-    const resumption = new PipelineResumptionCoordinator(
-      executor,
-      chainManager,
-      audit,
-    );
+    const resumption = new PipelineResumptionCoordinator(executor, chainManager, audit);
     const reEscalation = new ReEscalationManager(engine, audit);
 
     const handler = new HumanResponseHandler(
@@ -664,7 +609,7 @@ describe("Integration: Escalation chain timeout -> secondary target responds", (
     const result = handler.handleResponse(
       firstOption.option_id,
       escalationId,
-      "escalation-manager",
+      'escalation-manager',
     );
 
     // --- Step (e): Verify pipeline resumes ---
@@ -674,14 +619,14 @@ describe("Integration: Escalation chain timeout -> secondary target responds", (
 
     // --- Step (f): Verify audit trail contains timeout event and resolution ---
     const allEventTypes = audit.events.map((e) => e.event_type);
-    expect(allEventTypes).toContain("escalation_raised");
-    expect(allEventTypes).toContain("escalation_timeout");
-    expect(allEventTypes).toContain("escalation_response_received");
-    expect(allEventTypes).toContain("escalation_resolved");
+    expect(allEventTypes).toContain('escalation_raised');
+    expect(allEventTypes).toContain('escalation_timeout');
+    expect(allEventTypes).toContain('escalation_response_received');
+    expect(allEventTypes).toContain('escalation_resolved');
 
     // Verify the timeout happened before the response
-    const timeoutIdx = allEventTypes.indexOf("escalation_timeout");
-    const responseIdx = allEventTypes.indexOf("escalation_response_received");
+    const timeoutIdx = allEventTypes.indexOf('escalation_timeout');
+    const responseIdx = allEventTypes.indexOf('escalation_response_received');
     expect(timeoutIdx).toBeLessThan(responseIdx);
   });
 });

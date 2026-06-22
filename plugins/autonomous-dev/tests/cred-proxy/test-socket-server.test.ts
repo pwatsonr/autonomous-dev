@@ -12,26 +12,15 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import {
-  ActiveTokenRegistry,
-} from '../../intake/cred-proxy/active-tokens';
-import {
-  CredentialAuditEmitter,
-  type AuditSink,
-} from '../../intake/cred-proxy/audit-emitter';
+import { ActiveTokenRegistry } from '../../intake/cred-proxy/active-tokens';
+import { CredentialAuditEmitter, type AuditSink } from '../../intake/cred-proxy/audit-emitter';
 import {
   __resetLiveBackendsForTests,
   registerLiveBackend,
 } from '../../intake/cred-proxy/caller-identity';
 import { CredentialProxy } from '../../intake/cred-proxy/proxy';
-import {
-  CredProxySocketServer,
-  type SocketResponse,
-} from '../../intake/cred-proxy/socket-server';
-import {
-  type CredentialScoper,
-  type Provider,
-} from '../../intake/cred-proxy/types';
+import { CredProxySocketServer, type SocketResponse } from '../../intake/cred-proxy/socket-server';
+import { type CredentialScoper, type Provider } from '../../intake/cred-proxy/types';
 
 function makeScoper(): CredentialScoper {
   return {
@@ -66,17 +55,11 @@ function makeProxy(privileged: string[]): {
 }
 
 function tmpSocketPath(): string {
-  const dir = path.join(
-    os.tmpdir(),
-    `cred-proxy-test-${randomBytes(4).toString('hex')}`,
-  );
+  const dir = path.join(os.tmpdir(), `cred-proxy-test-${randomBytes(4).toString('hex')}`);
   return path.join(dir, 'sock');
 }
 
-async function sendRequest(
-  socketPath: string,
-  body: string,
-): Promise<string> {
+async function sendRequest(socketPath: string, body: string): Promise<string> {
   return await new Promise((resolve, reject) => {
     const sock = net.createConnection(socketPath);
     let buf = '';
@@ -178,7 +161,9 @@ describe('CredProxySocketServer', () => {
     );
     const resp = JSON.parse(respText.trim()) as SocketResponse;
     expect(resp.ok).toBe(true);
-    interface CredEnvelope { delivery: 'stdin' | 'socket' }
+    interface CredEnvelope {
+      delivery: 'stdin' | 'socket';
+    }
     expect((resp.cred as CredEnvelope).delivery).toBe('socket');
     expect(registry.size()).toBe(1);
   });
@@ -237,21 +222,13 @@ describe('CredProxySocketServer', () => {
     });
     await server.start();
     await Promise.all([
-      sendRequest(
-        socketPath,
-        JSON.stringify({ provider: 'aws', operation: 'A', scope: {} }),
-      ),
-      sendRequest(
-        socketPath,
-        JSON.stringify({ provider: 'aws', operation: 'B', scope: {} }),
-      ),
+      sendRequest(socketPath, JSON.stringify({ provider: 'aws', operation: 'A', scope: {} })),
+      sendRequest(socketPath, JSON.stringify({ provider: 'aws', operation: 'B', scope: {} })),
     ]);
     // The end of the first call MUST appear before the start of the
     // second — the chain enforces serial dispatch.
     const firstEnd = order.findIndex((e) => e.startsWith('end:'));
-    const secondStart = order.findIndex(
-      (e, i) => i > firstEnd && e.startsWith('start:'),
-    );
+    const secondStart = order.findIndex((e, i) => i > firstEnd && e.startsWith('start:'));
     expect(firstEnd).toBeGreaterThan(-1);
     expect(secondStart).toBeGreaterThan(firstEnd);
   });

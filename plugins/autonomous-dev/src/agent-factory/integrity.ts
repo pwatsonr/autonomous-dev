@@ -29,7 +29,11 @@ export type { IntegrityResult, FileIntegrityResult };
  * (SPEC-005-1-3). For now, we emit structured messages to stderr so
  * they are captured by process-level log collectors.
  */
-function logSecurityAlert(filePath: string, reason: string, details: Record<string, unknown>): void {
+function logSecurityAlert(
+  filePath: string,
+  reason: string,
+  details: Record<string, unknown>,
+): void {
   const event = {
     timestamp: new Date().toISOString(),
     eventType: 'integrity_check_failed',
@@ -67,7 +71,8 @@ export function checkIntegrity(agentsDir: string): IntegrityResult {
   }
 
   // Discover all .md files on disk
-  const mdFiles = fs.readdirSync(resolvedDir)
+  const mdFiles = fs
+    .readdirSync(resolvedDir)
     .filter((f) => f.endsWith('.md'))
     .map((f) => path.join(resolvedDir, f));
 
@@ -137,8 +142,10 @@ export function checkIntegrity(agentsDir: string): IntegrityResult {
         gitStatus: status,
       };
       // Only add if not already processed
-      if (!rejected.some((r) => r.filePath === result.filePath) &&
-          !passed.some((r) => r.filePath === result.filePath)) {
+      if (
+        !rejected.some((r) => r.filePath === result.filePath) &&
+        !passed.some((r) => r.filePath === result.filePath)
+      ) {
         rejected.push(result);
         logSecurityAlert(result.filePath, result.reason!, { gitStatus: status });
       }
@@ -243,15 +250,11 @@ function batchGitStatus(agentsDir: string): Map<string, string> {
   }
 
   try {
-    const output = execFileSync(
-      'git',
-      ['status', '--porcelain', agentsDir],
-      {
-        encoding: 'utf-8',
-        cwd: gitRoot,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      },
-    );
+    const output = execFileSync('git', ['status', '--porcelain', agentsDir], {
+      encoding: 'utf-8',
+      cwd: gitRoot,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
 
     if (!output.trim()) {
       return dirtyFiles;
@@ -275,9 +278,7 @@ function batchGitStatus(agentsDir: string): Map<string, string> {
     }
   } catch (err) {
     // If git is not available or the directory is not in a repo, throw
-    throw new Error(
-      `git status failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    throw new Error(`git status failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return dirtyFiles;
@@ -292,15 +293,11 @@ function getGitFileContent(filePath: string): string {
   const gitRoot = getGitRoot(path.dirname(filePath));
   const relativePath = path.relative(gitRoot, filePath);
 
-  return execFileSync(
-    'git',
-    ['show', `HEAD:${relativePath}`],
-    {
-      encoding: 'utf-8',
-      cwd: gitRoot,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    },
-  );
+  return execFileSync('git', ['show', `HEAD:${relativePath}`], {
+    encoding: 'utf-8',
+    cwd: gitRoot,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
 }
 
 /**
@@ -308,15 +305,11 @@ function getGitFileContent(filePath: string): string {
  */
 function getGitRoot(fromDir: string): string {
   try {
-    return execFileSync(
-      'git',
-      ['rev-parse', '--show-toplevel'],
-      {
-        encoding: 'utf-8',
-        cwd: fromDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      },
-    ).trim();
+    return execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      encoding: 'utf-8',
+      cwd: fromDir,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
   } catch (err) {
     throw new Error(
       `Not a git repository or git not available: ${err instanceof Error ? err.message : String(err)}`,

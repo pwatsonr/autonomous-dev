@@ -50,10 +50,7 @@ export interface ImpactAnalysis {
 // Audit logging
 // ---------------------------------------------------------------------------
 
-function logRollbackEvent(
-  eventType: string,
-  details: Record<string, unknown>,
-): void {
+function logRollbackEvent(eventType: string, details: Record<string, unknown>): void {
   const event = {
     timestamp: new Date().toISOString(),
     eventType,
@@ -71,11 +68,7 @@ export class RollbackManager {
   private readonly registry: IAgentRegistry;
   private readonly metricsEngine: IMetricsEngine;
 
-  constructor(
-    agentsDir: string,
-    registry: IAgentRegistry,
-    metricsEngine: IMetricsEngine,
-  ) {
+  constructor(agentsDir: string, registry: IAgentRegistry, metricsEngine: IMetricsEngine) {
     this.agentsDir = path.resolve(agentsDir);
     this.registry = registry;
     this.metricsEngine = metricsEngine;
@@ -96,10 +89,7 @@ export class RollbackManager {
    *   5. Commit the change.
    *   6. Post-rollback: reload registry, audit log, quarantine.
    */
-  async rollback(
-    agentName: string,
-    opts?: RollbackOptions,
-  ): Promise<RollbackResult> {
+  async rollback(agentName: string, opts?: RollbackOptions): Promise<RollbackResult> {
     const filePath = path.join(this.agentsDir, `${agentName}.md`);
 
     // Validate agent exists in registry
@@ -236,17 +226,8 @@ export class RollbackManager {
     const currentVersion = record.agent.version;
 
     try {
-      const resolved = this.resolveTargetVersion(
-        agentName,
-        filePath,
-        currentVersion,
-      );
-      return this.performImpactAnalysis(
-        agentName,
-        currentVersion,
-        resolved.commitHash,
-        filePath,
-      );
+      const resolved = this.resolveTargetVersion(agentName, filePath, currentVersion);
+      return this.performImpactAnalysis(agentName, currentVersion, resolved.commitHash, filePath);
     } catch {
       return null;
     }
@@ -272,9 +253,7 @@ export class RollbackManager {
     const commits = this.getGitLog(relativePath);
 
     if (commits.length < 2) {
-      throw new Error(
-        `No previous version found in git history for '${agentName}'`,
-      );
+      throw new Error(`No previous version found in git history for '${agentName}'`);
     }
 
     if (targetVersion) {
@@ -371,12 +350,8 @@ export class RollbackManager {
     // be in progress)
     const inFlight: string[] = [];
     for (const pipelineId of pipelineIds) {
-      const pipelineInvocations = invocations.filter(
-        (m) => m.pipeline_run_id === pipelineId,
-      );
-      const hasIncomplete = pipelineInvocations.some(
-        (m) => m.review_outcome === 'not_reviewed',
-      );
+      const pipelineInvocations = invocations.filter((m) => m.pipeline_run_id === pipelineId);
+      const hasIncomplete = pipelineInvocations.some((m) => m.review_outcome === 'not_reviewed');
       if (hasIncomplete) {
         inFlight.push(pipelineId);
       }
@@ -394,10 +369,10 @@ export class RollbackManager {
    */
   private getGitLog(relativePath: string): Array<{ hash: string; message: string }> {
     try {
-      const output = execSync(
-        `git log --oneline -- "${relativePath}"`,
-        { encoding: 'utf-8', cwd: this.findGitRoot() },
-      ).trim();
+      const output = execSync(`git log --oneline -- "${relativePath}"`, {
+        encoding: 'utf-8',
+        cwd: this.findGitRoot(),
+      }).trim();
 
       if (!output) return [];
 
@@ -417,10 +392,10 @@ export class RollbackManager {
    * Get file content at a specific commit.
    */
   private getFileContentAtCommit(commitHash: string, relativePath: string): string {
-    return execSync(
-      `git show ${commitHash}:"${relativePath}"`,
-      { encoding: 'utf-8', cwd: this.findGitRoot() },
-    );
+    return execSync(`git show ${commitHash}:"${relativePath}"`, {
+      encoding: 'utf-8',
+      cwd: this.findGitRoot(),
+    });
   }
 
   /**
@@ -437,10 +412,10 @@ export class RollbackManager {
   private computeDiff(targetCommit: string, filePath: string): string {
     const relativePath = this.getRelativePath(filePath);
     try {
-      return execSync(
-        `git diff ${targetCommit} HEAD -- "${relativePath}"`,
-        { encoding: 'utf-8', cwd: this.findGitRoot() },
-      );
+      return execSync(`git diff ${targetCommit} HEAD -- "${relativePath}"`, {
+        encoding: 'utf-8',
+        cwd: this.findGitRoot(),
+      });
     } catch {
       return '(diff unavailable)';
     }
@@ -528,10 +503,7 @@ export class RollbackManager {
     let updated = content;
 
     // Ensure version field matches the target version
-    updated = updated.replace(
-      /^(version:\s*["']?)[^"'\n]+(["']?\s*)$/m,
-      `$1${targetVersion}$2`,
-    );
+    updated = updated.replace(/^(version:\s*["']?)[^"'\n]+(["']?\s*)$/m, `$1${targetVersion}$2`);
 
     // Append rollback entry to version_history
     // Find the last entry in version_history (look for the pattern of

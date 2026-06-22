@@ -35,9 +35,7 @@ function buildService(overrides: Partial<ServiceConfig> = {}): ServiceConfig {
   };
 }
 
-function buildThresholds(
-  overrides: Partial<ThresholdConfig> = {},
-): ThresholdConfig {
+function buildThresholds(overrides: Partial<ThresholdConfig> = {}): ThresholdConfig {
   return {
     error_rate_percent: 5.0,
     sustained_duration_minutes: 10,
@@ -47,10 +45,7 @@ function buildThresholds(
   };
 }
 
-function buildMetric(
-  queryName: string,
-  value: number | null,
-): PrometheusResult {
+function buildMetric(queryName: string, value: number | null): PrometheusResult {
   return {
     query_name: queryName,
     query: `test_query_${queryName}`,
@@ -83,9 +78,7 @@ function buildDataPoints(
   }));
 }
 
-function buildLogResult(
-  overrides: Partial<OpenSearchResult> = {},
-): OpenSearchResult {
+function buildLogResult(overrides: Partial<OpenSearchResult> = {}): OpenSearchResult {
   return {
     query_name: 'error_aggregation',
     hits: [],
@@ -126,9 +119,7 @@ function buildBaseline(
 }
 
 /** Builds a mock sustained error rate query function. */
-function buildSustainedQuery(
-  rangeResult: PrometheusRangeResult,
-): QuerySustainedErrorRateFn {
+function buildSustainedQuery(rangeResult: PrometheusRangeResult): QuerySustainedErrorRateFn {
   return async () => rangeResult;
 }
 
@@ -200,12 +191,7 @@ describe('ErrorDetector.detectErrors - error rate', () => {
     const metrics = [buildMetric('error_rate', 12.3)];
     const thresholds = buildThresholds({ error_rate_percent: 5.0, sustained_duration_minutes: 15 });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
     expect(candidates).toHaveLength(1);
     expect(candidates[0].error_type).toBe('error_rate');
@@ -220,16 +206,9 @@ describe('ErrorDetector.detectErrors - error rate', () => {
     const metrics = [buildMetric('error_rate', 3.2)];
     const thresholds = buildThresholds({ error_rate_percent: 5.0 });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
-    const errorRateCandidates = candidates.filter(
-      (c) => c.error_type === 'error_rate',
-    );
+    const errorRateCandidates = candidates.filter((c) => c.error_type === 'error_rate');
     expect(errorRateCandidates).toHaveLength(0);
   });
 
@@ -244,16 +223,9 @@ describe('ErrorDetector.detectErrors - error rate', () => {
       sustained_duration_minutes: 15,
     });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
-    const errorRateCandidate = candidates.find(
-      (c) => c.error_type === 'error_rate',
-    );
+    const errorRateCandidate = candidates.find((c) => c.error_type === 'error_rate');
     expect(errorRateCandidate).toBeDefined();
     expect(errorRateCandidate!.sustained_minutes).toBe(15);
   });
@@ -261,10 +233,7 @@ describe('ErrorDetector.detectErrors - error rate', () => {
   // TC-3-1-04: Sustained check fails
   it('TC-3-1-04: does not generate candidate when sustained duration is insufficient', async () => {
     // Only 3 of 10 minutes above threshold
-    const points = [
-      ...buildDataPoints(3, 12.0),
-      ...buildDataPoints(7, 3.0),
-    ];
+    const points = [...buildDataPoints(3, 12.0), ...buildDataPoints(7, 3.0)];
     const sustainedData = buildRangeResult(points);
     const detector = buildDetector(sustainedData);
 
@@ -274,16 +243,9 @@ describe('ErrorDetector.detectErrors - error rate', () => {
       sustained_duration_minutes: 10,
     });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
-    const errorRateCandidates = candidates.filter(
-      (c) => c.error_type === 'error_rate',
-    );
+    const errorRateCandidates = candidates.filter((c) => c.error_type === 'error_rate');
     expect(errorRateCandidates).toHaveLength(0);
   });
 
@@ -294,16 +256,9 @@ describe('ErrorDetector.detectErrors - error rate', () => {
     const metrics = [buildMetric('error_rate', 5.0)];
     const thresholds = buildThresholds({ error_rate_percent: 5.0 });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
-    const errorRateCandidates = candidates.filter(
-      (c) => c.error_type === 'error_rate',
-    );
+    const errorRateCandidates = candidates.filter((c) => c.error_type === 'error_rate');
     expect(errorRateCandidates).toHaveLength(0);
   });
 
@@ -320,16 +275,9 @@ describe('ErrorDetector.detectErrors - error rate', () => {
       sustained_duration_minutes: 10,
     });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
-    const errorRateCandidate = candidates.find(
-      (c) => c.error_type === 'error_rate',
-    );
+    const errorRateCandidate = candidates.find((c) => c.error_type === 'error_rate');
     expect(errorRateCandidate).toBeDefined();
     expect(errorRateCandidate!.metric_value).toBe(4.0);
     expect(errorRateCandidate!.threshold_value).toBe(3.0);
@@ -337,30 +285,16 @@ describe('ErrorDetector.detectErrors - error rate', () => {
 
   it('does not generate candidate when error_rate metric is missing', async () => {
     const detector = buildDetector();
-    const candidates = await detector.detectErrors(
-      [],
-      [],
-      buildThresholds(),
-      buildService(),
-    );
-    const errorRateCandidates = candidates.filter(
-      (c) => c.error_type === 'error_rate',
-    );
+    const candidates = await detector.detectErrors([], [], buildThresholds(), buildService());
+    const errorRateCandidates = candidates.filter((c) => c.error_type === 'error_rate');
     expect(errorRateCandidates).toHaveLength(0);
   });
 
   it('does not generate candidate when error_rate value is null', async () => {
     const detector = buildDetector();
     const metrics = [buildMetric('error_rate', null)];
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      buildThresholds(),
-      buildService(),
-    );
-    const errorRateCandidates = candidates.filter(
-      (c) => c.error_type === 'error_rate',
-    );
+    const candidates = await detector.detectErrors(metrics, [], buildThresholds(), buildService());
+    const errorRateCandidates = candidates.filter((c) => c.error_type === 'error_rate');
     expect(errorRateCandidates).toHaveLength(0);
   });
 });
@@ -375,12 +309,7 @@ describe('ErrorDetector.detectCrash', () => {
     const detector = buildDetector();
     const metrics = [buildMetric('crash_down', 0)];
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      buildThresholds(),
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], buildThresholds(), buildService());
 
     const crashCandidate = candidates.find((c) => c.error_type === 'crash');
     expect(crashCandidate).toBeDefined();
@@ -393,12 +322,7 @@ describe('ErrorDetector.detectCrash', () => {
     const detector = buildDetector();
     const metrics = [buildMetric('crash_restarts', 2)];
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      buildThresholds(),
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], buildThresholds(), buildService());
 
     const crashCandidate = candidates.find((c) => c.error_type === 'crash');
     expect(crashCandidate).toBeDefined();
@@ -422,10 +346,7 @@ describe('ErrorDetector.detectCrash', () => {
 
   it('prefers crash_down over crash_restarts', () => {
     const detector = buildDetector();
-    const metrics = [
-      buildMetric('crash_down', 0),
-      buildMetric('crash_restarts', 5),
-    ];
+    const metrics = [buildMetric('crash_down', 0), buildMetric('crash_restarts', 5)];
     const result = detector.detectCrash(metrics, buildService());
     expect(result).toBeDefined();
     expect(result!.metric_value).toBe(0);
@@ -444,9 +365,7 @@ describe('ErrorDetector.detectExceptions', () => {
     const logs: OpenSearchResult[] = [
       buildLogResult({
         aggregations: {
-          error_messages: [
-            { key: 'ConnectionPoolExhausted', doc_count: 150 },
-          ],
+          error_messages: [{ key: 'ConnectionPoolExhausted', doc_count: 150 }],
         },
         hits: [
           { timestamp: '', message: 'ConnectionPoolExhausted: pool limit reached' },
@@ -455,16 +374,9 @@ describe('ErrorDetector.detectExceptions', () => {
       }),
     ];
 
-    const candidates = await detector.detectErrors(
-      [],
-      logs,
-      buildThresholds(),
-      buildService(),
-    );
+    const candidates = await detector.detectErrors([], logs, buildThresholds(), buildService());
 
-    const exceptionCandidate = candidates.find(
-      (c) => c.error_type === 'exception',
-    );
+    const exceptionCandidate = candidates.find((c) => c.error_type === 'exception');
     expect(exceptionCandidate).toBeDefined();
     expect(exceptionCandidate!.error_class).toBe('ConnectionPoolExhausted');
     expect(exceptionCandidate!.metric_value).toBe(150);
@@ -476,9 +388,7 @@ describe('ErrorDetector.detectExceptions', () => {
     const logs: OpenSearchResult[] = [
       buildLogResult({
         aggregations: {
-          error_messages: [
-            { key: 'MinorError', doc_count: 10 },
-          ],
+          error_messages: [{ key: 'MinorError', doc_count: 10 }],
         },
         hits: [],
       }),
@@ -512,9 +422,7 @@ describe('ErrorDetector.detectExceptions', () => {
     const logs: OpenSearchResult[] = [
       buildLogResult({
         aggregations: {
-          error_messages: [
-            { key: 'SomeError', doc_count: 6 },
-          ],
+          error_messages: [{ key: 'SomeError', doc_count: 6 }],
         },
         hits: [],
       }),
@@ -535,16 +443,9 @@ describe('ErrorDetector.detectTimeout', () => {
     const metrics = [buildMetric('latency_p99', 8200)];
     const thresholds = buildThresholds({ p99_latency_ms: 5000 });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
-    const timeoutCandidate = candidates.find(
-      (c) => c.error_type === 'timeout',
-    );
+    const timeoutCandidate = candidates.find((c) => c.error_type === 'timeout');
     expect(timeoutCandidate).toBeDefined();
     expect(timeoutCandidate!.metric_value).toBe(8200);
     expect(timeoutCandidate!.threshold_value).toBe(5000);
@@ -588,9 +489,7 @@ describe('ErrorDetector.detectDegradedPerformance', () => {
       baseline,
     );
 
-    const degradedCandidate = candidates.find(
-      (c) => c.error_type === 'degraded_performance',
-    );
+    const degradedCandidate = candidates.find((c) => c.error_type === 'degraded_performance');
     expect(degradedCandidate).toBeDefined();
     expect(degradedCandidate!.metric_value).toBe(120);
     expect(degradedCandidate!.threshold_value).toBe(90); // 2 * 45
@@ -612,9 +511,7 @@ describe('ErrorDetector.detectDegradedPerformance', () => {
       baseline,
     );
 
-    const degradedCandidates = candidates.filter(
-      (c) => c.error_type === 'degraded_performance',
-    );
+    const degradedCandidates = candidates.filter((c) => c.error_type === 'degraded_performance');
     expect(degradedCandidates).toHaveLength(0);
   });
 
@@ -630,9 +527,7 @@ describe('ErrorDetector.detectDegradedPerformance', () => {
       // no baseline
     );
 
-    const degradedCandidates = candidates.filter(
-      (c) => c.error_type === 'degraded_performance',
-    );
+    const degradedCandidates = candidates.filter((c) => c.error_type === 'degraded_performance');
     expect(degradedCandidates).toHaveLength(0);
   });
 });
@@ -652,11 +547,7 @@ describe('ErrorDetector.detectDataInconsistency', () => {
       client_error_rate: { mean_7d: 4.0 },
     });
 
-    const result = detector.detectDataInconsistency(
-      metrics,
-      baseline,
-      buildService(),
-    );
+    const result = detector.detectDataInconsistency(metrics, baseline, buildService());
     expect(result).toBeDefined();
     expect(result!.error_type).toBe('data_inconsistency');
     expect(result!.metric_value).toBe(15.0);
@@ -666,18 +557,12 @@ describe('ErrorDetector.detectDataInconsistency', () => {
 
   it('does not flag corruption when no 422 metric is present', () => {
     const detector = buildDetector();
-    const metrics = [
-      buildMetric('client_error_rate_4xx', 15.0),
-    ];
+    const metrics = [buildMetric('client_error_rate_4xx', 15.0)];
     const baseline = buildBaseline({
       client_error_rate: { mean_7d: 4.0 },
     });
 
-    const result = detector.detectDataInconsistency(
-      metrics,
-      baseline,
-      buildService(),
-    );
+    const result = detector.detectDataInconsistency(metrics, baseline, buildService());
     expect(result).toBeDefined();
     expect(result!.has_data_corruption_indicator).toBe(false);
   });
@@ -689,11 +574,7 @@ describe('ErrorDetector.detectDataInconsistency', () => {
       client_error_rate: { mean_7d: 4.0 },
     });
 
-    const result = detector.detectDataInconsistency(
-      metrics,
-      baseline,
-      buildService(),
-    );
+    const result = detector.detectDataInconsistency(metrics, baseline, buildService());
     expect(result).toBeNull();
   });
 
@@ -706,11 +587,7 @@ describe('ErrorDetector.detectDataInconsistency', () => {
       client_error_rate: { mean_7d: 4.0 },
     });
 
-    const result = detector.detectDataInconsistency(
-      metrics,
-      baseline,
-      buildService(),
-    );
+    const result = detector.detectDataInconsistency(metrics, baseline, buildService());
     expect(result).toBeDefined();
     expect(result!.threshold_value).toBe(8.0); // 2 * 4.0
   });
@@ -736,12 +613,7 @@ describe('ErrorDetector.detectErrors - multiple detections', () => {
       p99_latency_ms: 5000,
     });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
     const types = candidates.map((c) => c.error_type);
     expect(types).toContain('error_rate');
@@ -765,24 +637,14 @@ describe('ErrorDetector - edge cases (SPEC-007-3-6)', () => {
       buildMetric('latency_p99', null),
     ];
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      buildThresholds(),
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], buildThresholds(), buildService());
 
     expect(candidates).toHaveLength(0);
   });
 
   it('handles empty metrics array without errors', async () => {
     const detector = buildDetector();
-    const candidates = await detector.detectErrors(
-      [],
-      [],
-      buildThresholds(),
-      buildService(),
-    );
+    const candidates = await detector.detectErrors([], [], buildThresholds(), buildService());
 
     expect(candidates).toHaveLength(0);
   });
@@ -795,13 +657,9 @@ describe('ErrorDetector - edge cases (SPEC-007-3-6)', () => {
     const logs: OpenSearchResult[] = [
       buildLogResult({
         aggregations: {
-          error_messages: [
-            { key: 'NullPointerException', doc_count: 500 },
-          ],
+          error_messages: [{ key: 'NullPointerException', doc_count: 500 }],
         },
-        hits: [
-          { timestamp: '', message: 'NullPointerException at line 42' },
-        ],
+        hits: [{ timestamp: '', message: 'NullPointerException at line 42' }],
       }),
     ];
     const thresholds = buildThresholds({
@@ -809,12 +667,7 @@ describe('ErrorDetector - edge cases (SPEC-007-3-6)', () => {
       sustained_duration_minutes: 10,
     });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      logs,
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, logs, thresholds, buildService());
 
     const types = candidates.map((c) => c.error_type);
     expect(types).toContain('error_rate');
@@ -833,12 +686,7 @@ describe('ErrorDetector - edge cases (SPEC-007-3-6)', () => {
       sustained_duration_minutes: 10,
     });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
     const errorRateCandidate = candidates.find((c) => c.error_type === 'error_rate');
     expect(errorRateCandidate).toBeDefined();
@@ -848,22 +696,14 @@ describe('ErrorDetector - edge cases (SPEC-007-3-6)', () => {
     const sustainedData = buildRangeResult(buildDataPoints(10, 99999));
     const detector = buildDetector(sustainedData);
 
-    const metrics = [
-      buildMetric('error_rate', 99999),
-      buildMetric('latency_p99', 99999999),
-    ];
+    const metrics = [buildMetric('error_rate', 99999), buildMetric('latency_p99', 99999999)];
     const thresholds = buildThresholds({
       error_rate_percent: 5.0,
       sustained_duration_minutes: 10,
       p99_latency_ms: 5000,
     });
 
-    const candidates = await detector.detectErrors(
-      metrics,
-      [],
-      thresholds,
-      buildService(),
-    );
+    const candidates = await detector.detectErrors(metrics, [], thresholds, buildService());
 
     expect(candidates.length).toBeGreaterThanOrEqual(2);
   });

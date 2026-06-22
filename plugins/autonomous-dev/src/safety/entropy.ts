@@ -58,8 +58,7 @@ export function shannonEntropy(s: string): number {
  *   token = <value>
  *   key=<value>
  */
-const HIGH_ENTROPY_CONTEXT_REGEX =
-  /(?:password|secret|token|key)\s*[=:]\s*(\S{20,})/gi;
+const HIGH_ENTROPY_CONTEXT_REGEX = /(?:password|secret|token|key)\s*[=:]\s*(\S{20,})/gi;
 
 /**
  * Minimum Shannon entropy (bits/char) to flag a value as a potential secret.

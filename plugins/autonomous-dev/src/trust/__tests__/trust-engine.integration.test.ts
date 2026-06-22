@@ -6,33 +6,33 @@
  * sequences at L0, L1, and mid-pipeline downgrade.
  */
 
-import { TrustEngine } from "../trust-engine";
-import { TrustResolver } from "../trust-resolver";
-import { TrustChangeManager } from "../trust-change-manager";
-import { TrustConfigLoader, DEFAULT_TRUST_CONFIG } from "../trust-config";
-import type { ConfigProvider } from "../trust-config";
-import type { AuditTrail } from "../trust-change-manager";
-import type { TrustResolutionContext } from "../trust-resolver";
+import { TrustEngine } from '../trust-engine';
+import { TrustResolver } from '../trust-resolver';
+import { TrustChangeManager } from '../trust-change-manager';
+import { TrustConfigLoader, DEFAULT_TRUST_CONFIG } from '../trust-config';
+import type { ConfigProvider } from '../trust-config';
+import type { AuditTrail } from '../trust-change-manager';
+import type { TrustResolutionContext } from '../trust-resolver';
 import type {
   TrustConfig,
   TrustLevel,
   PipelineGate,
   GateAuthority,
   TrustLevelChangeRequest,
-} from "../types";
+} from '../types';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const ALL_GATES: PipelineGate[] = [
-  "prd_approval",
-  "code_review",
-  "test_review",
-  "deployment_approval",
-  "security_review",
-  "cost_approval",
-  "quality_gate",
+  'prd_approval',
+  'code_review',
+  'test_review',
+  'deployment_approval',
+  'security_review',
+  'cost_approval',
+  'quality_gate',
 ];
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,10 @@ function createMockAuditTrail(): AuditTrail & { events: CapturedEvent[] } {
 
 function createMockConfigProvider(
   trustSection: Record<string, unknown> | undefined = undefined,
-): ConfigProvider & { setTrustSection: (s: Record<string, unknown> | undefined) => void; triggerChange: () => void } {
+): ConfigProvider & {
+  setTrustSection: (s: Record<string, unknown> | undefined) => void;
+  triggerChange: () => void;
+} {
   let section = trustSection;
   const callbacks: Array<() => void> = [];
 
@@ -96,8 +99,8 @@ function createTestEngine(config: Partial<TrustConfig> = {}) {
 
 function makeContext(overrides: Partial<TrustResolutionContext> = {}): TrustResolutionContext {
   return {
-    requestId: overrides.requestId ?? "req-1",
-    repositoryId: overrides.repositoryId ?? "repo-a",
+    requestId: overrides.requestId ?? 'req-1',
+    repositoryId: overrides.repositoryId ?? 'repo-a',
     ...overrides,
   };
 }
@@ -106,8 +109,8 @@ function makeContext(overrides: Partial<TrustResolutionContext> = {}): TrustReso
 // Integration Test 1: Full pipeline at L0
 // ---------------------------------------------------------------------------
 
-describe("Integration: Full pipeline at L0", () => {
-  test("every gate pauses for human", () => {
+describe('Integration: Full pipeline at L0', () => {
+  test('every gate pauses for human', () => {
     const { engine, audit } = createTestEngine({
       system_default_level: 0,
     });
@@ -116,21 +119,19 @@ describe("Integration: Full pipeline at L0", () => {
 
     for (const gate of ALL_GATES) {
       const result = engine.checkGate(gate, context);
-      expect(result.authority).toBe("human");
+      expect(result.authority).toBe('human');
       expect(result.effectiveLevel).toBe(0);
       expect(result.pendingChangeApplied).toBe(false);
       expect(result.securityOverrideRejected).toBe(false);
     }
 
     // Verify 7 gate_decision audit events emitted
-    const gateEvents = audit.events.filter(
-      (e) => e.event_type === "gate_decision",
-    );
+    const gateEvents = audit.events.filter((e) => e.event_type === 'gate_decision');
     expect(gateEvents).toHaveLength(7);
 
     // Each event should have authority "human"
     for (const event of gateEvents) {
-      expect(event.payload.authority).toBe("human");
+      expect(event.payload.authority).toBe('human');
       expect(event.payload.effectiveLevel).toBe(0);
     }
   });
@@ -140,8 +141,8 @@ describe("Integration: Full pipeline at L0", () => {
 // Integration Test 2: Full pipeline at L1
 // ---------------------------------------------------------------------------
 
-describe("Integration: Full pipeline at L1", () => {
-  test("PRD and code gates pause, others auto where expected", () => {
+describe('Integration: Full pipeline at L1', () => {
+  test('PRD and code gates pause, others auto where expected', () => {
     const { engine, audit } = createTestEngine({
       system_default_level: 1,
     });
@@ -149,13 +150,13 @@ describe("Integration: Full pipeline at L1", () => {
     const context = makeContext();
 
     const expectedAuthorities: Record<PipelineGate, GateAuthority> = {
-      prd_approval: "human",
-      code_review: "human",
-      test_review: "system",
-      deployment_approval: "human",
-      security_review: "human",
-      cost_approval: "human",
-      quality_gate: "system",
+      prd_approval: 'human',
+      code_review: 'human',
+      test_review: 'system',
+      deployment_approval: 'human',
+      security_review: 'human',
+      cost_approval: 'human',
+      quality_gate: 'system',
     };
 
     for (const gate of ALL_GATES) {
@@ -165,9 +166,7 @@ describe("Integration: Full pipeline at L1", () => {
     }
 
     // Verify 7 gate_decision audit events emitted
-    const gateEvents = audit.events.filter(
-      (e) => e.event_type === "gate_decision",
-    );
+    const gateEvents = audit.events.filter((e) => e.event_type === 'gate_decision');
     expect(gateEvents).toHaveLength(7);
 
     // Verify each event matches expected authority
@@ -182,13 +181,13 @@ describe("Integration: Full pipeline at L1", () => {
 // Integration Test 3: Mid-pipeline downgrade from L2 to L0
 // ---------------------------------------------------------------------------
 
-describe("Integration: Mid-pipeline downgrade from L2 to L0", () => {
+describe('Integration: Mid-pipeline downgrade from L2 to L0', () => {
   // SKIP: change manager pending downgrade is not applied at gate boundary --
   // effectiveLevel stays at 2 instead of dropping to 0 when re-checked. This
   // appears to be a regression in TrustChangeManager.resolveAtGateBoundary
   // for the "pending downgrade" case.
   // (PRD-016 triage: SKIP-WITH-NOTE — production fix required separately.)
-  test.skip("first gates use L2, then downgrade takes effect at boundary", () => {
+  test.skip('first gates use L2, then downgrade takes effect at boundary', () => {
     const { engine, audit, changeManager } = createTestEngine({
       system_default_level: 2,
     });
@@ -197,17 +196,17 @@ describe("Integration: Mid-pipeline downgrade from L2 to L0", () => {
 
     // L2 expected authorities
     const l2Authorities: Record<PipelineGate, GateAuthority> = {
-      prd_approval: "system",
-      code_review: "human",
-      test_review: "system",
-      deployment_approval: "human",
-      security_review: "human",
-      cost_approval: "system",
-      quality_gate: "system",
+      prd_approval: 'system',
+      code_review: 'human',
+      test_review: 'system',
+      deployment_approval: 'human',
+      security_review: 'human',
+      cost_approval: 'system',
+      quality_gate: 'system',
     };
 
     // Check first 2 gates at L2
-    const firstTwoGates: PipelineGate[] = ["prd_approval", "code_review"];
+    const firstTwoGates: PipelineGate[] = ['prd_approval', 'code_review'];
     for (const gate of firstTwoGates) {
       const result = engine.checkGate(gate, context);
       expect(result.authority).toBe(l2Authorities[gate]);
@@ -217,30 +216,30 @@ describe("Integration: Mid-pipeline downgrade from L2 to L0", () => {
 
     // Request downgrade from L2 to L0
     const change: TrustLevelChangeRequest = {
-      requestId: "req-1",
+      requestId: 'req-1',
       fromLevel: 2,
       toLevel: 0,
-      requestedBy: "admin",
-      requestedAt: new Date("2026-04-08T12:00:00Z"),
-      reason: "emergency downgrade",
-      status: "pending",
+      requestedBy: 'admin',
+      requestedAt: new Date('2026-04-08T12:00:00Z'),
+      reason: 'emergency downgrade',
+      status: 'pending',
     };
     engine.requestTrustChange(change);
 
     // Check remaining 5 gates -- should now use L0 authorities (all human)
     const remainingGates: PipelineGate[] = [
-      "test_review",
-      "deployment_approval",
-      "security_review",
-      "cost_approval",
-      "quality_gate",
+      'test_review',
+      'deployment_approval',
+      'security_review',
+      'cost_approval',
+      'quality_gate',
     ];
 
     // The first remaining gate should pick up the pending change
     let pendingChangeAppliedOnce = false;
     for (const gate of remainingGates) {
       const result = engine.checkGate(gate, context);
-      expect(result.authority).toBe("human"); // L0: all human
+      expect(result.authority).toBe('human'); // L0: all human
       expect(result.effectiveLevel).toBe(0);
 
       if (result.pendingChangeApplied) {
@@ -252,17 +251,13 @@ describe("Integration: Mid-pipeline downgrade from L2 to L0", () => {
     expect(pendingChangeAppliedOnce).toBe(true);
 
     // Verify trust_level_changed audit event was emitted
-    const changedEvents = audit.events.filter(
-      (e) => e.event_type === "trust_level_changed",
-    );
+    const changedEvents = audit.events.filter((e) => e.event_type === 'trust_level_changed');
     expect(changedEvents.length).toBeGreaterThanOrEqual(1);
     expect(changedEvents[0].payload.fromLevel).toBe(2);
     expect(changedEvents[0].payload.toLevel).toBe(0);
 
     // Verify gate_decision events: 2 at L2 + 5 at L0 = 7 total
-    const gateEvents = audit.events.filter(
-      (e) => e.event_type === "gate_decision",
-    );
+    const gateEvents = audit.events.filter((e) => e.event_type === 'gate_decision');
     expect(gateEvents).toHaveLength(7);
 
     // First 2 events should be at L2
@@ -275,7 +270,7 @@ describe("Integration: Mid-pipeline downgrade from L2 to L0", () => {
     }
   });
 
-  test("earlier gates are NOT retroactively affected by downgrade", () => {
+  test('earlier gates are NOT retroactively affected by downgrade', () => {
     const { engine, audit } = createTestEngine({
       system_default_level: 2,
     });
@@ -283,24 +278,24 @@ describe("Integration: Mid-pipeline downgrade from L2 to L0", () => {
     const context = makeContext();
 
     // Check prd_approval at L2 -- should be "system"
-    const earlyResult = engine.checkGate("prd_approval", context);
-    expect(earlyResult.authority).toBe("system");
+    const earlyResult = engine.checkGate('prd_approval', context);
+    expect(earlyResult.authority).toBe('system');
     expect(earlyResult.effectiveLevel).toBe(2);
 
     // Request downgrade
     engine.requestTrustChange({
-      requestId: "req-1",
+      requestId: 'req-1',
       fromLevel: 2,
       toLevel: 0,
-      requestedBy: "admin",
-      requestedAt: new Date("2026-04-08T12:00:00Z"),
-      reason: "downgrade",
-      status: "pending",
+      requestedBy: 'admin',
+      requestedAt: new Date('2026-04-08T12:00:00Z'),
+      reason: 'downgrade',
+      status: 'pending',
     });
 
     // The early result should still show L2/system -- it was already returned
     // and cannot be retroactively changed
-    expect(earlyResult.authority).toBe("system");
+    expect(earlyResult.authority).toBe('system');
     expect(earlyResult.effectiveLevel).toBe(2);
   });
 });
@@ -309,10 +304,10 @@ describe("Integration: Mid-pipeline downgrade from L2 to L0", () => {
 // Integration: createTrustEngine factory
 // ---------------------------------------------------------------------------
 
-describe("Integration: createTrustEngine factory", () => {
-  test("factory wires all dependencies correctly", () => {
+describe('Integration: createTrustEngine factory', () => {
+  test('factory wires all dependencies correctly', () => {
     // Import the factory from the barrel
-    const { createTrustEngine } = require("../index");
+    const { createTrustEngine } = require('../index');
 
     const configProvider = createMockConfigProvider({
       system_default_level: 1,
@@ -329,14 +324,12 @@ describe("Integration: createTrustEngine factory", () => {
     const engine = createTrustEngine(configProvider, audit);
 
     // Engine should work end-to-end
-    const result = engine.checkGate("test_review", makeContext());
-    expect(result.authority).toBe("system"); // L1 test_review = system
+    const result = engine.checkGate('test_review', makeContext());
+    expect(result.authority).toBe('system'); // L1 test_review = system
     expect(result.effectiveLevel).toBe(1);
 
     // Verify audit event was emitted
-    const gateEvents = audit.events.filter(
-      (e: CapturedEvent) => e.event_type === "gate_decision",
-    );
+    const gateEvents = audit.events.filter((e: CapturedEvent) => e.event_type === 'gate_decision');
     expect(gateEvents).toHaveLength(1);
   });
 });
@@ -345,9 +338,9 @@ describe("Integration: createTrustEngine factory", () => {
 // Integration: barrel exports
 // ---------------------------------------------------------------------------
 
-describe("Integration: barrel exports", () => {
-  test("TrustEngine can be imported from barrel", () => {
-    const barrel = require("../index");
+describe('Integration: barrel exports', () => {
+  test('TrustEngine can be imported from barrel', () => {
+    const barrel = require('../index');
     expect(barrel.TrustEngine).toBeDefined();
     expect(barrel.TrustResolver).toBeDefined();
     expect(barrel.TrustChangeManager).toBeDefined();
@@ -365,43 +358,43 @@ describe("Integration: barrel exports", () => {
 // Integration: full 28 gate/level combinations
 // ---------------------------------------------------------------------------
 
-describe("Integration: all 28 gate/level combinations", () => {
+describe('Integration: all 28 gate/level combinations', () => {
   const expectedMatrix: Record<TrustLevel, Record<PipelineGate, GateAuthority>> = {
     0: {
-      prd_approval: "human",
-      code_review: "human",
-      test_review: "human",
-      deployment_approval: "human",
-      security_review: "human",
-      cost_approval: "human",
-      quality_gate: "human",
+      prd_approval: 'human',
+      code_review: 'human',
+      test_review: 'human',
+      deployment_approval: 'human',
+      security_review: 'human',
+      cost_approval: 'human',
+      quality_gate: 'human',
     },
     1: {
-      prd_approval: "human",
-      code_review: "human",
-      test_review: "system",
-      deployment_approval: "human",
-      security_review: "human",
-      cost_approval: "human",
-      quality_gate: "system",
+      prd_approval: 'human',
+      code_review: 'human',
+      test_review: 'system',
+      deployment_approval: 'human',
+      security_review: 'human',
+      cost_approval: 'human',
+      quality_gate: 'system',
     },
     2: {
-      prd_approval: "system",
-      code_review: "human",
-      test_review: "system",
-      deployment_approval: "human",
-      security_review: "human",
-      cost_approval: "system",
-      quality_gate: "system",
+      prd_approval: 'system',
+      code_review: 'human',
+      test_review: 'system',
+      deployment_approval: 'human',
+      security_review: 'human',
+      cost_approval: 'system',
+      quality_gate: 'system',
     },
     3: {
-      prd_approval: "system",
-      code_review: "system",
-      test_review: "system",
-      deployment_approval: "system",
-      security_review: "human",
-      cost_approval: "system",
-      quality_gate: "system",
+      prd_approval: 'system',
+      code_review: 'system',
+      test_review: 'system',
+      deployment_approval: 'system',
+      security_review: 'human',
+      cost_approval: 'system',
+      quality_gate: 'system',
     },
   };
 
@@ -424,36 +417,36 @@ describe("Integration: all 28 gate/level combinations", () => {
 // Integration: per-repo config override
 // ---------------------------------------------------------------------------
 
-describe("Integration: per-repo config override", () => {
-  test("uses per-repo trust level instead of system default", () => {
+describe('Integration: per-repo config override', () => {
+  test('uses per-repo trust level instead of system default', () => {
     const { engine } = createTestEngine({
       system_default_level: 0,
       repositories: {
-        "repo-a": { default_level: 3 },
+        'repo-a': { default_level: 3 },
       },
     });
 
-    const context = makeContext({ repositoryId: "repo-a" });
-    const result = engine.checkGate("code_review", context);
+    const context = makeContext({ repositoryId: 'repo-a' });
+    const result = engine.checkGate('code_review', context);
 
     // repo-a is L3, so code_review should be "system"
-    expect(result.authority).toBe("system");
+    expect(result.authority).toBe('system');
     expect(result.effectiveLevel).toBe(3);
   });
 
-  test("falls back to system default for unknown repos", () => {
+  test('falls back to system default for unknown repos', () => {
     const { engine } = createTestEngine({
       system_default_level: 0,
       repositories: {
-        "repo-a": { default_level: 3 },
+        'repo-a': { default_level: 3 },
       },
     });
 
-    const context = makeContext({ repositoryId: "unknown-repo" });
-    const result = engine.checkGate("code_review", context);
+    const context = makeContext({ repositoryId: 'unknown-repo' });
+    const result = engine.checkGate('code_review', context);
 
     // Unknown repo falls back to system default L0
-    expect(result.authority).toBe("human");
+    expect(result.authority).toBe('human');
     expect(result.effectiveLevel).toBe(0);
   });
 });
@@ -462,24 +455,24 @@ describe("Integration: per-repo config override", () => {
 // Integration: per-request override
 // ---------------------------------------------------------------------------
 
-describe("Integration: per-request override", () => {
-  test("per-request override takes precedence over all config", () => {
+describe('Integration: per-request override', () => {
+  test('per-request override takes precedence over all config', () => {
     const { engine } = createTestEngine({
       system_default_level: 0,
       repositories: {
-        "repo-a": { default_level: 0 },
+        'repo-a': { default_level: 0 },
       },
     });
 
     const context = makeContext({
-      repositoryId: "repo-a",
+      repositoryId: 'repo-a',
       requestOverride: 3,
     });
 
-    const result = engine.checkGate("code_review", context);
+    const result = engine.checkGate('code_review', context);
 
     // Override is L3, so code_review should be "system"
-    expect(result.authority).toBe("system");
+    expect(result.authority).toBe('system');
     expect(result.effectiveLevel).toBe(3);
   });
 });

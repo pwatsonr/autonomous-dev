@@ -67,14 +67,12 @@ export async function writeReviewFeedback(
   type: DocumentType,
   directoryManager: DirectoryManager,
 ): Promise<string> {
-  const reviewsDir = directoryManager.getReviewsDir(
-    pipelineId, type, feedback.documentId,
-  );
+  const reviewsDir = directoryManager.getReviewsDir(pipelineId, type, feedback.documentId);
 
   // Determine sequence number by counting existing reviews for this version
   const existingFiles = await fs.readdir(reviewsDir).catch(() => []);
   const prefix = `v${feedback.documentVersion}-review-`;
-  const existingForVersion = existingFiles.filter(f => f.startsWith(prefix));
+  const existingForVersion = existingFiles.filter((f) => f.startsWith(prefix));
   const seq = existingForVersion.length + 1;
   const seqStr = String(seq).padStart(3, '0');
 
@@ -117,7 +115,7 @@ export async function readReviewFeedback(
     ? new RegExp(`^v${version.replace('.', '\\.')}-review-\\d{3}\\.yaml$`)
     : /^v[\d.]+-review-\d{3}\.yaml$/;
 
-  const reviewFiles = files.filter(f => pattern.test(f)).sort();
+  const reviewFiles = files.filter((f) => pattern.test(f)).sort();
   const reviews: ReviewFeedback[] = [];
 
   for (const file of reviewFiles) {

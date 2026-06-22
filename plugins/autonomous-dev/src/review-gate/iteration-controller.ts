@@ -36,12 +36,7 @@ export interface IterationState {
 
 export interface IterationCheckpoint {
   iteration: number;
-  stage:
-    | 'validation'
-    | 'review_started'
-    | 'review_completed'
-    | 'aggregation'
-    | 'decision';
+  stage: 'validation' | 'review_started' | 'review_completed' | 'aggregation' | 'decision';
   timestamp: string;
   state_snapshot: Partial<IterationState>;
 }
@@ -85,9 +80,7 @@ export class IterationController {
   /** In-memory store of checkpoints keyed by gate_id. */
   private checkpointStore: Map<string, IterationState> = new Map();
 
-  constructor(
-    config: Partial<IterationControllerConfig> = {}
-  ) {
+  constructor(config: Partial<IterationControllerConfig> = {}) {
     this.config = {
       max_iterations: config.max_iterations ?? 3,
       auto_rollback_on_regression: config.auto_rollback_on_regression ?? false,
@@ -123,7 +116,7 @@ export class IterationController {
     const nextIteration = state.current_iteration + 1;
     if (nextIteration > state.max_iterations) {
       throw new Error(
-        `Cannot start iteration ${nextIteration}: exceeds max_iterations (${state.max_iterations}).`
+        `Cannot start iteration ${nextIteration}: exceeds max_iterations (${state.max_iterations}).`,
       );
     }
     return {
@@ -149,7 +142,7 @@ export class IterationController {
     aggregateScore: number,
     findings: MergedFinding[],
     contentHash: string,
-    approvalOutcome: 'approved' | 'changes_requested' | 'rejected'
+    approvalOutcome: 'approved' | 'changes_requested' | 'rejected',
   ): IterationDecision {
     // 1. Record in history
     state.score_history.push({
@@ -166,9 +159,7 @@ export class IterationController {
     });
 
     // 2. Identical revision check
-    const previousHashMatch = state.content_hashes.find(
-      (h) => h.hash === contentHash
-    );
+    const previousHashMatch = state.content_hashes.find((h) => h.hash === contentHash);
     state.content_hashes.push({
       iteration: state.current_iteration,
       hash: contentHash,
@@ -178,8 +169,7 @@ export class IterationController {
       return {
         should_continue: false,
         outcome: 'changes_requested',
-        reason:
-          'Revision is identical to a previous version. No changes were made.',
+        reason: 'Revision is identical to a previous version. No changes were made.',
         stagnation_warning: false,
         quality_regression: null,
         identical_revision: true,
@@ -249,8 +239,7 @@ export class IterationController {
         return {
           should_continue: true,
           outcome: 'changes_requested',
-          reason:
-            'Quality regression detected. Rolling back to previous version.',
+          reason: 'Quality regression detected. Rolling back to previous version.',
           stagnation_warning: stagnationWarning,
           quality_regression: regression,
           identical_revision: false,
@@ -287,12 +276,7 @@ export class IterationController {
    */
   checkpoint(
     state: IterationState,
-    stage:
-      | 'validation'
-      | 'review_started'
-      | 'review_completed'
-      | 'aggregation'
-      | 'decision'
+    stage: 'validation' | 'review_started' | 'review_completed' | 'aggregation' | 'decision',
   ): void {
     const cp: IterationCheckpoint = {
       iteration: state.current_iteration,

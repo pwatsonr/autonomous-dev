@@ -17,10 +17,7 @@ import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 
-import {
-  ConflictClassifier,
-  diffLines,
-} from '../../src/parallel/conflict-classifier';
+import { ConflictClassifier, diffLines } from '../../src/parallel/conflict-classifier';
 import { ConflictType } from '../../src/parallel/types';
 
 // ============================================================================
@@ -203,13 +200,19 @@ function setupStructuralConflict(repoRoot: string): void {
   // Track A: deletes the file
   execSync('git checkout -b auto/req-001/track-a', { cwd: repoRoot, stdio: 'pipe' });
   fs.unlinkSync(path.join(srcDir, 'removed.ts'));
-  execSync('git add . && git commit -m "track-a deletes removed.ts"', { cwd: repoRoot, stdio: 'pipe' });
+  execSync('git add . && git commit -m "track-a deletes removed.ts"', {
+    cwd: repoRoot,
+    stdio: 'pipe',
+  });
 
   // Track B: modifies the file
   execSync('git checkout auto/req-001/integration', { cwd: repoRoot, stdio: 'pipe' });
   execSync('git checkout -b auto/req-001/track-b', { cwd: repoRoot, stdio: 'pipe' });
   fs.writeFileSync(path.join(srcDir, 'removed.ts'), 'export const x = 2;\nexport const y = 3;\n');
-  execSync('git add . && git commit -m "track-b modifies removed.ts"', { cwd: repoRoot, stdio: 'pipe' });
+  execSync('git add . && git commit -m "track-b modifies removed.ts"', {
+    cwd: repoRoot,
+    stdio: 'pipe',
+  });
 
   // Merge track-a, then track-b
   execSync('git checkout auto/req-001/integration', { cwd: repoRoot, stdio: 'pipe' });
@@ -257,9 +260,7 @@ describe('diffLines', () => {
 
   it('handles empty base', () => {
     const changes = diffLines('', 'a\nb');
-    const addedCount = changes
-      .filter((c) => c.added)
-      .reduce((sum, c) => sum + c.count, 0);
+    const addedCount = changes.filter((c) => c.added).reduce((sum, c) => sum + c.count, 0);
     // Empty string split gives [''], so base has 1 "line"
     // The modified has 2 lines: 'a' and 'b'
     expect(addedCount).toBeGreaterThan(0);
@@ -267,9 +268,7 @@ describe('diffLines', () => {
 
   it('handles empty modified', () => {
     const changes = diffLines('a\nb', '');
-    const removedCount = changes
-      .filter((c) => c.removed)
-      .reduce((sum, c) => sum + c.count, 0);
+    const removedCount = changes.filter((c) => c.removed).reduce((sum, c) => sum + c.count, 0);
     expect(removedCount).toBeGreaterThan(0);
   });
 });
@@ -330,9 +329,7 @@ describe('ConflictClassifier hunk analysis (unit)', () => {
         { baseStart: 0, baseEnd: 2, modStart: 0, modEnd: 2 },
         { baseStart: 10, baseEnd: 12, modStart: 10, modEnd: 12 },
       ];
-      const theirsHunks = [
-        { baseStart: 5, baseEnd: 7, modStart: 5, modEnd: 7 },
-      ];
+      const theirsHunks = [{ baseStart: 5, baseEnd: 7, modStart: 5, modEnd: 7 }];
       const analysis = classifier.analyzeHunkOverlaps(oursHunks, theirsHunks);
       // All hunks are non-overlapping
       expect(analysis.every((h) => !h.overlaps)).toBe(true);
@@ -512,18 +509,14 @@ describe.skip('ConflictClassifier (integration)', () => {
 
       // Track A: changes lines 1-2
       execSync('git checkout -b auto/req-001/track-a', { cwd: repoRoot, stdio: 'pipe' });
-      const oursContent = baseContent
-        .replace('line-1', 'OURS-1')
-        .replace('line-2', 'OURS-2');
+      const oursContent = baseContent.replace('line-1', 'OURS-1').replace('line-2', 'OURS-2');
       fs.writeFileSync(path.join(srcDir, 'multi.ts'), oursContent);
       execSync('git add . && git commit -m "track-a changes"', { cwd: repoRoot, stdio: 'pipe' });
 
       // Track B: changes lines 8-9
       execSync('git checkout auto/req-001/integration', { cwd: repoRoot, stdio: 'pipe' });
       execSync('git checkout -b auto/req-001/track-b', { cwd: repoRoot, stdio: 'pipe' });
-      const theirsContent = baseContent
-        .replace('line-8', 'THEIRS-8')
-        .replace('line-9', 'THEIRS-9');
+      const theirsContent = baseContent.replace('line-8', 'THEIRS-8').replace('line-9', 'THEIRS-9');
       fs.writeFileSync(path.join(srcDir, 'multi.ts'), theirsContent);
       execSync('git add . && git commit -m "track-b changes"', { cwd: repoRoot, stdio: 'pipe' });
 

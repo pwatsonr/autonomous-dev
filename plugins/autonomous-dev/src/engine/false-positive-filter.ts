@@ -41,9 +41,7 @@ const DAY_MAP: Record<string, number> = {
  * Type guard: returns true when the window has a `days` array
  * (recurring window format).
  */
-function isRecurringWindow(
-  window: MaintenanceWindow,
-): window is RecurringMaintenanceWindow {
+function isRecurringWindow(window: MaintenanceWindow): window is RecurringMaintenanceWindow {
   return 'days' in window && Array.isArray((window as RecurringMaintenanceWindow).days);
 }
 
@@ -63,10 +61,7 @@ function parseTimeToMinutes(time: string): number {
  * - One-time windows with ISO 8601 start/end timestamps
  * - Overnight recurring windows where end < start (e.g., 23:00 to 03:00)
  */
-export function isWithinMaintenanceWindow(
-  currentTime: Date,
-  window: MaintenanceWindow,
-): boolean {
+export function isWithinMaintenanceWindow(currentTime: Date, window: MaintenanceWindow): boolean {
   if (isRecurringWindow(window)) {
     return isWithinRecurringWindow(currentTime, window);
   }
@@ -76,28 +71,20 @@ export function isWithinMaintenanceWindow(
 /**
  * Checks a recurring window (day-of-week + time range).
  */
-function isWithinRecurringWindow(
-  currentTime: Date,
-  window: RecurringMaintenanceWindow,
-): boolean {
+function isWithinRecurringWindow(currentTime: Date, window: RecurringMaintenanceWindow): boolean {
   // Convert current time to the window's timezone
   const tz = window.timezone ?? 'UTC';
-  const localTime = new Date(
-    currentTime.toLocaleString('en-US', { timeZone: tz }),
-  );
+  const localTime = new Date(currentTime.toLocaleString('en-US', { timeZone: tz }));
 
   const currentDay = localTime.getDay();
-  const currentMinutes =
-    localTime.getHours() * 60 + localTime.getMinutes();
+  const currentMinutes = localTime.getHours() * 60 + localTime.getMinutes();
 
   const startMinutes = parseTimeToMinutes(window.start);
   const endMinutes = parseTimeToMinutes(window.end);
 
   // Check if current day is in the configured days
   const dayNames = window.days.map((d) => d.toUpperCase());
-  const matchesDayNumbers = dayNames
-    .map((name) => DAY_MAP[name])
-    .filter((n) => n !== undefined);
+  const matchesDayNumbers = dayNames.map((name) => DAY_MAP[name]).filter((n) => n !== undefined);
 
   if (endMinutes > startMinutes) {
     // Normal window (e.g., 02:00 to 06:00) -- same day
@@ -114,17 +101,11 @@ function isWithinRecurringWindow(
   // and "started today, still in window before midnight".
   const previousDay = (currentDay + 6) % 7; // day - 1, wrapping
 
-  if (
-    matchesDayNumbers.includes(currentDay) &&
-    currentMinutes >= startMinutes
-  ) {
+  if (matchesDayNumbers.includes(currentDay) && currentMinutes >= startMinutes) {
     // Started today, still before midnight
     return true;
   }
-  if (
-    matchesDayNumbers.includes(previousDay) &&
-    currentMinutes < endMinutes
-  ) {
+  if (matchesDayNumbers.includes(previousDay) && currentMinutes < endMinutes) {
     // Started yesterday, still in window today
     return true;
   }
@@ -135,10 +116,7 @@ function isWithinRecurringWindow(
 /**
  * Checks a one-time window (ISO 8601 start/end).
  */
-function isWithinOneTimeWindow(
-  currentTime: Date,
-  window: MaintenanceWindow,
-): boolean {
+function isWithinOneTimeWindow(currentTime: Date, window: MaintenanceWindow): boolean {
   const start = new Date(window.start);
   const end = new Date(window.end);
   return currentTime >= start && currentTime < end;
@@ -228,10 +206,7 @@ export function isFalsePositive(
 
   // Check 3: Load test markers (check request metadata)
   for (const marker of config.load_test_markers) {
-    if (
-      candidate.request_metadata &&
-      hasLoadTestMarker(candidate.request_metadata, marker)
-    ) {
+    if (candidate.request_metadata && hasLoadTestMarker(candidate.request_metadata, marker)) {
       return { filtered: true, reason: 'load_test_traffic' };
     }
   }
@@ -274,8 +249,7 @@ export function filterCandidates(
   currentTime: Date = new Date(),
 ): FilterBatchResult {
   const passed: CandidateObservation[] = [];
-  const filtered: Array<{ candidate: CandidateObservation; reason: string }> =
-    [];
+  const filtered: Array<{ candidate: CandidateObservation; reason: string }> = [];
 
   for (const candidate of candidates) {
     const result = isFalsePositive(candidate, config, currentTime);

@@ -185,11 +185,7 @@ describe('writeEffectivenessResult', () => {
   // TC-5-2-15: Writeback idempotency
   it('TC-5-2-15: skips writeback when effectiveness is already terminal (improved)', async () => {
     const filePath = path.join(tmpDir, 'OBS-003.md');
-    await fs.writeFile(
-      filePath,
-      makeObservationFile({ effectiveness: 'improved' }),
-      'utf-8',
-    );
+    await fs.writeFile(filePath, makeObservationFile({ effectiveness: 'improved' }), 'utf-8');
 
     const result = await writeEffectivenessResult(filePath, makeImprovedResult());
     expect(result.updated).toBe(false);
@@ -198,11 +194,7 @@ describe('writeEffectivenessResult', () => {
 
   it('skips writeback when effectiveness is degraded', async () => {
     const filePath = path.join(tmpDir, 'OBS-004.md');
-    await fs.writeFile(
-      filePath,
-      makeObservationFile({ effectiveness: 'degraded' }),
-      'utf-8',
-    );
+    await fs.writeFile(filePath, makeObservationFile({ effectiveness: 'degraded' }), 'utf-8');
 
     const result = await writeEffectivenessResult(filePath, makeImprovedResult());
     expect(result.updated).toBe(false);
@@ -211,11 +203,7 @@ describe('writeEffectivenessResult', () => {
 
   it('skips writeback when effectiveness is unchanged', async () => {
     const filePath = path.join(tmpDir, 'OBS-005.md');
-    await fs.writeFile(
-      filePath,
-      makeObservationFile({ effectiveness: 'unchanged' }),
-      'utf-8',
-    );
+    await fs.writeFile(filePath, makeObservationFile({ effectiveness: 'unchanged' }), 'utf-8');
 
     const result = await writeEffectivenessResult(filePath, makeImprovedResult());
     expect(result.updated).toBe(false);
@@ -225,11 +213,7 @@ describe('writeEffectivenessResult', () => {
   // TC-5-2-16: Writeback handles pending->improved
   it('TC-5-2-16: updates from pending to improved', async () => {
     const filePath = path.join(tmpDir, 'OBS-006.md');
-    await fs.writeFile(
-      filePath,
-      makeObservationFile({ effectiveness: 'pending' }),
-      'utf-8',
-    );
+    await fs.writeFile(filePath, makeObservationFile({ effectiveness: 'pending' }), 'utf-8');
 
     const result = await writeEffectivenessResult(filePath, makeImprovedResult());
     expect(result.updated).toBe(true);
@@ -354,18 +338,10 @@ describe('findPendingEffectivenessObservations', () => {
     await fs.mkdir(obsDir, { recursive: true });
 
     // Non-OBS file
-    await fs.writeFile(
-      path.join(obsDir, 'README.md'),
-      makeObservationFile(),
-      'utf-8',
-    );
+    await fs.writeFile(path.join(obsDir, 'README.md'), makeObservationFile(), 'utf-8');
 
     // Valid OBS file
-    await fs.writeFile(
-      path.join(obsDir, 'OBS-20260301-001.md'),
-      makeObservationFile(),
-      'utf-8',
-    );
+    await fs.writeFile(path.join(obsDir, 'OBS-20260301-001.md'), makeObservationFile(), 'utf-8');
 
     const results = await findPendingEffectivenessObservations(tmpDir);
     expect(results).toHaveLength(1);

@@ -70,10 +70,10 @@ export class ConvergenceTracker {
 
     // 1. Score trend
     const currentScoreEntry = state.score_history.find(
-      (h) => h.iteration === state.current_iteration
+      (h) => h.iteration === state.current_iteration,
     );
     const previousScoreEntry = state.score_history.find(
-      (h) => h.iteration === state.current_iteration - 1
+      (h) => h.iteration === state.current_iteration - 1,
     );
 
     const currentScore = currentScoreEntry?.aggregate_score ?? 0;
@@ -91,10 +91,10 @@ export class ConvergenceTracker {
 
     // 2. Finding resolution
     const currentFindingEntry = state.finding_history.find(
-      (h) => h.iteration === state.current_iteration
+      (h) => h.iteration === state.current_iteration,
     );
     const previousFindingEntry = state.finding_history.find(
-      (h) => h.iteration === state.current_iteration - 1
+      (h) => h.iteration === state.current_iteration - 1,
     );
 
     const currentFindings = currentFindingEntry?.findings ?? [];
@@ -123,20 +123,18 @@ export class ConvergenceTracker {
     const stagnationReasons: string[] = [];
 
     if (scoreTrend === 'declining') {
-      stagnationReasons.push(
-        `Aggregate score declined from ${previousScore} to ${currentScore}.`
-      );
+      stagnationReasons.push(`Aggregate score declined from ${previousScore} to ${currentScore}.`);
     }
 
     if (recurredFindings.length > 0) {
       stagnationReasons.push(
-        `${recurredFindings.length} previously resolved finding(s) have recurred.`
+        `${recurredFindings.length} previously resolved finding(s) have recurred.`,
       );
     }
 
     if (findingCountTrend !== 'decreasing') {
       stagnationReasons.push(
-        `Total finding count did not decrease (${previousCount} -> ${currentCount}).`
+        `Total finding count did not decrease (${previousCount} -> ${currentCount}).`,
       );
     }
 
@@ -157,11 +155,9 @@ export class ConvergenceTracker {
    */
   private findResolvedFindings(
     previousFindings: MergedFinding[],
-    currentFindings: MergedFinding[]
+    currentFindings: MergedFinding[],
   ): string[] {
-    const currentKeys = new Set(
-      currentFindings.map((f) => `${f.section_id}::${f.category_id}`)
-    );
+    const currentKeys = new Set(currentFindings.map((f) => `${f.section_id}::${f.category_id}`));
 
     const resolved: string[] = [];
     for (const finding of previousFindings) {
@@ -182,17 +178,13 @@ export class ConvergenceTracker {
     const resolvedKeys = new Set<string>();
 
     // Sort finding history by iteration
-    const sorted = [...state.finding_history].sort(
-      (a, b) => a.iteration - b.iteration
-    );
+    const sorted = [...state.finding_history].sort((a, b) => a.iteration - b.iteration);
 
     for (let i = 0; i < sorted.length - 1; i++) {
       const current = sorted[i];
       const next = sorted[i + 1];
 
-      const nextKeys = new Set(
-        next.findings.map((f) => `${f.section_id}::${f.category_id}`)
-      );
+      const nextKeys = new Set(next.findings.map((f) => `${f.section_id}::${f.category_id}`));
 
       for (const finding of current.findings) {
         const key = `${finding.section_id}::${finding.category_id}`;
@@ -211,7 +203,7 @@ export class ConvergenceTracker {
    */
   private findRecurredFindings(
     currentFindings: MergedFinding[],
-    resolvedKeys: Set<string>
+    resolvedKeys: Set<string>,
   ): string[] {
     const recurred: string[] = [];
 

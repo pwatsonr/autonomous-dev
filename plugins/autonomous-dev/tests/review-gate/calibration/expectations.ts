@@ -26,7 +26,7 @@ export interface CalibrationExpectation {
     min_count: number;
     severity?: FindingSeverity;
   }[];
-  score_tolerance: number;  // +/- tolerance for consistency checks (default: 5)
+  score_tolerance: number; // +/- tolerance for consistency checks (default: 5)
 }
 
 // ---------------------------------------------------------------------------

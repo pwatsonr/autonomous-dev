@@ -7,12 +7,7 @@
 import { execSync } from 'child_process';
 import { EventEmitter } from 'events';
 
-import {
-  DAGCluster,
-  DependencyDAG,
-  MergeResult,
-  ConflictDetail,
-} from './types';
+import { DAGCluster, DependencyDAG, MergeResult, ConflictDetail } from './types';
 import { ParallelConfig } from './config';
 import { trackBranchName, integrationBranchName } from './naming';
 
@@ -166,9 +161,7 @@ export class MergeEngine {
     // Step 3: Check for conflicting files
     let conflictedFiles: string[] = [];
     if (mergeExitCode !== 0) {
-      const output = this.exec(
-        `git -C "${this.repoRoot}" diff --name-only --diff-filter=U`,
-      );
+      const output = this.exec(`git -C "${this.repoRoot}" diff --name-only --diff-filter=U`);
       conflictedFiles = output.trim().split('\n').filter(Boolean);
     }
 
@@ -216,7 +209,7 @@ export class MergeEngine {
         `Request: ${requestId}`,
         `Track: ${trackName}`,
         `Conflicts: ${conflicts.length}`,
-        `Resolutions: ${conflicts.map(c => `${c.file}:${c.resolution}`).join(', ')}`,
+        `Resolutions: ${conflicts.map((c) => `${c.file}:${c.resolution}`).join(', ')}`,
       ].join('\n');
 
       this.exec(`git -C "${this.repoRoot}" commit -m "${this.escapeGitMsg(commitMsg)}"`);
@@ -229,7 +222,7 @@ export class MergeEngine {
         mergeCommitSha: sha,
         conflictCount: conflicts.length,
         conflicts,
-        resolutionStrategy: conflicts.some(c => c.resolution === 'ai')
+        resolutionStrategy: conflicts.some((c) => c.resolution === 'ai')
           ? 'ai-resolved'
           : 'auto-resolved',
         resolutionDurationMs: Date.now() - startTime,
@@ -352,7 +345,7 @@ export class MergeEngine {
    */
   checkCircuitBreaker(requestId: string, results: MergeResult[]): void {
     const unresolved = results.filter(
-      r => r.resolutionStrategy === 'failed' || r.resolutionStrategy === 'escalated',
+      (r) => r.resolutionStrategy === 'failed' || r.resolutionStrategy === 'escalated',
     ).length;
 
     const current = (this.unresolvedConflictCount.get(requestId) ?? 0) + unresolved;
@@ -504,9 +497,7 @@ export class MergeEngine {
     for (const contract of contracts) {
       try {
         // Check if the file contains the expected definition at HEAD
-        const fileContent = this.exec(
-          `git -C "${this.repoRoot}" show HEAD:${contract.filePath}`,
-        );
+        const fileContent = this.exec(`git -C "${this.repoRoot}" show HEAD:${contract.filePath}`);
 
         // Verify the interface definition is present
         if (!fileContent.includes(contract.definition)) {
@@ -552,9 +543,7 @@ export class MergeEngine {
    * @param migrationDir  Relative path to the migrations directory
    * @returns Validation result with any ordering issues
    */
-  async validateMigrationSequence(
-    migrationDir: string,
-  ): Promise<MigrationValidationResult> {
+  async validateMigrationSequence(migrationDir: string): Promise<MigrationValidationResult> {
     const issues: MigrationIssue[] = [];
 
     try {
@@ -649,7 +638,7 @@ export class MergeCircuitBreakerError extends Error {
   ) {
     super(
       `Merge circuit breaker tripped for request "${requestId}": ` +
-      `${unresolvedCount} unresolved conflicts exceed threshold of ${threshold}`,
+        `${unresolvedCount} unresolved conflicts exceed threshold of ${threshold}`,
     );
     this.name = 'MergeCircuitBreakerError';
   }

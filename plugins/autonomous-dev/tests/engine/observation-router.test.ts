@@ -22,7 +22,10 @@ import type {
   PreviousRunState,
 } from '../../src/engine/observation-router';
 import type { CandidateObservation, BaselineMetrics, MetricBaseline } from '../../src/engine/types';
-import type { ServiceConfig, IntelligenceConfig } from '../../src/config/intelligence-config.schema';
+import type {
+  ServiceConfig,
+  IntelligenceConfig,
+} from '../../src/config/intelligence-config.schema';
 import type { PrometheusResult, GrafanaAlertResult } from '../../src/adapters/types';
 import type { AdoptionResult } from '../../src/engine/adoption-tracker';
 
@@ -104,9 +107,7 @@ const defaultMetricBaseline: MetricBaseline = {
   p99: 150,
 };
 
-function buildBaseline(
-  overrides: Partial<BaselineMetrics> = {},
-): BaselineMetrics {
+function buildBaseline(overrides: Partial<BaselineMetrics> = {}): BaselineMetrics {
   const metrics: Record<string, MetricBaseline> = {};
   for (const m of BASELINE_METRICS) {
     metrics[m] = { ...defaultMetricBaseline };
@@ -123,9 +124,7 @@ function buildBaseline(
   };
 }
 
-function buildPreviousRunState(
-  overrides: Partial<PreviousRunState> = {},
-): PreviousRunState {
+function buildPreviousRunState(overrides: Partial<PreviousRunState> = {}): PreviousRunState {
   return {
     anomalyFlags: {},
     ...overrides,

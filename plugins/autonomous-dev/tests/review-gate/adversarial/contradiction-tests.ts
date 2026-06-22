@@ -9,15 +9,8 @@
  */
 
 import type { Finding } from '../../../src/review-gate/types';
-import {
-  AdversarialRunner,
-  ADVERSARIAL_TESTS,
-  validateResult,
-} from './adversarial-runner';
-import type {
-  AdversarialTestCase,
-  ReviewerExecutorAdapter,
-} from './adversarial-runner';
+import { AdversarialRunner, ADVERSARIAL_TESTS, validateResult } from './adversarial-runner';
+import type { AdversarialTestCase, ReviewerExecutorAdapter } from './adversarial-runner';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -71,7 +64,8 @@ describe('Adversarial Contradiction Tests', () => {
       const findings = [
         makeFinding({
           category_id: 'internal_consistency',
-          description: 'Data model uses PostgreSQL-specific JSONB columns but NFR-003 requires database portability',
+          description:
+            'Data model uses PostgreSQL-specific JSONB columns but NFR-003 requires database portability',
           severity: 'critical',
         }),
       ];
@@ -90,9 +84,7 @@ describe('Adversarial Contradiction Tests', () => {
       const result = validateResult(testCase, 80, 'approved', []);
       expect(result.pass).toBe(false);
       expect(result.failures).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining('contradiction'),
-        ]),
+        expect.arrayContaining([expect.stringContaining('contradiction')]),
       );
     });
 
@@ -108,9 +100,7 @@ describe('Adversarial Contradiction Tests', () => {
       // But required_finding_categories includes "internal_consistency" which is not present
       expect(result.pass).toBe(false);
       expect(result.failures).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("'internal_consistency'"),
-        ]),
+        expect.arrayContaining([expect.stringContaining("'internal_consistency'")]),
       );
     });
 
@@ -203,9 +193,7 @@ describe('Adversarial Contradiction Tests', () => {
       const result = validateResult(testCase, 65, 'changes_requested', findings);
       expect(result.pass).toBe(false);
       expect(result.failures).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("'user_story_coverage'"),
-        ]),
+        expect.arrayContaining([expect.stringContaining("'user_story_coverage'")]),
       );
     });
 

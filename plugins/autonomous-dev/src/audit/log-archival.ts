@@ -16,11 +16,11 @@
  *      written and fsynced.
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import * as crypto from "crypto";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as crypto from 'crypto';
 
-import type { AuditEvent } from "./types";
+import type { AuditEvent } from './types';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -104,43 +104,39 @@ export class LogArchival {
       return {
         archivedEventCount: 0,
         activeEventCount: allEvents.length,
-        archiveFilePath: "",
-        chainHeadHashAtArchival: "",
+        archiveFilePath: '',
+        chainHeadHashAtArchival: '',
       };
     }
 
     // Determine archive file name from date range
     const dateFrom = toArchive[0].timestamp.slice(0, 10); // YYYY-MM-DD
     const dateTo = toArchive[toArchive.length - 1].timestamp.slice(0, 10);
-    const archiveFile = path.join(
-      this.archivePath,
-      `events-${dateFrom}-to-${dateTo}.jsonl`,
-    );
+    const archiveFile = path.join(this.archivePath, `events-${dateFrom}-to-${dateTo}.jsonl`);
 
     // Step 1: Write archive atomically
-    const archiveTmpFile = archiveFile + ".tmp." + randomSuffix();
+    const archiveTmpFile = archiveFile + '.tmp.' + randomSuffix();
     this.writeJsonLines(archiveTmpFile, toArchive);
     fsyncFile(archiveTmpFile);
 
     // Step 2: Determine chain head hash at point of archival
     // The chain head hash is the hash of the last archived event
-    const chainHeadHash =
-      toArchive[toArchive.length - 1].hash || computeFallbackHash(toArchive);
+    const chainHeadHash = toArchive[toArchive.length - 1].hash || computeFallbackHash(toArchive);
 
     // Step 3: Write metadata sidecar
-    const metaFile = archiveFile + ".meta.json";
+    const metaFile = archiveFile + '.meta.json';
     const metadata = {
       dateRange: { from: dateFrom, to: dateTo },
       eventCount: toArchive.length,
       chainHeadHash,
     };
-    fs.writeFileSync(metaFile, JSON.stringify(metadata, null, 2) + "\n", "utf-8");
+    fs.writeFileSync(metaFile, JSON.stringify(metadata, null, 2) + '\n', 'utf-8');
 
     // Step 4: Rename temp archive to final path (atomic)
     fs.renameSync(archiveTmpFile, archiveFile);
 
     // Step 5: Rewrite active log with remaining events (atomic)
-    const activeTmpFile = this.logPath + ".tmp." + randomSuffix();
+    const activeTmpFile = this.logPath + '.tmp.' + randomSuffix();
     this.writeJsonLines(activeTmpFile, toKeep);
     fsyncFile(activeTmpFile);
 
@@ -181,17 +177,17 @@ export class LogArchival {
     const archives: ArchiveInfo[] = [];
 
     for (const entry of entries) {
-      if (!entry.endsWith(".jsonl")) {
+      if (!entry.endsWith('.jsonl')) {
         continue;
       }
 
       const filePath = path.join(this.archivePath, entry);
-      const metaPath = filePath + ".meta.json";
+      const metaPath = filePath + '.meta.json';
 
       if (fs.existsSync(metaPath)) {
         // Read metadata from sidecar
         try {
-          const metaRaw = fs.readFileSync(metaPath, "utf-8");
+          const metaRaw = fs.readFileSync(metaPath, 'utf-8');
           const meta = JSON.parse(metaRaw) as {
             dateRange: { from: string; to: string };
             eventCount: number;
@@ -219,7 +215,7 @@ export class LogArchival {
                 to: events[events.length - 1].timestamp.slice(0, 10),
               },
               eventCount: events.length,
-              chainHeadHash: events[events.length - 1].hash || "",
+              chainHeadHash: events[events.length - 1].hash || '',
             });
           }
         } catch {
@@ -247,10 +243,10 @@ export class LogArchival {
       return [];
     }
 
-    const content = fs.readFileSync(filePath, "utf-8");
+    const content = fs.readFileSync(filePath, 'utf-8');
     const events: AuditEvent[] = [];
 
-    for (const line of content.split("\n")) {
+    for (const line of content.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.length === 0) {
         continue;
@@ -275,8 +271,8 @@ export class LogArchival {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    const content = events.map((e) => JSON.stringify(e)).join("\n") + "\n";
-    fs.writeFileSync(filePath, content, "utf-8");
+    const content = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
+    fs.writeFileSync(filePath, content, 'utf-8');
   }
 }
 
@@ -288,7 +284,7 @@ export class LogArchival {
  * fsync a file by path: open, fsync, close.
  */
 function fsyncFile(filePath: string): void {
-  const fd = fs.openSync(filePath, "r");
+  const fd = fs.openSync(filePath, 'r');
   try {
     fs.fsyncSync(fd);
   } finally {
@@ -300,7 +296,7 @@ function fsyncFile(filePath: string): void {
  * Generate a short random suffix for temp file names.
  */
 function randomSuffix(): string {
-  return crypto.randomBytes(6).toString("hex");
+  return crypto.randomBytes(6).toString('hex');
 }
 
 /**
@@ -310,9 +306,9 @@ function randomSuffix(): string {
  */
 function computeFallbackHash(events: AuditEvent[]): string {
   if (events.length === 0) {
-    return "";
+    return '';
   }
   const lastEvent = events[events.length - 1];
   const canonical = JSON.stringify(lastEvent);
-  return crypto.createHash("sha256").update(canonical).digest("hex");
+  return crypto.createHash('sha256').update(canonical).digest('hex');
 }

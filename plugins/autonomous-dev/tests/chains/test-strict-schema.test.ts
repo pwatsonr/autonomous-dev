@@ -21,17 +21,10 @@ import {
   SchemaValidationError,
   type ConsumerPluginRef,
 } from '../../intake/chains/types';
-import {
-  clearSchemaCache,
-  getCompileCount,
-} from '../../intake/chains/schema-cache';
+import { clearSchemaCache, getCompileCount } from '../../intake/chains/schema-cache';
 import { createTempRequestDir, cleanupTempDir } from '../helpers/chain-fixtures';
 
-const FIXTURE_SCHEMA_ROOT = path.resolve(
-  __dirname,
-  'fixtures',
-  'schemas',
-);
+const FIXTURE_SCHEMA_ROOT = path.resolve(__dirname, 'fixtures', 'schemas');
 
 describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
   let tempRoot: string;
@@ -50,10 +43,7 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
     clearSchemaCache();
   });
 
-  function consumer(
-    artifactType: string,
-    schemaVersion: string,
-  ): ConsumerPluginRef {
+  function consumer(artifactType: string, schemaVersion: string): ConsumerPluginRef {
     return {
       pluginId: 'consumer-plugin',
       consumes: [{ artifact_type: artifactType, schema_version: schemaVersion }],
@@ -84,13 +74,7 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
     // clone surfaced to the consumer).
     const onDisk = JSON.parse(
       await fs.readFile(
-        path.join(
-          tempRoot,
-          '.autonomous-dev',
-          'artifacts',
-          'security-findings',
-          'scan-extra.json',
-        ),
+        path.join(tempRoot, '.autonomous-dev', 'artifacts', 'security-findings', 'scan-extra.json'),
         'utf-8',
       ),
     );
@@ -108,12 +92,7 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
         },
       ],
     };
-    await registry.persist(
-      tempRoot,
-      'security-findings',
-      'scan-narrow',
-      payload,
-    );
+    await registry.persist(tempRoot, 'security-findings', 'scan-narrow', payload);
 
     const out = await registry.read(
       'security-findings',
@@ -121,8 +100,7 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
       consumer('security-findings', '1.0'),
       tempRoot,
     );
-    const finding = (out.payload as { findings: Array<Record<string, unknown>> })
-      .findings[0];
+    const finding = (out.payload as { findings: Array<Record<string, unknown>> }).findings[0];
     expect(finding.severity).toBeUndefined();
     expect(finding.file).toBe('src/y.ts');
   });
@@ -147,29 +125,18 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
   });
 
   it('throws SchemaNotFoundError when the consumer requests an unknown version', async () => {
-    await registry.persist(
-      tempRoot,
-      'security-findings',
-      'scan-uv',
-      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
-    );
+    await registry.persist(tempRoot, 'security-findings', 'scan-uv', {
+      findings: [{ file: 'a', line: 1, rule_id: 'R' }],
+    });
     await expect(
-      registry.read(
-        'security-findings',
-        'scan-uv',
-        consumer('security-findings', '9.9'),
-        tempRoot,
-      ),
+      registry.read('security-findings', 'scan-uv', consumer('security-findings', '9.9'), tempRoot),
     ).rejects.toBeInstanceOf(SchemaNotFoundError);
   });
 
   it('caches the compiled validator: 100 reads compile exactly once', async () => {
-    await registry.persist(
-      tempRoot,
-      'security-findings',
-      'scan-cache',
-      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
-    );
+    await registry.persist(tempRoot, 'security-findings', 'scan-cache', {
+      findings: [{ file: 'a', line: 1, rule_id: 'R' }],
+    });
     const before = getCompileCount();
     for (let i = 0; i < 100; i++) {
       await registry.read(
@@ -188,12 +155,7 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
       findings: [{ file: 'src/x.ts', line: 1, rule_id: 'R1' }],
       extra_data: 'still-here',
     };
-    await registry.persist(
-      tempRoot,
-      'security-findings',
-      'scan-fresh',
-      payload,
-    );
+    await registry.persist(tempRoot, 'security-findings', 'scan-fresh', payload);
     await registry.read(
       'security-findings',
       'scan-fresh',
@@ -202,13 +164,7 @@ describe('ArtifactRegistry.read — strict-schema (SPEC-022-3-01)', () => {
     );
     const onDisk = JSON.parse(
       await fs.readFile(
-        path.join(
-          tempRoot,
-          '.autonomous-dev',
-          'artifacts',
-          'security-findings',
-          'scan-fresh.json',
-        ),
+        path.join(tempRoot, '.autonomous-dev', 'artifacts', 'security-findings', 'scan-fresh.json'),
         'utf-8',
       ),
     );

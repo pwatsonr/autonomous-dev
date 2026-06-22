@@ -68,9 +68,7 @@ export class AuditLogger {
     } catch (err) {
       // Never crash on write failure — log to stderr and continue
       const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(
-        `[AUDIT_ERROR] Failed to write audit event: ${message}\n`,
-      );
+      process.stderr.write(`[AUDIT_ERROR] Failed to write audit event: ${message}\n`);
     }
   }
 

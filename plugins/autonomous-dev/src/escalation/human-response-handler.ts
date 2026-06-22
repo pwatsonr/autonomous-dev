@@ -17,13 +17,13 @@
  *   RESUME_FAILED               | Failed to resume pipeline: {error}. Please try again.
  */
 
-import type { ResponseParser } from "./response-parser";
-import type { ResponseValidator, EscalationStore } from "./response-validator";
-import type { ActionResolver } from "./action-resolver";
-import type { PipelineResumptionCoordinator, ResumeResult } from "./pipeline-resumption";
-import type { ReEscalationManager } from "./re-escalation-manager";
-import type { AuditTrail } from "./types";
-import type { ResolvedAction, ResponseValidationError } from "./response-types";
+import type { ResponseParser } from './response-parser';
+import type { ResponseValidator, EscalationStore } from './response-validator';
+import type { ActionResolver } from './action-resolver';
+import type { PipelineResumptionCoordinator, ResumeResult } from './pipeline-resumption';
+import type { ReEscalationManager } from './re-escalation-manager';
+import type { AuditTrail } from './types';
+import type { ResolvedAction, ResponseValidationError } from './response-types';
 
 // ---------------------------------------------------------------------------
 // HandleResult type
@@ -90,11 +90,7 @@ export class HumanResponseHandler {
    * @param responder     Who provided the response (user ID or name).
    * @returns A HandleResult indicating success or failure.
    */
-  handleResponse(
-    rawInput: string,
-    escalationId: string,
-    responder: string,
-  ): HandleResult {
+  handleResponse(rawInput: string, escalationId: string, responder: string): HandleResult {
     // Step 1: Parse
     const parseResult = this.parser.parse(rawInput, escalationId, responder);
 
@@ -117,21 +113,18 @@ export class HumanResponseHandler {
       return {
         success: false,
         error: {
-          code: "ESCALATION_NOT_FOUND",
+          code: 'ESCALATION_NOT_FOUND',
           message: `Escalation ${escalationId} not found. It may have been resolved or expired.`,
         },
       };
     }
 
     // Step 6: Resolve action
-    const action = this.actionResolver.resolve(
-      validationResult.response,
-      escalation,
-    );
+    const action = this.actionResolver.resolve(validationResult.response, escalation);
 
     // Step 7: Emit audit event before resumption attempt
     void this.auditTrail.append({
-      event_type: "escalation_response_received",
+      event_type: 'escalation_response_received',
       payload: {
         escalation_id: escalationId,
         responder,
@@ -148,7 +141,7 @@ export class HumanResponseHandler {
       return {
         success: false,
         error: {
-          code: "RESUME_FAILED",
+          code: 'RESUME_FAILED',
           message: `Failed to resume pipeline: ${resumeResult.error}. Please try again.`,
         },
       };

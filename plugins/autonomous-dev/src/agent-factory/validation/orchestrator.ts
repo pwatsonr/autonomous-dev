@@ -128,9 +128,7 @@ export class TokenTracker {
       scoring_tokens: this.scoringTokens,
       total_tokens: this.cumulative,
       budget: this.budget,
-      utilization_percent: this.budget > 0
-        ? (this.cumulative / this.budget) * 100
-        : 0,
+      utilization_percent: this.budget > 0 ? (this.cumulative / this.budget) * 100 : 0,
     };
   }
 
@@ -220,7 +218,9 @@ export class ABValidationOrchestrator {
   private readonly evaluationsDir: string;
   private readonly tokenBudget: number;
   private readonly logger: OrchestratorLogger;
-  private readonly inputResolver?: (invocation: import('../metrics/types').InvocationMetric) => string;
+  private readonly inputResolver?: (
+    invocation: import('../metrics/types').InvocationMetric,
+  ) => string;
   private readonly metricsEngine: import('../metrics/types').IMetricsEngine;
 
   constructor(opts: ABValidationOrchestratorOptions) {
@@ -259,7 +259,7 @@ export class ABValidationOrchestrator {
 
     this.logger.info(
       `Starting A/B validation ${evaluationId} for proposal ${proposal.proposal_id} ` +
-      `(agent: ${proposal.agent_name}, budget: ${this.tokenBudget} tokens)`,
+        `(agent: ${proposal.agent_name}, budget: ${this.tokenBudget} tokens)`,
     );
 
     try {
@@ -268,18 +268,22 @@ export class ABValidationOrchestrator {
       const agentRecord = this.registry.get(proposal.agent_name);
       if (!agentRecord) {
         return this.abortResult(
-          evaluationId, proposal, startedAt, [],
+          evaluationId,
+          proposal,
+          startedAt,
+          [],
           `Agent '${proposal.agent_name}' not found in registry`,
           tokenTracker,
         );
       }
 
-      const weaknessReport = this.weaknessReportStore.getById(
-        proposal.weakness_report_id,
-      );
+      const weaknessReport = this.weaknessReportStore.getById(proposal.weakness_report_id);
       if (!weaknessReport) {
         return this.abortResult(
-          evaluationId, proposal, startedAt, [],
+          evaluationId,
+          proposal,
+          startedAt,
+          [],
           `Weakness report '${proposal.weakness_report_id}' not found`,
           tokenTracker,
         );
@@ -288,18 +292,15 @@ export class ABValidationOrchestrator {
       // --- Step 1: Input selection ---
 
       this.logger.info('Step 1: Selecting historical inputs');
-      const inputSelector = new InputSelector(
-        this.metricsEngine,
-        this.inputResolver,
-      );
-      const selectionResult = inputSelector.selectInputs(
-        proposal.agent_name,
-        weaknessReport,
-      );
+      const inputSelector = new InputSelector(this.metricsEngine, this.inputResolver);
+      const selectionResult = inputSelector.selectInputs(proposal.agent_name, weaknessReport);
 
       if (!selectionResult.success) {
         return this.abortResult(
-          evaluationId, proposal, startedAt, [],
+          evaluationId,
+          proposal,
+          startedAt,
+          [],
           selectionResult.error ?? 'Input selection failed',
           tokenTracker,
         );
@@ -325,9 +326,7 @@ export class ABValidationOrchestrator {
       const comparisons: ComparisonResult[] = [];
 
       for (const input of selectedInputs) {
-        this.logger.info(
-          `Processing input ${input.input_id} (reason: ${input.selection_reason})`,
-        );
+        this.logger.info(`Processing input ${input.input_id} (reason: ${input.selection_reason})`);
 
         // Step 2: Run current agent (version_a)
         this.logger.info('Step 2: Running current agent version');
@@ -347,10 +346,13 @@ export class ABValidationOrchestrator {
         if (tokenTracker.exceeded) {
           this.logger.warn(
             `Token budget exceeded after running input ${input.input_id} ` +
-            `(${tokenTracker.total}/${this.tokenBudget})`,
+              `(${tokenTracker.total}/${this.tokenBudget})`,
           );
           return this.abortResult(
-            evaluationId, proposal, startedAt, abInputs,
+            evaluationId,
+            proposal,
+            startedAt,
+            abInputs,
             'token_budget_exceeded',
             tokenTracker,
           );
@@ -364,11 +366,7 @@ export class ABValidationOrchestrator {
         this.logger.info('Step 5: Blind scoring');
         const rubric = agentRecord.agent.evaluation_rubric;
         const targetRole = agentRecord.agent.role;
-        const scoringResult = await blindScorer.score(
-          randomized,
-          rubric,
-          targetRole,
-        );
+        const scoringResult = await blindScorer.score(randomized, rubric, targetRole);
 
         // Estimate scoring tokens (from scoring rounds)
         const scoringTokenEstimate = estimateScoringTokens(scoringResult);
@@ -378,10 +376,13 @@ export class ABValidationOrchestrator {
         if (tokenTracker.exceeded) {
           this.logger.warn(
             `Token budget exceeded after scoring input ${input.input_id} ` +
-            `(${tokenTracker.total}/${this.tokenBudget})`,
+              `(${tokenTracker.total}/${this.tokenBudget})`,
           );
           return this.abortResult(
-            evaluationId, proposal, startedAt, abInputs,
+            evaluationId,
+            proposal,
+            startedAt,
+            abInputs,
             'token_budget_exceeded',
             tokenTracker,
           );
@@ -423,19 +424,15 @@ export class ABValidationOrchestrator {
 
       this.logger.info(
         `A/B validation ${evaluationId} complete: verdict=${aggregate.verdict}, ` +
-        `wins=${aggregate.proposed_wins}, losses=${aggregate.current_wins}, ` +
-        `ties=${aggregate.ties}, tokens=${tokenTracker.total}/${this.tokenBudget}`,
+          `wins=${aggregate.proposed_wins}, losses=${aggregate.current_wins}, ` +
+          `ties=${aggregate.ties}, tokens=${tokenTracker.total}/${this.tokenBudget}`,
       );
 
       return result;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`Validation failed: ${message}`);
-      return this.abortResult(
-        evaluationId, proposal, startedAt, [],
-        message,
-        tokenTracker,
-      );
+      return this.abortResult(evaluationId, proposal, startedAt, [], message, tokenTracker);
     }
   }
 
@@ -458,20 +455,16 @@ export class ABValidationOrchestrator {
     try {
       const newStatus =
         aggregate.verdict === 'positive'
-          ? 'validated_positive' as const
-          : 'validated_negative' as const;
+          ? ('validated_positive' as const)
+          : ('validated_negative' as const);
 
       this.proposalStore.updateStatus(proposal.proposal_id, newStatus);
       this.proposalStore.setEvaluationId(proposal.proposal_id, evaluationId);
 
-      this.logger.info(
-        `Proposal ${proposal.proposal_id} status updated to ${newStatus}`,
-      );
+      this.logger.info(`Proposal ${proposal.proposal_id} status updated to ${newStatus}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(
-        `Failed to update proposal status: ${message}`,
-      );
+      this.logger.error(`Failed to update proposal status: ${message}`);
     }
   }
 
@@ -520,9 +513,7 @@ export class ABValidationOrchestrator {
     reason: string,
     tokenTracker: TokenTracker,
   ): ABEvaluationResult {
-    this.logger.warn(
-      `Validation ${evaluationId} aborted: ${reason}`,
-    );
+    this.logger.warn(`Validation ${evaluationId} aborted: ${reason}`);
 
     // Build an inconclusive aggregate from partial results
     const aggregate: ABAggregate = {
@@ -531,9 +522,10 @@ export class ABValidationOrchestrator {
       current_wins: partialInputs.filter((i) => i.outcome === 'current_wins').length,
       ties: partialInputs.filter((i) => i.outcome === 'tie').length,
       total_inputs: partialInputs.length,
-      mean_delta: partialInputs.length > 0
-        ? partialInputs.reduce((sum, i) => sum + i.overall_delta, 0) / partialInputs.length
-        : 0,
+      mean_delta:
+        partialInputs.length > 0
+          ? partialInputs.reduce((sum, i) => sum + i.overall_delta, 0) / partialInputs.length
+          : 0,
       per_dimension_summary: {},
       recommendation: `Validation aborted: ${reason}`,
     };
@@ -572,10 +564,7 @@ export class ABValidationOrchestrator {
         fs.mkdirSync(this.evaluationsDir, { recursive: true });
       }
 
-      const filePath = path.join(
-        this.evaluationsDir,
-        `${result.evaluation_id}.json`,
-      );
+      const filePath = path.join(this.evaluationsDir, `${result.evaluation_id}.json`);
       const content = JSON.stringify(result, null, 2);
       fs.writeFileSync(filePath, content, { encoding: 'utf-8' });
 
@@ -594,10 +583,7 @@ export class ABValidationOrchestrator {
 /**
  * Convert a ComparisonResult and its SelectedInput into an ABInput record.
  */
-function toABInput(
-  input: import('./types').SelectedInput,
-  comparison: ComparisonResult,
-): ABInput {
+function toABInput(input: import('./types').SelectedInput, comparison: ComparisonResult): ABInput {
   return {
     input_id: input.input_id,
     selection_reason: input.selection_reason,

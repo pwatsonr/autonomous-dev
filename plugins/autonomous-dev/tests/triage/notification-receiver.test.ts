@@ -7,11 +7,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import {
-  setupTestDir,
-  createMockObservation,
-  readObservation,
-} from '../helpers/mock-observations';
+import { setupTestDir, createMockObservation, readObservation } from '../helpers/mock-observations';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,10 +40,7 @@ interface ParseResult {
  * Example:
  *   /triage OBS-20260408-143022-a7f3 dismiss False positive from deploy
  */
-function parseTriageCommand(
-  text: string,
-  actor: string,
-): ParseResult {
+function parseTriageCommand(text: string, actor: string): ParseResult {
   const trimmed = text.trim();
 
   // Match /triage command
@@ -105,11 +98,16 @@ async function processTriageDecision(
     const lines = fmRaw.split('\n');
     const updatedLines: string[] = [];
     const fieldsToUpdate: Record<string, string> = {
-      triage_status: decision.decision === 'promote' ? 'promoted' :
-                     decision.decision === 'dismiss' ? 'dismissed' :
-                     decision.decision === 'defer' ? 'deferred' :
-                     decision.decision === 'investigate' ? 'investigating' :
-                     decision.decision,
+      triage_status:
+        decision.decision === 'promote'
+          ? 'promoted'
+          : decision.decision === 'dismiss'
+            ? 'dismissed'
+            : decision.decision === 'defer'
+              ? 'deferred'
+              : decision.decision === 'investigate'
+                ? 'investigating'
+                : decision.decision,
       triage_decision: decision.decision,
       triage_by: decision.actor,
       triage_at: decision.timestamp ?? new Date().toISOString(),
@@ -212,18 +210,12 @@ describe('parseTriageCommand', () => {
   });
 
   test('rejects invalid decision', () => {
-    const result = parseTriageCommand(
-      '/triage OBS-123 yolo Some reason',
-      'pm-lead',
-    );
+    const result = parseTriageCommand('/triage OBS-123 yolo Some reason', 'pm-lead');
     expect(result.valid).toBe(false);
   });
 
   test('is case-insensitive for decision', () => {
-    const result = parseTriageCommand(
-      '/triage OBS-20260408-143022-a7f3 DISMISS Noise',
-      'pm-lead',
-    );
+    const result = parseTriageCommand('/triage OBS-20260408-143022-a7f3 DISMISS Noise', 'pm-lead');
     expect(result.valid).toBe(true);
     expect(result.command!.decision).toBe('dismiss');
   });

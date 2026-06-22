@@ -10,7 +10,10 @@ import {
   type ObservationRunnerOptions,
 } from '../../src/runner/observation-runner';
 import type { DataSourceStatus } from '../../src/adapters/mcp-error-handler';
-import type { IntelligenceConfig, ServiceConfig } from '../../src/config/intelligence-config.schema';
+import type {
+  IntelligenceConfig,
+  ServiceConfig,
+} from '../../src/config/intelligence-config.schema';
 import { generateRunId } from '../../src/runner/run-id';
 
 // ---------------------------------------------------------------------------
@@ -54,7 +57,11 @@ function makeTestConfig(overrides: Partial<IntelligenceConfig> = {}): Intelligen
     },
     anomaly_detection: { method: 'zscore', sensitivity: 2.5, consecutive_runs_required: 3 },
     trend_analysis: { windows: ['1h', '24h', '7d'], min_slope_threshold: 0.1 },
-    false_positive_filters: { maintenance_windows: [], excluded_error_patterns: [], load_test_markers: [] },
+    false_positive_filters: {
+      maintenance_windows: [],
+      excluded_error_patterns: [],
+      load_test_markers: [],
+    },
     governance: {
       cooldown_days: 7,
       oscillation_window_days: 14,
@@ -87,12 +94,16 @@ services:
     grafana_dashboard_uid: ${c.services[0].grafana_dashboard_uid}
     opensearch_index: "${c.services[0].opensearch_index}"
     criticality: ${c.services[0].criticality}
-${c.services.length > 1 ? `  - name: ${c.services[1].name}
+${
+  c.services.length > 1
+    ? `  - name: ${c.services[1].name}
     repo: ${c.services[1].repo}
     prometheus_job: ${c.services[1].prometheus_job}
     grafana_dashboard_uid: ${c.services[1].grafana_dashboard_uid}
     opensearch_index: "${c.services[1].opensearch_index}"
-    criticality: ${c.services[1].criticality}` : ''}
+    criticality: ${c.services[1].criticality}`
+    : ''
+}
 default_thresholds:
   error_rate_percent: 1
   sustained_duration_minutes: 15
@@ -193,9 +204,7 @@ describe('ObservationRunner', () => {
   });
 
   /** Helper: create a runner with reasonable defaults and overrides. */
-  function createRunner(
-    overrides: Partial<ObservationRunnerOptions> = {},
-  ): ObservationRunner {
+  function createRunner(overrides: Partial<ObservationRunnerOptions> = {}): ObservationRunner {
     return new ObservationRunner({
       rootDir: tmpDir,
       configPath,
@@ -320,9 +329,7 @@ describe('ObservationRunner', () => {
       await runner.run('all');
 
       // First service should complete before second starts
-      const firstEnd = timeline.find(
-        (e) => e.service === 'api-gateway' && e.phase === 'end',
-      )!;
+      const firstEnd = timeline.find((e) => e.service === 'api-gateway' && e.phase === 'end')!;
       const secondStart = timeline.find(
         (e) => e.service === 'auth-service' && e.phase === 'start',
       )!;

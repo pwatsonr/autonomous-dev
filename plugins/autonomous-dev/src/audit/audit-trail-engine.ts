@@ -27,9 +27,7 @@ import type { HashChainVerifier } from './hash-verifier';
  * Only exposes append -- replay and verification are engine-only.
  */
 export interface AuditTrail {
-  append(
-    event: Omit<AuditEvent, 'event_id' | 'timestamp' | 'hash' | 'prev_hash'>,
-  ): Promise<void>;
+  append(event: Omit<AuditEvent, 'event_id' | 'timestamp' | 'hash' | 'prev_hash'>): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

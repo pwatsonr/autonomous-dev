@@ -9,7 +9,7 @@ import {
 
 function makeState(
   currentIteration: number,
-  scores: { iteration: number; aggregate_score: number }[]
+  scores: { iteration: number; aggregate_score: number }[],
 ): RegressionDetectorState {
   return {
     current_iteration: currentIteration,

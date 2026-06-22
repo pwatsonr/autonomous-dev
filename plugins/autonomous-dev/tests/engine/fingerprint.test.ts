@@ -19,9 +19,7 @@ import type { CandidateObservation } from '../../src/engine/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildCandidate(
-  overrides: Partial<CandidateObservation> = {},
-): CandidateObservation {
+function buildCandidate(overrides: Partial<CandidateObservation> = {}): CandidateObservation {
   return {
     type: 'error',
     error_type: 'error_rate',
@@ -104,8 +102,9 @@ describe('generateFingerprint', () => {
   // -------------------------------------------------------------------------
 
   it('TC-3-3-07: only top 3 frames contribute to fingerprint', () => {
-    const tenFrames = Array.from({ length: 10 }, (_, i) =>
-      `  at com.example.Class${i}.method(Class${i}.java:${i * 10})`,
+    const tenFrames = Array.from(
+      { length: 10 },
+      (_, i) => `  at com.example.Class${i}.method(Class${i}.java:${i * 10})`,
     );
     const threeFrames = tenFrames.slice(0, 3);
 
@@ -163,9 +162,7 @@ describe('normalizeFrame', () => {
 
   // SKIP: same root cause as TC-3-3-06 (PRD-016 triage: SKIP-WITH-NOTE).
   it.skip('replaces timestamps with fractional seconds', () => {
-    expect(normalizeFrame('2026-04-08T14:30:22.123Z at Foo.bar')).toBe(
-      '<timestamp> at Foo.bar',
-    );
+    expect(normalizeFrame('2026-04-08T14:30:22.123Z at Foo.bar')).toBe('<timestamp> at Foo.bar');
   });
 
   // SKIP: same root cause as TC-3-3-06 (PRD-016 triage: SKIP-WITH-NOTE).
@@ -227,10 +224,7 @@ describe('normalizeStackTrace', () => {
   });
 
   it('normalizes all frames in the output', () => {
-    const trace = [
-      'at Foo.bar(Foo.java:42)',
-      'at Baz.qux(Baz.java:99)',
-    ].join('\n');
+    const trace = ['at Foo.bar(Foo.java:42)', 'at Baz.qux(Baz.java:99)'].join('\n');
 
     const result = normalizeStackTrace(trace);
     expect(result).not.toMatch(/:\d+\)/); // No raw line numbers

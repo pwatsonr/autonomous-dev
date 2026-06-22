@@ -76,9 +76,7 @@ async function createTestObservation(
     linked_prd: opts.linked_prd ?? null,
   });
 
-  const dir = opts.subDir
-    ? path.join(observationsDir, opts.subDir)
-    : observationsDir;
+  const dir = opts.subDir ? path.join(observationsDir, opts.subDir) : observationsDir;
   await fs.mkdir(dir, { recursive: true });
   const filePath = path.join(dir, `${id}.md`);
   await fs.writeFile(filePath, content, 'utf-8');
@@ -580,11 +578,7 @@ describe('Retention Policy', () => {
 
   test('ignores non-OBS files', async () => {
     // Write a file that does not match OBS-*.md
-    await fs.writeFile(
-      path.join(observationsDir, 'README.md'),
-      '# Not an observation',
-      'utf-8',
-    );
+    await fs.writeFile(path.join(observationsDir, 'README.md'), '# Not an observation', 'utf-8');
 
     const result = await applyRetentionPolicy(
       observationsDir,
@@ -708,11 +702,7 @@ describe('readFrontmatter (retention)', () => {
 
   test('returns null for frontmatter missing required id field', async () => {
     const filePath = path.join(tmpDir, 'no-id.md');
-    await fs.writeFile(
-      filePath,
-      '---\ntimestamp: 2026-04-01T00:00:00Z\n---\n# Body',
-      'utf-8',
-    );
+    await fs.writeFile(filePath, '---\ntimestamp: 2026-04-01T00:00:00Z\n---\n# Body', 'utf-8');
     // id is null -> returns null (requires both id and timestamp)
     const fm = await readFrontmatter(filePath);
     expect(fm).toBeNull();

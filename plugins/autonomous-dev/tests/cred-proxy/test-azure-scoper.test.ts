@@ -145,14 +145,13 @@ describe('AzureCredentialScoper.scope', () => {
     await out.revoke();
     expect(ra.state.deleted).toEqual([
       {
-        scope:
-          '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.App/containerApps/app1',
+        scope: '/subscriptions/sub1/resourceGroups/rg1/providers/Microsoft.App/containerApps/app1',
         name: 'asn-uuid-xyz',
       },
     ]);
   });
 
-  it("revoke() treats 404 as success (idempotent)", async () => {
+  it('revoke() treats 404 as success (idempotent)', async () => {
     const ra = makeRoleAssignments();
     const cred = makeCred();
     const scoper = new AzureCredentialScoper(cfg, ra.client, cred.cred);
@@ -213,18 +212,14 @@ describe('AzureCredentialScoper.scope', () => {
     const ra = makeRoleAssignments();
     const cred = makeCred(null);
     const scoper = new AzureCredentialScoper(cfg, ra.client, cred.cred);
-    await expect(scoper.scope('ContainerApps.Deploy', VALID)).rejects.toThrow(
-      /no token/,
-    );
+    await expect(scoper.scope('ContainerApps.Deploy', VALID)).rejects.toThrow(/no token/);
   });
 
   it('throws on unknown operation', async () => {
     const ra = makeRoleAssignments();
     const cred = makeCred();
     const scoper = new AzureCredentialScoper(cfg, ra.client, cred.cred);
-    await expect(scoper.scope('UnknownOp', {})).rejects.toThrow(
-      /unknown Azure operation/,
-    );
+    await expect(scoper.scope('UnknownOp', {})).rejects.toThrow(/unknown Azure operation/);
   });
 
   it('throws when a required scope key is missing', async () => {

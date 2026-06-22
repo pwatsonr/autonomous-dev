@@ -28,10 +28,7 @@ class FakeBackend implements FirewallBackend {
   }
 }
 
-function mkLoop(opts: {
-  resolver?: Partial<DnsResolver>;
-  initialNow?: number;
-}) {
+function mkLoop(opts: { resolver?: Partial<DnsResolver>; initialNow?: number }) {
   let now = opts.initialNow ?? 1_000_000;
   let intervalSet: { handler: () => void; ms: number } | null = null;
   const timers: TimerFactory = {
@@ -121,7 +118,10 @@ describe('DnsRefreshLoop.refresh', () => {
     resolved = ['1.1.1.1', '2.2.2.2'];
     await loop.refresh();
     expect(backend.replaceCalls).toHaveLength(2);
-    expect(backend.replaceCalls[1].rules.map((r: any) => r.ip).sort()).toEqual(['1.1.1.1', '2.2.2.2']);
+    expect(backend.replaceCalls[1].rules.map((r: any) => r.ip).sort()).toEqual([
+      '1.1.1.1',
+      '2.2.2.2',
+    ]);
   });
 
   test('IP not seen for >1h is removed on next refresh', async () => {
@@ -136,7 +136,10 @@ describe('DnsRefreshLoop.refresh', () => {
     resolved = ['1.1.1.1'];
     env.advance(STALE_TTL_MS + 1000);
     await env.loop.refresh();
-    const ips = env.loop.rulesFor(1).map((r) => r.ip).sort();
+    const ips = env.loop
+      .rulesFor(1)
+      .map((r) => r.ip)
+      .sort();
     expect(ips).toEqual(['1.1.1.1']);
   });
 

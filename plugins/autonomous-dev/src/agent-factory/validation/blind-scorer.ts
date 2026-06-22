@@ -96,14 +96,16 @@ const MAX_SCORE = 5.0;
  * and common version labels.
  */
 export function stripVersionMetadata(output: string): string {
-  return output
-    // "Version X.Y.Z" headers (case-insensitive)
-    .replace(/\bVersion\s+\d+\.\d+\.\d+\b/gi, '')
-    // "vX.Y.Z" patterns
-    .replace(/\bv\d+\.\d+\.\d+\b/g, '')
-    // Clean up any double spaces or empty header lines left behind
-    .replace(/ {2,}/g, ' ')
-    .trim();
+  return (
+    output
+      // "Version X.Y.Z" headers (case-insensitive)
+      .replace(/\bVersion\s+\d+\.\d+\.\d+\b/gi, '')
+      // "vX.Y.Z" patterns
+      .replace(/\bv\d+\.\d+\.\d+\b/g, '')
+      // Clean up any double spaces or empty header lines left behind
+      .replace(/ {2,}/g, ' ')
+      .trim()
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -170,12 +172,7 @@ export class BlindScorer {
     const output2 = stripVersionMetadata(pair.output_2);
 
     // Build the scoring prompt
-    const prompt = buildScoringPrompt(
-      pair.input.input_content,
-      output1,
-      output2,
-      rubric,
-    );
+    const prompt = buildScoringPrompt(pair.input.input_content, output1, output2, rubric);
 
     // Run 3 scoring rounds
     const rounds: ScoringRound[] = [];
@@ -183,12 +180,7 @@ export class BlindScorer {
 
     for (let roundNum = 1; roundNum <= SCORING_ROUNDS; roundNum++) {
       try {
-        const round = await this.executeRound(
-          roundNum,
-          reviewerName,
-          prompt,
-          rubric,
-        );
+        const round = await this.executeRound(roundNum, reviewerName, prompt, rubric);
         rounds.push(round);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -201,9 +193,7 @@ export class BlindScorer {
 
     // All 3 rounds failed
     if (rounds.length === 0) {
-      this.logger.error(
-        `All scoring rounds failed for input ${pair.input.input_id}`,
-      );
+      this.logger.error(`All scoring rounds failed for input ${pair.input.input_id}`);
       return {
         input_id: pair.input.input_id,
         rounds: [],
@@ -224,7 +214,7 @@ export class BlindScorer {
 
     this.logger.info(
       `Scoring complete for input ${pair.input.input_id}: ` +
-      `${rounds.length}/${SCORING_ROUNDS} rounds succeeded, variance=${scoringVariance.toFixed(4)}`,
+        `${rounds.length}/${SCORING_ROUNDS} rounds succeeded, variance=${scoringVariance.toFixed(4)}`,
     );
 
     return {
@@ -245,11 +235,9 @@ export class BlindScorer {
     prompt: string,
     rubric: QualityDimension[],
   ): Promise<ScoringRound> {
-    const result = await this.reviewerInvoker.invoke(
-      reviewerName,
-      prompt,
-      { environment: 'validation' },
-    );
+    const result = await this.reviewerInvoker.invoke(reviewerName, prompt, {
+      environment: 'validation',
+    });
 
     // Parse the reviewer's JSON output
     const parsed = parseReviewerOutput(result.output, rubric);
@@ -283,12 +271,14 @@ export function buildScoringPrompt(
   output2: string,
   rubric: QualityDimension[],
 ): string {
-  const dimensionLines = rubric.map(
-    (dim) =>
-      `- **${dim.name}** (weight: ${dim.weight}): ${dim.description}\n` +
-      `  Score Output 1: ___\n` +
-      `  Score Output 2: ___`,
-  ).join('\n');
+  const dimensionLines = rubric
+    .map(
+      (dim) =>
+        `- **${dim.name}** (weight: ${dim.weight}): ${dim.description}\n` +
+        `  Score Output 1: ___\n` +
+        `  Score Output 2: ___`,
+    )
+    .join('\n');
 
   return `You are scoring two outputs produced by an agent for the same input.
 Do NOT attempt to determine which output is "better" overall -- score each independently.
@@ -466,10 +456,7 @@ export function computeMedianScores(
  * For each dimension, for each output, compute the variance of scores
  * across rounds. Return the average of all these variances.
  */
-export function computeScoringVariance(
-  rounds: ScoringRound[],
-  rubric: QualityDimension[],
-): number {
+export function computeScoringVariance(rounds: ScoringRound[], rubric: QualityDimension[]): number {
   if (rounds.length < 2) return 0;
 
   const variances: number[] = [];
@@ -567,10 +554,7 @@ function variance(values: number[]): number {
 /**
  * Compute weighted mean from dimension scores and rubric.
  */
-function computeWeightedMean(
-  scores: Record<string, number>,
-  rubric: QualityDimension[],
-): number {
+function computeWeightedMean(scores: Record<string, number>, rubric: QualityDimension[]): number {
   let weightedSum = 0;
   let totalWeight = 0;
 

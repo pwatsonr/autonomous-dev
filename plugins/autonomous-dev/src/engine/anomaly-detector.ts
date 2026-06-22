@@ -45,12 +45,7 @@ export interface AnomalyResult {
 // ---------------------------------------------------------------------------
 
 /** Metrics where an increase indicates degradation. */
-const BAD_IF_ABOVE = [
-  'error_rate',
-  'latency_p50_ms',
-  'latency_p95_ms',
-  'latency_p99_ms',
-];
+const BAD_IF_ABOVE = ['error_rate', 'latency_p50_ms', 'latency_p95_ms', 'latency_p99_ms'];
 
 /** Metrics where a decrease indicates degradation. */
 const BAD_IF_BELOW = ['throughput_rps', 'availability'];
@@ -66,10 +61,7 @@ const BAD_IF_BELOW = ['throughput_rps', 'availability'];
  * @param direction  Direction of deviation
  * @returns          True if this direction represents degradation
  */
-export function isBadDirection(
-  metric: string,
-  direction: 'above' | 'below',
-): boolean {
+export function isBadDirection(metric: string, direction: 'above' | 'below'): boolean {
   if (BAD_IF_ABOVE.includes(metric)) return direction === 'above';
   if (BAD_IF_BELOW.includes(metric)) return direction === 'below';
   return false;
@@ -175,8 +167,7 @@ export function detectAnomalyIQR(
   const upperBound = q3 + 1.5 * iqr;
 
   const isOutside = currentValue < lowerBound || currentValue > upperBound;
-  const direction: 'above' | 'below' =
-    currentValue > upperBound ? 'above' : 'below';
+  const direction: 'above' | 'below' = currentValue > upperBound ? 'above' : 'below';
   const isBad = isBadDirection(metric, direction);
 
   const detected = isOutside && isBad;
@@ -243,13 +234,7 @@ export function detectAnomalies(
 
     let result: AnomalyResult;
     if (config.method === 'zscore') {
-      result = detectAnomalyZScore(
-        metric,
-        value,
-        baseline,
-        config.sensitivity,
-        previousRunAnomaly,
-      );
+      result = detectAnomalyZScore(metric, value, baseline, config.sensitivity, previousRunAnomaly);
     } else {
       result = detectAnomalyIQR(metric, value, baseline, previousRunAnomaly);
     }

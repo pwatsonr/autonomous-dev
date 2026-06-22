@@ -35,7 +35,12 @@ describe('QuotaEnforcer', () => {
     await dm.createDocumentDirs(pipelineId, type, docId);
   }
 
-  async function writeVersionFile(type: DocumentType, docId: string, version: string, content?: string): Promise<void> {
+  async function writeVersionFile(
+    type: DocumentType,
+    docId: string,
+    version: string,
+    content?: string,
+  ): Promise<void> {
     const filePath = dm.getVersionFilePath(pipelineId, type, docId, version);
     await fs.writeFile(filePath, content ?? 'test content');
   }
@@ -95,9 +100,9 @@ describe('QuotaEnforcer', () => {
       await writeVersionFile(DocumentType.PRD, 'DOC-001', '1.1');
       await writeVersionFile(DocumentType.PRD, 'DOC-001', '1.2');
 
-      await expect(
-        enforcer.checkVersionLimit(pipelineId, 'PRD', 'DOC-001'),
-      ).rejects.toThrow(QuotaExceededError);
+      await expect(enforcer.checkVersionLimit(pipelineId, 'PRD', 'DOC-001')).rejects.toThrow(
+        QuotaExceededError,
+      );
       try {
         await enforcer.checkVersionLimit(pipelineId, 'PRD', 'DOC-001');
       } catch (err) {
@@ -178,9 +183,9 @@ describe('QuotaEnforcer', () => {
       await createDocumentDir(DocumentType.PRD, 'DOC-001');
       await writeVersionFile(DocumentType.PRD, 'DOC-001', '1.0');
 
-      await expect(
-        enforcer.checkVersionLimit(pipelineId, 'PRD', 'DOC-001'),
-      ).rejects.toThrow(QuotaExceededError);
+      await expect(enforcer.checkVersionLimit(pipelineId, 'PRD', 'DOC-001')).rejects.toThrow(
+        QuotaExceededError,
+      );
     });
 
     it('uses custom maxDocumentSizeBytes', () => {
@@ -213,9 +218,9 @@ describe('QuotaEnforcer', () => {
 
       await createDocumentDir(DocumentType.PRD, 'DOC-001');
 
-      await expect(
-        enforcer.checkBeforeDocumentCreate(pipelineId, 'content'),
-      ).rejects.toThrow(QuotaExceededError);
+      await expect(enforcer.checkBeforeDocumentCreate(pipelineId, 'content')).rejects.toThrow(
+        QuotaExceededError,
+      );
     });
 
     it('fails on document size limit', async () => {

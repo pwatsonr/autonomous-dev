@@ -57,9 +57,7 @@ const DEFAULT_AUDIT_CONFIG: AuditConfig = {
  *   - `hash_chain_enabled` must be a boolean (default false).
  *   - All other fields fall back to defaults when missing or invalid.
  */
-export function loadAuditConfig(
-  raw: Record<string, unknown> | undefined | null,
-): AuditConfig {
+export function loadAuditConfig(raw: Record<string, unknown> | undefined | null): AuditConfig {
   if (!raw || typeof raw !== 'object') {
     return { ...DEFAULT_AUDIT_CONFIG };
   }
@@ -108,10 +106,7 @@ export function loadAuditConfig(
       );
     }
 
-    if (
-      typeof retention.archive_path === 'string' &&
-      retention.archive_path.length > 0
-    ) {
+    if (typeof retention.archive_path === 'string' && retention.archive_path.length > 0) {
       config.retention.archive_path = retention.archive_path;
     }
   }

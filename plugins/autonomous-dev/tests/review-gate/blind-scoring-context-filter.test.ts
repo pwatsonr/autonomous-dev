@@ -207,7 +207,8 @@ describe('BlindScoringContextFilter', () => {
 
   // Test 11: Normal content not stripped
   it('does not strip normal content that mentions "reviewed"', () => {
-    const content = 'The product analyst reviewed the market data. The team reviewed the architecture.';
+    const content =
+      'The product analyst reviewed the market data. The team reviewed the architecture.';
 
     const doc = makeDocument({ content });
     const result = filter.filterDocument(doc);

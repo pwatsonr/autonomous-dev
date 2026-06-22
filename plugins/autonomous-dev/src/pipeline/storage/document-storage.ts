@@ -7,7 +7,11 @@ import { TemplateEngine } from '../template-engine/template-engine';
 import { IdCounter } from '../frontmatter/id-generator';
 import { CreateDocumentRequest, DocumentHandle, createDocument } from './document-creator';
 import { DocumentContent, readDocument, readVersion } from './document-reader';
-import { DocumentFilter, listDocuments, DocumentHandle as DocumentSummary } from './document-lister';
+import {
+  DocumentFilter,
+  listDocuments,
+  DocumentHandle as DocumentSummary,
+} from './document-lister';
 import { WriteVersionRequest, VersionRecord, writeVersion } from './version-writer';
 import { listVersions } from './version-lister';
 import { deleteDocument } from './document-deleter';
@@ -30,10 +34,7 @@ export class DocumentStorage {
   private templateEngine: TemplateEngine;
   private idCounter: IdCounter;
 
-  constructor(
-    config: PipelineConfig,
-    idCounter: IdCounter,
-  ) {
+  constructor(config: PipelineConfig, idCounter: IdCounter) {
     this.directoryManager = new DirectoryManager(config.pipeline.rootDir);
     this.auditLogger = new AuditLogger(this.directoryManager);
     this.quotaEnforcer = new QuotaEnforcer(config, this.directoryManager);
@@ -44,9 +45,7 @@ export class DocumentStorage {
   /** Initialize a new pipeline directory with all required files. */
   async initializePipeline(pipelineId: string, title: string): Promise<PipelineInitResult> {
     const result = await initializePipeline(this.directoryManager, pipelineId, title);
-    await this.auditLogger.appendEvent(
-      pipelineId, 'pipeline_created', { title }, 'system',
-    );
+    await this.auditLogger.appendEvent(pipelineId, 'pipeline_created', { title }, 'system');
     return result;
   }
 
@@ -77,12 +76,21 @@ export class DocumentStorage {
   }
 
   /** Read current version of a document. */
-  async readDocument(pipelineId: string, type: DocumentType, documentId: string): Promise<DocumentContent> {
+  async readDocument(
+    pipelineId: string,
+    type: DocumentType,
+    documentId: string,
+  ): Promise<DocumentContent> {
     return readDocument(pipelineId, type, documentId, this.directoryManager);
   }
 
   /** Read a specific version of a document. */
-  async readVersion(pipelineId: string, type: DocumentType, documentId: string, version: string): Promise<DocumentContent> {
+  async readVersion(
+    pipelineId: string,
+    type: DocumentType,
+    documentId: string,
+    version: string,
+  ): Promise<DocumentContent> {
     return readVersion(pipelineId, type, documentId, version, this.directoryManager);
   }
 
@@ -92,14 +100,21 @@ export class DocumentStorage {
   }
 
   /** List all versions of a document. */
-  async listVersions(pipelineId: string, type: DocumentType, documentId: string): Promise<VersionRecord[]> {
+  async listVersions(
+    pipelineId: string,
+    type: DocumentType,
+    documentId: string,
+  ): Promise<VersionRecord[]> {
     return listVersions(pipelineId, type, documentId, this.directoryManager);
   }
 
   /** Write a new version. Enforces quotas. */
   async writeVersion(request: WriteVersionRequest): Promise<VersionRecord> {
     await this.quotaEnforcer.checkBeforeVersionWrite(
-      request.pipelineId, request.type, request.documentId, request.content,
+      request.pipelineId,
+      request.type,
+      request.documentId,
+      request.content,
     );
 
     const record = await writeVersion(request, this.directoryManager);
@@ -116,8 +131,20 @@ export class DocumentStorage {
   }
 
   /** Delete a document (admin). */
-  async deleteDocument(pipelineId: string, type: DocumentType, documentId: string, actorId: string): Promise<void> {
-    return deleteDocument(pipelineId, type, documentId, this.directoryManager, this.auditLogger, actorId);
+  async deleteDocument(
+    pipelineId: string,
+    type: DocumentType,
+    documentId: string,
+    actorId: string,
+  ): Promise<void> {
+    return deleteDocument(
+      pipelineId,
+      type,
+      documentId,
+      this.directoryManager,
+      this.auditLogger,
+      actorId,
+    );
   }
 
   /** Get the directory manager for direct path queries. */

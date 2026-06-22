@@ -32,11 +32,7 @@ export interface MockExpectation {
 
 export interface RunToolMock {
   runTool: (cmd: string, args: string[], opts: RunToolOptions) => Promise<RunToolResult>;
-  expect(
-    cmdRegex: RegExp,
-    argMatcher: (args: string[]) => boolean,
-    response: MockResponse,
-  ): void;
+  expect(cmdRegex: RegExp, argMatcher: (args: string[]) => boolean, response: MockResponse): void;
   calls(): RunToolCall[];
   reset(): void;
 }
@@ -66,9 +62,7 @@ export function makeRunToolMock(): RunToolMock {
         return { stdout: exp.response.stdout ?? '', stderr: exp.response.stderr ?? '' };
       }
     }
-    throw new Error(
-      `runTool mock: no expectation matched ${cmd} ${args.join(' ')}`,
-    );
+    throw new Error(`runTool mock: no expectation matched ${cmd} ${args.join(' ')}`);
   };
 
   return {

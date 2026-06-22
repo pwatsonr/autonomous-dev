@@ -1,4 +1,7 @@
-import { BackwardCascadeController, CascadeInitiateRequest } from '../../../src/pipeline/cascade/cascade-controller';
+import {
+  BackwardCascadeController,
+  CascadeInitiateRequest,
+} from '../../../src/pipeline/cascade/cascade-controller';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
 import { DEFAULT_PIPELINE_CONFIG, PipelineConfig } from '../../../src/pipeline/types/config';
 import { PipelineState } from '../../../src/pipeline/flow/pipeline-state';
@@ -27,21 +30,28 @@ jest.mock('../../../src/pipeline/flow/pipeline-state-io', () => ({
 }));
 
 import { analyzeImpact } from '../../../src/pipeline/traceability/impact-analyzer';
-import { readPipelineState, writePipelineState } from '../../../src/pipeline/flow/pipeline-state-io';
+import {
+  readPipelineState,
+  writePipelineState,
+} from '../../../src/pipeline/flow/pipeline-state-io';
 
 const mockedAnalyzeImpact = analyzeImpact as jest.MockedFunction<typeof analyzeImpact>;
 const mockedReadPipelineState = readPipelineState as jest.MockedFunction<typeof readPipelineState>;
-const mockedWritePipelineState = writePipelineState as jest.MockedFunction<typeof writePipelineState>;
+const mockedWritePipelineState = writePipelineState as jest.MockedFunction<
+  typeof writePipelineState
+>;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createMockStorage(childDocs: Array<{
-  documentId: string;
-  type: DocumentType;
-  tracesFrom: string[];
-}>) {
+function createMockStorage(
+  childDocs: Array<{
+    documentId: string;
+    type: DocumentType;
+    tracesFrom: string[];
+  }>,
+) {
   const targetDoc = {
     frontmatter: {
       id: 'PRD-001',
@@ -55,7 +65,7 @@ function createMockStorage(childDocs: Array<{
     filePath: '/fake/PRD-001',
   };
 
-  const docHandles = childDocs.map(d => ({
+  const docHandles = childDocs.map((d) => ({
     documentId: d.documentId,
     pipelineId: 'PIPE-2026-0408-001',
     type: d.type,
@@ -65,10 +75,11 @@ function createMockStorage(childDocs: Array<{
   }));
 
   return {
-    readDocument: jest.fn().mockImplementation(
-      (_pipelineId: string, type: DocumentType, docId: string) => {
+    readDocument: jest
+      .fn()
+      .mockImplementation((_pipelineId: string, type: DocumentType, docId: string) => {
         if (docId === 'PRD-001') return Promise.resolve(targetDoc);
-        const child = childDocs.find(c => c.documentId === docId);
+        const child = childDocs.find((c) => c.documentId === docId);
         if (!child) throw new Error(`Document not found: ${docId}`);
         return Promise.resolve({
           frontmatter: {
@@ -81,8 +92,7 @@ function createMockStorage(childDocs: Array<{
           version: '1.0',
           filePath: `/fake/${child.documentId}`,
         });
-      },
-    ),
+      }),
     listDocuments: jest.fn().mockResolvedValue(docHandles),
     createDocument: jest.fn(),
     readVersion: jest.fn(),
@@ -303,11 +313,7 @@ describe('Backward Cascade Integration', () => {
       eventEmitter,
     );
 
-    const resolved = await controller.resolve(
-      'PIPE-2026-0408-001',
-      'CASCADE-001-001',
-      'system',
-    );
+    const resolved = await controller.resolve('PIPE-2026-0408-001', 'CASCADE-001-001', 'system');
 
     // Cascade should be removed from active list
     expect(state.activeCascades).not.toContain('CASCADE-001-001');
@@ -386,9 +392,7 @@ describe('Backward Cascade Integration', () => {
   });
 
   it('circuit breaker: cascading same section twice escalates on second attempt', async () => {
-    const childDocs = [
-      { documentId: 'TDD-001-01', type: DocumentType.TDD, tracesFrom: ['scope'] },
-    ];
+    const childDocs = [{ documentId: 'TDD-001-01', type: DocumentType.TDD, tracesFrom: ['scope'] }];
     const storage = createMockStorage(childDocs);
     mockedAnalyzeImpact.mockResolvedValue(['TDD-001-01']);
 

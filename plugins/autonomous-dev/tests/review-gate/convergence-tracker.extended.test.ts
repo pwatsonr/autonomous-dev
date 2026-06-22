@@ -16,7 +16,7 @@ function makeFinding(
   id: string,
   sectionId: string,
   categoryId: string,
-  overrides?: Partial<MergedFinding>
+  overrides?: Partial<MergedFinding>,
 ): MergedFinding {
   return {
     id,
@@ -49,9 +49,7 @@ describe('ConvergenceTracker - Extended tests', () => {
     const state: ConvergenceState = {
       current_iteration: 1,
       score_history: [{ iteration: 1, aggregate_score: 75 }],
-      finding_history: [
-        { iteration: 1, findings: [makeFinding('f1', 's1', 'c1')] },
-      ],
+      finding_history: [{ iteration: 1, findings: [makeFinding('f1', 's1', 'c1')] }],
     };
 
     const result = tracker.analyze(state);
@@ -77,10 +75,7 @@ describe('ConvergenceTracker - Extended tests', () => {
       finding_history: [
         {
           iteration: 1,
-          findings: [
-            makeFinding('f1', 's1', 'c1'),
-            makeFinding('f2', 's2', 'c2'),
-          ],
+          findings: [makeFinding('f1', 's1', 'c1'), makeFinding('f2', 's2', 'c2')],
         },
         {
           iteration: 2,
@@ -118,7 +113,7 @@ describe('ConvergenceTracker - Extended tests', () => {
     expect(result.stagnation_detected).toBe(true);
     expect(result.score_trend).toBe('declining');
     expect(result.stagnation_reasons).toEqual(
-      expect.arrayContaining([expect.stringContaining('declined')])
+      expect.arrayContaining([expect.stringContaining('declined')]),
     );
   });
 
@@ -154,7 +149,7 @@ describe('ConvergenceTracker - Extended tests', () => {
     expect(result.recurred_findings.length).toBeGreaterThan(0);
     expect(result.stagnation_detected).toBe(true);
     expect(result.stagnation_reasons).toEqual(
-      expect.arrayContaining([expect.stringContaining('recurred')])
+      expect.arrayContaining([expect.stringContaining('recurred')]),
     );
   });
 
@@ -204,10 +199,7 @@ describe('ConvergenceTracker - Extended tests', () => {
         },
         {
           iteration: 2,
-          findings: [
-            makeFinding('f2', 's2', 'c2'),
-            makeFinding('f3', 's3', 'c3'),
-          ],
+          findings: [makeFinding('f2', 's2', 'c2'), makeFinding('f3', 's3', 'c3')],
         },
       ],
     };

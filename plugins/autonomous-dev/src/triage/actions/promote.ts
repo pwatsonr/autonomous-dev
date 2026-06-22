@@ -29,10 +29,7 @@ export type GeneratePrdFromObservationFn = (
  * Default stub for PRD generation.
  * Returns a placeholder PRD ID until SPEC-007-4-3 is implemented.
  */
-export const defaultGeneratePrd: GeneratePrdFromObservationFn = async (
-  _filePath,
-  decision,
-) => {
+export const defaultGeneratePrd: GeneratePrdFromObservationFn = async (_filePath, decision) => {
   return `PRD-${decision.observation_id}`;
 };
 

@@ -147,9 +147,12 @@ export async function advancePipeline(
 
 function mapReviewOutcome(outcome: ReviewOutcome): import('../types/frontmatter').DocumentStatus {
   switch (outcome) {
-    case 'approved': return 'approved';
-    case 'changes_requested': return 'revision-requested';
-    case 'rejected': return 'rejected';
+    case 'approved':
+      return 'approved';
+    case 'changes_requested':
+      return 'revision-requested';
+    case 'rejected':
+      return 'rejected';
   }
 }
 

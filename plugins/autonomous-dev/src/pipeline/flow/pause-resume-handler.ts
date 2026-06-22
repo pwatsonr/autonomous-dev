@@ -83,8 +83,8 @@ export async function resumePipeline(
   const readyDocuments: string[] = [];
   for (const [docId, docState] of Object.entries(state.documentStates)) {
     if (docState.status === 'draft' || docState.status === 'revision-requested') {
-      const depsApproved = docState.blockedBy.every(bid =>
-        state.documentStates[bid]?.status === 'approved',
+      const depsApproved = docState.blockedBy.every(
+        (bid) => state.documentStates[bid]?.status === 'approved',
       );
       if (depsApproved) readyDocuments.push(docId);
     }

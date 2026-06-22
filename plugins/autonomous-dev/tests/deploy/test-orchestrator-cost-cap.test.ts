@@ -146,10 +146,7 @@ function makeStubBackend(opts: { name: string; estimate?: number }): DeploymentB
         metadata: {},
       };
     },
-    async deploy(
-      artifact: BuildArtifact,
-      environment: string,
-    ): Promise<DeploymentRecord> {
+    async deploy(artifact: BuildArtifact, environment: string): Promise<DeploymentRecord> {
       return {
         deployId: `dep-${opts.name}-${Date.now()}`,
         backend: opts.name,
@@ -282,12 +279,7 @@ describe('SPEC-032-1-04 orchestrator cost-cap integration matrix', () => {
 
     // The legacy ledger (still active under the bridge) should record
     // the deploy-id (SPEC-023-2-04 contract).
-    const ledgerPath = join(
-      requestDir,
-      '.autonomous-dev',
-      'deployments',
-      'cost-ledger-dev.json',
-    );
+    const ledgerPath = join(requestDir, '.autonomous-dev', 'deployments', 'cost-ledger-dev.json');
     const raw = await readFile(ledgerPath, 'utf8');
     const ledger = JSON.parse(raw) as { entries: Array<{ deployId: string }> };
     expect(ledger.entries.some((e) => e.deployId === 'spec-1-04-A')).toBe(true);
@@ -329,9 +321,7 @@ describe('SPEC-032-1-04 orchestrator cost-cap integration matrix', () => {
       }),
     ).rejects.toBeInstanceOf(CostCapExceededError);
 
-    const comp = telemetry
-      .filter((e) => e.type === 'deploy.completion')
-      .pop();
+    const comp = telemetry.filter((e) => e.type === 'deploy.completion').pop();
     expect(comp?.outcome).toBe('cost-cap-exceeded');
     expect(typeof comp?.reason).toBe('string');
     // SPEC-032-1-02 FR-4: reason carries the enforcer's error class.
@@ -361,12 +351,7 @@ describe('SPEC-032-1-04 orchestrator cost-cap integration matrix', () => {
       buildContext: buildContextFor('spec-1-04-C'),
     });
 
-    const ledgerPath = join(
-      requestDir,
-      '.autonomous-dev',
-      'deployments',
-      'cost-ledger-dev.json',
-    );
+    const ledgerPath = join(requestDir, '.autonomous-dev', 'deployments', 'cost-ledger-dev.json');
     const raw = await readFile(ledgerPath, 'utf8');
     const ledger = JSON.parse(raw) as { entries: Array<{ deployId: string }> };
     const matching = ledger.entries.filter((e) => e.deployId === 'spec-1-04-C');

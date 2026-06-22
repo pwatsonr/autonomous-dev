@@ -26,7 +26,11 @@ import { LockManager } from './lock-manager';
 import type { LockManagerOptions } from './lock-manager';
 import { bootstrapDirectories } from './directory-bootstrap';
 import { loadConfig } from '../config/intelligence-config';
-import type { IntelligenceConfig, ServiceConfig, QueryBudgetConfig } from '../config/intelligence-config.schema';
+import type {
+  IntelligenceConfig,
+  ServiceConfig,
+  QueryBudgetConfig,
+} from '../config/intelligence-config.schema';
 import {
   runEffectivenessEvaluations,
   applyGovernanceChecks as applyGovernanceChecksImpl,
@@ -57,8 +61,8 @@ import type { SentryEnrichment } from '../adapters/sentry-types';
  */
 export interface RunMetadata {
   run_id: string;
-  started_at: string;       // ISO 8601
-  completed_at: string;     // ISO 8601
+  started_at: string; // ISO 8601
+  completed_at: string; // ISO 8601
   services_in_scope: string[];
   data_source_status: Record<string, DataSourceStatus>;
   observations_generated: number;
@@ -440,9 +444,7 @@ export class ObservationRunner {
     // 3. FOR EACH SERVICE IN SCOPE
     // -----------------------------------------------------------------------
     const services =
-      scope === 'all'
-        ? config.services
-        : config.services.filter((s) => s.name === scope);
+      scope === 'all' ? config.services : config.services.filter((s) => s.name === scope);
 
     const budget = new QueryBudgetTracker(config.query_budgets);
 
@@ -494,7 +496,7 @@ export class ObservationRunner {
           const scrubInput: ScrubCollectedDataInput = {
             prometheus: rawData.prometheus as any[],
             opensearch: rawData.opensearch as any[],
-            grafana: rawData.grafana as any ?? { alerts: {}, annotations: { annotations: [] } },
+            grafana: (rawData.grafana as any) ?? { alerts: {}, annotations: { annotations: [] } },
           };
           const scrubResult = await scrubPipeline(scrubInput, safetyCfg, {
             runId,
@@ -536,8 +538,7 @@ export class ObservationRunner {
         if (this.sentryAdapter) {
           // connectivity.results is keyed by source name in mcp-error-handler's
           // ConnectivityResult shape ({ results: Record<string, status> }).
-          const sentryStatus: DataSourceStatus =
-            connectivity.results['sentry'] ?? 'not_configured';
+          const sentryStatus: DataSourceStatus = connectivity.results['sentry'] ?? 'not_configured';
 
           if (sentryStatus === 'available' || sentryStatus === 'degraded') {
             for (const candidate of candidates) {
@@ -554,8 +555,8 @@ export class ObservationRunner {
                 if (sentryData.issues.length > 0) {
                   auditLog.info(
                     `Sentry enrichment for ${service.name}/${candidate.id}: ` +
-                    `${sentryData.issues.length} issues, ${sentryData.user_count_total} users, ` +
-                    `${sentryData.queries_used} queries used`,
+                      `${sentryData.issues.length} issues, ${sentryData.user_count_total} users, ` +
+                      `${sentryData.queries_used} queries used`,
                   );
                 }
               } catch (sentryErr) {

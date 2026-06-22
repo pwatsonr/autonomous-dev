@@ -76,9 +76,7 @@ export class FindingTracker {
       const key = matchKey(current);
 
       // Step 2a: Search previousIterationFindings for a match
-      const prevMatch = previousIterationFindings.find(
-        (prev) => matchKey(prev) === key,
-      );
+      const prevMatch = previousIterationFindings.find((prev) => matchKey(prev) === key);
 
       if (prevMatch) {
         // Finding persists from previous iteration
@@ -95,9 +93,7 @@ export class FindingTracker {
 
       // Step 2c: Search allPreviousFindings for a previously resolved match
       const resolvedMatch = allPreviousFindings.find(
-        (prev) =>
-          matchKey(prev) === key &&
-          prev.resolution_status === 'resolved',
+        (prev) => matchKey(prev) === key && prev.resolution_status === 'resolved',
       );
 
       if (resolvedMatch) {

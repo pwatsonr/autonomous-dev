@@ -1,18 +1,13 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import {
-  TriageAuditLogger,
-  type TriageAuditEntry,
-} from '../../src/triage/audit-log';
+import { TriageAuditLogger, type TriageAuditEntry } from '../../src/triage/audit-log';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeEntry(
-  overrides: Partial<TriageAuditEntry> = {},
-): TriageAuditEntry {
+function makeEntry(overrides: Partial<TriageAuditEntry> = {}): TriageAuditEntry {
   return {
     observation_id: 'OBS-20260408-143022-a7f3',
     action: 'promote',
@@ -54,13 +49,7 @@ describe('TriageAuditLogger', () => {
 
   it('getLogPath returns expected path', () => {
     expect(logger.getLogPath()).toBe(
-      path.join(
-        tmpDir,
-        '.autonomous-dev',
-        'logs',
-        'intelligence',
-        'triage-audit.log',
-      ),
+      path.join(tmpDir, '.autonomous-dev', 'logs', 'intelligence', 'triage-audit.log'),
     );
   });
 
@@ -196,8 +185,12 @@ describe('TriageAuditLogger', () => {
 
   it('readByObservation filters by observation_id', async () => {
     await logger.log(makeEntry({ observation_id: 'OBS-AAA', action: 'promote' }));
-    await logger.log(makeEntry({ observation_id: 'OBS-BBB', action: 'dismiss', generated_prd: null }));
-    await logger.log(makeEntry({ observation_id: 'OBS-AAA', action: 'defer', generated_prd: null }));
+    await logger.log(
+      makeEntry({ observation_id: 'OBS-BBB', action: 'dismiss', generated_prd: null }),
+    );
+    await logger.log(
+      makeEntry({ observation_id: 'OBS-AAA', action: 'defer', generated_prd: null }),
+    );
 
     const filtered = await logger.readByObservation('OBS-AAA');
     expect(filtered).toHaveLength(2);

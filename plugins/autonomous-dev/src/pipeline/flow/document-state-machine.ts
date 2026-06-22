@@ -26,7 +26,10 @@ import { DocumentStatus } from '../types/frontmatter';
 
 const VALID_TRANSITIONS: Map<DocumentStatus, Set<DocumentStatus>> = new Map([
   ['draft', new Set<DocumentStatus>(['in-review', 'cancelled'])],
-  ['in-review', new Set<DocumentStatus>(['approved', 'revision-requested', 'rejected', 'cancelled'])],
+  [
+    'in-review',
+    new Set<DocumentStatus>(['approved', 'revision-requested', 'rejected', 'cancelled']),
+  ],
   ['revision-requested', new Set<DocumentStatus>(['in-review', 'cancelled'])],
   ['approved', new Set<DocumentStatus>(['stale', 'cancelled'])],
   ['rejected', new Set<DocumentStatus>(['cancelled'])],

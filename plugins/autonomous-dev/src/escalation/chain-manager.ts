@@ -27,7 +27,7 @@ import type {
   ResolvedRoute,
   Timer,
   TimerHandle,
-} from "./types";
+} from './types';
 
 // ---------------------------------------------------------------------------
 // Internal state for tracking active timers
@@ -51,7 +51,7 @@ interface ActiveChain {
 export interface TimeoutBehaviorResult {
   escalationId: string;
   requestId: string;
-  behavior: "pause" | "retry" | "skip" | "cancel";
+  behavior: 'pause' | 'retry' | 'skip' | 'cancel';
 }
 
 // ---------------------------------------------------------------------------
@@ -100,7 +100,7 @@ export class EscalationChainManager {
     const state: ChainState = {
       escalationId: escalation.escalation_id,
       requestId: escalation.request_id,
-      status: "primary_dispatched",
+      status: 'primary_dispatched',
       primaryTarget: route.primary,
       secondaryTarget: route.secondary,
       primaryDispatchedAt: now,
@@ -114,7 +114,7 @@ export class EscalationChainManager {
 
     // Emit audit: escalation_raised
     this.auditTrail.append({
-      event_type: "escalation_raised",
+      event_type: 'escalation_raised',
       payload: {
         escalation_id: escalation.escalation_id,
         request_id: escalation.request_id,
@@ -153,7 +153,7 @@ export class EscalationChainManager {
       return; // No-op: unknown chain
     }
 
-    if (chain.state.status === "resolved" || chain.state.status === "cancelled") {
+    if (chain.state.status === 'resolved' || chain.state.status === 'cancelled') {
       return; // No-op: already terminal
     }
 
@@ -163,7 +163,7 @@ export class EscalationChainManager {
       chain.timerHandle = null;
     }
 
-    chain.state.status = "cancelled";
+    chain.state.status = 'cancelled';
   }
 
   /**
@@ -209,35 +209,32 @@ export class EscalationChainManager {
    * If a secondary target exists, dispatch to it and start a new timer.
    * Otherwise, apply the timeout behavior directly.
    */
-  private onPrimaryTimeout(
-    escalation: EscalationMessage,
-    route: ResolvedRoute,
-  ): void {
+  private onPrimaryTimeout(escalation: EscalationMessage, route: ResolvedRoute): void {
     const chain = this.chains.get(escalation.escalation_id);
     if (!chain) {
       return; // Chain was removed or never existed
     }
 
     // If chain was already cancelled/resolved, do nothing
-    if (chain.state.status === "cancelled" || chain.state.status === "resolved") {
+    if (chain.state.status === 'cancelled' || chain.state.status === 'resolved') {
       return;
     }
 
     if (route.secondary) {
       // Dispatch to secondary target
-      chain.state.status = "secondary_dispatched";
+      chain.state.status = 'secondary_dispatched';
       chain.state.secondaryDispatchedAt = new Date();
 
       this.deliveryAdapter.deliver(escalation, route.secondary);
 
       // Emit audit: escalation_timeout (primary -> secondary)
       this.auditTrail.append({
-        event_type: "escalation_timeout",
+        event_type: 'escalation_timeout',
         payload: {
           escalation_id: escalation.escalation_id,
           request_id: escalation.request_id,
-          target: "primary",
-          chainedTo: "secondary",
+          target: 'primary',
+          chainedTo: 'secondary',
         },
       });
 
@@ -249,11 +246,11 @@ export class EscalationChainManager {
     } else {
       // No secondary target -- apply timeout behavior directly
       this.auditTrail.append({
-        event_type: "escalation_timeout",
+        event_type: 'escalation_timeout',
         payload: {
           escalation_id: escalation.escalation_id,
           request_id: escalation.request_id,
-          target: "primary",
+          target: 'primary',
           behavior: chain.state.timeoutBehavior,
         },
       });
@@ -266,26 +263,23 @@ export class EscalationChainManager {
    * Called when the secondary target's timeout expires.
    * Always applies the timeout behavior.
    */
-  private onSecondaryTimeout(
-    escalation: EscalationMessage,
-    _route: ResolvedRoute,
-  ): void {
+  private onSecondaryTimeout(escalation: EscalationMessage, _route: ResolvedRoute): void {
     const chain = this.chains.get(escalation.escalation_id);
     if (!chain) {
       return;
     }
 
-    if (chain.state.status === "cancelled" || chain.state.status === "resolved") {
+    if (chain.state.status === 'cancelled' || chain.state.status === 'resolved') {
       return;
     }
 
     // Emit audit: escalation_timeout (secondary)
     this.auditTrail.append({
-      event_type: "escalation_timeout",
+      event_type: 'escalation_timeout',
       payload: {
         escalation_id: escalation.escalation_id,
         request_id: escalation.request_id,
-        target: "secondary",
+        target: 'secondary',
         behavior: chain.state.timeoutBehavior,
       },
     });
@@ -314,33 +308,33 @@ export class EscalationChainManager {
     let effectiveBehavior = chain.state.timeoutBehavior;
 
     // Skip is only allowed for informational urgency
-    if (effectiveBehavior === "skip" && chain.message.urgency !== "informational") {
+    if (effectiveBehavior === 'skip' && chain.message.urgency !== 'informational') {
       console.warn(
         `[EscalationChainManager] Timeout behavior "skip" is only allowed for ` +
           `"informational" urgency (got "${chain.message.urgency}"). ` +
           `Falling back to "pause".`,
       );
-      effectiveBehavior = "pause";
+      effectiveBehavior = 'pause';
     }
 
     switch (effectiveBehavior) {
-      case "pause":
+      case 'pause':
         // Pipeline stays paused indefinitely. Escalation remains open.
         // Status stays as-is (primary_dispatched or secondary_dispatched)
         // to indicate the escalation is still awaiting a human response.
-        chain.state.status = "timeout_behavior_applied";
+        chain.state.status = 'timeout_behavior_applied';
         break;
 
-      case "retry":
-        chain.state.status = "timeout_behavior_applied";
+      case 'retry':
+        chain.state.status = 'timeout_behavior_applied';
         break;
 
-      case "skip":
-        chain.state.status = "timeout_behavior_applied";
+      case 'skip':
+        chain.state.status = 'timeout_behavior_applied';
         break;
 
-      case "cancel":
-        chain.state.status = "timeout_behavior_applied";
+      case 'cancel':
+        chain.state.status = 'timeout_behavior_applied';
         break;
     }
 

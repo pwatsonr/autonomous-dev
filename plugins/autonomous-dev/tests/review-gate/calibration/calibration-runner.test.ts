@@ -62,9 +62,7 @@ describe('CalibrationRunner', () => {
   // Test 15: Gold doc in range
   // -----------------------------------------------------------------------
   test('15. Gold doc in range: score 95, expected 90-100, score_in_range true', async () => {
-    const pipeline = makeMockPipeline([
-      { aggregate_score: 95, outcome: 'approved', findings: [] },
-    ]);
+    const pipeline = makeMockPipeline([{ aggregate_score: 95, outcome: 'approved', findings: [] }]);
     const runner = new CalibrationRunner(pipeline);
     const expectation = makeExpectation({
       expected_score_range: { min: 90, max: 100 },
@@ -81,9 +79,7 @@ describe('CalibrationRunner', () => {
   // Test 16: Gold doc below range
   // -----------------------------------------------------------------------
   test('16. Gold doc below range: score 80, expected 90-100, score_in_range false', async () => {
-    const pipeline = makeMockPipeline([
-      { aggregate_score: 80, outcome: 'approved', findings: [] },
-    ]);
+    const pipeline = makeMockPipeline([{ aggregate_score: 80, outcome: 'approved', findings: [] }]);
     const runner = new CalibrationRunner(pipeline);
     const expectation = makeExpectation({
       expected_score_range: { min: 90, max: 100 },
@@ -134,9 +130,7 @@ describe('CalibrationRunner', () => {
       tier: 'bronze',
       expected_score_range: { min: 50, max: 70 },
       expected_outcome: ['changes_requested'],
-      expected_findings: [
-        { category_id: 'requirements_completeness', min_count: 2 },
-      ],
+      expected_findings: [{ category_id: 'requirements_completeness', min_count: 2 }],
     });
 
     const [result] = await runner.runCalibration([expectation], 1);
@@ -155,9 +149,7 @@ describe('CalibrationRunner', () => {
       {
         aggregate_score: 78,
         outcome: 'changes_requested',
-        findings: [
-          { category_id: 'error_handling', severity: 'minor' },
-        ],
+        findings: [{ category_id: 'error_handling', severity: 'minor' }],
       },
     ]);
     const runner = new CalibrationRunner(pipeline);
@@ -166,9 +158,7 @@ describe('CalibrationRunner', () => {
       document_type: 'TDD',
       expected_score_range: { min: 70, max: 85 },
       expected_outcome: ['changes_requested'],
-      expected_findings: [
-        { category_id: 'tradeoff_rigor', min_count: 1 },
-      ],
+      expected_findings: [{ category_id: 'tradeoff_rigor', min_count: 1 }],
     });
 
     const [result] = await runner.runCalibration([expectation], 1);
@@ -232,9 +222,7 @@ describe('CalibrationRunner', () => {
   // Test 22: Outcome matches expectation
   // -----------------------------------------------------------------------
   test('22. Outcome matches expectation: gold PRD returns approved', async () => {
-    const pipeline = makeMockPipeline([
-      { aggregate_score: 95, outcome: 'approved', findings: [] },
-    ]);
+    const pipeline = makeMockPipeline([{ aggregate_score: 95, outcome: 'approved', findings: [] }]);
     const runner = new CalibrationRunner(pipeline);
     const expectation = makeExpectation({
       expected_outcome: ['approved'],
@@ -292,7 +280,7 @@ describe('CalibrationRunner', () => {
 
     expect(result.score_in_range).toBe(true);
     expect(result.outcome_expected).toBe(true);
-    expect(result.expected_findings_found.every(f => f.pass)).toBe(true);
+    expect(result.expected_findings_found.every((f) => f.pass)).toBe(true);
     expect(result.consistency_check.within_tolerance).toBe(true);
     expect(result.overall_pass).toBe(true);
   });
@@ -328,12 +316,12 @@ describe('CalibrationRunner', () => {
     expect(result.outcome_expected).toBe(true);
     // requirements_completeness not found
     const reqFinding = result.expected_findings_found.find(
-      f => f.category_id === 'requirements_completeness',
+      (f) => f.category_id === 'requirements_completeness',
     );
     expect(reqFinding!.pass).toBe(false);
     // problem_clarity found
     const probFinding = result.expected_findings_found.find(
-      f => f.category_id === 'problem_clarity',
+      (f) => f.category_id === 'problem_clarity',
     );
     expect(probFinding!.pass).toBe(true);
     // Overall fail because one finding check failed

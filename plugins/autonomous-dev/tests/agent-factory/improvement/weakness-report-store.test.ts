@@ -17,9 +17,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
-import {
-  WeaknessReportStore,
-} from '../../../src/agent-factory/improvement/types';
+import { WeaknessReportStore } from '../../../src/agent-factory/improvement/types';
 import type {
   WeaknessReport,
   Weakness,
@@ -74,18 +72,14 @@ function makeReport(overrides?: Partial<WeaknessReport>): WeaknessReport {
         evidence:
           'Average test-coverage score is 2.8/5.0, 1.2 below median. Decline of 0.4 over last 15 invocations.',
         affected_domains: ['python'],
-        suggested_focus:
-          'Emphasize test generation for non-TypeScript domains',
+        suggested_focus: 'Emphasize test generation for non-TypeScript domains',
       },
     ],
-    strengths: [
-      'correctness score stable at 4.2',
-      'spec-adherence consistently above 4.0',
-    ],
+    strengths: ['correctness score stable at 4.2', 'spec-adherence consistently above 4.0'],
     recommendation: 'propose_modification',
     metrics_summary: {
       invocation_count: 25,
-      approval_rate: 0.80,
+      approval_rate: 0.8,
       avg_quality_score: 3.6,
       trend_direction: 'declining',
       active_alerts: 1,
@@ -107,7 +101,10 @@ function test_weakness_report_serialization(): void {
   assert(parsed.agent_name === report.agent_name, 'agent_name should round-trip');
   assert(parsed.agent_version === report.agent_version, 'agent_version should round-trip');
   assert(parsed.analysis_date === report.analysis_date, 'analysis_date should round-trip');
-  assert(parsed.overall_assessment === report.overall_assessment, 'overall_assessment should round-trip');
+  assert(
+    parsed.overall_assessment === report.overall_assessment,
+    'overall_assessment should round-trip',
+  );
   assert(parsed.weaknesses.length === 1, 'weaknesses should round-trip');
   assert(parsed.strengths.length === 2, 'strengths should round-trip');
   assert(parsed.recommendation === report.recommendation, 'recommendation should round-trip');
@@ -281,18 +278,11 @@ function test_weakness_severity_enum(): void {
 }
 
 function test_overall_assessment_enum(): void {
-  const validAssessments: OverallAssessment[] = [
-    'healthy',
-    'needs_improvement',
-    'critical',
-  ];
+  const validAssessments: OverallAssessment[] = ['healthy', 'needs_improvement', 'critical'];
 
   for (const assessment of validAssessments) {
     const report = makeReport({ overall_assessment: assessment });
-    assert(
-      report.overall_assessment === assessment,
-      `assessment ${assessment} should be accepted`,
-    );
+    assert(report.overall_assessment === assessment, `assessment ${assessment} should be accepted`);
   }
 
   assert(validAssessments.length === 3, 'exactly 3 assessment levels');
@@ -304,18 +294,11 @@ function test_overall_assessment_enum(): void {
 }
 
 function test_recommendation_enum(): void {
-  const validRecs: Recommendation[] = [
-    'no_action',
-    'propose_modification',
-    'propose_specialist',
-  ];
+  const validRecs: Recommendation[] = ['no_action', 'propose_modification', 'propose_specialist'];
 
   for (const rec of validRecs) {
     const report = makeReport({ recommendation: rec });
-    assert(
-      report.recommendation === rec,
-      `recommendation ${rec} should be accepted`,
-    );
+    assert(report.recommendation === rec, `recommendation ${rec} should be accepted`);
   }
 
   assert(validRecs.length === 3, 'exactly 3 recommendation types');
@@ -337,16 +320,16 @@ function test_malformed_lines_skipped(): void {
 
     fs.writeFileSync(
       filePath,
-      JSON.stringify(report1) + '\n' +
-      'this is not valid json\n' +
-      JSON.stringify(report2) + '\n',
+      JSON.stringify(report1) + '\n' + 'this is not valid json\n' + JSON.stringify(report2) + '\n',
       'utf-8',
     );
 
     const warnings: string[] = [];
     const store = new WeaknessReportStore(filePath, {
       info: () => {},
-      warn: (msg) => { warnings.push(msg); },
+      warn: (msg) => {
+        warnings.push(msg);
+      },
     });
 
     const reports = store.getReports();
@@ -399,14 +382,18 @@ function test_creates_parent_directory_on_write(): void {
 
 function test_example_from_spec(): void {
   // Verify the exact example from the spec can be parsed
-  const specExample = '{"report_id":"a1b2c3d4-...","agent_name":"code-executor","agent_version":"1.0.0","analysis_date":"2026-04-08T10:00:00.000Z","overall_assessment":"needs_improvement","weaknesses":[{"dimension":"test-coverage","severity":"medium","evidence":"Average test-coverage score is 2.8/5.0, 1.2 below median. Decline of 0.4 over last 15 invocations.","affected_domains":["python"],"suggested_focus":"Emphasize test generation for non-TypeScript domains"}],"strengths":["correctness score stable at 4.2","spec-adherence consistently above 4.0"],"recommendation":"propose_modification","metrics_summary":{"invocation_count":25,"approval_rate":0.80,"avg_quality_score":3.6,"trend_direction":"declining","active_alerts":1}}';
+  const specExample =
+    '{"report_id":"a1b2c3d4-...","agent_name":"code-executor","agent_version":"1.0.0","analysis_date":"2026-04-08T10:00:00.000Z","overall_assessment":"needs_improvement","weaknesses":[{"dimension":"test-coverage","severity":"medium","evidence":"Average test-coverage score is 2.8/5.0, 1.2 below median. Decline of 0.4 over last 15 invocations.","affected_domains":["python"],"suggested_focus":"Emphasize test generation for non-TypeScript domains"}],"strengths":["correctness score stable at 4.2","spec-adherence consistently above 4.0"],"recommendation":"propose_modification","metrics_summary":{"invocation_count":25,"approval_rate":0.80,"avg_quality_score":3.6,"trend_direction":"declining","active_alerts":1}}';
 
   const parsed = JSON.parse(specExample) as WeaknessReport;
   assert(parsed.report_id === 'a1b2c3d4-...', 'report_id from spec example');
   assert(parsed.agent_name === 'code-executor', 'agent_name from spec example');
   assert(parsed.overall_assessment === 'needs_improvement', 'overall_assessment from spec example');
   assert(parsed.weaknesses.length === 1, 'weaknesses count from spec example');
-  assert(parsed.weaknesses[0].dimension === 'test-coverage', 'weakness dimension from spec example');
+  assert(
+    parsed.weaknesses[0].dimension === 'test-coverage',
+    'weakness dimension from spec example',
+  );
   assert(parsed.recommendation === 'propose_modification', 'recommendation from spec example');
   assert(parsed.metrics_summary.invocation_count === 25, 'invocation_count from spec example');
 

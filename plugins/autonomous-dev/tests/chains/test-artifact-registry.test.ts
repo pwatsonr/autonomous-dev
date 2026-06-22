@@ -43,9 +43,7 @@ describe('ArtifactRegistry', () => {
 
   it('loadSchemas returns errors for a malformed schema file but loads the others', async () => {
     // Synthesize a temp schema dir mirroring the real one, with one bad file.
-    const tmpSchemaRoot = await fs.mkdtemp(
-      path.join(os.tmpdir(), 'ad-schema-'),
-    );
+    const tmpSchemaRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ad-schema-'));
     try {
       const goodDir = path.join(tmpSchemaRoot, 'security-findings');
       await fs.mkdir(goodDir, { recursive: true });
@@ -77,9 +75,7 @@ describe('ArtifactRegistry', () => {
 
   it('validate returns isValid:false with pointer at /findings/0/severity for an enum violation', async () => {
     const reg = await loadArtifactSchemas();
-    const example = JSON.parse(
-      JSON.stringify(await loadSecurityFindingsExample()),
-    );
+    const example = JSON.parse(JSON.stringify(await loadSecurityFindingsExample()));
     example.findings[0].severity = 'urgent';
     const r = reg.validate('security-findings', '1.0', example);
     expect(r.isValid).toBe(false);
@@ -97,12 +93,7 @@ describe('ArtifactRegistry', () => {
   it('persist writes file at <requestRoot>/.autonomous-dev/artifacts/<type>/<scanId>.json', async () => {
     const reg = await loadArtifactSchemas();
     const example = await loadSecurityFindingsExample();
-    const rec = await reg.persist(
-      tempRoot,
-      'security-findings',
-      'scan-001',
-      example,
-    );
+    const rec = await reg.persist(tempRoot, 'security-findings', 'scan-001', example);
     const expected = path.join(
       tempRoot,
       '.autonomous-dev',
@@ -120,12 +111,7 @@ describe('ArtifactRegistry', () => {
   it('persist creates parent directories if absent (mkdir recursive)', async () => {
     const reg = await loadArtifactSchemas();
     const nested = path.join(tempRoot, 'deeper', 'still');
-    await reg.persist(
-      nested,
-      'security-findings',
-      'scan-002',
-      await loadSecurityFindingsExample(),
-    );
+    await reg.persist(nested, 'security-findings', 'scan-002', await loadSecurityFindingsExample());
     const exists = fsSync.existsSync(
       path.join(nested, '.autonomous-dev', 'artifacts', 'security-findings'),
     );
@@ -140,12 +126,7 @@ describe('ArtifactRegistry', () => {
       'scan-003',
       await loadSecurityFindingsExample(),
     );
-    const dir = path.join(
-      tempRoot,
-      '.autonomous-dev',
-      'artifacts',
-      'security-findings',
-    );
+    const dir = path.join(tempRoot, '.autonomous-dev', 'artifacts', 'security-findings');
     const entries = await fs.readdir(dir);
     expect(entries.some((n) => n.includes('.tmp.'))).toBe(false);
   });
@@ -157,22 +138,12 @@ describe('ArtifactRegistry', () => {
     // a regular file onto an existing directory throws EISDIR/ENOTEMPTY,
     // which exercises the SAME error-handling branch (catch → unlink temp).
     const reg = await loadArtifactSchemas();
-    const dir = path.join(
-      tempRoot,
-      '.autonomous-dev',
-      'artifacts',
-      'security-findings',
-    );
+    const dir = path.join(tempRoot, '.autonomous-dev', 'artifacts', 'security-findings');
     await fs.mkdir(dir, { recursive: true });
     // Create a directory at the target file path so fs.rename fails.
     await fs.mkdir(path.join(dir, 'scan-004.json'));
     await expect(
-      reg.persist(
-        tempRoot,
-        'security-findings',
-        'scan-004',
-        await loadSecurityFindingsExample(),
-      ),
+      reg.persist(tempRoot, 'security-findings', 'scan-004', await loadSecurityFindingsExample()),
     ).rejects.toThrow();
     const entries = fsSync.existsSync(dir) ? await fs.readdir(dir) : [];
     expect(entries.some((n) => n.includes('.tmp.'))).toBe(false);
@@ -180,16 +151,16 @@ describe('ArtifactRegistry', () => {
 
   it("persist rejects scanId containing '..'", async () => {
     const reg = await loadArtifactSchemas();
-    await expect(
-      reg.persist(tempRoot, 'security-findings', '..evil', {}),
-    ).rejects.toThrow('invalid scanId');
+    await expect(reg.persist(tempRoot, 'security-findings', '..evil', {})).rejects.toThrow(
+      'invalid scanId',
+    );
   });
 
   it("persist rejects scanId containing '/'", async () => {
     const reg = await loadArtifactSchemas();
-    await expect(
-      reg.persist(tempRoot, 'security-findings', 'a/b', {}),
-    ).rejects.toThrow('invalid scanId');
+    await expect(reg.persist(tempRoot, 'security-findings', 'a/b', {})).rejects.toThrow(
+      'invalid scanId',
+    );
   });
 
   it('load round-trips a persisted artifact deep-equal', async () => {
@@ -202,9 +173,9 @@ describe('ArtifactRegistry', () => {
 
   it("load throws 'artifact not found' on ENOENT", async () => {
     const reg = await loadArtifactSchemas();
-    await expect(
-      reg.load(tempRoot, 'security-findings', 'never-written'),
-    ).rejects.toThrow('artifact not found');
+    await expect(reg.load(tempRoot, 'security-findings', 'never-written')).rejects.toThrow(
+      'artifact not found',
+    );
   });
 
   it('knownTypes returns lex-sorted list', async () => {

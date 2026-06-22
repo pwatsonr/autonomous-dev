@@ -58,7 +58,7 @@ function buildChainedEvents(count: number): AuditEvent[] {
 }
 
 function writeEventsToFile(filePath: string, events: AuditEvent[]): void {
-  const content = events.map(e => JSON.stringify(e)).join('\n') + '\n';
+  const content = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
@@ -111,7 +111,7 @@ describe('HashChainVerifier', () => {
     expect(result.errors.length).toBeGreaterThan(0);
 
     // Should detect hash mismatch at the tampered event
-    const hashError = result.errors.find(e => e.errorType === 'hash_mismatch');
+    const hashError = result.errors.find((e) => e.errorType === 'hash_mismatch');
     expect(hashError).toBeDefined();
   });
 
@@ -129,9 +129,7 @@ describe('HashChainVerifier', () => {
     const result = await verifier.verify(logPath);
 
     expect(result.valid).toBe(false);
-    const prevHashError = result.errors.find(
-      e => e.errorType === 'prev_hash_mismatch',
-    );
+    const prevHashError = result.errors.find((e) => e.errorType === 'prev_hash_mismatch');
     expect(prevHashError).toBeDefined();
   });
 

@@ -203,9 +203,7 @@ describe('ReviewerExecutor', () => {
     const executor = new ReviewerExecutor(adapter, outputValidator, pool);
 
     const assignments = [makeAssignment('reviewer-a', 100)];
-    const prompts = new Map<string, AssembledPrompt>([
-      ['reviewer-a', { text: 'prompt-a' }],
-    ]);
+    const prompts = new Map<string, AssembledPrompt>([['reviewer-a', { text: 'prompt-a' }]]);
 
     const result = await executor.executePanel(assignments, prompts, rubric);
 
@@ -229,9 +227,7 @@ describe('ReviewerExecutor', () => {
     const executor = new ReviewerExecutor(adapter, outputValidator, pool);
 
     const assignments = [makeAssignment('reviewer-a', 100)];
-    const prompts = new Map<string, AssembledPrompt>([
-      ['reviewer-a', { text: 'prompt-a' }],
-    ]);
+    const prompts = new Map<string, AssembledPrompt>([['reviewer-a', { text: 'prompt-a' }]]);
 
     const result = await executor.executePanel(assignments, prompts, rubric);
 
@@ -256,9 +252,7 @@ describe('ReviewerExecutor', () => {
     });
 
     const assignments = [makeAssignment('reviewer-a', 100)];
-    const prompts = new Map<string, AssembledPrompt>([
-      ['reviewer-a', { text: 'prompt-a' }],
-    ]);
+    const prompts = new Map<string, AssembledPrompt>([['reviewer-a', { text: 'prompt-a' }]]);
 
     const result = await executor.executePanel(assignments, prompts, rubric);
 
@@ -283,9 +277,7 @@ describe('ReviewerExecutor', () => {
     const executor = new ReviewerExecutor(adapter, outputValidator, pool);
 
     const assignments = [makeAssignment('reviewer-a', 100)];
-    const prompts = new Map<string, AssembledPrompt>([
-      ['reviewer-a', { text: 'prompt-a' }],
-    ]);
+    const prompts = new Map<string, AssembledPrompt>([['reviewer-a', { text: 'prompt-a' }]]);
 
     const result = await executor.executePanel(assignments, prompts, rubric);
 
@@ -318,7 +310,7 @@ describe('ReviewerExecutor', () => {
   test('execution timing is approximately the longest reviewer, not sum', async () => {
     const DELAY_MS = 50;
     const adapter = createMockAdapter(async (_prompt, _agentSeed) => {
-      await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+      await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
       return makeValidResponse('r');
     });
     const pool = createMockPool();
@@ -361,18 +353,18 @@ describe('ReviewerExecutor', () => {
     await executor.executePanel(assignments, prompts, rubric);
 
     const instances = Array.from(pool.instances.values());
-    const completedInstances = instances.filter(i => i.status === 'completed');
-    const failedInstances = instances.filter(i => i.status === 'failed');
+    const completedInstances = instances.filter((i) => i.status === 'completed');
+    const failedInstances = instances.filter((i) => i.status === 'failed');
 
     expect(completedInstances.length).toBeGreaterThanOrEqual(1);
     expect(failedInstances.length).toBeGreaterThanOrEqual(1);
 
     // The successful reviewer should be completed
-    const successInst = instances.find(i => i.agent_seed === 100);
+    const successInst = instances.find((i) => i.agent_seed === 100);
     expect(successInst?.status).toBe('completed');
 
     // The failed reviewer should be failed
-    const failedInst = instances.find(i => i.agent_seed === 200);
+    const failedInst = instances.find((i) => i.agent_seed === 200);
     expect(failedInst?.status).toBe('failed');
   });
 
@@ -391,9 +383,7 @@ describe('ReviewerExecutor', () => {
     const executor = new ReviewerExecutor(adapter, outputValidator, pool, config);
 
     const assignments = [makeAssignment('reviewer-a', 100)];
-    const prompts = new Map<string, AssembledPrompt>([
-      ['reviewer-a', { text: 'prompt-a' }],
-    ]);
+    const prompts = new Map<string, AssembledPrompt>([['reviewer-a', { text: 'prompt-a' }]]);
 
     await executor.executePanel(assignments, prompts, rubric);
 
