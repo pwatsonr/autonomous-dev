@@ -5,7 +5,7 @@
  * No agent execution: this suite parses the markdown frontmatter and
  * inspects the prompt body for required structural elements. It guards
  * against regressions in the agent file's contract:
- *   - frontmatter schema (name, model, read-only tools)
+ *   - frontmatter schema (name, model, tools)
  *   - four detection-category sections
  *   - two-person-approval directive with the three trigger conditions
  *   - false-positive guard
@@ -58,21 +58,22 @@ describe('standards-meta-reviewer.md (static validation)', () => {
     expect(parsed.frontmatter.name).toBe('standards-meta-reviewer');
   });
 
-  it('frontmatter.model is set (sonnet family)', () => {
+  it('frontmatter.model is set (opus family)', () => {
     expect(typeof parsed.frontmatter.model).toBe('string');
-    expect(String(parsed.frontmatter.model)).toMatch(/sonnet/i);
+    expect(String(parsed.frontmatter.model)).toMatch(/claude-opus-4-7/i);
   });
 
-  it('frontmatter.tools is exactly the read-only set [Read, Glob, Grep]', () => {
+  it('frontmatter.tools is exactly [Glob, Grep, Read, Write]', () => {
     const tools = parsed.frontmatter.tools as string[];
     expect(Array.isArray(tools)).toBe(true);
     const sorted = [...tools].sort();
-    expect(sorted).toEqual(['Glob', 'Grep', 'Read']);
+    expect(sorted).toEqual(['Glob', 'Grep', 'Read', 'Write']);
   });
 
-  it('frontmatter.tools does NOT declare any mutating tools', () => {
+  it('frontmatter.tools does NOT declare any escalated mutating tools', () => {
     const tools = (parsed.frontmatter.tools as string[]) ?? [];
-    const forbidden = ['Write', 'Edit', 'Bash', 'MultiEdit', 'NotebookEdit'];
+    // Write is allowed for review output (commit #347). Forbidden = real escalations.
+    const forbidden = ['Edit', 'Bash', 'MultiEdit', 'NotebookEdit'];
     for (const t of forbidden) {
       expect(tools).not.toContain(t);
     }

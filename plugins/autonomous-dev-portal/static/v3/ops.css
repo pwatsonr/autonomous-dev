@@ -445,7 +445,7 @@
     gap: var(--s-2);
     background: var(--bg-1);
     border: 1px solid var(--border-thin);
-    border-radius: 3px;
+    border-radius: var(--r-2);
     padding: var(--s-3);
     min-width: 0;
 }

@@ -23,6 +23,7 @@
 import type { FC } from "hono/jsx";
 
 import { ArtifactPane } from "./artifact-pane";
+import { icon } from "../../lib/icons";
 import type { RequestArtifact } from "../../types/render";
 
 interface Props {
@@ -69,9 +70,8 @@ export const PhaseArtifactModal: FC<Props> = ({ artifacts, requestId, allPhases 
                                     class="modal-close"
                                     data-modal-close
                                     aria-label="Close"
-                                >
-                                    ✕
-                                </button>
+                                    dangerouslySetInnerHTML={{ __html: icon("x", 16) }}
+                                ></button>
                             </div>
                             <div class="artifact-body">
                                 {artifact ? (
