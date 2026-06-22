@@ -48,6 +48,7 @@ paths = [
   # detection rules above still apply everywhere else.
   '''.*/tests/safety/.*''',
   '''.*/tests/adapters/.*''',
+  '''.*/tests/integration/.*''',
   '''.*/__tests__/adapters/.*''',
   '''docs/.*''',
   '''.*\.example$''',
@@ -62,5 +63,9 @@ regexes = [
 ]
 
 # Reserved for SHA-pinned exemptions; require SECURITY.md review.
-[allowlist.commits]
+# NOTE: `commits` is a plain array key UNDER [allowlist], NOT a
+# `[allowlist.commits]` sub-table. gitleaks 8.18+ rejects the sub-table form
+# ("Allowlist.Commits[0] expected type 'string'"), which silently fails the
+# WHOLE config load → it falls back to default rules with NO allowlist, so the
+# tests/safety fixtures get flagged as real leaks (#573).
 commits = []

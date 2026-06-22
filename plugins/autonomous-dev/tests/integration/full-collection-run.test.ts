@@ -30,9 +30,30 @@ let configPath: string;
 /** Writes a minimal valid YAML config. */
 async function writeConfig(serviceCount: number = 3): Promise<void> {
   const services = [
-    { name: 'api-gateway', repo: 'org/api-gateway', job: 'api-gateway', uid: 'abc', index: 'api-gateway-*', crit: 'critical' },
-    { name: 'auth-service', repo: 'org/auth-service', job: 'auth-service', uid: 'def', index: 'auth-service-*', crit: 'high' },
-    { name: 'billing', repo: 'org/billing', job: 'billing', uid: 'ghi', index: 'billing-*', crit: 'medium' },
+    {
+      name: 'api-gateway',
+      repo: 'org/api-gateway',
+      job: 'api-gateway',
+      uid: 'abc',
+      index: 'api-gateway-*',
+      crit: 'critical',
+    },
+    {
+      name: 'auth-service',
+      repo: 'org/auth-service',
+      job: 'auth-service',
+      uid: 'def',
+      index: 'auth-service-*',
+      crit: 'high',
+    },
+    {
+      name: 'billing',
+      repo: 'org/billing',
+      job: 'billing',
+      uid: 'ghi',
+      index: 'billing-*',
+      crit: 'medium',
+    },
   ].slice(0, serviceCount);
 
   const svcYaml = services
@@ -175,9 +196,7 @@ describe('Full collection run integration', () => {
         servicesProcessed.push(service.name);
         return makeCollectedData(service.name);
       },
-      analyzeData: async (_data, service) => [
-        makeObservation(service.name, `obs-${service.name}`),
-      ],
+      analyzeData: async (_data, service) => [makeObservation(service.name, `obs-${service.name}`)],
       generateReports: async (_obs, service, runId) => {
         reportsGenerated.push(`${service.name}:${runId}`);
       },
@@ -204,10 +223,7 @@ describe('Full collection run integration', () => {
     expect(metadata.data_source_status.opensearch).toBe('available');
 
     // Audit log file exists
-    const logPath = path.join(
-      tmpDir,
-      '.autonomous-dev/logs/intelligence/RUN-20260408-143000.log',
-    );
+    const logPath = path.join(tmpDir, '.autonomous-dev/logs/intelligence/RUN-20260408-143000.log');
     const stat = await fs.stat(logPath);
     expect(stat.isFile()).toBe(true);
   });
@@ -229,9 +245,7 @@ describe('Full collection run integration', () => {
         }
         return data;
       },
-      analyzeData: async (_data, service) => [
-        makeObservation(service.name, `obs-${service.name}`),
-      ],
+      analyzeData: async (_data, service) => [makeObservation(service.name, `obs-${service.name}`)],
     });
 
     const metadata = await runner.run('all');
@@ -346,9 +360,7 @@ describe('Full collection run integration', () => {
         }
         return data;
       },
-      analyzeData: async (_data, service) => [
-        makeObservation(service.name, `obs-${service.name}`),
-      ],
+      analyzeData: async (_data, service) => [makeObservation(service.name, `obs-${service.name}`)],
     });
 
     const metadata = await runner.run('all');
@@ -418,10 +430,7 @@ describe('Full collection run integration', () => {
       },
       analyzeData: async (_data, service) => {
         phases.push(`analyze:${service.name}`);
-        return [
-          makeObservation(service.name, 'obs1'),
-          makeObservation(service.name, 'obs2'),
-        ];
+        return [makeObservation(service.name, 'obs1'), makeObservation(service.name, 'obs2')];
       },
       deduplicateCandidates: async (candidates, service) => {
         phases.push(`dedup:${service.name}`);

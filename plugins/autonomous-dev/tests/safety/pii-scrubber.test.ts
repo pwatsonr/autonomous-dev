@@ -96,7 +96,7 @@ describe('PII: phone_intl', () => {
   test('TC-2-1-06: international phone', () => {
     const result = scrubPii('+44 7911 123456');
     expect(result.text).toContain('[REDACTED:phone]');
-    expect(result.redactions.some(r => r.type === 'phone')).toBe(true);
+    expect(result.redactions.some((r) => r.type === 'phone')).toBe(true);
   });
 
   // SKIP: phone_intl regex `\+\d{1,3}[-.\s]?\d{4,14}` requires a 4+ digit run after the
@@ -164,7 +164,7 @@ describe('PII: credit_card_amex', () => {
   test.skip('TC-2-1-11: Amex credit card', () => {
     const result = scrubPii('card 3782 822463 10005');
     expect(result.text).toBe('card [REDACTED:credit_card]');
-    expect(result.redactions.some(r => r.type === 'credit_card')).toBe(true);
+    expect(result.redactions.some((r) => r.type === 'credit_card')).toBe(true);
   });
 
   // SKIP: same root cause — phone_us greedy match on Amex digits. (PRD-016 triage: SKIP-WITH-NOTE)
@@ -235,9 +235,7 @@ describe('PII: ipv6_compressed', () => {
 
 describe('PII: jwt', () => {
   test('TC-2-1-16: JWT token', () => {
-    const result = scrubPii(
-      'token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.abc123def456',
-    );
+    const result = scrubPii('token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.abc123def456');
     expect(result.text).toBe('token [REDACTED:jwt]');
     expect(result.redactions[0].type).toBe('jwt');
   });
@@ -311,7 +309,7 @@ describe('Custom patterns', () => {
     };
     const result = scrubPii('customer CUST-12345678 logged in', [customPattern]);
     expect(result.text).toBe('customer [REDACTED:custom] logged in');
-    expect(result.redactions.some(r => r.type === 'custom')).toBe(true);
+    expect(result.redactions.some((r) => r.type === 'custom')).toBe(true);
   });
 });
 
@@ -321,8 +319,7 @@ describe('Custom patterns', () => {
 
 describe('PII scrubber integration', () => {
   test('multiple PII types in one string', () => {
-    const input =
-      'User john@example.com (SSN: 123-45-6789) called from 192.168.1.1';
+    const input = 'User john@example.com (SSN: 123-45-6789) called from 192.168.1.1';
     const result = scrubPii(input);
     expect(result.text).toContain('[REDACTED:email]');
     expect(result.text).toContain('[REDACTED:ssn]');
@@ -345,7 +342,7 @@ describe('PII scrubber integration', () => {
   });
 
   test('all 11 pattern names are present', () => {
-    const names = PII_PATTERNS.map(p => p.name);
+    const names = PII_PATTERNS.map((p) => p.name);
     expect(names).toEqual([
       'email',
       'phone_us',

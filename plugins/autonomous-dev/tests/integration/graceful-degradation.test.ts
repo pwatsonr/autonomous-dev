@@ -13,7 +13,10 @@ import type {
   ObservationRouterOptions,
   PreviousRunState,
 } from '../../src/engine/observation-router';
-import type { ServiceConfig, IntelligenceConfig } from '../../src/config/intelligence-config.schema';
+import type {
+  ServiceConfig,
+  IntelligenceConfig,
+} from '../../src/config/intelligence-config.schema';
 import type {
   PrometheusResult,
   GrafanaAlertResult,
@@ -130,7 +133,11 @@ function buildRouter(overrides: Partial<ObservationRouterOptions> = {}): Observa
 
       // Error from metrics (Prometheus)
       const errorRate = metrics.find((m) => m.query_name === 'error_rate');
-      if (errorRate && errorRate.value !== null && errorRate.value > (thresholds.error_rate_percent ?? 5)) {
+      if (
+        errorRate &&
+        errorRate.value !== null &&
+        errorRate.value > (thresholds.error_rate_percent ?? 5)
+      ) {
         candidates.push({
           type: 'error',
           error_type: 'error_rate',
@@ -138,16 +145,15 @@ function buildRouter(overrides: Partial<ObservationRouterOptions> = {}): Observa
           metric_value: errorRate.value,
           threshold_value: thresholds.error_rate_percent ?? 5,
           sustained_minutes: 15,
-          log_samples: logs.length > 0
-            ? logs[0].hits.map((h) => h.message).slice(0, 5)
-            : [],
-          data_sources_used: metrics.length > 0 && logs.length > 0
-            ? ['prometheus', 'opensearch']
-            : metrics.length > 0
-              ? ['prometheus']
-              : logs.length > 0
-                ? ['opensearch']
-                : [],
+          log_samples: logs.length > 0 ? logs[0].hits.map((h) => h.message).slice(0, 5) : [],
+          data_sources_used:
+            metrics.length > 0 && logs.length > 0
+              ? ['prometheus', 'opensearch']
+              : metrics.length > 0
+                ? ['prometheus']
+                : logs.length > 0
+                  ? ['opensearch']
+                  : [],
           has_data_loss_indicator: false,
           has_data_corruption_indicator: false,
         });
@@ -156,7 +162,9 @@ function buildRouter(overrides: Partial<ObservationRouterOptions> = {}): Observa
       // Error from logs only (OpenSearch -- exception aggregation)
       if (logs.length > 0) {
         for (const logResult of logs) {
-          const aggs = logResult.aggregations as { error_messages?: Array<{ key: string; doc_count: number }> } | undefined;
+          const aggs = logResult.aggregations as
+            | { error_messages?: Array<{ key: string; doc_count: number }> }
+            | undefined;
           if (aggs?.error_messages) {
             for (const bucket of aggs.error_messages) {
               if (bucket.doc_count > 10) {
@@ -187,7 +195,13 @@ function buildRouter(overrides: Partial<ObservationRouterOptions> = {}): Observa
     filterFalsePositive: () => ({ filtered: false }),
     detectAnomaly: (metric, currentValue, baseline, sensitivity) => {
       if (baseline.stddev_7d === 0) {
-        return { detected: false, metric, current_value: currentValue, deviation: 0, consecutive_runs: 0 };
+        return {
+          detected: false,
+          metric,
+          current_value: currentValue,
+          deviation: 0,
+          consecutive_runs: 0,
+        };
       }
       const z = (currentValue - baseline.mean_7d) / baseline.stddev_7d;
       return {
@@ -239,9 +253,7 @@ describe('Graceful Degradation', () => {
         ],
         total_hits: 1847,
         aggregations: {
-          error_messages: [
-            { key: 'ConnectionPoolExhausted', doc_count: 1847 },
-          ],
+          error_messages: [{ key: 'ConnectionPoolExhausted', doc_count: 1847 }],
         },
       },
     ];

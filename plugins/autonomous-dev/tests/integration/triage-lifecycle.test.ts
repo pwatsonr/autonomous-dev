@@ -17,10 +17,7 @@ import { processPendingTriage } from '../../src/triage/triage-processor';
 import { DefaultTriageAuditLogger } from '../../src/triage/audit-logger';
 import type { LlmPrdContent } from '../../src/triage/prd-template';
 import { createPrdGenerator, type GeneratePrdViaLlmFn } from '../../src/triage/prd-generator';
-import {
-  applyRetentionPolicy,
-  type AuditLogger,
-} from '../../src/reports/retention';
+import { applyRetentionPolicy, type AuditLogger } from '../../src/reports/retention';
 import {
   writeRunMetadata,
   readRunMetadata,
@@ -127,8 +124,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 
 const MOCK_LLM_RESPONSE: LlmPrdContent = {
   title: 'Fix Error Rate Spike on api-gateway',
-  problemStatement:
-    'The api-gateway service error rate spiked to 12.5% from a baseline of 0.5%.',
+  problemStatement: 'The api-gateway service error rate spiked to 12.5% from a baseline of 0.5%.',
   scope: 'Investigate and fix connection pool exhaustion.',
 };
 
@@ -227,9 +223,7 @@ describe('Full Triage Lifecycle', () => {
 
     // 9. Verify audit log
     const entries = auditLog.getEntries();
-    const promoteEntry = entries.find(
-      (e) => e.observation_id === obsId && e.action === 'promote',
-    );
+    const promoteEntry = entries.find((e) => e.observation_id === obsId && e.action === 'promote');
     expect(promoteEntry).toBeDefined();
     expect(promoteEntry?.actor).toBe('pwatson');
     expect(promoteEntry?.generated_prd).toMatch(/^PRD-OBS-/);
@@ -260,10 +254,7 @@ describe('Full Triage Lifecycle', () => {
     expect(result1.processed[0].decision).toBe('defer');
 
     // Verify status is deferred
-    let content = await fs.readFile(
-      path.join(observationsDir, `${obsId}.md`),
-      'utf-8',
-    );
+    let content = await fs.readFile(path.join(observationsDir, `${obsId}.md`), 'utf-8');
     let fm = parseFrontmatterFromContent(content);
     expect(fm.triage_status).toBe('deferred');
 
@@ -274,10 +265,7 @@ describe('Full Triage Lifecycle', () => {
     expect(result2.deferred_returned).toContain(obsId);
 
     // 4. Verify observation is back to pending
-    content = await fs.readFile(
-      path.join(observationsDir, `${obsId}.md`),
-      'utf-8',
-    );
+    content = await fs.readFile(path.join(observationsDir, `${obsId}.md`), 'utf-8');
     fm = parseFrontmatterFromContent(content);
     expect(fm.triage_status).toBe('pending');
     expect(fm.triage_decision).toBeNull();
@@ -310,18 +298,13 @@ describe('Full Triage Lifecycle', () => {
     expect(result.processed[0].decision).toBe('dismiss');
 
     // 3. Verify observation status is dismissed
-    const content = await fs.readFile(
-      path.join(observationsDir, `${obsId}.md`),
-      'utf-8',
-    );
+    const content = await fs.readFile(path.join(observationsDir, `${obsId}.md`), 'utf-8');
     const fm = parseFrontmatterFromContent(content);
     expect(fm.triage_status).toBe('dismissed');
 
     // 4. Verify audit log entry
     const entries = auditLog.getEntries();
-    const dismissEntry = entries.find(
-      (e) => e.observation_id === obsId && e.action === 'dismiss',
-    );
+    const dismissEntry = entries.find((e) => e.observation_id === obsId && e.action === 'dismiss');
     expect(dismissEntry).toBeDefined();
     expect(dismissEntry?.actor).toBe('pwatson');
   });

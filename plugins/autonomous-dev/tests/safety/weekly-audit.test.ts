@@ -28,10 +28,7 @@ afterEach(async () => {
 /**
  * Helper to write an observation file.
  */
-async function writeObservation(
-  relativePath: string,
-  content: string,
-): Promise<void> {
+async function writeObservation(relativePath: string, content: string): Promise<void> {
   const fullPath = path.join(tmpDir, relativePath);
   await fs.mkdir(path.dirname(fullPath), { recursive: true });
   await fs.writeFile(fullPath, content, 'utf-8');
@@ -43,14 +40,17 @@ async function writeObservation(
 
 describe('TC-2-3-06: Weekly audit clean files', () => {
   test('zero findings when files contain only redaction tokens', async () => {
-    await writeObservation('report-001.md', [
-      '# Observation Report',
-      '',
-      'User [REDACTED:email] logged in from [REDACTED:ip].',
-      'Auth token: [SECRET_REDACTED]',
-      'SSN provided: [REDACTED:ssn]',
-      'Phone: [REDACTED:phone]',
-    ].join('\n'));
+    await writeObservation(
+      'report-001.md',
+      [
+        '# Observation Report',
+        '',
+        'User [REDACTED:email] logged in from [REDACTED:ip].',
+        'Auth token: [SECRET_REDACTED]',
+        'SSN provided: [REDACTED:ssn]',
+        'Phone: [REDACTED:phone]',
+      ].join('\n'),
+    );
 
     const result = await weeklyAuditScan(tmpDir);
 
@@ -94,9 +94,7 @@ describe('TC-2-3-07: Weekly audit finds leak', () => {
     const result = await weeklyAuditScan(tmpDir);
 
     expect(result.findings.length).toBeGreaterThanOrEqual(1);
-    const emailFinding = result.findings.find(
-      (f) => f.pattern_name === 'email',
-    );
+    const emailFinding = result.findings.find((f) => f.pattern_name === 'email');
     expect(emailFinding).toBeDefined();
     expect(emailFinding!.file_path).toBe('report-with-leak.md');
     expect(emailFinding!.line_number).toBe(42);
@@ -128,9 +126,7 @@ describe('TC-2-3-07: Weekly audit finds leak', () => {
 
     const result = await weeklyAuditScan(tmpDir);
 
-    const secretFinding = result.findings.find(
-      (f) => f.pattern_name === 'aws_access_key',
-    );
+    const secretFinding = result.findings.find((f) => f.pattern_name === 'aws_access_key');
     expect(secretFinding).toBeDefined();
     expect(secretFinding!.pattern_type).toBe('secret');
   });
@@ -157,16 +153,11 @@ describe('TC-2-3-08: Weekly audit expanded entropy', () => {
     // This string is high-entropy and > 20 chars but NOT in password=/token= context
     // The real-time detector would miss it, but the weekly audit should catch it
     const highEntropyString = 'aB3$xY9!kL2@mN5^pQ8&rT1wZ';
-    await writeObservation(
-      'report-entropy.md',
-      `Some context: ${highEntropyString} more text`,
-    );
+    await writeObservation('report-entropy.md', `Some context: ${highEntropyString} more text`);
 
     const result = await weeklyAuditScan(tmpDir);
 
-    const entropyFinding = result.findings.find(
-      (f) => f.pattern_type === 'high_entropy',
-    );
+    const entropyFinding = result.findings.find((f) => f.pattern_type === 'high_entropy');
     expect(entropyFinding).toBeDefined();
     expect(entropyFinding!.pattern_name).toBe('expanded_entropy_scan');
     expect(entropyFinding!.context).toContain('high-entropy string detected');
@@ -180,9 +171,7 @@ describe('TC-2-3-08: Weekly audit expanded entropy', () => {
 
     const result = await weeklyAuditScan(tmpDir);
 
-    const entropyFindings = result.findings.filter(
-      (f) => f.pattern_type === 'high_entropy',
-    );
+    const entropyFindings = result.findings.filter((f) => f.pattern_type === 'high_entropy');
     expect(entropyFindings.length).toBe(0);
   });
 
@@ -191,9 +180,7 @@ describe('TC-2-3-08: Weekly audit expanded entropy', () => {
 
     const result = await weeklyAuditScan(tmpDir);
 
-    const entropyFindings = result.findings.filter(
-      (f) => f.pattern_type === 'high_entropy',
-    );
+    const entropyFindings = result.findings.filter((f) => f.pattern_type === 'high_entropy');
     expect(entropyFindings.length).toBe(0);
   });
 });
@@ -215,10 +202,7 @@ describe('TC-2-3-09: Weekly audit skips tokens', () => {
   });
 
   test('does not report [SECRET_REDACTED] as a finding', async () => {
-    await writeObservation(
-      'report-secret-redacted.md',
-      'Token: [SECRET_REDACTED]',
-    );
+    await writeObservation('report-secret-redacted.md', 'Token: [SECRET_REDACTED]');
 
     const result = await weeklyAuditScan(tmpDir);
 
@@ -226,31 +210,21 @@ describe('TC-2-3-09: Weekly audit skips tokens', () => {
   });
 
   test('does not report [SCRUB_FAILED:timeout] in entropy scan', async () => {
-    await writeObservation(
-      'report-scrub-failed.md',
-      'Field value: [SCRUB_FAILED:timeout]',
-    );
+    await writeObservation('report-scrub-failed.md', 'Field value: [SCRUB_FAILED:timeout]');
 
     const result = await weeklyAuditScan(tmpDir);
 
-    const entropyFindings = result.findings.filter(
-      (f) => f.pattern_type === 'high_entropy',
-    );
+    const entropyFindings = result.findings.filter((f) => f.pattern_type === 'high_entropy');
     expect(entropyFindings.length).toBe(0);
   });
 
   test('reports raw PII next to a redaction token', async () => {
     // The line has a redacted email AND a raw email
-    await writeObservation(
-      'report-mixed.md',
-      'From [REDACTED:email] to john@leaked.com',
-    );
+    await writeObservation('report-mixed.md', 'From [REDACTED:email] to john@leaked.com');
 
     const result = await weeklyAuditScan(tmpDir);
 
-    const emailFindings = result.findings.filter(
-      (f) => f.pattern_name === 'email',
-    );
+    const emailFindings = result.findings.filter((f) => f.pattern_name === 'email');
     expect(emailFindings.length).toBe(1);
   });
 });
@@ -272,9 +246,7 @@ describe('Audit scan metadata', () => {
   test('reports scan timestamp as ISO 8601', async () => {
     const result = await weeklyAuditScan(tmpDir);
 
-    expect(result.scan_timestamp).toMatch(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
-    );
+    expect(result.scan_timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   test('counts files and lines correctly', async () => {

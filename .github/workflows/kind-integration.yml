@@ -51,6 +51,11 @@ jobs:
         working-directory: plugins/autonomous-dev
         env:
           RUN_KIND_TESTS: '1'
+          # #573: the suite natively dynamic-imports the ESM-only
+          # @kubernetes/client-node; jest needs this flag to honor a real
+          # import() callback (otherwise: "A dynamic import callback was
+          # invoked without --experimental-vm-modules").
+          NODE_OPTIONS: --experimental-vm-modules
         run: npm run test:kind
 
       - name: Capture kind cluster logs on failure

@@ -88,13 +88,5 @@ module.exports = {
     'coverage/',
     '*.tsbuildinfo',
     '*.js',
-    // #570/#573: leave tests/integration/ untouched. The `kind
-    // scope-enforcement` job triggers on `tests/integration/**` and runs
-    // test-cred-proxy-scope.test.ts, which ts-jest-crashes on the ESM-only
-    // @kubernetes/client-node (pre-existing transform gap). Linting these
-    // would also re-surface dead `eslint-disable jest/no-disabled-tests`
-    // directives (eslint-plugin-jest isn't installed). Ignoring the dir keeps
-    // the files byte-for-byte at HEAD so this pass can't trigger the kind job.
-    'tests/integration/',
   ],
 };

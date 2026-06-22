@@ -41,6 +41,15 @@ const SKIP = !process.env.RUN_KIND_TESTS || !hasKind();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let k8s: any;
 
+// #573: @kubernetes/client-node@1.x is ESM-only (`"type": "module"`). ts-jest
+// compiles this test as CJS and rewrites a bare `await import(...)` into
+// `require(...)`, which throws on an ESM package. Building the import via
+// `new Function` keeps it a NATIVE dynamic `import()` at runtime, so Node loads
+// the ESM module directly (requires --experimental-vm-modules, set by the
+// kind-integration workflow). Only reached when RUN_KIND_TESTS=1 + kind present.
+// eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-explicit-any
+const nativeImport = new Function('s', 'return import(s)') as (s: string) => Promise<any>;
+
 function loadClusterInfo(kubeconfigPath: string): {
   server: string;
   caCertBase64: string;
@@ -55,10 +64,7 @@ function loadClusterInfo(kubeconfigPath: string): {
   };
 }
 
-function makeAdminClients(
-  kubeconfigPath: string,
-  clusterName: string,
-): K8sClients {
+function makeAdminClients(kubeconfigPath: string, clusterName: string): K8sClients {
   const kc = new k8s.KubeConfig();
   kc.loadFromFile(kubeconfigPath);
   const coreApi = kc.makeApiClient(k8s.CoreV1Api);
@@ -75,12 +81,10 @@ function makeAdminClients(
       coreApi.deleteNamespacedServiceAccount({ name, namespace: ns }),
   };
   const rbac: RbacV1Like = {
-    createNamespacedRole: async (ns, body) =>
-      rbacApi.createNamespacedRole({ namespace: ns, body }),
+    createNamespacedRole: async (ns, body) => rbacApi.createNamespacedRole({ namespace: ns, body }),
     createNamespacedRoleBinding: async (ns, body) =>
       rbacApi.createNamespacedRoleBinding({ namespace: ns, body }),
-    deleteNamespacedRole: async (name, ns) =>
-      rbacApi.deleteNamespacedRole({ name, namespace: ns }),
+    deleteNamespacedRole: async (name, ns) => rbacApi.deleteNamespacedRole({ name, namespace: ns }),
     deleteNamespacedRoleBinding: async (name, ns) =>
       rbacApi.deleteNamespacedRoleBinding({ name, namespace: ns }),
   };
@@ -116,9 +120,7 @@ function minimalDeployment(name: string): unknown {
       template: {
         metadata: { labels: { app: name } },
         spec: {
-          containers: [
-            { name: 'pause', image: 'registry.k8s.io/pause:3.9' },
-          ],
+          containers: [{ name: 'pause', image: 'registry.k8s.io/pause:3.9' }],
         },
       },
     },
@@ -142,7 +144,7 @@ describe('cred-proxy K8s scope enforcement (kind)', () => {
     // Lazy import: the ESM-only `@kubernetes/client-node` module is
     // never required when this suite is skipped, which is the default
     // for contributors without Docker / kind installed.
-    k8s = await import('@kubernetes/client-node');
+    k8s = await nativeImport('@kubernetes/client-node');
     cluster = startKindCluster();
     clusterName = `kind-${cluster.name}`;
     const kc = new k8s.KubeConfig();
@@ -163,7 +165,6 @@ describe('cred-proxy K8s scope enforcement (kind)', () => {
   // Surface a single skipped test when SKIP is true so CI reporting
   // still records the intent. Without this the entire describe block
   // could report zero tests, masking configuration drift.
-  // eslint-disable-next-line jest/no-disabled-tests
   (SKIP ? it.skip : it)(
     'issued kubeconfig succeeds for in-namespace deploy',
     async () => {
@@ -224,9 +225,8 @@ describe('cred-proxy K8s scope enforcement (kind)', () => {
       const list = await core.listNamespacedServiceAccount({
         namespace: 'ns-a',
       });
-      const proxyAccounts = (list.items ?? []).filter(
-        (sa: { metadata?: { name?: string } }) =>
-          sa.metadata?.name?.startsWith('cred-proxy-'),
+      const proxyAccounts = (list.items ?? []).filter((sa: { metadata?: { name?: string } }) =>
+        sa.metadata?.name?.startsWith('cred-proxy-'),
       );
       expect(proxyAccounts).toHaveLength(0);
     },

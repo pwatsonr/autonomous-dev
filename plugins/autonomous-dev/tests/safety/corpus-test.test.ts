@@ -123,7 +123,7 @@ describe('Corpus Generation (TC-2-4-01)', () => {
   });
 
   test('no duplicate line numbers in manifest', () => {
-    const lineNumbers = corpus.manifest.embedded_items.map(i => i.line_number);
+    const lineNumbers = corpus.manifest.embedded_items.map((i) => i.line_number);
     const unique = new Set(lineNumbers);
     expect(unique.size).toBe(lineNumbers.length);
   });
@@ -150,7 +150,7 @@ describe('Corpus Generation (TC-2-4-01)', () => {
 
   test('clean lines (~8,550) contain no known PII/secret values', () => {
     const lines = corpus.text.split('\n');
-    const embeddedLineNums = new Set(corpus.manifest.embedded_items.map(i => i.line_number));
+    const embeddedLineNums = new Set(corpus.manifest.embedded_items.map((i) => i.line_number));
 
     // Sample 200 clean lines and check they don't contain any embedded values
     const cleanLineIndices: number[] = [];
@@ -162,7 +162,7 @@ describe('Corpus Generation (TC-2-4-01)', () => {
     // Spot-check a few clean lines for known PII patterns
     const sampleSize = Math.min(200, cleanLineIndices.length);
     for (let s = 0; s < sampleSize; s++) {
-      const idx = cleanLineIndices[Math.floor(s * cleanLineIndices.length / sampleSize)];
+      const idx = cleanLineIndices[Math.floor((s * cleanLineIndices.length) / sampleSize)];
       const line = lines[idx];
       // Clean lines should not contain @ (email indicator), except in the log format itself
       // This is a heuristic check, not exhaustive
@@ -259,7 +259,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('TC-2-4-09: email recall — all 500 detected', () => {
-    const emailItems = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'email');
+    const emailItems = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'email');
     expect(emailItems.length).toBe(500);
 
     let detected = 0;
@@ -272,7 +272,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('US phone recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'phone_us');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'phone_us');
     expect(items.length).toBe(150);
 
     let detected = 0;
@@ -284,7 +284,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('SSN recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'ssn');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'ssn');
     expect(items.length).toBe(50);
 
     let detected = 0;
@@ -296,7 +296,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('credit card recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'credit_card');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'credit_card');
     expect(items.length).toBe(80);
 
     let detected = 0;
@@ -308,7 +308,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('IPv4 recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'ipv4');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'ipv4');
     expect(items.length).toBe(120);
 
     let detected = 0;
@@ -320,7 +320,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('AWS access key recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'aws_access_key');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'aws_access_key');
     expect(items.length).toBe(50);
 
     let detected = 0;
@@ -332,7 +332,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('GitHub token recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'github_pat');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'github_pat');
     expect(items.length).toBe(30);
 
     let detected = 0;
@@ -344,7 +344,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('Stripe key recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'stripe_secret');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'stripe_secret');
     expect(items.length).toBe(20);
 
     let detected = 0;
@@ -356,7 +356,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('Bearer token recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'bearer');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'bearer');
     expect(items.length).toBe(100);
 
     let detected = 0;
@@ -368,7 +368,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('JWT recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'jwt');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'jwt');
     expect(items.length).toBe(50);
 
     let detected = 0;
@@ -382,7 +382,7 @@ describe('Per-Type Recall Detail', () => {
   // SKIP: high-entropy detector currently catches only ~29% of corpus items. Production
   // detector tuning needed. (PRD-016 triage: SKIP-WITH-NOTE)
   test.skip('TC-2-4-10: high-entropy recall >= 99% (>= 198 of 200)', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'high_entropy');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'high_entropy');
     expect(items.length).toBe(200);
 
     let detected = 0;
@@ -395,7 +395,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('IPv6 full recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'ipv6_full');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'ipv6_full');
     expect(items.length).toBe(15);
 
     let detected = 0;
@@ -409,7 +409,9 @@ describe('Per-Type Recall Detail', () => {
   // SKIP: IPv6 compressed recall ~73%; depends on production regex tuning.
   // (PRD-016 triage: SKIP-WITH-NOTE)
   test.skip('IPv6 compressed recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'ipv6_compressed');
+    const items = corpus.manifest.embedded_items.filter(
+      (i) => i.pattern_type === 'ipv6_compressed',
+    );
     expect(items.length).toBe(15);
 
     let detected = 0;
@@ -421,7 +423,7 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('international phone recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'phone_intl');
+    const items = corpus.manifest.embedded_items.filter((i) => i.pattern_type === 'phone_intl');
     expect(items.length).toBe(50);
 
     let detected = 0;
@@ -433,7 +435,9 @@ describe('Per-Type Recall Detail', () => {
   });
 
   test('Amex credit card recall', () => {
-    const items = corpus.manifest.embedded_items.filter(i => i.pattern_type === 'credit_card_amex');
+    const items = corpus.manifest.embedded_items.filter(
+      (i) => i.pattern_type === 'credit_card_amex',
+    );
     expect(items.length).toBe(20);
 
     let detected = 0;
@@ -465,7 +469,7 @@ describe('False Positive Rate (TC-2-4-03)', () => {
   // (PRD-016 triage: SKIP-WITH-NOTE)
   test.skip('false positive rate < 5%', () => {
     // Count redactions whose position falls on a "clean" line
-    const embeddedLines = new Set(manifest.embedded_items.map(i => i.line_number));
+    const embeddedLines = new Set(manifest.embedded_items.map((i) => i.line_number));
     const totalCleanLines = manifest.total_lines - embeddedLines.size;
 
     // Collect line numbers that had redactions
@@ -491,7 +495,7 @@ describe('False Positive Rate (TC-2-4-03)', () => {
 
   // SKIP: same root cause as above false-positive rate test. (PRD-016 triage: SKIP-WITH-NOTE)
   test.skip('false redaction count < 427 (5% of ~8,550 clean lines)', () => {
-    const embeddedLines = new Set(manifest.embedded_items.map(i => i.line_number));
+    const embeddedLines = new Set(manifest.embedded_items.map((i) => i.line_number));
 
     let falseRedactionCount = 0;
     for (const r of result.redactions) {
@@ -557,7 +561,7 @@ describe('False Positive Edge Cases', () => {
       // The timestamp portion should be preserved, not redacted as IPv6
       expect(result.text).toContain('2026-04-08T');
       // The time part HH:MM:SS should not be redacted
-      expect(result.redactions.filter(r => r.type === 'ip').length).toBe(0);
+      expect(result.redactions.filter((r) => r.type === 'ip').length).toBe(0);
     }
   });
 

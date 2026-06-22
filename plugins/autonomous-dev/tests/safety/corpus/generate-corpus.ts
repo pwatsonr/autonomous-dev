@@ -115,14 +115,32 @@ function pick<T>(rng: () => number, arr: T[]): T {
 // ---------------------------------------------------------------------------
 
 const EMAIL_DOMAINS = [
-  'example.com', 'company.com', 'test.org', 'sub.domain.co.uk',
-  'mail.example.net', 'corp.io', 'example.org',
+  'example.com',
+  'company.com',
+  'test.org',
+  'sub.domain.co.uk',
+  'mail.example.net',
+  'corp.io',
+  'example.org',
 ];
 
 const EMAIL_NAMES = [
-  'john.doe', 'jane.smith', 'admin', 'user', 'bob', 'alice',
-  'admin+test', 'first.last', 'user_name-123', 'support',
-  'noreply', 'info', 'contact', 'help', 'sales', 'dev',
+  'john.doe',
+  'jane.smith',
+  'admin',
+  'user',
+  'bob',
+  'alice',
+  'admin+test',
+  'first.last',
+  'user_name-123',
+  'support',
+  'noreply',
+  'info',
+  'contact',
+  'help',
+  'sales',
+  'dev',
 ];
 
 function generateEmail(rng: () => number): string {
@@ -309,10 +327,7 @@ const DIRTY_TEMPLATES: Record<string, ((rng: () => number, value: string) => str
     (_rng, v) => `IPv6 connection established from ${v}`,
     (_rng, v) => `Peer address: ${v}`,
   ],
-  ipv6_compressed: [
-    (_rng, v) => `Listening on ${v}`,
-    (_rng, v) => `IPv6 peer: ${v}`,
-  ],
+  ipv6_compressed: [(_rng, v) => `Listening on ${v}`, (_rng, v) => `IPv6 peer: ${v}`],
   aws_access_key: [
     (_rng, v) => `AWS API call with access_key=${v}`,
     (_rng, v) => `Credential detected: ${v}`,
@@ -325,18 +340,9 @@ const DIRTY_TEMPLATES: Record<string, ((rng: () => number, value: string) => str
     (_rng, v) => `Stripe API initialized with key ${v}`,
     (_rng, v) => `Payment gateway config stripe_key=${v}`,
   ],
-  bearer: [
-    (_rng, v) => `Authorization: ${v}`,
-    (_rng, v) => `Token refresh: ${v}`,
-  ],
-  jwt: [
-    (_rng, v) => `JWT validated token=${v}`,
-    (_rng, v) => `Session token: ${v}`,
-  ],
-  high_entropy: [
-    (_rng, v) => `Config loaded: ${v}`,
-    (_rng, v) => `Environment variable ${v}`,
-  ],
+  bearer: [(_rng, v) => `Authorization: ${v}`, (_rng, v) => `Token refresh: ${v}`],
+  jwt: [(_rng, v) => `JWT validated token=${v}`, (_rng, v) => `Session token: ${v}`],
+  high_entropy: [(_rng, v) => `Config loaded: ${v}`, (_rng, v) => `Environment variable ${v}`],
 };
 
 // ---------------------------------------------------------------------------
@@ -358,22 +364,82 @@ function generateTimestamp(rng: () => number): string {
 /**
  * Distribution specification — count of each pattern type to embed.
  */
-const DISTRIBUTION: { type: string; count: number; generator: (rng: () => number) => string; expectedReplacement: string }[] = [
+const DISTRIBUTION: {
+  type: string;
+  count: number;
+  generator: (rng: () => number) => string;
+  expectedReplacement: string;
+}[] = [
   { type: 'email', count: 500, generator: generateEmail, expectedReplacement: '[REDACTED:email]' },
-  { type: 'phone_us', count: 150, generator: generateUSPhone, expectedReplacement: '[REDACTED:phone]' },
-  { type: 'phone_intl', count: 50, generator: generateIntlPhone, expectedReplacement: '[REDACTED:phone]' },
+  {
+    type: 'phone_us',
+    count: 150,
+    generator: generateUSPhone,
+    expectedReplacement: '[REDACTED:phone]',
+  },
+  {
+    type: 'phone_intl',
+    count: 50,
+    generator: generateIntlPhone,
+    expectedReplacement: '[REDACTED:phone]',
+  },
   { type: 'ssn', count: 50, generator: generateSSN, expectedReplacement: '[REDACTED:ssn]' },
-  { type: 'credit_card', count: 80, generator: generateCreditCard, expectedReplacement: '[REDACTED:credit_card]' },
-  { type: 'credit_card_amex', count: 20, generator: generateAmex, expectedReplacement: '[REDACTED:credit_card]' },
+  {
+    type: 'credit_card',
+    count: 80,
+    generator: generateCreditCard,
+    expectedReplacement: '[REDACTED:credit_card]',
+  },
+  {
+    type: 'credit_card_amex',
+    count: 20,
+    generator: generateAmex,
+    expectedReplacement: '[REDACTED:credit_card]',
+  },
   { type: 'ipv4', count: 120, generator: generateIPv4, expectedReplacement: '[REDACTED:ip]' },
-  { type: 'ipv6_full', count: 15, generator: generateIPv6Full, expectedReplacement: '[REDACTED:ip]' },
-  { type: 'ipv6_compressed', count: 15, generator: generateIPv6Compressed, expectedReplacement: '[REDACTED:ip]' },
-  { type: 'aws_access_key', count: 50, generator: generateAWSAccessKey, expectedReplacement: '[SECRET_REDACTED]' },
-  { type: 'github_pat', count: 30, generator: generateGitHubToken, expectedReplacement: '[SECRET_REDACTED]' },
-  { type: 'stripe_secret', count: 20, generator: generateStripeKey, expectedReplacement: '[SECRET_REDACTED]' },
-  { type: 'bearer', count: 100, generator: generateBearerToken, expectedReplacement: '[SECRET_REDACTED]' },
+  {
+    type: 'ipv6_full',
+    count: 15,
+    generator: generateIPv6Full,
+    expectedReplacement: '[REDACTED:ip]',
+  },
+  {
+    type: 'ipv6_compressed',
+    count: 15,
+    generator: generateIPv6Compressed,
+    expectedReplacement: '[REDACTED:ip]',
+  },
+  {
+    type: 'aws_access_key',
+    count: 50,
+    generator: generateAWSAccessKey,
+    expectedReplacement: '[SECRET_REDACTED]',
+  },
+  {
+    type: 'github_pat',
+    count: 30,
+    generator: generateGitHubToken,
+    expectedReplacement: '[SECRET_REDACTED]',
+  },
+  {
+    type: 'stripe_secret',
+    count: 20,
+    generator: generateStripeKey,
+    expectedReplacement: '[SECRET_REDACTED]',
+  },
+  {
+    type: 'bearer',
+    count: 100,
+    generator: generateBearerToken,
+    expectedReplacement: '[SECRET_REDACTED]',
+  },
   { type: 'jwt', count: 50, generator: generateJWT, expectedReplacement: '[REDACTED:jwt]' },
-  { type: 'high_entropy', count: 200, generator: generateHighEntropySecret, expectedReplacement: '[SECRET_REDACTED]' },
+  {
+    type: 'high_entropy',
+    count: 200,
+    generator: generateHighEntropySecret,
+    expectedReplacement: '[SECRET_REDACTED]',
+  },
 ];
 
 const TOTAL_LINES = 10_000;
@@ -394,7 +460,12 @@ export function generateCorpus(seed: number = 42): GeneratedCorpus {
   // 1. Decide which line numbers will contain embedded PII/secrets.
   //    We spread them across the corpus to avoid clustering.
   const dirtyLineNumbers = new Set<number>();
-  const allDirtyLines: { lineNumber: number; type: string; value: string; expectedReplacement: string }[] = [];
+  const allDirtyLines: {
+    lineNumber: number;
+    type: string;
+    value: string;
+    expectedReplacement: string;
+  }[] = [];
 
   for (const dist of DISTRIBUTION) {
     for (let i = 0; i < dist.count; i++) {
@@ -415,7 +486,7 @@ export function generateCorpus(seed: number = 42): GeneratedCorpus {
   }
 
   // 2. Build a lookup map: lineNum -> dirty entry
-  const dirtyMap = new Map<number, typeof allDirtyLines[0]>();
+  const dirtyMap = new Map<number, (typeof allDirtyLines)[0]>();
   for (const entry of allDirtyLines) {
     dirtyMap.set(entry.lineNumber, entry);
   }
@@ -482,10 +553,7 @@ export function getLineNumber(text: string, charOffset: number): number {
  * @param corpus  The generated corpus object.
  * @param dir     Directory to write files into.
  */
-export async function writeCorpusToFile(
-  corpus: GeneratedCorpus,
-  dir: string,
-): Promise<void> {
+export async function writeCorpusToFile(corpus: GeneratedCorpus, dir: string): Promise<void> {
   const fs = await import('fs/promises');
   const path = await import('path');
 

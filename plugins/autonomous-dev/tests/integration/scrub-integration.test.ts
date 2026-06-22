@@ -35,9 +35,7 @@ describe('TC-2-3-01: OpenSearch messages scrubbed', () => {
       prometheus: [],
       opensearch: [
         {
-          hits: [
-            { message: 'User john@test.com logged in successfully' },
-          ],
+          hits: [{ message: 'User john@test.com logged in successfully' }],
         },
       ],
       grafana: { alerts: {}, annotations: { annotations: [] } },
@@ -56,8 +54,7 @@ describe('TC-2-3-01: OpenSearch messages scrubbed', () => {
         {
           hits: [
             {
-              message:
-                'User john@test.com from 192.168.1.1 with SSN 123-45-6789',
+              message: 'User john@test.com from 192.168.1.1 with SSN 123-45-6789',
             },
           ],
         },
@@ -90,8 +87,7 @@ describe('TC-2-3-02: Stack traces scrubbed', () => {
           hits: [
             {
               message: 'Connection failed',
-              stack_trace:
-                'Error at 10.0.0.5:8080\n  at connect(192.168.1.100)\n  at main()',
+              stack_trace: 'Error at 10.0.0.5:8080\n  at connect(192.168.1.100)\n  at main()',
             },
           ],
         },
@@ -125,9 +121,7 @@ describe('TC-2-3-02: Stack traces scrubbed', () => {
 
     const result = await scrubCollectedData(data, makeConfig(), makeContext());
 
-    expect(result.opensearch[0].hits[0].stack_trace).toBe(
-      'at function foo()\n  at bar()',
-    );
+    expect(result.opensearch[0].hits[0].stack_trace).toBe('at function foo()\n  at bar()');
   });
 
   test('hits without stack_trace preserve undefined', async () => {
@@ -173,9 +167,7 @@ describe('TC-2-3-03: Grafana annotations scrubbed', () => {
 
     expect(text).not.toContain('Bearer eyJ');
     // Should be redacted by either bearer or JWT pattern
-    expect(
-      text.includes('[SECRET_REDACTED]') || text.includes('[REDACTED:jwt]'),
-    ).toBe(true);
+    expect(text.includes('[SECRET_REDACTED]') || text.includes('[REDACTED:jwt]')).toBe(true);
   });
 
   test('alerts are passed through unchanged', async () => {
@@ -336,9 +328,7 @@ describe('TC-2-3-12: Integration end-to-end', () => {
       grafana: {
         alerts: {},
         annotations: {
-          annotations: [
-            { text: `Key ${rawAwsKey} used for auth: ${rawBearer}` },
-          ],
+          annotations: [{ text: `Key ${rawAwsKey} used for auth: ${rawBearer}` }],
         },
       },
     };
@@ -365,14 +355,10 @@ describe('TC-2-3-12: Integration end-to-end', () => {
 
   test('audit entries are produced for each scrubbed field', async () => {
     const data: CollectedData = {
-      prometheus: [
-        { metric: 'test', labels: { email: 'user@test.com' } },
-      ],
+      prometheus: [{ metric: 'test', labels: { email: 'user@test.com' } }],
       opensearch: [
         {
-          hits: [
-            { message: 'from user@test.com', stack_trace: 'at 10.0.0.1' },
-          ],
+          hits: [{ message: 'from user@test.com', stack_trace: 'at 10.0.0.1' }],
         },
       ],
       grafana: {
@@ -405,10 +391,7 @@ describe('TC-2-3-10: .gitignore updated', () => {
     const fs = await import('fs/promises');
     const path = await import('path');
 
-    const gitignorePath = path.join(
-      __dirname,
-      '../../.gitignore',
-    );
+    const gitignorePath = path.join(__dirname, '../../.gitignore');
 
     let content: string;
     try {

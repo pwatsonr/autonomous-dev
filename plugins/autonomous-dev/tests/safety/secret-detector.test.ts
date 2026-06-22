@@ -5,11 +5,7 @@
  * Covers SPEC-007-2-1 test cases TC-2-1-20 through TC-2-1-35.
  */
 
-import {
-  detectSecrets,
-  SECRET_PATTERNS,
-  ENV_VAR_PATTERN,
-} from '../../src/safety/secret-detector';
+import { detectSecrets, SECRET_PATTERNS, ENV_VAR_PATTERN } from '../../src/safety/secret-detector';
 import type { PatternDefinition } from '../../src/safety/types';
 
 // ---------------------------------------------------------------------------
@@ -20,13 +16,13 @@ describe('Secret: aws_access_key', () => {
   test('TC-2-1-20: AWS access key', () => {
     const result = detectSecrets('key=AKIAIOSFODNN7EXAMPLE');
     expect(result.text).toBe('key=[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'aws_access_key')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'aws_access_key')).toBe(true);
   });
 
   test('partial AKIA prefix not matched', () => {
     const result = detectSecrets('key=AKIA123');
     // Only 3 chars after AKIA, need 16
-    expect(result.redactions.filter(r => r.patternName === 'aws_access_key').length).toBe(0);
+    expect(result.redactions.filter((r) => r.patternName === 'aws_access_key').length).toBe(0);
   });
 });
 
@@ -36,13 +32,11 @@ describe('Secret: aws_secret_key', () => {
       'aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
     );
     expect(result.text).toContain('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'aws_secret_key')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'aws_secret_key')).toBe(true);
   });
 
   test('case insensitive matching', () => {
-    const result = detectSecrets(
-      'AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
-    );
+    const result = detectSecrets('AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY');
     expect(result.text).toContain('[SECRET_REDACTED]');
   });
 });
@@ -55,7 +49,7 @@ describe('Secret: stripe_secret', () => {
   test('TC-2-1-22: Stripe secret key', () => {
     const result = detectSecrets('sk_TESTONLY_abc123def456ghi789jkl012mnop');
     expect(result.text).toBe('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'stripe_secret')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'stripe_secret')).toBe(true);
   });
 
   // SKIP: stripe_secret regex `sk_(?:live|test|TESTONLY)_[a-zA-Z0-9]{24,}` matches
@@ -65,7 +59,7 @@ describe('Secret: stripe_secret', () => {
   // (PRD-016 triage: SKIP-WITH-NOTE)
   test.skip('Stripe test key not matched (sk_TESTONLY_)', () => {
     const result = detectSecrets('sk_TESTONLY_abc123def456ghi789jkl012');
-    expect(result.redactions.filter(r => r.patternName === 'stripe_secret').length).toBe(0);
+    expect(result.redactions.filter((r) => r.patternName === 'stripe_secret').length).toBe(0);
   });
 });
 
@@ -73,7 +67,7 @@ describe('Secret: stripe_publishable', () => {
   test('Stripe publishable key', () => {
     const result = detectSecrets('pk_TESTONLY_abc123def456ghi789jkl012mnop');
     expect(result.text).toBe('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'stripe_publishable')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'stripe_publishable')).toBe(true);
   });
 });
 
@@ -85,12 +79,12 @@ describe('Secret: github_pat', () => {
   test('TC-2-1-23: GitHub PAT', () => {
     const result = detectSecrets('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij');
     expect(result.text).toBe('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'github_pat')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'github_pat')).toBe(true);
   });
 
   test('too short GitHub PAT not matched', () => {
     const result = detectSecrets('ghp_short');
-    expect(result.redactions.filter(r => r.patternName === 'github_pat').length).toBe(0);
+    expect(result.redactions.filter((r) => r.patternName === 'github_pat').length).toBe(0);
   });
 });
 
@@ -116,7 +110,7 @@ describe('Secret: gitlab_pat', () => {
   test('TC-2-1-24: GitLab PAT', () => {
     const result = detectSecrets('glpat-abc123def456ghi789jk');
     expect(result.text).toBe('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'gitlab_pat')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'gitlab_pat')).toBe(true);
   });
 
   test('GitLab PAT with hyphens', () => {
@@ -140,7 +134,7 @@ describe('Secret: gcp_api_key', () => {
   test('TC-2-1-25: GCP API key', () => {
     const result = detectSecrets('AIzaSyA1234567890abcdefghijklmnopqrstuv');
     expect(result.text).toBe('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'gcp_api_key')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'gcp_api_key')).toBe(true);
   });
 });
 
@@ -155,17 +149,15 @@ describe('Secret: slack_bot_token', () => {
   test.skip('TC-2-1-26: Slack bot token', () => {
     const result = detectSecrets('xoxb-FAKE-0000000-ABCDEFGHIJKLMNOPQRSTUVWXyz');
     expect(result.text).toBe('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'slack_bot_token')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'slack_bot_token')).toBe(true);
   });
 });
 
 describe('Secret: slack_webhook', () => {
   test('TC-2-1-27: Slack webhook URL', () => {
-    const result = detectSecrets(
-      'https://hooks.slack.com/services/T12345/B67890/abcdef123456',
-    );
+    const result = detectSecrets('https://hooks.slack.com/services/T12345/B67890/abcdef123456');
     expect(result.text).toBe('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'slack_webhook')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'slack_webhook')).toBe(true);
   });
 });
 
@@ -175,11 +167,9 @@ describe('Secret: slack_webhook', () => {
 
 describe('Secret: generic_bearer', () => {
   test('TC-2-1-28: Bearer token', () => {
-    const result = detectSecrets(
-      'Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.abc.def',
-    );
+    const result = detectSecrets('Authorization: Bearer eyJhbGciOiJSUzI1NiJ9.abc.def');
     expect(result.text).toBe('Authorization: [SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'generic_bearer')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'generic_bearer')).toBe(true);
   });
 
   test('case insensitive Bearer', () => {
@@ -192,7 +182,7 @@ describe('Secret: basic_auth', () => {
   test('TC-2-1-29: Basic auth', () => {
     const result = detectSecrets('Authorization: Basic dXNlcjpwYXNz');
     expect(result.text).toBe('Authorization: [SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'basic_auth')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'basic_auth')).toBe(true);
   });
 });
 
@@ -204,7 +194,7 @@ describe('Secret: private_key_block', () => {
   test('TC-2-1-30: RSA private key block', () => {
     const result = detectSecrets('-----BEGIN RSA PRIVATE KEY-----');
     expect(result.text).toBe('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'private_key_block')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'private_key_block')).toBe(true);
   });
 
   test('EC private key block', () => {
@@ -220,7 +210,7 @@ describe('Secret: private_key_block', () => {
   test('public key not matched', () => {
     const input = '-----BEGIN PUBLIC KEY-----';
     const result = detectSecrets(input);
-    expect(result.redactions.filter(r => r.patternName === 'private_key_block').length).toBe(0);
+    expect(result.redactions.filter((r) => r.patternName === 'private_key_block').length).toBe(0);
   });
 });
 
@@ -238,13 +228,13 @@ describe('Secret: high entropy detection', () => {
     const result = detectSecrets('password=aaaaaaaaaaaaaaaaaaaaaa');
     // The env var pattern may match here since it ends with _PASSWORD-like patterns
     // but the entropy detector should NOT flag it
-    expect(result.redactions.filter(r => r.patternName === 'high_entropy').length).toBe(0);
+    expect(result.redactions.filter((r) => r.patternName === 'high_entropy').length).toBe(0);
   });
 
   test('TC-2-1-33: high entropy without context not flagged', () => {
     const input = 'random_data aB3$xY9!kL2@mN5^pQ8&rT1';
     const result = detectSecrets(input);
-    expect(result.redactions.filter(r => r.patternName === 'high_entropy').length).toBe(0);
+    expect(result.redactions.filter((r) => r.patternName === 'high_entropy').length).toBe(0);
   });
 });
 
@@ -277,7 +267,7 @@ describe('Secret: env_var', () => {
     const input = 'MY_CONFIG=some_value';
     const result = detectSecrets(input);
     // No _KEY, _SECRET, _TOKEN, or _PASSWORD suffix
-    expect(result.redactions.filter(r => r.patternName === 'env_var').length).toBe(0);
+    expect(result.redactions.filter((r) => r.patternName === 'env_var').length).toBe(0);
   });
 });
 
@@ -293,12 +283,9 @@ describe('Custom patterns', () => {
       regex: /myapi_[a-z0-9]{16}/g,
       replacement: '[SECRET_REDACTED]',
     };
-    const result = detectSecrets(
-      'token: myapi_abcdef1234567890',
-      [customPattern],
-    );
+    const result = detectSecrets('token: myapi_abcdef1234567890', [customPattern]);
     expect(result.text).toContain('[SECRET_REDACTED]');
-    expect(result.redactions.some(r => r.patternName === 'custom_api')).toBe(true);
+    expect(result.redactions.some((r) => r.patternName === 'custom_api')).toBe(true);
   });
 });
 
@@ -315,7 +302,7 @@ describe('Secret detector integration', () => {
     ].join('\n');
     const result = detectSecrets(input);
     expect(result.redactionCount).toBeGreaterThanOrEqual(3);
-    const patternNames = result.redactions.map(r => r.patternName);
+    const patternNames = result.redactions.map((r) => r.patternName);
     expect(patternNames).toContain('aws_access_key');
     expect(patternNames).toContain('github_pat');
     expect(patternNames).toContain('private_key_block');
@@ -336,7 +323,7 @@ describe('Secret detector integration', () => {
   });
 
   test('all 15 pattern names are present', () => {
-    const names = SECRET_PATTERNS.map(p => p.name);
+    const names = SECRET_PATTERNS.map((p) => p.name);
     expect(names).toEqual([
       'aws_access_key',
       'aws_secret_key',

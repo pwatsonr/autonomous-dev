@@ -15,7 +15,10 @@ import * as path from 'path';
 import { checkCooldown } from '../../src/governance/cooldown';
 import { checkOscillation } from '../../src/governance/oscillation';
 import { evaluateEffectiveness, computeImprovement } from '../../src/governance/effectiveness';
-import { writeEffectivenessResult, splitFrontmatterAndBody } from '../../src/governance/effectiveness-writeback';
+import {
+  writeEffectivenessResult,
+  splitFrontmatterAndBody,
+} from '../../src/governance/effectiveness-writeback';
 import type {
   GovernanceConfig,
   FixDeployment,
@@ -33,11 +36,7 @@ import {
   createObservationSeries,
   listObservations,
 } from '../helpers/mock-observations';
-import {
-  createMockDeployment,
-  readMockDeployment,
-  mockLogger,
-} from '../helpers/mock-deployments';
+import { createMockDeployment, readMockDeployment, mockLogger } from '../helpers/mock-deployments';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,7 +80,13 @@ async function applyGovernanceChecks(
     (svc, err) => {
       // Find the most recent fix deployment for this service+error
       // In integration tests, we scan mock deployments
-      return getDeployment(`DEPLOY-${svc}-${err}`) ?? getDeployment('DEPLOY-001') ?? getDeployment('DEPLOY-002') ?? getDeployment('DEPLOY-003') ?? null;
+      return (
+        getDeployment(`DEPLOY-${svc}-${err}`) ??
+        getDeployment('DEPLOY-001') ??
+        getDeployment('DEPLOY-002') ??
+        getDeployment('DEPLOY-003') ??
+        null
+      );
     },
     now,
   );
@@ -169,14 +174,25 @@ async function runEffectivenessEvaluations(
   prometheus: MockPrometheusClient,
   logger: ReturnType<typeof mockLogger>,
   now?: Date,
-): Promise<{ evaluated: number; improved: number; degraded: number; unchanged: number; pending: number }> {
+): Promise<{
+  evaluated: number;
+  improved: number;
+  degraded: number;
+  unchanged: number;
+  pending: number;
+}> {
   const observations = await listObservations(rootDir);
   const summary = { evaluated: 0, improved: 0, degraded: 0, unchanged: 0, pending: 0 };
 
   for (const obs of observations) {
     if (obs.triage_decision !== 'promote') continue;
     if (!obs.linked_deployment) continue;
-    if (obs.effectiveness === 'improved' || obs.effectiveness === 'degraded' || obs.effectiveness === 'unchanged') continue;
+    if (
+      obs.effectiveness === 'improved' ||
+      obs.effectiveness === 'degraded' ||
+      obs.effectiveness === 'unchanged'
+    )
+      continue;
 
     const candidate: EffectivenessCandidate = {
       id: obs.id,
@@ -292,7 +308,7 @@ describe('governance in runner lifecycle', () => {
     const summary = await runEffectivenessEvaluations(
       rootDir,
       defaultGovernanceConfig(),
-      (id) => id === 'DEPLOY-002' ? deployInfo : null,
+      (id) => (id === 'DEPLOY-002' ? deployInfo : null),
       prometheus,
       mockLogger(),
       clock.now(),
@@ -303,7 +319,7 @@ describe('governance in runner lifecycle', () => {
 
     // Verify file was updated
     const obs = await listObservations(rootDir);
-    const updated = obs.find(o => o.id === 'OBS-20260301-120000-ef01');
+    const updated = obs.find((o) => o.id === 'OBS-20260301-120000-ef01');
     expect(updated).toBeDefined();
     expect(updated!.effectiveness).toBe('improved');
   });

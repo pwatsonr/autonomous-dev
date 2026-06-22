@@ -23,10 +23,7 @@ import {
   type ChainHookInvoker,
   type ManifestLookup,
 } from '../../intake/chains/executor';
-import {
-  recoverPending,
-  StateStore,
-} from '../../intake/chains/state-store';
+import { recoverPending, StateStore } from '../../intake/chains/state-store';
 import {
   setChainMetricsClient,
   type ChainMetricsClient,
@@ -70,9 +67,7 @@ function manifests(): HookManifest[] {
     buildManifest({
       id: 'rule-set-enforcement-reviewer',
       version: '1.0.0',
-      produces: [
-        { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-      ],
+      produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
     }),
     buildManifest({
       id: 'code-fixer',
@@ -123,13 +118,7 @@ async function buildFindingsPayload(diff: string, requestId: string): Promise<un
 
 /** Read the canonical code-patches example to use as the fixer's payload. */
 async function loadPatchesExample(): Promise<unknown> {
-  const p = path.resolve(
-    __dirname,
-    '..',
-    'fixtures',
-    'artifacts',
-    'code-patches.example.json',
-  );
+  const p = path.resolve(__dirname, '..', 'fixtures', 'artifacts', 'code-patches.example.json');
   return JSON.parse(await fs.readFile(p, 'utf-8'));
 }
 
