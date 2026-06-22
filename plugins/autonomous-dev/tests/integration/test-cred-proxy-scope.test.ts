@@ -69,7 +69,6 @@ function makeAdminClients(kubeconfigPath: string, clusterName: string): K8sClien
   kc.loadFromFile(kubeconfigPath);
   const coreApi = kc.makeApiClient(k8s.CoreV1Api);
   const rbacApi = kc.makeApiClient(k8s.RbacAuthorizationV1Api);
-  const authApi = kc.makeApiClient(k8s.AuthenticationV1Api);
 
   // Adapt the @kubernetes/client-node v1 API surface to our structural
   // interfaces. The v1 client returns plain objects (no `.body` wrapper),
@@ -89,10 +88,14 @@ function makeAdminClients(kubeconfigPath: string, clusterName: string): K8sClien
       rbacApi.deleteNamespacedRoleBinding({ name, namespace: ns }),
   };
   const auth: AuthV1Like = {
+    // #573: TokenRequest creation lives on CoreV1Api in @kubernetes/client-node
+    // v1.x (`createNamespacedServiceAccountToken`), NOT AuthenticationV1Api —
+    // the old `authApi.createServiceAccountToken` is undefined in v1 and threw
+    // "is not a function". Object-param style matches the other core calls above.
     createServiceAccountToken: async (ns, sa, body) => {
-      const resp = await authApi.createServiceAccountToken({
-        namespace: ns,
+      const resp = await coreApi.createNamespacedServiceAccountToken({
         name: sa,
+        namespace: ns,
         body,
       });
       // v1 client returns the response object directly; surface as
