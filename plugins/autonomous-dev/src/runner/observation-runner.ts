@@ -21,6 +21,7 @@
 import * as path from 'path';
 import { generateRunId } from './run-id';
 import { AuditLogger } from './audit-logger';
+import { writeProductionIntelligence } from './production-intelligence-writer';
 import { LockManager } from './lock-manager';
 import type { LockManagerOptions } from './lock-manager';
 import { bootstrapDirectories } from './directory-bootstrap';
@@ -630,6 +631,17 @@ export class ObservationRunner {
     };
 
     await auditLog.writeMetadata(metadata);
+
+    // #562 / FR-938: persist a portal-facing summary of this completed cycle to
+    // the daemon-home state dir so the Ops surface can show last-run production
+    // intelligence. Best-effort — a write failure must NOT fail the observe run.
+    try {
+      await writeProductionIntelligence(metadata);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      auditLog.warn(`Failed to persist production-intelligence summary: ${msg}`);
+    }
+
     await auditLog.close();
 
     return metadata;

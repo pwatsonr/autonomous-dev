@@ -26,6 +26,7 @@ import { OpsAutopilotTile } from "../fragments/ops-autopilot-tile";
 import type { AutopilotStatus } from "../fragments/ops-autopilot-tile";
 import { OpsCostCeilingTile } from "../fragments/ops-cost-ceiling-tile";
 import { OpsDaemonTile } from "../fragments/ops-daemon-tile";
+import { OpsProductionIntelligenceTile } from "../fragments/ops-production-intelligence-tile";
 
 // Pre-computed hx-trigger value — using double quotes inside bracket expression.
 // Guard: skip the poll when a descendant of #ops-body has focus so that
@@ -154,6 +155,9 @@ export const OpsView: FC<OpsViewV3Props> = ({
                             lastHeartbeat={health.lastHeartbeat}
                             port={daemonPort}
                             csrfToken={csrfToken}
+                        />
+                        <OpsProductionIntelligenceTile
+                            productionIntelligence={health.productionIntelligence}
                         />
                     </div>
                 </section>
