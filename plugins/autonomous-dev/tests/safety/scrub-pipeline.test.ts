@@ -55,9 +55,7 @@ describe('TC-2-2-01: PII before secrets ordering', () => {
     expect(result.text).toBe('key=[REDACTED:email]');
     expect(result.redactions.some((r) => r.type === 'email')).toBe(true);
     // Should NOT have a secret redaction for the email
-    expect(
-      result.redactions.filter((r) => r.type === 'secret').length,
-    ).toBe(0);
+    expect(result.redactions.filter((r) => r.type === 'secret').length).toBe(0);
   });
 });
 
@@ -115,9 +113,7 @@ describe('TC-2-2-04: Post-scrub clean', () => {
     const input = 'a@b.com c@d.com e@f.com';
     const result = await scrub(input, config, context);
 
-    expect(result.text).toBe(
-      '[REDACTED:email] [REDACTED:email] [REDACTED:email]',
-    );
+    expect(result.text).toBe('[REDACTED:email] [REDACTED:email] [REDACTED:email]');
     expect(result.validation_passed).toBe(true);
     expect(result.redaction_count).toBe(3);
   });
@@ -374,9 +370,7 @@ describe('Pipeline ordering', () => {
 
     // Default PII patterns should still be present
     expect(config.pii_patterns.length).toBeGreaterThan(1);
-    expect(config.pii_patterns[config.pii_patterns.length - 1].name).toBe(
-      'test_custom',
-    );
+    expect(config.pii_patterns[config.pii_patterns.length - 1].name).toBe('test_custom');
   });
 });
 
@@ -387,29 +381,20 @@ describe('Pipeline ordering', () => {
 describe('detectResiduals', () => {
   test('returns empty array when no residuals found', () => {
     const config = defaultConfig();
-    const residuals = detectResiduals(
-      'clean text with [REDACTED:email] tokens',
-      config,
-    );
+    const residuals = detectResiduals('clean text with [REDACTED:email] tokens', config);
     expect(residuals).toEqual([]);
   });
 
   test('finds residual PII that was missed', () => {
     const config = defaultConfig();
-    const residuals = detectResiduals(
-      'clean text but also john@example.com',
-      config,
-    );
+    const residuals = detectResiduals('clean text but also john@example.com', config);
     expect(residuals.length).toBeGreaterThan(0);
     expect(residuals[0].pattern).toBe('email');
   });
 
   test('skips replacement tokens', () => {
     const config = defaultConfig();
-    const residuals = detectResiduals(
-      '[REDACTED:email] [SECRET_REDACTED]',
-      config,
-    );
+    const residuals = detectResiduals('[REDACTED:email] [SECRET_REDACTED]', config);
     expect(residuals).toEqual([]);
   });
 });

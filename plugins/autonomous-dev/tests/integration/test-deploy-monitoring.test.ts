@@ -18,13 +18,8 @@ import { CostLedger } from '../../intake/deploy/cost-ledger';
 import { CostCapEnforcer } from '../../intake/deploy/cost-cap-enforcer';
 import { DeployLogger } from '../../intake/deploy/logger';
 import { HealthMonitor } from '../../intake/deploy/monitor';
-import type {
-  DeploymentRecord,
-} from '../../intake/deploy/types';
-import type {
-  EscalationMessage,
-  SlaConfig,
-} from '../../intake/deploy/monitor-types';
+import type { DeploymentRecord } from '../../intake/deploy/types';
+import type { EscalationMessage, SlaConfig } from '../../intake/deploy/monitor-types';
 
 import { FakeBackend } from '../deploy/helpers/fake-backend';
 import { TEST_HMAC_KEY } from '../deploy/fixtures/cost-ledger-fixtures';

@@ -85,10 +85,7 @@ function makeStubBackend(opts: StubBackendOpts): DeploymentBackend {
         metadata: {},
       };
     },
-    async deploy(
-      artifact: BuildArtifact,
-      environment: string,
-    ): Promise<DeploymentRecord> {
+    async deploy(artifact: BuildArtifact, environment: string): Promise<DeploymentRecord> {
       return {
         deployId: `dep-${opts.name}-${Date.now()}`,
         backend: opts.name,
@@ -188,7 +185,9 @@ describe('SPEC-023-2-05 dev -> staging -> prod promotion', () => {
     __setApprovalClockForTest(null);
   });
 
-  function go(args: Partial<RunDeployArgs> & { deployId: string; envName: string }): ReturnType<typeof runDeploy> {
+  function go(
+    args: Partial<RunDeployArgs> & { deployId: string; envName: string },
+  ): ReturnType<typeof runDeploy> {
     const { deployId, envName, buildContext, ...rest } = args;
     return runDeploy({
       ...rest,
@@ -197,14 +196,16 @@ describe('SPEC-023-2-05 dev -> staging -> prod promotion', () => {
       requestDir,
       actor: 'test-actor',
       selectorRegistry,
-      buildContext: buildContext ?? ({
-        repoPath: requestDir,
-        commitSha: '0'.repeat(40),
-        branch: 'main',
-        requestId: deployId,
-        cleanWorktree: true,
-        params: {},
-      } satisfies BuildContext),
+      buildContext:
+        buildContext ??
+        ({
+          repoPath: requestDir,
+          commitSha: '0'.repeat(40),
+          branch: 'main',
+          requestId: deployId,
+          cleanWorktree: true,
+          params: {},
+        } satisfies BuildContext),
     });
   }
 
@@ -262,7 +263,11 @@ describe('SPEC-023-2-05 dev -> staging -> prod promotion', () => {
     // beyond the orchestrator's own registry/escalation pointers, which
     // are reset by setEscalationSink + makeStubRegistry calls below.
     resetEscalationSink();
-    setEscalationSink({ raise: (e) => { escalations.push(e); } });
+    setEscalationSink({
+      raise: (e) => {
+        escalations.push(e);
+      },
+    });
 
     await expect(
       recordApproval({

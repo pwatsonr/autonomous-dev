@@ -64,19 +64,10 @@ import {
   runMaliciousProducer,
   type MaliciousMode,
 } from '../chains/fixtures/malicious-producer';
-import type {
-  ChainAuditEntry,
-  ChainEventType,
-} from '../../intake/chains/audit-events';
+import type { ChainAuditEntry, ChainEventType } from '../../intake/chains/audit-events';
 import type { HookManifest } from '../../intake/hooks/types';
 
-const FIXTURE_SCHEMA_ROOT = path.resolve(
-  __dirname,
-  '..',
-  'chains',
-  'fixtures',
-  'schemas',
-);
+const FIXTURE_SCHEMA_ROOT = path.resolve(__dirname, '..', 'chains', 'fixtures', 'schemas');
 const KEYS_DIR = path.resolve(__dirname, '..', 'chains', 'fixtures', 'keys');
 
 // Stable HMAC key shared across the integration: matches the producer's
@@ -97,9 +88,7 @@ function ed25519SignerOf(privPem: string) {
   const key = createPrivateKey({ key: privPem, format: 'pem' });
   return {
     sign(_producer: string, canonical: string): string {
-      return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString(
-        'base64',
-      );
+      return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString('base64');
     },
   };
 }
@@ -137,9 +126,7 @@ async function readAuditEntries(p: string): Promise<ChainAuditEntry[]> {
     .map((l) => JSON.parse(l) as ChainAuditEntry);
 }
 
-function counts(
-  entries: ChainAuditEntry[],
-): Partial<Record<ChainEventType, number>> {
+function counts(entries: ChainAuditEntry[]): Partial<Record<ChainEventType, number>> {
   const out: Partial<Record<ChainEventType, number>> = {};
   for (const e of entries) {
     out[e.type] = (out[e.type] ?? 0) + 1;
@@ -180,9 +167,7 @@ function injectPathFormatOnFindingsFile(reg: ArtifactRegistry): void {
   }
   const fileSchema = entry.rawSchema.properties?.findings?.items?.properties?.file;
   if (!fileSchema) {
-    throw new Error(
-      'security-findings@1.0 schema missing findings[].file property',
-    );
+    throw new Error('security-findings@1.0 schema missing findings[].file property');
   }
   fileSchema.format = 'path';
 }
@@ -225,9 +210,7 @@ describe('SPEC-022-3-04 Block A: privileged chain happy path', () => {
       }),
       buildManifest({
         id: 'code-fixer',
-        consumes: [
-          { artifact_type: 'security-findings', schema_version: '^1.0' },
-        ],
+        consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
         produces: [
           {
             artifact_type: 'code-patches',
@@ -392,12 +375,7 @@ describe('SPEC-022-3-04 Block B: malicious-producer suite', () => {
    * consumer-read failure before any downstream output is written.
    */
   async function assertNoCodePatchesArtifact(): Promise<void> {
-    const dir = path.join(
-      tempRoot,
-      '.autonomous-dev',
-      'artifacts',
-      'code-patches',
-    );
+    const dir = path.join(tempRoot, '.autonomous-dev', 'artifacts', 'code-patches');
     let exists = true;
     try {
       const entries = await fs.readdir(dir);
@@ -479,12 +457,8 @@ describe('SPEC-022-3-04 Block B: malicious-producer suite', () => {
       tempRoot,
     );
     // Strict-schema strip: extra_data is gone from the consumer view.
-    expect(
-      (out.payload as Record<string, unknown>).extra_data,
-    ).toBeUndefined();
-    expect(
-      (out.payload as { findings: unknown[] }).findings,
-    ).toHaveLength(1);
+    expect((out.payload as Record<string, unknown>).extra_data).toBeUndefined();
+    expect((out.payload as { findings: unknown[] }).findings).toHaveLength(1);
 
     await writer.close();
     const entries = await readAuditEntries(auditPath);
@@ -540,9 +514,7 @@ describe('SPEC-022-3-04 Block B: malicious-producer suite', () => {
     expect(verifyChain(entries, AUDIT_KEY)).toEqual({ ok: true });
     const failed = entries.find((e) => e.type === 'plugin_failed');
     expect(failed).toBeDefined();
-    expect(
-      (failed!.payload as { error_code: string }).error_code,
-    ).toBe('SANITIZATION_FAILED');
+    expect((failed!.payload as { error_code: string }).error_code).toBe('SANITIZATION_FAILED');
     await assertNoCodePatchesArtifact();
   });
 
@@ -586,9 +558,7 @@ describe('SPEC-022-3-04 Block B: malicious-producer suite', () => {
     expect(verifyChain(entries, AUDIT_KEY)).toEqual({ ok: true });
     const failed = entries.find((e) => e.type === 'plugin_failed');
     expect(failed).toBeDefined();
-    expect(
-      (failed!.payload as { error_code: string }).error_code,
-    ).toBe('ARTIFACT_TAMPERED');
+    expect((failed!.payload as { error_code: string }).error_code).toBe('ARTIFACT_TAMPERED');
     await assertNoCodePatchesArtifact();
   });
 
@@ -635,9 +605,7 @@ describe('SPEC-022-3-04 Block B: malicious-producer suite', () => {
     expect(verifyChain(entries, AUDIT_KEY)).toEqual({ ok: true });
     const failed = entries.find((e) => e.type === 'plugin_failed');
     expect(failed).toBeDefined();
-    expect(
-      (failed!.payload as { error_code: string }).error_code,
-    ).toBe('CapabilityError');
+    expect((failed!.payload as { error_code: string }).error_code).toBe('CapabilityError');
     // The malicious producer never persisted its OWN security-findings
     // artifact (it threw before persist), and code-patches was the seed
     // we manually planted — so no NEW code-patches artifact came from
@@ -685,10 +653,9 @@ describe('SPEC-022-3-04 Block B: malicious-producer suite', () => {
     expect(verifyChain(entries, AUDIT_KEY)).toEqual({ ok: true });
     const failed = entries.find((e) => e.type === 'plugin_failed');
     expect(failed).toBeDefined();
-    expect(
-      (failed!.payload as { error_code: string }).error_code,
-    ).toBe('PRIVILEGED_SIGNATURE_FAILED');
+    expect((failed!.payload as { error_code: string }).error_code).toBe(
+      'PRIVILEGED_SIGNATURE_FAILED',
+    );
     await assertNoCodePatchesArtifact();
   });
 });
-

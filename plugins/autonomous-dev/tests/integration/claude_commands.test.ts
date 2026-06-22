@@ -84,9 +84,7 @@ function parseCommandFile(filePath: string): ParsedCommand {
   // Frontmatter delimiters: a leading `---` line and a trailing `---` line.
   const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) {
-    throw new Error(
-      `${filePath}: missing YAML frontmatter (expected --- ... --- at top)`,
-    );
+    throw new Error(`${filePath}: missing YAML frontmatter (expected --- ... --- at top)`);
   }
   const frontmatter = yaml.load(match[1]) as CommandFrontmatter;
   const body = match[2];
@@ -95,10 +93,7 @@ function parseCommandFile(filePath: string): ParsedCommand {
 
 /** Load `_shared/arg_schemas.yaml` as a plain map. */
 function loadArgSchemas(): Record<Subcommand, FrontmatterArgument[]> {
-  const raw = fs.readFileSync(
-    path.join(SHARED_DIR, 'arg_schemas.yaml'),
-    'utf8',
-  );
+  const raw = fs.readFileSync(path.join(SHARED_DIR, 'arg_schemas.yaml'), 'utf8');
   return yaml.load(raw) as Record<Subcommand, FrontmatterArgument[]>;
 }
 
@@ -118,9 +113,7 @@ describe('Claude App slash command discovery (SPEC-011-2-03)', () => {
 
   test('_shared/ directory contains the bridge proxy and reference YAML', () => {
     expect(fs.existsSync(path.join(SHARED_DIR, 'bridge_proxy.sh'))).toBe(true);
-    expect(fs.existsSync(path.join(SHARED_DIR, 'command_template.yaml'))).toBe(
-      true,
-    );
+    expect(fs.existsSync(path.join(SHARED_DIR, 'command_template.yaml'))).toBe(true);
     expect(fs.existsSync(path.join(SHARED_DIR, 'arg_schemas.yaml'))).toBe(true);
   });
 
@@ -213,9 +206,7 @@ describe('Claude App slash command discovery (SPEC-011-2-03)', () => {
       expect(body).toMatch(/```bash\s*\n[\s\S]*```/);
       expect(body).toMatch(/_shared\/bridge_proxy\.sh/);
       // The first arg to bridge_proxy_invoke must be the subcommand string.
-      const invokeRegex = new RegExp(
-        `bridge_proxy_invoke\\s+["']${sub}["']`,
-      );
+      const invokeRegex = new RegExp(`bridge_proxy_invoke\\s+["']${sub}["']`);
       expect(body).toMatch(invokeRegex);
     });
   });
@@ -225,12 +216,8 @@ describe('Claude App slash command discovery (SPEC-011-2-03)', () => {
   // -----------------------------------------------------------------------
 
   test('no extra autonomous-dev-*.md files beyond the documented 10', () => {
-    const entries = fs
-      .readdirSync(COMMANDS_DIR)
-      .filter((f) => /^autonomous-dev-.+\.md$/.test(f));
-    const stems = entries
-      .map((f) => f.replace(/^autonomous-dev-|\.md$/g, ''))
-      .sort();
+    const entries = fs.readdirSync(COMMANDS_DIR).filter((f) => /^autonomous-dev-.+\.md$/.test(f));
+    const stems = entries.map((f) => f.replace(/^autonomous-dev-|\.md$/g, '')).sort();
     const expected = [...EXPECTED_SUBCOMMANDS].sort();
     expect(stems).toEqual(expected);
   });

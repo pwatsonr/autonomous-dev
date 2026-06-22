@@ -119,10 +119,9 @@ describe('detectHighEntropySecrets', () => {
   });
 
   test('handles multiple secrets in one text', () => {
-    const input = [
-      'password=aB3$xY9!kL2@mN5^pQ8&rT1',
-      'token=zX4%wQ7#jR2!nM6*tP9&yV1bKaZ',
-    ].join('\n');
+    const input = ['password=aB3$xY9!kL2@mN5^pQ8&rT1', 'token=zX4%wQ7#jR2!nM6*tP9&yV1bKaZ'].join(
+      '\n',
+    );
     const redactions = detectHighEntropySecrets(input);
     expect(redactions.length).toBe(2);
   });

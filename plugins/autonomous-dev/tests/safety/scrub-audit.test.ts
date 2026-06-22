@@ -8,11 +8,7 @@
  */
 
 import { ScrubAuditLogger, InMemoryAuditLogger } from '../../src/safety/scrub-audit';
-import type {
-  ScrubAuditEntry,
-  ScrubContext,
-  ScrubResult,
-} from '../../src/safety/types';
+import type { ScrubAuditEntry, ScrubContext, ScrubResult } from '../../src/safety/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -117,9 +113,7 @@ describe('TC-2-2-09: Audit log format', () => {
     const logger = new ScrubAuditLogger(backend);
 
     const result = makeScrubResult({
-      redactions: [
-        { type: 'email', position: 0, original_length: 15 },
-      ],
+      redactions: [{ type: 'email', position: 0, original_length: 15 }],
       redaction_count: 1,
     });
 
@@ -296,18 +290,9 @@ describe('Multiple audit entries', () => {
     const backend = new InMemoryAuditLogger();
     const logger = new ScrubAuditLogger(backend);
 
-    logger.logScrub(
-      makeScrubResult({ processing_time_ms: 10 }),
-      makeContext({ runId: 'RUN-1' }),
-    );
-    logger.logScrub(
-      makeScrubResult({ processing_time_ms: 20 }),
-      makeContext({ runId: 'RUN-2' }),
-    );
-    logger.logScrub(
-      makeScrubResult({ processing_time_ms: 30 }),
-      makeContext({ runId: 'RUN-3' }),
-    );
+    logger.logScrub(makeScrubResult({ processing_time_ms: 10 }), makeContext({ runId: 'RUN-1' }));
+    logger.logScrub(makeScrubResult({ processing_time_ms: 20 }), makeContext({ runId: 'RUN-2' }));
+    logger.logScrub(makeScrubResult({ processing_time_ms: 30 }), makeContext({ runId: 'RUN-3' }));
 
     expect(backend.entries).toHaveLength(3);
     expect(backend.entries[0].run_id).toBe('RUN-1');

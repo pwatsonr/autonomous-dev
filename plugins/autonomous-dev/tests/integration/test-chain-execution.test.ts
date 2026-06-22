@@ -48,16 +48,12 @@ describe('chain execution integration', () => {
     return [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
         consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
-        produces: [
-          { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'code-patches', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'audit-logger',
@@ -76,9 +72,7 @@ describe('chain execution integration', () => {
     const sentinelPath = path.join(tempRoot, '.autonomous-dev', 'audit-ran');
     const invoker: ChainHookInvoker = async (pid) => {
       if (pid === 'code-fixer') {
-        return [
-          { artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample }];
       }
       if (pid === 'audit-logger') {
         await fs.mkdir(path.dirname(sentinelPath), { recursive: true });
@@ -191,7 +185,6 @@ describe('chain execution integration', () => {
   // Daemon-spawn variant — Bun is not on PATH in this sandbox; SPEC-022-1-05
   // calls out that the daemon-spawn path lands in a follow-up. The
   // in-process variant above already exercises every primitive end-to-end.
-  // eslint-disable-next-line jest/no-disabled-tests
   it.skip('runs a 3-plugin chain end-to-end through the spawned daemon (Bun not on PATH)', () => {
     // Intentionally skipped: requires `spawnDaemon` from SPEC-019-1-05's
     // helpers + Bun on PATH for the daemon binary.

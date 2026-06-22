@@ -52,20 +52,16 @@ export function hasKind(): boolean {
  * collide. The caller MUST `cluster.destroy()` in `afterAll` (best-effort
  * cleanup; idempotent).
  */
-export function startKindCluster(
-  name = `cred-proxy-${Date.now()}`,
-): KindCluster {
+export function startKindCluster(name = `cred-proxy-${Date.now()}`): KindCluster {
   if (!hasKind()) {
     throw new Error(
-      'kind binary not on PATH; run `brew install kind` or see ' +
-        'docs/testing/kind-setup.md',
+      'kind binary not on PATH; run `brew install kind` or see ' + 'docs/testing/kind-setup.md',
     );
   }
   // `--wait 60s` blocks until the control-plane node reports Ready.
-  execSync(
-    `kind create cluster --name ${name} --image ${KIND_NODE_IMAGE} --wait 60s`,
-    { stdio: 'inherit' },
-  );
+  execSync(`kind create cluster --name ${name} --image ${KIND_NODE_IMAGE} --wait 60s`, {
+    stdio: 'inherit',
+  });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kind-kc-'));
   const kc = path.join(tmp, 'kubeconfig');
   // Capture the kubeconfig to a dedicated file rather than relying on the

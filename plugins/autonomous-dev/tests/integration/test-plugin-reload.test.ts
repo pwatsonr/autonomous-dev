@@ -37,13 +37,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import {
-  cpSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -203,79 +197,71 @@ describe('plugin-reload CLI (integration, SPEC-030-3-03)', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it(
-    'reloads a plugin without restarting the daemon (exit 0, PID unchanged, v1.1.0)',
-    async () => {
-      // 1. Spawn the daemon shim and capture its PID once it is ready.
-      daemon = spawnDaemonShim();
-      await waitForReady(daemon, 3_000);
-      const pidBefore = daemon.pid;
-      expect(typeof pidBefore).toBe('number');
-      expect(isAlive(pidBefore!)).toBe(true);
+  it('reloads a plugin without restarting the daemon (exit 0, PID unchanged, v1.1.0)', async () => {
+    // 1. Spawn the daemon shim and capture its PID once it is ready.
+    daemon = spawnDaemonShim();
+    await waitForReady(daemon, 3_000);
+    const pidBefore = daemon.pid;
+    expect(typeof pidBefore).toBe('number');
+    expect(isAlive(pidBefore!)).toBe(true);
 
-      // 2. Pre-state: hook reports v1.0.0.
-      const preLogger = makeLogger();
-      const preCode = await dispatch([PLUGIN_NAME], {
-        logger: preLogger,
-        pluginReload: makeFsHook(pidBefore!, manifestPath),
-      });
-      expect(preCode).toBe(0);
-      expect(preLogger.out.join('\n')).toMatch(/1\.0\.0/);
+    // 2. Pre-state: hook reports v1.0.0.
+    const preLogger = makeLogger();
+    const preCode = await dispatch([PLUGIN_NAME], {
+      logger: preLogger,
+      pluginReload: makeFsHook(pidBefore!, manifestPath),
+    });
+    expect(preCode).toBe(0);
+    expect(preLogger.out.join('\n')).toMatch(/1\.0\.0/);
 
-      // 3. Bump manifest on disk to v1.1.0.
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-      manifest.version = '1.1.0';
-      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+    // 3. Bump manifest on disk to v1.1.0.
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+    manifest.version = '1.1.0';
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
-      // 4. Capture PID immediately before the reload (≤100 ms window).
-      const tBeforeReload = Date.now();
-      expect(daemon.pid).toBe(pidBefore);
-      expect(isAlive(pidBefore!)).toBe(true);
+    // 4. Capture PID immediately before the reload (≤100 ms window).
+    const tBeforeReload = Date.now();
+    expect(daemon.pid).toBe(pidBefore);
+    expect(isAlive(pidBefore!)).toBe(true);
 
-      // 5. Invoke the dispatcher with the same hook.
-      const logger = makeLogger();
-      const code = await dispatch([PLUGIN_NAME], {
-        logger,
-        pluginReload: makeFsHook(pidBefore!, manifestPath),
-      });
+    // 5. Invoke the dispatcher with the same hook.
+    const logger = makeLogger();
+    const code = await dispatch([PLUGIN_NAME], {
+      logger,
+      pluginReload: makeFsHook(pidBefore!, manifestPath),
+    });
 
-      // 6. Assertions: exit 0, stdout reports new version, PID unchanged,
-      // window is well under 100 ms (no daemon self-restart possible since
-      // the shim has no restart logic).
-      const tAfterReload = Date.now();
-      expect(code).toBe(0);
-      expect(logger.out.join('\n')).toMatch(/1\.1\.0/);
-      expect(daemon.pid).toBe(pidBefore);
-      expect(isAlive(pidBefore!)).toBe(true);
-      expect(daemon.exitCode).toBeNull();
-      expect(tAfterReload - tBeforeReload).toBeLessThan(100);
-    },
-    8_000,
-  );
+    // 6. Assertions: exit 0, stdout reports new version, PID unchanged,
+    // window is well under 100 ms (no daemon self-restart possible since
+    // the shim has no restart logic).
+    const tAfterReload = Date.now();
+    expect(code).toBe(0);
+    expect(logger.out.join('\n')).toMatch(/1\.1\.0/);
+    expect(daemon.pid).toBe(pidBefore);
+    expect(isAlive(pidBefore!)).toBe(true);
+    expect(daemon.exitCode).toBeNull();
+    expect(tAfterReload - tBeforeReload).toBeLessThan(100);
+  }, 8_000);
 
-  it(
-    'returns exit 1 within 2 s when the daemon is not running',
-    async () => {
-      // Spawn a daemon, wait for ready, kill it, then drive dispatch().
-      daemon = spawnDaemonShim();
-      await waitForReady(daemon, 3_000);
-      const deadPid = daemon.pid!;
-      daemon.kill('SIGTERM');
-      await waitForExit(daemon, 2_000);
-      // After SIGTERM the PID slot is freed; isAlive(deadPid) === false.
+  it('returns exit 1 within 2 s when the daemon is not running', async () => {
+    // Spawn a daemon, wait for ready, kill it, then drive dispatch().
+    daemon = spawnDaemonShim();
+    await waitForReady(daemon, 3_000);
+    const deadPid = daemon.pid!;
+    daemon.kill('SIGTERM');
+    await waitForExit(daemon, 2_000);
+    // After SIGTERM the PID slot is freed; isAlive(deadPid) === false.
 
-      const logger = makeLogger();
-      const start = Date.now();
-      const code = await dispatch([PLUGIN_NAME], {
-        logger,
-        pluginReload: makeFsHook(deadPid, manifestPath),
-      });
-      const elapsed = Date.now() - start;
+    const logger = makeLogger();
+    const start = Date.now();
+    const code = await dispatch([PLUGIN_NAME], {
+      logger,
+      pluginReload: makeFsHook(deadPid, manifestPath),
+    });
+    const elapsed = Date.now() - start;
 
-      expect(code).toBe(1);
-      expect(elapsed).toBeLessThan(2_000);
-      expect(logger.err.join('\n')).toMatch(/transient|ECONNREFUSED|unreachable/i);
-    },
-    5_000,
-  );
+    expect(code).toBe(1);
+    expect(elapsed).toBeLessThan(2_000);
+    expect(logger.err.join('\n')).toMatch(/transient|ECONNREFUSED|unreachable/i);
+  }, 5_000);
 });

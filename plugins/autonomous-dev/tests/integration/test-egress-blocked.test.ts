@@ -126,11 +126,17 @@ describeMaybe('egress firewall enforcement (integration)', () => {
     await fixture.waitForLine((l) => l === 'ready', 10_000);
 
     fixture.send('httpbin.org');
-    const okLine = await fixture.waitForLine((l) => l.startsWith('OK httpbin.org') || l.startsWith('ERR httpbin.org'), 15_000);
+    const okLine = await fixture.waitForLine(
+      (l) => l.startsWith('OK httpbin.org') || l.startsWith('ERR httpbin.org'),
+      15_000,
+    );
     expect(okLine.startsWith('OK httpbin.org')).toBe(true);
 
     fixture.send('evil.example.com');
-    const blockedLine = await fixture.waitForLine((l) => l.startsWith('ERR evil.example.com'), 15_000);
+    const blockedLine = await fixture.waitForLine(
+      (l) => l.startsWith('ERR evil.example.com'),
+      15_000,
+    );
     const code = blockedLine.split(' ')[2];
     expect(code).toBeTruthy();
     expect(ACCEPTABLE_BLOCK_CODES.has(code)).toBe(true);

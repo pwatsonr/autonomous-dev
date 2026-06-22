@@ -70,11 +70,7 @@ async function runMockObservation(
   // Process each mock response through the scrubbing pipeline
   for (const response of mockResponses) {
     const scrubbedContent = scrubFull(response.content);
-    await fs.writeFile(
-      path.join(observationsDir, response.filename),
-      scrubbedContent,
-      'utf-8',
-    );
+    await fs.writeFile(path.join(observationsDir, response.filename), scrubbedContent, 'utf-8');
   }
 }
 
@@ -113,12 +109,7 @@ function generateMetricsReport(values: string[]): string {
 }
 
 function generateLogsReport(values: string[]): string {
-  const lines = [
-    '# Log Analysis Report',
-    '',
-    '## Error Patterns',
-    '',
-  ];
+  const lines = ['# Log Analysis Report', '', '## Error Patterns', ''];
 
   for (let i = 0; i < values.length; i++) {
     lines.push(`[ERROR] Authentication failed for ${values[i]} - invalid credentials`);
@@ -130,12 +121,7 @@ function generateLogsReport(values: string[]): string {
 }
 
 function generateAlertsReport(values: string[]): string {
-  const lines = [
-    '# Alerts Report',
-    '',
-    '## Active Alerts',
-    '',
-  ];
+  const lines = ['# Alerts Report', '', '## Active Alerts', ''];
 
   for (let i = 0; i < values.length; i++) {
     lines.push(`**Alert ${i + 1}**: Credential exposure detected — ${values[i]}`);
@@ -242,10 +228,7 @@ describe('Security Audit Tests', () => {
     expect(files.length).toBeGreaterThan(0);
 
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const pii of knownPII) {
         expect(content).not.toContain(pii);
       }
@@ -253,21 +236,14 @@ describe('Security Audit Tests', () => {
   });
 
   test('PII leak audit — emails are scrubbed to [REDACTED:email]', async () => {
-    const piiEmails = [
-      'admin@company.com',
-      'user+tag@example.org',
-      'first.last@sub.domain.co.uk',
-    ];
+    const piiEmails = ['admin@company.com', 'user+tag@example.org', 'first.last@sub.domain.co.uk'];
 
     const observationsDir = path.join(tempDir, 'observations-email');
     await runMockObservation(piiEmails, observationsDir);
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const email of piiEmails) {
         expect(content).not.toContain(email);
       }
@@ -284,10 +260,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const phone of phones) {
         expect(content).not.toContain(phone);
       }
@@ -302,10 +275,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const ssn of ssns) {
         expect(content).not.toContain(ssn);
       }
@@ -320,10 +290,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const card of cards) {
         expect(content).not.toContain(card);
       }
@@ -338,10 +305,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const ip of ips) {
         expect(content).not.toContain(ip);
       }
@@ -366,10 +330,7 @@ describe('Security Audit Tests', () => {
     expect(files.length).toBeGreaterThan(0);
 
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const secret of knownSecrets) {
         expect(content).not.toContain(secret);
       }
@@ -387,10 +348,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const token of bearerTokens) {
         expect(content).not.toContain(token);
       }
@@ -398,20 +356,14 @@ describe('Security Audit Tests', () => {
   });
 
   test('secret leak audit — private key markers are scrubbed', async () => {
-    const keys = [
-      '-----BEGIN RSA PRIVATE KEY-----',
-      '-----BEGIN EC PRIVATE KEY-----',
-    ];
+    const keys = ['-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN EC PRIVATE KEY-----'];
 
     const observationsDir = path.join(tempDir, 'observations-privkey');
     await runMockObservation(keys, observationsDir);
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const key of keys) {
         expect(content).not.toContain(key);
       }
@@ -426,10 +378,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const token of tokens) {
         expect(content).not.toContain(token);
       }
@@ -448,10 +397,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const token of tokens) {
         expect(content).not.toContain(token);
       }
@@ -466,10 +412,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const key of keys) {
         expect(content).not.toContain(key);
       }
@@ -478,12 +421,12 @@ describe('Security Audit Tests', () => {
 
   test('secret leak audit — mixed PII and secrets all scrubbed', async () => {
     const mixed = [
-      'john@example.com',                                     // PII: email
-      '123-45-6789',                                          // PII: SSN
-      'AKIAIOSFODNN7EXAMPLE',                                 // Secret: AWS key
-      'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij',            // Secret: GitHub PAT
-      '192.168.1.100',                                        // PII: IPv4
-      'Bearer eyJhbGciOiJSUzI1NiJ9.abc.def',                 // Secret: Bearer
+      'john@example.com', // PII: email
+      '123-45-6789', // PII: SSN
+      'AKIAIOSFODNN7EXAMPLE', // Secret: AWS key
+      'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij', // Secret: GitHub PAT
+      '192.168.1.100', // PII: IPv4
+      'Bearer eyJhbGciOiJSUzI1NiJ9.abc.def', // Secret: Bearer
     ];
 
     const observationsDir = path.join(tempDir, 'observations-mixed');
@@ -491,10 +434,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
       for (const val of mixed) {
         expect(content).not.toContain(val);
       }
@@ -548,21 +488,14 @@ describe('Security Audit Tests', () => {
     const observationsDir = path.join(tempDir, 'observations-credscan');
 
     // Generate "clean" observation reports (no injected secrets)
-    const cleanValues = [
-      'user-42',
-      'order-12345',
-      'request-abc-def',
-    ];
+    const cleanValues = ['user-42', 'order-12345', 'request-abc-def'];
     await runMockObservation(cleanValues, observationsDir);
 
     const files = await fs.readdir(observationsDir);
     expect(files.length).toBeGreaterThan(0);
 
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
 
       // None of these credential patterns should appear
       expect(content).not.toMatch(/AKIA[0-9A-Z]{16}/);
@@ -593,10 +526,7 @@ describe('Security Audit Tests', () => {
 
     const files = await fs.readdir(observationsDir);
     for (const file of files) {
-      const content = await fs.readFile(
-        path.join(observationsDir, file),
-        'utf-8',
-      );
+      const content = await fs.readFile(path.join(observationsDir, file), 'utf-8');
 
       // After scrubbing, no credential patterns should remain
       expect(content).not.toMatch(/AKIA[0-9A-Z]{16}/);
@@ -617,30 +547,30 @@ describe('Security Audit Tests', () => {
   test.skip('end-to-end: all 26 pattern types covered by scrubbing', () => {
     // Comprehensive input with every pattern type
     const input = [
-      'john@example.com',                                               // email
-      '(555) 123-4567',                                                 // phone_us
-      '+44 79111234',                                                   // phone_intl
-      '123-45-6789',                                                    // ssn
-      '4111-1111-1111-1111',                                            // credit_card
-      '3782 822463 10005',                                              // credit_card_amex
-      '192.168.1.100',                                                  // ipv4
-      '2001:0db8:85a3:0000:0000:8a2e:0370:7334',                       // ipv6_full
-      'fe80::1',                                                        // ipv6_compressed
-      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.abc123def456',        // jwt
-      'AKIAIOSFODNN7EXAMPLE',                                           // aws_access_key
-      'sk_TESTONLY_abc123def456ghi789jkl012mnop',                           // stripe_secret
-      'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij',                      // github_pat
-      'Bearer sometoken123456789',                                      // generic_bearer
-      'Basic dXNlcjpwYXNz',                                            // basic_auth
-      '-----BEGIN RSA PRIVATE KEY-----',                                // private_key_block
-      'glpat-abc123def456ghi789jk',                                     // gitlab_pat
-      'ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij',                      // github_app
-      'gho_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij',                      // github_oauth
-      'AIzaSyA1234567890abcdefghijklmnopqrstuv',                        // gcp_api_key
-      'xoxb-FAKE-0000000-ABCDEFGHIJKLMNOPQRSTUVWXyz',                    // slack_bot_token
-      'https://hooks.slack.com/services/T12345/B67890/abcdef123456',    // slack_webhook
-      'MY_SECRET_KEY=super-secret-value123',                            // env_var
-      'password=aB3$xY9!kL2@mN5^pQ8&rT1',                              // high_entropy
+      'john@example.com', // email
+      '(555) 123-4567', // phone_us
+      '+44 79111234', // phone_intl
+      '123-45-6789', // ssn
+      '4111-1111-1111-1111', // credit_card
+      '3782 822463 10005', // credit_card_amex
+      '192.168.1.100', // ipv4
+      '2001:0db8:85a3:0000:0000:8a2e:0370:7334', // ipv6_full
+      'fe80::1', // ipv6_compressed
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.abc123def456', // jwt
+      'AKIAIOSFODNN7EXAMPLE', // aws_access_key
+      'sk_TESTONLY_abc123def456ghi789jkl012mnop', // stripe_secret
+      'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij', // github_pat
+      'Bearer sometoken123456789', // generic_bearer
+      'Basic dXNlcjpwYXNz', // basic_auth
+      '-----BEGIN RSA PRIVATE KEY-----', // private_key_block
+      'glpat-abc123def456ghi789jk', // gitlab_pat
+      'ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij', // github_app
+      'gho_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij', // github_oauth
+      'AIzaSyA1234567890abcdefghijklmnopqrstuv', // gcp_api_key
+      'xoxb-FAKE-0000000-ABCDEFGHIJKLMNOPQRSTUVWXyz', // slack_bot_token
+      'https://hooks.slack.com/services/T12345/B67890/abcdef123456', // slack_webhook
+      'MY_SECRET_KEY=super-secret-value123', // env_var
+      'password=aB3$xY9!kL2@mN5^pQ8&rT1', // high_entropy
     ].join('\n');
 
     const result = scrubFull(input);
