@@ -273,8 +273,12 @@ jobs:
         working-directory: plugins/autonomous-dev-portal
         run: bun install --frozen-lockfile
 
+      # `lcov` writes coverage/lcov.info + coverage/lcov-report/ (the paths the
+      # upload step below expects). The old `text-lcov` reporter only streamed
+      # LCOV to stdout, so coverage/lcov.info never existed and the upload's
+      # `if-no-files-found: error` failed the whole job (#570).
       - name: Run Jest with coverage
-        run: npm test -- --coverage --coverageReporters=text-lcov --coverageReporters=html
+        run: npm test -- --coverage --coverageReporters=lcov --coverageReporters=text
 
       - name: Upload coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 20
