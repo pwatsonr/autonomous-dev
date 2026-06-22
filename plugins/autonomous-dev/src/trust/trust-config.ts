@@ -14,8 +14,8 @@
  *   - auto_demotion.window_hours must be a positive number (default: 24)
  */
 
-import type { TrustConfig, TrustLevel, RepositoryTrustConfig } from "./types";
-import { isTrustLevel } from "./types";
+import type { TrustConfig, TrustLevel, RepositoryTrustConfig } from './types';
+import { isTrustLevel } from './types';
 
 // ---------------------------------------------------------------------------
 // Default config
@@ -96,7 +96,7 @@ export class TrustConfigLoader {
   load(): TrustConfig {
     const raw = this.configProvider.getTrustSection();
 
-    if (raw === undefined || raw === null || typeof raw !== "object") {
+    if (raw === undefined || raw === null || typeof raw !== 'object') {
       if (!this.hasLoadedOnce) {
         this.currentConfig = { ...DEFAULT_TRUST_CONFIG };
         this.hasLoadedOnce = true;
@@ -148,10 +148,10 @@ export class TrustConfigLoader {
   private handleConfigChange(): void {
     const raw = this.configProvider.getTrustSection();
 
-    if (raw === undefined || raw === null || typeof raw !== "object") {
+    if (raw === undefined || raw === null || typeof raw !== 'object') {
       // New config is absent/invalid -- retain previous
       console.error(
-        "[TrustConfigLoader] Config change detected but trust section is missing or invalid. Retaining previous config.",
+        '[TrustConfigLoader] Config change detected but trust section is missing or invalid. Retaining previous config.',
       );
       return;
     }
@@ -165,7 +165,7 @@ export class TrustConfigLoader {
       }
     } catch (err) {
       console.error(
-        "[TrustConfigLoader] Config change detected but validation failed. Retaining previous config.",
+        '[TrustConfigLoader] Config change detected but validation failed. Retaining previous config.',
         err,
       );
     }
@@ -182,9 +182,7 @@ export class TrustConfigLoader {
     const config: TrustConfig = { ...DEFAULT_TRUST_CONFIG };
 
     // -- system_default_level --
-    config.system_default_level = this.validateSystemDefaultLevel(
-      raw.system_default_level,
-    );
+    config.system_default_level = this.validateSystemDefaultLevel(raw.system_default_level);
 
     // -- repositories --
     config.repositories = this.validateRepositories(raw.repositories);
@@ -220,10 +218,8 @@ export class TrustConfigLoader {
    * Validate the repositories map. Each entry must have a valid default_level.
    * Invalid entries are skipped with a warning; valid entries are preserved.
    */
-  private validateRepositories(
-    value: unknown,
-  ): Record<string, RepositoryTrustConfig> {
-    if (value === undefined || value === null || typeof value !== "object") {
+  private validateRepositories(value: unknown): Record<string, RepositoryTrustConfig> {
+    if (value === undefined || value === null || typeof value !== 'object') {
       return {};
     }
 
@@ -231,14 +227,8 @@ export class TrustConfigLoader {
     const rawRepos = value as Record<string, unknown>;
 
     for (const [repoId, repoConfig] of Object.entries(rawRepos)) {
-      if (
-        repoConfig === null ||
-        repoConfig === undefined ||
-        typeof repoConfig !== "object"
-      ) {
-        console.warn(
-          `[TrustConfigLoader] Invalid repository config for "${repoId}". Skipping.`,
-        );
+      if (repoConfig === null || repoConfig === undefined || typeof repoConfig !== 'object') {
+        console.warn(`[TrustConfigLoader] Invalid repository config for "${repoId}". Skipping.`);
         continue;
       }
 
@@ -262,23 +252,20 @@ export class TrustConfigLoader {
    * - failure_threshold must be a positive integer (default: 3)
    * - window_hours must be a positive number (default: 24)
    */
-  private validateAutoDemotion(
-    value: unknown,
-  ): TrustConfig["auto_demotion"] {
+  private validateAutoDemotion(value: unknown): TrustConfig['auto_demotion'] {
     const defaults = DEFAULT_TRUST_CONFIG.auto_demotion;
 
-    if (value === undefined || value === null || typeof value !== "object") {
+    if (value === undefined || value === null || typeof value !== 'object') {
       return { ...defaults };
     }
 
     const raw = value as Record<string, unknown>;
 
-    const enabled =
-      typeof raw.enabled === "boolean" ? raw.enabled : defaults.enabled;
+    const enabled = typeof raw.enabled === 'boolean' ? raw.enabled : defaults.enabled;
 
     let failureThreshold = defaults.failure_threshold;
     if (
-      typeof raw.failure_threshold === "number" &&
+      typeof raw.failure_threshold === 'number' &&
       Number.isInteger(raw.failure_threshold) &&
       raw.failure_threshold > 0
     ) {
@@ -290,7 +277,7 @@ export class TrustConfigLoader {
     }
 
     let windowHours = defaults.window_hours;
-    if (typeof raw.window_hours === "number" && raw.window_hours > 0) {
+    if (typeof raw.window_hours === 'number' && raw.window_hours > 0) {
       windowHours = raw.window_hours;
     } else if (raw.window_hours !== undefined) {
       console.warn(
@@ -308,10 +295,10 @@ export class TrustConfigLoader {
    * - min_successful_runs must be a positive integer (default: 10).
    * - cooldown_hours must be a positive number (default: 72).
    */
-  private validatePromotion(value: unknown): TrustConfig["promotion"] {
+  private validatePromotion(value: unknown): TrustConfig['promotion'] {
     const defaults = DEFAULT_TRUST_CONFIG.promotion;
 
-    if (value === undefined || value === null || typeof value !== "object") {
+    if (value === undefined || value === null || typeof value !== 'object') {
       return { ...defaults };
     }
 
@@ -320,13 +307,13 @@ export class TrustConfigLoader {
     // require_human_approval is immutable -- always true
     if (raw.require_human_approval === false) {
       console.error(
-        "[TrustConfigLoader] promotion.require_human_approval cannot be set to false. Forcing to true.",
+        '[TrustConfigLoader] promotion.require_human_approval cannot be set to false. Forcing to true.',
       );
     }
 
     let minSuccessfulRuns = defaults.min_successful_runs;
     if (
-      typeof raw.min_successful_runs === "number" &&
+      typeof raw.min_successful_runs === 'number' &&
       Number.isInteger(raw.min_successful_runs) &&
       raw.min_successful_runs > 0
     ) {
@@ -338,7 +325,7 @@ export class TrustConfigLoader {
     }
 
     let cooldownHours = defaults.cooldown_hours;
-    if (typeof raw.cooldown_hours === "number" && raw.cooldown_hours > 0) {
+    if (typeof raw.cooldown_hours === 'number' && raw.cooldown_hours > 0) {
       cooldownHours = raw.cooldown_hours;
     } else if (raw.cooldown_hours !== undefined) {
       console.warn(

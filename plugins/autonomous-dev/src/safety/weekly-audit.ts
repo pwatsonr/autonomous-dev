@@ -118,9 +118,7 @@ function isMatchInsideToken(line: string, pattern: RegExp): boolean {
     return false;
   }
 
-  const cleanedLine = line
-    .replace(/\[REDACTED:[^\]]+\]/g, '')
-    .replace(/\[SECRET_REDACTED\]/g, '');
+  const cleanedLine = line.replace(/\[REDACTED:[^\]]+\]/g, '').replace(/\[SECRET_REDACTED\]/g, '');
 
   const freshRegex = new RegExp(pattern.source, pattern.flags);
   return !freshRegex.test(cleanedLine);

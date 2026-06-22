@@ -63,15 +63,13 @@ describe('runCustomEvaluator — allowlist enforcement', () => {
   });
 
   it('throws SecurityError when allowlist is empty even for an existing file', async () => {
-    await expect(
-      runCustomEvaluator(FIXTURE_DENIED, [], {}, { allowlist: [] }),
-    ).rejects.toThrow(/evaluators_allowlist/);
+    await expect(runCustomEvaluator(FIXTURE_DENIED, [], {}, { allowlist: [] })).rejects.toThrow(
+      /evaluators_allowlist/,
+    );
   });
 
   it('throws SecurityError on empty path', async () => {
-    await expect(
-      runCustomEvaluator('', [], {}, { allowlist: [] }),
-    ).rejects.toThrow(SecurityError);
+    await expect(runCustomEvaluator('', [], {}, { allowlist: [] })).rejects.toThrow(SecurityError);
   });
 });
 
@@ -107,9 +105,9 @@ describe('runCustomEvaluator — output validation', () => {
     writeFileSync(script, '#!/bin/sh\nprintf "not json\\n"\nexit 0\n');
     chmodSync(script, 0o755);
     try {
-      await expect(
-        runCustomEvaluator(script, [], {}, { allowlist: [script] }),
-      ).rejects.toThrow(/invalid JSON/);
+      await expect(runCustomEvaluator(script, [], {}, { allowlist: [script] })).rejects.toThrow(
+        /invalid JSON/,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -124,9 +122,9 @@ describe('runCustomEvaluator — output validation', () => {
     writeFileSync(script, '#!/bin/sh\nprintf \'{"oops":1}\\n\'\nexit 0\n');
     chmodSync(script, 0o755);
     try {
-      await expect(
-        runCustomEvaluator(script, [], {}, { allowlist: [script] }),
-      ).rejects.toThrow(/missing required fields/);
+      await expect(runCustomEvaluator(script, [], {}, { allowlist: [script] })).rejects.toThrow(
+        /missing required fields/,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -17,11 +17,7 @@ import * as path from 'path';
 
 import type { AgentFactoryConfig } from '../config';
 import type { AuditLogger } from '../audit';
-import type {
-  RateLimitResult,
-  RateLimitState,
-  ModificationRecord,
-} from './types';
+import type { RateLimitResult, RateLimitState, ModificationRecord } from './types';
 
 // Re-export for convenience
 export type { RateLimitResult };
@@ -75,11 +71,7 @@ export class ModificationRateLimiter {
   private readonly rateLimitsPath: string;
   private readonly logger: RateLimiterLogger;
 
-  constructor(
-    config: AgentFactoryConfig,
-    auditLogger: AuditLogger,
-    opts: RateLimiterOptions,
-  ) {
+  constructor(config: AgentFactoryConfig, auditLogger: AuditLogger, opts: RateLimiterOptions) {
     this.config = config;
     this.auditLogger = auditLogger;
     this.rateLimitsPath = path.resolve(opts.rateLimitsPath);
@@ -119,7 +111,7 @@ export class ModificationRateLimiter {
 
       this.logger.warn(
         `Rate limit hit for '${agentName}': ${currentCount}/${maxPerWeek} ` +
-        `modifications this week. Next allowed at ${nextAllowedAt}`,
+          `modifications this week. Next allowed at ${nextAllowedAt}`,
       );
 
       this.auditLogger.log({
@@ -173,9 +165,7 @@ export class ModificationRateLimiter {
     state.modifications[agentName].push(record);
     this.saveState(state);
 
-    this.logger.info(
-      `Modification recorded for '${agentName}': proposal ${proposalId}`,
-    );
+    this.logger.info(`Modification recorded for '${agentName}': proposal ${proposalId}`);
   }
 
   // -------------------------------------------------------------------------
@@ -196,11 +186,7 @@ export class ModificationRateLimiter {
       const parsed = JSON.parse(content);
 
       // Validate structure
-      if (
-        parsed &&
-        typeof parsed === 'object' &&
-        typeof parsed.modifications === 'object'
-      ) {
+      if (parsed && typeof parsed === 'object' && typeof parsed.modifications === 'object') {
         return parsed as RateLimitState;
       }
 
@@ -224,11 +210,7 @@ export class ModificationRateLimiter {
         fs.mkdirSync(dir, { recursive: true });
       }
 
-      fs.writeFileSync(
-        this.rateLimitsPath,
-        JSON.stringify(state, null, 2) + '\n',
-        'utf-8',
-      );
+      fs.writeFileSync(this.rateLimitsPath, JSON.stringify(state, null, 2) + '\n', 'utf-8');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`Failed to save rate limits: ${message}`);

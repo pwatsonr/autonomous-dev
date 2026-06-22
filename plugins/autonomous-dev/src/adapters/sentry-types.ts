@@ -23,7 +23,10 @@ export interface SentryAdapterConfig {
 }
 
 /** Default Sentry adapter configuration values. */
-export const DEFAULT_SENTRY_CONFIG: Omit<SentryAdapterConfig, 'project_slug' | 'organization_slug'> = {
+export const DEFAULT_SENTRY_CONFIG: Omit<
+  SentryAdapterConfig,
+  'project_slug' | 'organization_slug'
+> = {
   enabled: true,
   query_budget: 10,
   query_timeout_ms: 30_000,

@@ -91,19 +91,13 @@ describe('LocalBackend.deploy', () => {
     let bodyFilePath = '';
     let bodyFileMode = 0;
     let bodyFileExisted = false;
-    m.expect(
-      /^gh$/,
-      (a) => a[0] === 'pr' && a[1] === 'create',
-      { stdout: 'https://github.com/org/repo/pull/9\n' },
-    );
+    m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'create', {
+      stdout: 'https://github.com/org/repo/pull/9\n',
+    });
     // Inject a side effect to capture the tempfile path the moment gh
     // pr create is invoked: wrap the runTool to inspect calls then
     // delegate to the mock.
-    const wrapped = async (
-      cmd: string,
-      args: string[],
-      opts: Parameters<typeof m.runTool>[2],
-    ) => {
+    const wrapped = async (cmd: string, args: string[], opts: Parameters<typeof m.runTool>[2]) => {
       if (cmd === 'gh' && args[0] === 'pr' && args[1] === 'create') {
         const idx = args.indexOf('--body-file');
         if (idx !== -1) {
@@ -128,17 +122,12 @@ describe('LocalBackend.deploy', () => {
     const m = makeRunToolMock();
     m.expect(/^git$/, (a) => a[0] === 'status', { stdout: '' });
     m.expect(/^git$/, (a) => a[0] === 'push', { stdout: '' });
-    m.expect(
-      /^gh$/,
-      (a) => a[0] === 'pr' && a[1] === 'create',
-      { exitCode: 1, stderr: 'gh: rate limited' },
-    );
+    m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'create', {
+      exitCode: 1,
+      stderr: 'gh: rate limited',
+    });
     let bodyFilePath = '';
-    const wrapped = async (
-      cmd: string,
-      args: string[],
-      opts: Parameters<typeof m.runTool>[2],
-    ) => {
+    const wrapped = async (cmd: string, args: string[], opts: Parameters<typeof m.runTool>[2]) => {
       if (cmd === 'gh') {
         const idx = args.indexOf('--body-file');
         if (idx !== -1) bodyFilePath = args[idx + 1];
@@ -156,11 +145,9 @@ describe('LocalBackend.deploy', () => {
     const m = makeRunToolMock();
     m.expect(/^git$/, (a) => a[0] === 'status', { stdout: '' });
     m.expect(/^git$/, (a) => a[0] === 'push', { stdout: '' });
-    m.expect(
-      /^gh$/,
-      (a) => a[0] === 'pr' && a[1] === 'create',
-      { stdout: 'noise\nhttps://github.com/octo/cat/pull/1234\nmore noise\n' },
-    );
+    m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'create', {
+      stdout: 'noise\nhttps://github.com/octo/cat/pull/1234\nmore noise\n',
+    });
     const b = new LocalBackend({ runTool: m.runTool });
     const a = await b.build(ctx());
     const r = await b.deploy(a, 'env', localValidParams);
@@ -181,11 +168,9 @@ describe('LocalBackend.deploy', () => {
     const m = makeRunToolMock();
     m.expect(/^git$/, (a) => a[0] === 'status', { stdout: '' });
     m.expect(/^git$/, (a) => a[0] === 'push', { stdout: '' });
-    m.expect(
-      /^gh$/,
-      (a) => a[0] === 'pr' && a[1] === 'create',
-      { stdout: 'https://github.com/o/r/pull/1\n' },
-    );
+    m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'create', {
+      stdout: 'https://github.com/o/r/pull/1\n',
+    });
     const b = new LocalBackend({ runTool: m.runTool });
     const a = await b.build(ctx());
     const r = await b.deploy(a, 'env', localValidParams);
@@ -199,16 +184,12 @@ describe('LocalBackend.healthCheck', () => {
     const m = makeRunToolMock();
     m.expect(/^git$/, (a) => a[0] === 'status', { stdout: '' });
     m.expect(/^git$/, (a) => a[0] === 'push', { stdout: '' });
-    m.expect(
-      /^gh$/,
-      (a) => a[0] === 'pr' && a[1] === 'create',
-      { stdout: 'https://github.com/o/r/pull/7\n' },
-    );
-    m.expect(
-      /^gh$/,
-      (a) => a[0] === 'pr' && a[1] === 'view',
-      { stdout: JSON.stringify({ state }) },
-    );
+    m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'create', {
+      stdout: 'https://github.com/o/r/pull/7\n',
+    });
+    m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'view', {
+      stdout: JSON.stringify({ state }),
+    });
     const b = new LocalBackend({ runTool: m.runTool });
     const a = await b.build(ctx());
     const r = await b.deploy(a, 'env', localValidParams);
@@ -232,11 +213,9 @@ describe('LocalBackend.rollback', () => {
     const m = makeRunToolMock();
     m.expect(/^git$/, (a) => a[0] === 'status', { stdout: '' });
     m.expect(/^git$/, (a) => a[0] === 'push', { stdout: '' });
-    m.expect(
-      /^gh$/,
-      (a) => a[0] === 'pr' && a[1] === 'create',
-      { stdout: 'https://github.com/o/r/pull/9\n' },
-    );
+    m.expect(/^gh$/, (a) => a[0] === 'pr' && a[1] === 'create', {
+      stdout: 'https://github.com/o/r/pull/9\n',
+    });
     m.expect(
       /^gh$/,
       (a) => a[0] === 'pr' && a[1] === 'close',

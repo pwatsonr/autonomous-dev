@@ -13,10 +13,7 @@
 import * as path from 'path';
 import { openDatabase, runMigrations } from '../../../intake/db/migrator';
 
-const MIGRATIONS_DIR = path.resolve(
-  __dirname,
-  '../../../intake/db/migrations',
-);
+const MIGRATIONS_DIR = path.resolve(__dirname, '../../../intake/db/migrations');
 
 /** All tables the 001_initial migration must create. */
 const EXPECTED_TABLES = [
@@ -109,13 +106,15 @@ describe('Migrator', () => {
     // Attempt to insert a conversation_messages row referencing a
     // nonexistent request_id.
     expect(() => {
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO conversation_messages (
           message_id, request_id, direction, channel, content, message_type
         ) VALUES (
           'msg-001', 'NONEXISTENT', 'inbound', 'discord', 'hello', 'feedback'
         )
-      `).run();
+      `,
+      ).run();
     }).toThrow(/FOREIGN KEY constraint failed/);
 
     db.close();
@@ -174,7 +173,8 @@ describe('Migrator', () => {
       runMigrations(db, MIGRATIONS_DIR);
 
       expect(() => {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO requests (
             request_id, title, description, raw_input, priority,
             requester_id, source_channel
@@ -182,7 +182,8 @@ describe('Migrator', () => {
             'REQ-001', 'Test', 'A test request', 'raw text', 'urgent',
             'user-1', 'discord'
           )
-        `).run();
+        `,
+        ).run();
       }).toThrow(/CHECK constraint failed/);
 
       db.close();
@@ -193,7 +194,8 @@ describe('Migrator', () => {
       runMigrations(db, MIGRATIONS_DIR);
 
       expect(() => {
-        db.prepare(`
+        db.prepare(
+          `
           INSERT INTO requests (
             request_id, title, description, raw_input, status,
             requester_id, source_channel
@@ -201,7 +203,8 @@ describe('Migrator', () => {
             'REQ-001', 'Test', 'A test request', 'raw text', 'running',
             'user-1', 'discord'
           )
-        `).run();
+        `,
+        ).run();
       }).toThrow(/CHECK constraint failed/);
 
       db.close();
@@ -212,7 +215,8 @@ describe('Migrator', () => {
       runMigrations(db, MIGRATIONS_DIR);
 
       // Should not throw
-      db.prepare(`
+      db.prepare(
+        `
         INSERT INTO requests (
           request_id, title, description, raw_input, priority, status,
           requester_id, source_channel
@@ -220,7 +224,8 @@ describe('Migrator', () => {
           'REQ-001', 'Test', 'A test request', 'raw text', 'high', 'queued',
           'user-1', 'discord'
         )
-      `).run();
+      `,
+      ).run();
 
       const row = db
         .prepare('SELECT priority, status FROM requests WHERE request_id = ?')

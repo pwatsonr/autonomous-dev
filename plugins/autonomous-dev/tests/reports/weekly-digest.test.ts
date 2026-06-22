@@ -79,10 +79,7 @@ function makeObservation(overrides: Partial<ObservationForDigest> = {}): Observa
 /**
  * Write a test observation file to the expected directory structure.
  */
-async function writeObservationFile(
-  rootDir: string,
-  obs: ObservationForDigest,
-): Promise<void> {
+async function writeObservationFile(rootDir: string, obs: ObservationForDigest): Promise<void> {
   const year = obs.id.slice(4, 8);
   const month = obs.id.slice(8, 10);
   const dir = path.join(rootDir, '.autonomous-dev', 'observations', year, month);
@@ -128,86 +125,184 @@ function makeAppendixADataset(): ObservationForDigest[] {
   const observations: ObservationForDigest[] = [];
 
   // P0 x1 (promote) - error
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P0', triage_decision: 'promote', type: 'error',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-001', tokens_consumed: 35000,
-    triage_at: '2026-04-08T11:00:00.000Z', // 1h latency
-    service: 'api-gateway',
-  }));
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P0',
+      triage_decision: 'promote',
+      type: 'error',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-001',
+      tokens_consumed: 35000,
+      triage_at: '2026-04-08T11:00:00.000Z', // 1h latency
+      service: 'api-gateway',
+    }),
+  );
 
   // P1 x3 (1 promote, 1 dismiss, 1 investigate)
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P1', triage_decision: 'promote', type: 'error',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-001', tokens_consumed: 0,
-    triage_at: '2026-04-08T13:12:00.000Z', // 3.2h latency
-    service: 'api-gateway',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P1', triage_decision: 'dismiss', type: 'error',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-001', tokens_consumed: 0,
-    service: 'auth-service',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P1', triage_decision: 'investigate', type: 'anomaly',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-002', tokens_consumed: 38000,
-    service: 'auth-service',
-  }));
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P1',
+      triage_decision: 'promote',
+      type: 'error',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-001',
+      tokens_consumed: 0,
+      triage_at: '2026-04-08T13:12:00.000Z', // 3.2h latency
+      service: 'api-gateway',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P1',
+      triage_decision: 'dismiss',
+      type: 'error',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-001',
+      tokens_consumed: 0,
+      service: 'auth-service',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P1',
+      triage_decision: 'investigate',
+      type: 'anomaly',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-002',
+      tokens_consumed: 38000,
+      service: 'auth-service',
+    }),
+  );
 
   // P2 x7 (2 promote, 3 dismiss, 1 defer, 1 pending)
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P2', triage_decision: 'promote', type: 'error',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-002', tokens_consumed: 0,
-    triage_at: '2026-04-08T22:00:00.000Z', // 12h latency
-    service: 'data-pipeline',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P2', triage_decision: 'dismiss', type: 'error',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-002', tokens_consumed: 0,
-    service: 'api-gateway',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P2', triage_decision: 'dismiss', type: 'anomaly',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-003', tokens_consumed: 41600,
-    service: 'api-gateway',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P2', triage_decision: 'defer', type: 'anomaly',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-003', tokens_consumed: 0,
-    service: 'auth-service',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P2', triage_decision: null, type: 'error',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-003', tokens_consumed: 0,
-    service: 'data-pipeline',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P2', triage_decision: 'promote', type: 'trend',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-003', tokens_consumed: 0,
-    triage_at: '2026-04-09T04:00:00.000Z', // 18h latency
-    service: 'api-gateway',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P2', triage_decision: 'dismiss', type: 'error',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-003', tokens_consumed: 0,
-    service: 'auth-service',
-  }));
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P2',
+      triage_decision: 'promote',
+      type: 'error',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-002',
+      tokens_consumed: 0,
+      triage_at: '2026-04-08T22:00:00.000Z', // 12h latency
+      service: 'data-pipeline',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P2',
+      triage_decision: 'dismiss',
+      type: 'error',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-002',
+      tokens_consumed: 0,
+      service: 'api-gateway',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P2',
+      triage_decision: 'dismiss',
+      type: 'anomaly',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-003',
+      tokens_consumed: 41600,
+      service: 'api-gateway',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P2',
+      triage_decision: 'defer',
+      type: 'anomaly',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-003',
+      tokens_consumed: 0,
+      service: 'auth-service',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P2',
+      triage_decision: null,
+      type: 'error',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-003',
+      tokens_consumed: 0,
+      service: 'data-pipeline',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P2',
+      triage_decision: 'promote',
+      type: 'trend',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-003',
+      tokens_consumed: 0,
+      triage_at: '2026-04-09T04:00:00.000Z', // 18h latency
+      service: 'api-gateway',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P2',
+      triage_decision: 'dismiss',
+      type: 'error',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-003',
+      tokens_consumed: 0,
+      service: 'auth-service',
+    }),
+  );
 
   // P3 x3 (1 defer, 1 dismiss, 1 pending)
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P3', triage_decision: 'defer', type: 'error',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-003', tokens_consumed: 0,
-    service: 'data-pipeline',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P3', triage_decision: 'dismiss', type: 'anomaly',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-003', tokens_consumed: 0,
-    service: 'api-gateway',
-  }));
-  observations.push(makeObservation({
-    id: mkId(), severity: 'P3', triage_decision: null, type: 'trend',
-    timestamp: baseTimestamp, observation_run_id: 'RUN-003', tokens_consumed: 0,
-    service: 'data-pipeline',
-  }));
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P3',
+      triage_decision: 'defer',
+      type: 'error',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-003',
+      tokens_consumed: 0,
+      service: 'data-pipeline',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P3',
+      triage_decision: 'dismiss',
+      type: 'anomaly',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-003',
+      tokens_consumed: 0,
+      service: 'api-gateway',
+    }),
+  );
+  observations.push(
+    makeObservation({
+      id: mkId(),
+      severity: 'P3',
+      triage_decision: null,
+      type: 'trend',
+      timestamp: baseTimestamp,
+      observation_run_id: 'RUN-003',
+      tokens_consumed: 0,
+      service: 'data-pipeline',
+    }),
+  );
 
   return observations;
 }
@@ -480,29 +575,35 @@ describe('WeeklyDigest', () => {
       const observations = [
         // 3 error observations for api-gateway with oscillation_warning
         makeObservation({
-          service: 'api-gateway', error_class: 'ConnectionTimeout',
+          service: 'api-gateway',
+          error_class: 'ConnectionTimeout',
           oscillation_warning: true,
         }),
         makeObservation({
-          service: 'api-gateway', error_class: 'ConnectionTimeout',
+          service: 'api-gateway',
+          error_class: 'ConnectionTimeout',
           oscillation_warning: true,
         }),
         makeObservation({
-          service: 'api-gateway', error_class: 'ConnectionTimeout',
+          service: 'api-gateway',
+          error_class: 'ConnectionTimeout',
           oscillation_warning: false,
         }),
         // 2 anomaly observations for auth-service (monitoring)
         makeObservation({
-          service: 'auth-service', error_class: 'MemoryLeak',
+          service: 'auth-service',
+          error_class: 'MemoryLeak',
           oscillation_warning: false,
         }),
         makeObservation({
-          service: 'auth-service', error_class: 'MemoryLeak',
+          service: 'auth-service',
+          error_class: 'MemoryLeak',
           oscillation_warning: false,
         }),
         // 1 solo observation (should not appear)
         makeObservation({
-          service: 'data-pipeline', error_class: 'OneOff',
+          service: 'data-pipeline',
+          error_class: 'OneOff',
           oscillation_warning: false,
         }),
       ];
@@ -711,29 +812,38 @@ describe('WeeklyDigest', () => {
   describe('full digest with observations on disk', () => {
     it('collects observations from directory and generates complete digest', async () => {
       // Write observations in the W15 period (April 6-12, 2026)
-      await writeObservationFile(tmpDir, makeObservation({
-        id: 'OBS-20260408-100000-d001',
-        timestamp: '2026-04-08T10:00:00.000Z',
-        service: 'api-gateway',
-        severity: 'P1',
-        triage_decision: 'promote',
-      }));
-      await writeObservationFile(tmpDir, makeObservation({
-        id: 'OBS-20260409-100000-d002',
-        timestamp: '2026-04-09T10:00:00.000Z',
-        service: 'auth-service',
-        severity: 'P2',
-        triage_decision: 'dismiss',
-      }));
+      await writeObservationFile(
+        tmpDir,
+        makeObservation({
+          id: 'OBS-20260408-100000-d001',
+          timestamp: '2026-04-08T10:00:00.000Z',
+          service: 'api-gateway',
+          severity: 'P1',
+          triage_decision: 'promote',
+        }),
+      );
+      await writeObservationFile(
+        tmpDir,
+        makeObservation({
+          id: 'OBS-20260409-100000-d002',
+          timestamp: '2026-04-09T10:00:00.000Z',
+          service: 'auth-service',
+          severity: 'P2',
+          triage_decision: 'dismiss',
+        }),
+      );
 
       // Write an observation OUTSIDE the period (should not be included)
-      await writeObservationFile(tmpDir, makeObservation({
-        id: 'OBS-20260401-100000-d003',
-        timestamp: '2026-04-01T10:00:00.000Z',
-        service: 'api-gateway',
-        severity: 'P0',
-        triage_decision: 'promote',
-      }));
+      await writeObservationFile(
+        tmpDir,
+        makeObservation({
+          id: 'OBS-20260401-100000-d003',
+          timestamp: '2026-04-01T10:00:00.000Z',
+          service: 'api-gateway',
+          severity: 'P0',
+          triage_decision: 'promote',
+        }),
+      );
 
       const now = new Date('2026-04-12T23:00:00.000Z');
       const result = await generateWeeklyDigest(tmpDir, '2026-W15', now);
@@ -757,8 +867,9 @@ describe('WeeklyDigest', () => {
     });
 
     it('formatSeverityCounts formats all severity levels', () => {
-      expect(formatSeverityCounts({ P0: 1, P1: 3, P2: 7, P3: 3 }))
-        .toBe('P0: 1, P1: 3, P2: 7, P3: 3');
+      expect(formatSeverityCounts({ P0: 1, P1: 3, P2: 7, P3: 3 })).toBe(
+        'P0: 1, P1: 3, P2: 7, P3: 3',
+      );
     });
 
     it('formatTypeCounts sorts by count descending', () => {
@@ -767,8 +878,9 @@ describe('WeeklyDigest', () => {
     });
 
     it('formatTriageCounts omits zero-count decisions', () => {
-      expect(formatTriageCounts({ promote: 4, dismiss: 5, defer: 0, investigate: 1, pending: 2 }))
-        .toBe('promote: 4, dismiss: 5, investigate: 1, pending: 2');
+      expect(
+        formatTriageCounts({ promote: 4, dismiss: 5, defer: 0, investigate: 1, pending: 2 }),
+      ).toBe('promote: 4, dismiss: 5, investigate: 1, pending: 2');
     });
 
     it('formatLatency returns hours or N/A', () => {
@@ -802,9 +914,27 @@ describe('WeeklyDigest', () => {
         {
           summary,
           byService: [
-            { service: 'api-gateway', total_observations: 8, p0_p1_count: 3, promoted: 3, dismissed: 3 },
-            { service: 'auth-service', total_observations: 4, p0_p1_count: 1, promoted: 1, dismissed: 2 },
-            { service: 'data-pipeline', total_observations: 2, p0_p1_count: 0, promoted: 0, dismissed: 0 },
+            {
+              service: 'api-gateway',
+              total_observations: 8,
+              p0_p1_count: 3,
+              promoted: 3,
+              dismissed: 3,
+            },
+            {
+              service: 'auth-service',
+              total_observations: 4,
+              p0_p1_count: 1,
+              promoted: 1,
+              dismissed: 2,
+            },
+            {
+              service: 'data-pipeline',
+              total_observations: 2,
+              p0_p1_count: 0,
+              promoted: 0,
+              dismissed: 0,
+            },
           ],
           effectiveness: [],
           recurring: [],

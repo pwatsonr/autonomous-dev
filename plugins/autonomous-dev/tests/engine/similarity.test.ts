@@ -12,18 +12,13 @@ import {
   temporalCorrelation,
   findSimilarObservations,
 } from '../../src/engine/similarity';
-import type {
-  CandidateObservation,
-  ObservationSummary,
-} from '../../src/engine/types';
+import type { CandidateObservation, ObservationSummary } from '../../src/engine/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildCandidate(
-  overrides: Partial<CandidateObservation> = {},
-): CandidateObservation {
+function buildCandidate(overrides: Partial<CandidateObservation> = {}): CandidateObservation {
   return {
     type: 'error',
     error_type: 'error_rate',
@@ -39,9 +34,7 @@ function buildCandidate(
   };
 }
 
-function buildObservation(
-  overrides: Partial<ObservationSummary> = {},
-): ObservationSummary {
+function buildObservation(overrides: Partial<ObservationSummary> = {}): ObservationSummary {
   return {
     id: 'obs-existing-001',
     service: 'api-gateway',
@@ -61,7 +54,7 @@ describe('jaccardStackSimilarity', () => {
     const jaccard = jaccardStackSimilarity(framesA, framesB);
     // Intersection: {A,B,C,D} = 4, Union: {A,B,C,D,E,F} = 6
     expect(jaccard).toBeCloseTo(4 / 6, 10);
-    expect(jaccard).toBeLessThanOrEqual(0.80);
+    expect(jaccard).toBeLessThanOrEqual(0.8);
   });
 
   it('TC-3-3-15: returns 0.833 (match) for 5/6 overlap', () => {
@@ -70,7 +63,7 @@ describe('jaccardStackSimilarity', () => {
     const jaccard = jaccardStackSimilarity(framesA, framesB);
     // Intersection: {A,B,C,D,E} = 5, Union: {A,B,C,D,E,F} = 6
     expect(jaccard).toBeCloseTo(5 / 6, 10);
-    expect(jaccard).toBeGreaterThan(0.80);
+    expect(jaccard).toBeGreaterThan(0.8);
   });
 
   it('returns 1.0 for identical frame sets', () => {
@@ -244,7 +237,7 @@ describe('findSimilarObservations', () => {
     expect(matches).toHaveLength(1);
     expect(matches[0].method).toBe('levenshtein_message');
     expect(matches[0].matched).toBe(true);
-    expect(matches[0].similarity_score).toBeGreaterThan(0.80);
+    expect(matches[0].similarity_score).toBeGreaterThan(0.8);
   });
 
   it('returns temporal match for same service within 5 min', async () => {
@@ -291,9 +284,9 @@ describe('findSimilarObservations', () => {
     });
     const existing = buildObservation({
       stack_frames: ['A', 'B', 'C', 'D', 'E', 'F'], // Jaccard match
-      error_message: 'same error message',           // Levenshtein match too
+      error_message: 'same error message', // Levenshtein match too
       service: 'api-gateway',
-      timestamp: new Date('2026-04-08T12:01:00Z'),   // Temporal match too
+      timestamp: new Date('2026-04-08T12:01:00Z'), // Temporal match too
     });
 
     const matches = await findSimilarObservations(candidate, [existing]);

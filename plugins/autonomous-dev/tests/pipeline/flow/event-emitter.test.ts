@@ -1,4 +1,8 @@
-import { PipelineEventEmitter, PipelineEventType, EventBusListener } from '../../../src/pipeline/flow/event-emitter';
+import {
+  PipelineEventEmitter,
+  PipelineEventType,
+  EventBusListener,
+} from '../../../src/pipeline/flow/event-emitter';
 import { AuditLogger, PipelineEvent } from '../../../src/pipeline/storage/audit-logger';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
 
@@ -80,7 +84,9 @@ describe('event-emitter', () => {
   it('emit dispatches to registered listeners', async () => {
     const receivedEvents: PipelineEvent[] = [];
     const listener: EventBusListener = {
-      onEvent: (event) => { receivedEvents.push(event); },
+      onEvent: (event) => {
+        receivedEvents.push(event);
+      },
     };
 
     emitter.addListener(listener);
@@ -124,11 +130,15 @@ describe('event-emitter', () => {
     const received: string[] = [];
 
     const failingListener: EventBusListener = {
-      onEvent: () => { throw new Error('listener failure'); },
+      onEvent: () => {
+        throw new Error('listener failure');
+      },
     };
 
     const successListener: EventBusListener = {
-      onEvent: (event) => { received.push(event.eventType); },
+      onEvent: (event) => {
+        received.push(event.eventType);
+      },
     };
 
     emitter.addListener(failingListener);
@@ -144,11 +154,15 @@ describe('event-emitter', () => {
     const received: string[] = [];
 
     const failingListener: EventBusListener = {
-      onEvent: async () => { throw new Error('async listener failure'); },
+      onEvent: async () => {
+        throw new Error('async listener failure');
+      },
     };
 
     const successListener: EventBusListener = {
-      onEvent: (event) => { received.push(event.eventType); },
+      onEvent: (event) => {
+        received.push(event.eventType);
+      },
     };
 
     emitter.addListener(failingListener);
@@ -163,7 +177,9 @@ describe('event-emitter', () => {
     it('addListener registers a listener', async () => {
       const events: PipelineEvent[] = [];
       const listener: EventBusListener = {
-        onEvent: (event) => { events.push(event); },
+        onEvent: (event) => {
+          events.push(event);
+        },
       };
 
       emitter.addListener(listener);
@@ -175,7 +191,9 @@ describe('event-emitter', () => {
     it('removeListener unregisters a listener', async () => {
       const events: PipelineEvent[] = [];
       const listener: EventBusListener = {
-        onEvent: (event) => { events.push(event); },
+        onEvent: (event) => {
+          events.push(event);
+        },
       };
 
       emitter.addListener(listener);
@@ -198,8 +216,16 @@ describe('event-emitter', () => {
       const received1: string[] = [];
       const received2: string[] = [];
 
-      emitter.addListener({ onEvent: (e) => { received1.push(e.eventType); } });
-      emitter.addListener({ onEvent: (e) => { received2.push(e.eventType); } });
+      emitter.addListener({
+        onEvent: (e) => {
+          received1.push(e.eventType);
+        },
+      });
+      emitter.addListener({
+        onEvent: (e) => {
+          received2.push(e.eventType);
+        },
+      });
 
       await emitter.emit('PIPE-001', 'human_escalation', {}, 'system');
 
@@ -218,7 +244,9 @@ describe('event-emitter', () => {
   it('all 25 event types can be emitted', async () => {
     const emittedTypes: string[] = [];
     emitter.addListener({
-      onEvent: (event) => { emittedTypes.push(event.eventType); },
+      onEvent: (event) => {
+        emittedTypes.push(event.eventType);
+      },
     });
 
     for (const eventType of ALL_EVENT_TYPES) {

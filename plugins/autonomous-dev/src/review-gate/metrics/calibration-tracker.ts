@@ -28,27 +28,27 @@ export interface CalibrationRecord {
   total_reviews: number;
   confirmed_findings: number;
   misses: number;
-  calibration_score: number;          // -1.0 to +1.0
+  calibration_score: number; // -1.0 to +1.0
   action: CalibrationAction;
-  window_size: number;                // number of reviews in the window
+  window_size: number; // number of reviews in the window
   last_updated: string;
-  events: CalibrationEvent[];         // rolling window of events
+  events: CalibrationEvent[]; // rolling window of events
 }
 
 /** Action recommended based on a reviewer's calibration score. */
 export type CalibrationAction =
-  | 'no_action'            // 0.7 to 1.0
-  | 'monitor'              // 0.4 to 0.69
-  | 'review_prompt'        // 0.1 to 0.39
-  | 'remove_from_pool';   // -1.0 to 0.09
+  | 'no_action' // 0.7 to 1.0
+  | 'monitor' // 0.4 to 0.69
+  | 'review_prompt' // 0.1 to 0.39
+  | 'remove_from_pool'; // -1.0 to 0.09
 
 /** Configuration for the CalibrationTracker. */
 export interface CalibrationTrackerConfig {
-  window_size: number;                // default: 50
+  window_size: number; // default: 50
   action_thresholds: {
-    no_action_min: number;            // default: 0.7
-    monitor_min: number;              // default: 0.4
-    review_prompt_min: number;        // default: 0.1
+    no_action_min: number; // default: 0.7
+    monitor_min: number; // default: 0.4
+    review_prompt_min: number; // default: 0.1
     // below review_prompt_min: remove_from_pool
   };
 }
@@ -113,17 +113,14 @@ export class InMemoryMetricsStore implements MetricsStore {
  * Range: -1.0 to +1.0
  * Returns 0 when no events exist.
  */
-export function computeCalibrationScore(
-  events: CalibrationEvent[],
-  windowSize: number,
-): number {
+export function computeCalibrationScore(events: CalibrationEvent[], windowSize: number): number {
   // Take the most recent `windowSize` events
   const windowEvents = events.slice(-windowSize);
 
   if (windowEvents.length === 0) return 0;
 
-  const confirmed = windowEvents.filter(e => e.event_type === 'confirmed_finding').length;
-  const misses = windowEvents.filter(e => e.event_type === 'miss').length;
+  const confirmed = windowEvents.filter((e) => e.event_type === 'confirmed_finding').length;
+  const misses = windowEvents.filter((e) => e.event_type === 'miss').length;
   const totalReviews = windowEvents.length;
 
   // calibration_score = (confirmed - misses) / totalReviews
@@ -210,8 +207,8 @@ export class CalibrationTracker {
     const score = computeCalibrationScore(allEvents, this.config.window_size);
     const action = determineAction(score, this.config.action_thresholds);
 
-    const confirmed = windowEvents.filter(e => e.event_type === 'confirmed_finding').length;
-    const misses = windowEvents.filter(e => e.event_type === 'miss').length;
+    const confirmed = windowEvents.filter((e) => e.event_type === 'confirmed_finding').length;
+    const misses = windowEvents.filter((e) => e.event_type === 'miss').length;
 
     return {
       reviewer_id: reviewerId,
@@ -222,9 +219,10 @@ export class CalibrationTracker {
       calibration_score: score,
       action,
       window_size: windowEvents.length,
-      last_updated: windowEvents.length > 0
-        ? windowEvents[windowEvents.length - 1].timestamp
-        : new Date().toISOString(),
+      last_updated:
+        windowEvents.length > 0
+          ? windowEvents[windowEvents.length - 1].timestamp
+          : new Date().toISOString(),
       events: windowEvents,
     };
   }

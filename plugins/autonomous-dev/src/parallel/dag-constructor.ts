@@ -3,13 +3,7 @@
 // SPEC-006-2-1: DAG Data Model and Dependency Extraction
 // ============================================================================
 
-import {
-  DAGNode,
-  DAGEdge,
-  DAGCluster,
-  DependencyDAG,
-  SpecMetadata,
-} from './types';
+import { DAGNode, DAGEdge, DAGCluster, DependencyDAG, SpecMetadata } from './types';
 
 // ============================================================================
 // Error classes
@@ -85,7 +79,7 @@ function defaultEstimate(complexity: 'small' | 'medium' | 'large'): number {
  */
 export function extractExplicitDependencies(specs: SpecMetadata[]): DAGEdge[] {
   const edges: DAGEdge[] = [];
-  const specNames = new Set(specs.map(s => s.name));
+  const specNames = new Set(specs.map((s) => s.name));
 
   for (const spec of specs) {
     for (const dep of spec.dependsOn ?? []) {
@@ -201,7 +195,7 @@ function mergeEdges(
   }
 
   // Filter file-overlap edges: suppress those whose pair is covered by explicit
-  const filteredFileEdges = fileEdges.filter(edge => {
+  const filteredFileEdges = fileEdges.filter((edge) => {
     const key = [edge.from, edge.to].sort().join('::');
     return !explicitPairs.has(key);
   });
@@ -267,10 +261,7 @@ function kahnsTopologicalSort(
  * Identifies strongly connected components using Tarjan's algorithm.
  * Used to report which nodes participate in cycles when Kahn's detects one.
  */
-function tarjanSCC(
-  nodes: Map<string, DAGNode>,
-  edges: DAGEdge[],
-): string[][] {
+function tarjanSCC(nodes: Map<string, DAGNode>, edges: DAGEdge[]): string[][] {
   let index = 0;
   const stack: string[] = [];
   const onStack = new Set<string>();
@@ -324,11 +315,7 @@ function tarjanSCC(
  * BFS from `from` to `target`, excluding the direct from->target edge.
  * Returns true if target is reachable via an alternative path.
  */
-function bfsExcludingDirect(
-  from: string,
-  target: string,
-  adj: Map<string, Set<string>>,
-): boolean {
+function bfsExcludingDirect(from: string, target: string, adj: Map<string, Set<string>>): boolean {
   // Can we reach `target` from `from` without using the direct from->target edge?
   const visited = new Set<string>();
   const queue: string[] = [];
@@ -434,8 +421,8 @@ export function buildDAG(requestId: string, specs: SpecMetadata[]): DependencyDA
   if (hasCycle) {
     const sccs = tarjanSCC(nodes, allEdges);
     const cycleDesc = sccs
-      .filter(scc => scc.length > 1)
-      .map(scc => scc.join(' -> ') + ' -> ' + scc[0])
+      .filter((scc) => scc.length > 1)
+      .map((scc) => scc.join(' -> ') + ' -> ' + scc[0])
       .join('; ');
     throw new CyclicDependencyError(`Cycle detected: ${cycleDesc}`);
   }
@@ -449,8 +436,8 @@ export function buildDAG(requestId: string, specs: SpecMetadata[]): DependencyDA
     edges: reducedEdges,
     reducedEdges,
     originalEdges: allEdges,
-    clusters: [],        // assigned in SPEC-006-2-2
-    criticalPath: [],    // computed in SPEC-006-2-2
+    clusters: [], // assigned in SPEC-006-2-2
+    criticalPath: [], // computed in SPEC-006-2-2
     validated: true,
   };
 }
@@ -569,8 +556,8 @@ export function computeCriticalPath(dag: DependencyDAG): void {
   for (const edge of edges) adj.get(edge.from)!.push(edge.to);
 
   // Dynamic programming: longest path ending at each node
-  const dist = new Map<string, number>();         // longest path distance to reach this node (inclusive)
-  const pred = new Map<string, string | null>();  // predecessor on longest path
+  const dist = new Map<string, number>(); // longest path distance to reach this node (inclusive)
+  const pred = new Map<string, string | null>(); // predecessor on longest path
 
   for (const name of sorted) {
     dist.set(name, dag.nodes.get(name)!.estimatedMinutes);
@@ -618,7 +605,7 @@ export function computeCriticalPath(dag: DependencyDAG): void {
     }
 
     // +5 per downstream dependent (out-degree from reduced edges)
-    const outDegree = edges.filter(e => e.from === name).length;
+    const outDegree = edges.filter((e) => e.from === name).length;
     priority += outDegree * 5;
 
     node.priority = priority;

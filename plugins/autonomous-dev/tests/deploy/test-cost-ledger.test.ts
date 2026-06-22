@@ -12,19 +12,9 @@ import { mkdtemp, rm, readFile, writeFile, appendFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  CostLedger,
-  computeHmac,
-  computeWindow,
-} from '../../intake/deploy/cost-ledger';
-import {
-  CostLedgerCorruptError,
-  CostLedgerKeyMissingError,
-} from '../../intake/deploy/errors';
-import {
-  GENESIS_PREV_HMAC,
-  type CostLedgerEntry,
-} from '../../intake/deploy/cost-ledger-types';
+import { CostLedger, computeHmac, computeWindow } from '../../intake/deploy/cost-ledger';
+import { CostLedgerCorruptError, CostLedgerKeyMissingError } from '../../intake/deploy/errors';
+import { GENESIS_PREV_HMAC, type CostLedgerEntry } from '../../intake/deploy/cost-ledger-types';
 import { TEST_HMAC_KEY } from './fixtures/cost-ledger-fixtures';
 
 async function tmp(): Promise<string> {
@@ -284,9 +274,7 @@ describe('SPEC-023-3-04 CostLedger', () => {
         keyHex: TEST_HMAC_KEY,
         clock: fixedClock(),
       });
-      await expect(ledger.recordActual('nonexistent', 1.0)).rejects.toThrow(
-        /no prior entry/,
-      );
+      await expect(ledger.recordActual('nonexistent', 1.0)).rejects.toThrow(/no prior entry/);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -327,19 +315,13 @@ describe('SPEC-023-3-04 CostLedger', () => {
 
 describe('SPEC-023-3-04 computeWindow', () => {
   it('day window covers exactly 24h UTC', () => {
-    const [start, end] = computeWindow(
-      'day',
-      new Date('2026-05-02T15:00:00.000Z'),
-    );
+    const [start, end] = computeWindow('day', new Date('2026-05-02T15:00:00.000Z'));
     expect(end - start).toBe(24 * 60 * 60 * 1000);
     expect(new Date(start).toISOString()).toBe('2026-05-02T00:00:00.000Z');
   });
 
   it('month window covers the calendar month UTC', () => {
-    const [start, end] = computeWindow(
-      'month',
-      new Date('2026-05-15T00:00:00.000Z'),
-    );
+    const [start, end] = computeWindow('month', new Date('2026-05-15T00:00:00.000Z'));
     expect(new Date(start).toISOString()).toBe('2026-05-01T00:00:00.000Z');
     expect(new Date(end).toISOString()).toBe('2026-06-01T00:00:00.000Z');
   });

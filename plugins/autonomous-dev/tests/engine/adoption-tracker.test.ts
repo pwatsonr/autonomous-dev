@@ -12,10 +12,11 @@ import {
   extractNewEndpoints,
   findSimilarEndpoint,
 } from '../../src/engine/adoption-tracker';
+import type { ExecuteInstantQueryFn } from '../../src/engine/adoption-tracker';
 import type {
-  ExecuteInstantQueryFn,
-} from '../../src/engine/adoption-tracker';
-import type { ServiceConfig, IntelligenceConfig } from '../../src/config/intelligence-config.schema';
+  ServiceConfig,
+  IntelligenceConfig,
+} from '../../src/config/intelligence-config.schema';
 import type { GrafanaAnnotationResult } from '../../src/adapters/types';
 
 // ---------------------------------------------------------------------------

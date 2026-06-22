@@ -59,11 +59,7 @@ describe('DockerLocalBackend.build', () => {
   it('invokes docker build -t name:sha12 -f Dockerfile .', async () => {
     const m = makeRunToolMock();
     m.expect(/^docker$/, (a) => a[0] === 'build', { stdout: '' });
-    m.expect(
-      /^docker$/,
-      (a) => a[0] === 'image' && a[1] === 'inspect',
-      { stdout: 'sha256:abc\n' },
-    );
+    m.expect(/^docker$/, (a) => a[0] === 'image' && a[1] === 'inspect', { stdout: 'sha256:abc\n' });
     const b = new DockerLocalBackend({ runTool: m.runTool });
     await b.build(ctx());
     const buildCall = m.calls().find((c) => c.cmd === 'docker' && c.args[0] === 'build');
@@ -79,11 +75,9 @@ describe('DockerLocalBackend.build', () => {
   it('captures image_id from docker image inspect', async () => {
     const m = makeRunToolMock();
     m.expect(/^docker$/, (a) => a[0] === 'build', { stdout: '' });
-    m.expect(
-      /^docker$/,
-      (a) => a[0] === 'image' && a[1] === 'inspect',
-      { stdout: 'sha256:deadbeef1234\n' },
-    );
+    m.expect(/^docker$/, (a) => a[0] === 'image' && a[1] === 'inspect', {
+      stdout: 'sha256:deadbeef1234\n',
+    });
     const b = new DockerLocalBackend({ runTool: m.runTool });
     const a = await b.build(ctx());
     expect(a.metadata.image_id).toBe('sha256:deadbeef1234');
@@ -93,11 +87,7 @@ describe('DockerLocalBackend.build', () => {
 describe('DockerLocalBackend.deploy', () => {
   function happyMocks(m: ReturnType<typeof makeRunToolMock>) {
     m.expect(/^docker$/, (a) => a[0] === 'build', { stdout: '' });
-    m.expect(
-      /^docker$/,
-      (a) => a[0] === 'image' && a[1] === 'inspect',
-      { stdout: 'sha256:abc\n' },
-    );
+    m.expect(/^docker$/, (a) => a[0] === 'image' && a[1] === 'inspect', { stdout: 'sha256:abc\n' });
     m.expect(/^docker$/, (a) => a[0] === 'run', { stdout: 'container-99\n' });
   }
 
@@ -122,9 +112,9 @@ describe('DockerLocalBackend.deploy', () => {
     happyMocks(m);
     const b = new DockerLocalBackend({ runTool: m.runTool });
     const a = await b.build(ctx());
-    await expect(
-      b.deploy(a, 'env', { ...dockerLocalValidParams, host_port: 80 }),
-    ).rejects.toThrow(ParameterValidationError);
+    await expect(b.deploy(a, 'env', { ...dockerLocalValidParams, host_port: 80 })).rejects.toThrow(
+      ParameterValidationError,
+    );
   });
 
   it("rejects image_name: 'My-IMAGE' (uppercase)", async () => {
@@ -159,15 +149,9 @@ describe('DockerLocalBackend.deploy', () => {
 });
 
 describe('DockerLocalBackend.healthCheck', () => {
-  function happyDeploy(
-    m: ReturnType<typeof makeRunToolMock>,
-  ) {
+  function happyDeploy(m: ReturnType<typeof makeRunToolMock>) {
     m.expect(/^docker$/, (a) => a[0] === 'build', { stdout: '' });
-    m.expect(
-      /^docker$/,
-      (a) => a[0] === 'image' && a[1] === 'inspect',
-      { stdout: 'sha256:abc\n' },
-    );
+    m.expect(/^docker$/, (a) => a[0] === 'image' && a[1] === 'inspect', { stdout: 'sha256:abc\n' });
     m.expect(/^docker$/, (a) => a[0] === 'run', { stdout: 'cid\n' });
   }
 
@@ -207,11 +191,7 @@ describe('DockerLocalBackend.rollback', () => {
   function deployHelper() {
     const m = makeRunToolMock();
     m.expect(/^docker$/, (a) => a[0] === 'build', { stdout: '' });
-    m.expect(
-      /^docker$/,
-      (a) => a[0] === 'image' && a[1] === 'inspect',
-      { stdout: 'sha256:abc\n' },
-    );
+    m.expect(/^docker$/, (a) => a[0] === 'image' && a[1] === 'inspect', { stdout: 'sha256:abc\n' });
     m.expect(/^docker$/, (a) => a[0] === 'run', { stdout: 'cid-deploy\n' });
     return m;
   }
@@ -220,11 +200,7 @@ describe('DockerLocalBackend.rollback', () => {
     const m = deployHelper();
     let stopCalls = 0;
     let rmCalls = 0;
-    const wrap = async (
-      cmd: string,
-      args: string[],
-      opts: Parameters<typeof m.runTool>[2],
-    ) => {
+    const wrap = async (cmd: string, args: string[], opts: Parameters<typeof m.runTool>[2]) => {
       if (cmd === 'docker' && args[0] === 'stop') {
         stopCalls++;
         if (stopCalls >= 2) {
@@ -264,19 +240,19 @@ describe('DockerLocalBackend.rollback', () => {
     // Second deploy via the SAME instance so artifact-store reads find r1.
     const m2 = makeRunToolMock();
     m2.expect(/^docker$/, (a) => a[0] === 'build', { stdout: '' });
-    m2.expect(
-      /^docker$/,
-      (a) => a[0] === 'image' && a[1] === 'inspect',
-      { stdout: 'sha256:def\n' },
-    );
+    m2.expect(/^docker$/, (a) => a[0] === 'image' && a[1] === 'inspect', {
+      stdout: 'sha256:def\n',
+    });
     m2.expect(/^docker$/, (a) => a[0] === 'run', { stdout: 'cid-2\n' });
     m2.expect(/^docker$/, (a) => a[0] === 'stop', { stdout: '' });
     m2.expect(/^docker$/, (a) => a[0] === 'rm', { stdout: '' });
     const b2 = new DockerLocalBackend({ runTool: m2.runTool });
-    const a2 = await b2.build(ctx({
-      ...dockerLocalValidParams,
-      image_name: 'demo-app',
-    }));
+    const a2 = await b2.build(
+      ctx({
+        ...dockerLocalValidParams,
+        image_name: 'demo-app',
+      }),
+    );
     const r2 = await b2.deploy(a2, 'env', dockerLocalValidParams);
     const rb = await b2.rollback(r2);
     expect(rb.success).toBe(true);

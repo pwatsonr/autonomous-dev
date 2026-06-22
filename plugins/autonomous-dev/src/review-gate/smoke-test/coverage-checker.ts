@@ -8,12 +8,7 @@
  * Based on SPEC-004-4-1 section 2.
  */
 
-import {
-  ParentDocument,
-  ChildDocument,
-  CoverageMatrix,
-  ParentSectionCoverage,
-} from './types';
+import { ParentDocument, ChildDocument, CoverageMatrix, ParentSectionCoverage } from './types';
 
 // ---------------------------------------------------------------------------
 // CoverageChecker
@@ -45,7 +40,7 @@ export class CoverageChecker {
           if (!parentSectionIds.has(sectionId)) {
             console.warn(
               `CoverageChecker: Child "${child.id}" traces to nonexistent ` +
-              `parent section "${sectionId}" in parent "${parent.id}". Ignoring.`
+                `parent section "${sectionId}" in parent "${parent.id}". Ignoring.`,
             );
           }
         }
@@ -89,9 +84,7 @@ export class CoverageChecker {
     });
 
     // Calculate gaps and coverage percentage
-    const gaps = parentSections
-      .filter((s) => s.coverage_type === 'none')
-      .map((s) => s.section_id);
+    const gaps = parentSections.filter((s) => s.coverage_type === 'none').map((s) => s.section_id);
 
     const coveredCount = parentSections.filter((s) => s.coverage_type !== 'none').length;
     const totalSections = parentSections.length;

@@ -60,7 +60,7 @@ export interface AutoPromoteResult {
   newVersion: string;
   commitHash?: string;
   overrideWindowExpiresAt?: string;
-  reason?: string;                   // populated if not promoted
+  reason?: string; // populated if not promoted
 }
 
 // ---------------------------------------------------------------------------
@@ -239,10 +239,7 @@ export class AutoPromoter {
    * @param proposal   The validated proposal to promote.
    * @returns          AutoPromoteResult indicating success or reason for skipping.
    */
-  async attemptAutoPromote(
-    agentName: string,
-    proposal: AgentProposal,
-  ): Promise<AutoPromoteResult> {
+  async attemptAutoPromote(agentName: string, proposal: AgentProposal): Promise<AutoPromoteResult> {
     const previousVersion = proposal.current_version;
     const newVersion = proposal.proposed_version;
 
@@ -281,12 +278,7 @@ export class AutoPromoter {
         reason: eligibility.reason,
       });
 
-      return this.notPromotedResult(
-        agentName,
-        previousVersion,
-        newVersion,
-        eligibility.reason,
-      );
+      return this.notPromotedResult(agentName, previousVersion, newVersion, eligibility.reason);
     }
 
     // Step 2: Auto-promote using existing Promoter with custom commit message
@@ -306,12 +298,7 @@ export class AutoPromoter {
         error: promotionResult.error,
       });
 
-      return this.notPromotedResult(
-        agentName,
-        previousVersion,
-        newVersion,
-        promotionResult.error,
-      );
+      return this.notPromotedResult(agentName, previousVersion, newVersion, promotionResult.error);
     }
 
     // Step 3: Open override window

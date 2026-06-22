@@ -122,7 +122,7 @@ function parseSimpleYaml(yamlStr: string): Record<string, any> {
     if (cleaned.trim() === '' || cleaned.trim().startsWith('#')) continue;
 
     // Detect indented lines (part of a nested object)
-    if (/^  \S/.test(cleaned) && currentObjectKey !== null) {
+    if (/^ {2}\S/.test(cleaned) && currentObjectKey !== null) {
       const colonIdx = cleaned.indexOf(':');
       if (colonIdx !== -1) {
         const key = cleaned.substring(0, colonIdx).trim();
@@ -246,9 +246,7 @@ function serializeYamlValue(value: any): string {
  *
  * Returns file paths for the runner to process.
  */
-export async function findPendingEffectivenessObservations(
-  rootDir: string,
-): Promise<string[]> {
+export async function findPendingEffectivenessObservations(rootDir: string): Promise<string[]> {
   const obsDir = `${rootDir}/.autonomous-dev/observations`;
   const results: string[] = [];
 

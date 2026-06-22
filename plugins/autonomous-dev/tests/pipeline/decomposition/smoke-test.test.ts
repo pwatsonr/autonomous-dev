@@ -189,9 +189,7 @@ describe('Smoke Test', () => {
   test('empty parent (no sections): all children trace to nothing -> passed (vacuously)', async () => {
     const storage = mockStorage(EMPTY_PARENT);
     // No sections in parent, so no children need to trace to anything
-    const children = [
-      makeChild({ id: 'TDD-003-01', tracesFrom: [] }),
-    ];
+    const children = [makeChild({ id: 'TDD-003-01', tracesFrom: [] })];
 
     const result = await smokeTest('PRD-003', DocumentType.PRD, 'pipeline-1', children, storage);
 

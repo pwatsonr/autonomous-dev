@@ -327,12 +327,40 @@ const CODE_RUBRIC: QualityRubric = {
 };
 
 /** Review gate defaults per document type (from TDD Section 3.1.3) */
-const REVIEW_CONFIGS: Record<DocumentType, { panelSize: number; maxIterations: number; approvalThreshold: number; regressionMargin: number }> = {
-  [DocumentType.PRD]: { panelSize: 2, maxIterations: 3, approvalThreshold: 85, regressionMargin: 5 },
-  [DocumentType.TDD]: { panelSize: 2, maxIterations: 3, approvalThreshold: 85, regressionMargin: 5 },
-  [DocumentType.PLAN]: { panelSize: 1, maxIterations: 3, approvalThreshold: 85, regressionMargin: 5 },
-  [DocumentType.SPEC]: { panelSize: 1, maxIterations: 3, approvalThreshold: 85, regressionMargin: 5 },
-  [DocumentType.CODE]: { panelSize: 2, maxIterations: 3, approvalThreshold: 85, regressionMargin: 5 },
+const REVIEW_CONFIGS: Record<
+  DocumentType,
+  { panelSize: number; maxIterations: number; approvalThreshold: number; regressionMargin: number }
+> = {
+  [DocumentType.PRD]: {
+    panelSize: 2,
+    maxIterations: 3,
+    approvalThreshold: 85,
+    regressionMargin: 5,
+  },
+  [DocumentType.TDD]: {
+    panelSize: 2,
+    maxIterations: 3,
+    approvalThreshold: 85,
+    regressionMargin: 5,
+  },
+  [DocumentType.PLAN]: {
+    panelSize: 1,
+    maxIterations: 3,
+    approvalThreshold: 85,
+    regressionMargin: 5,
+  },
+  [DocumentType.SPEC]: {
+    panelSize: 1,
+    maxIterations: 3,
+    approvalThreshold: 85,
+    regressionMargin: 5,
+  },
+  [DocumentType.CODE]: {
+    panelSize: 2,
+    maxIterations: 3,
+    approvalThreshold: 85,
+    regressionMargin: 5,
+  },
 };
 
 /** Decomposition strategies per document type */

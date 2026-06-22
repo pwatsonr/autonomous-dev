@@ -36,9 +36,7 @@ function makeMutableClock(initialMs: number = Date.now()): Clock & {
   };
 }
 
-function makeConfig(
-  overrides: Partial<FatigueConfig> = {},
-): FatigueConfig {
+function makeConfig(overrides: Partial<FatigueConfig> = {}): FatigueConfig {
   return {
     enabled: true,
     thresholdPerHour: 20,
@@ -58,10 +56,7 @@ describe('FatigueDetector', () => {
   // Test Case 11: Below threshold: not fatigued
   test('below threshold returns not fatigued', () => {
     const clock = makeMutableClock();
-    const detector = new FatigueDetector(
-      makeConfig({ thresholdPerHour: 20 }),
-      clock,
-    );
+    const detector = new FatigueDetector(makeConfig({ thresholdPerHour: 20 }), clock);
 
     // Record 10 notifications (below threshold of 20)
     for (let i = 0; i < 10; i++) {
@@ -74,10 +69,7 @@ describe('FatigueDetector', () => {
   // Test Case 12: At threshold: fatigued
   test('at threshold triggers fatigue', () => {
     const clock = makeMutableClock();
-    const detector = new FatigueDetector(
-      makeConfig({ thresholdPerHour: 20 }),
-      clock,
-    );
+    const detector = new FatigueDetector(makeConfig({ thresholdPerHour: 20 }), clock);
 
     // Record 20 notifications (at threshold)
     for (let i = 0; i < 20; i++) {
@@ -182,10 +174,7 @@ describe('FatigueDetector', () => {
   // Test Case 17: Immediate never fatigued (caller responsibility)
   test('isFatigued is independent of urgency (caller checks urgency)', () => {
     const clock = makeMutableClock();
-    const detector = new FatigueDetector(
-      makeConfig({ thresholdPerHour: 5 }),
-      clock,
-    );
+    const detector = new FatigueDetector(makeConfig({ thresholdPerHour: 5 }), clock);
 
     for (let i = 0; i < 5; i++) {
       detector.record('user-a');
@@ -200,10 +189,7 @@ describe('FatigueDetector', () => {
   // Test Case 18: Per-recipient tracking
   test('per-recipient tracking: user A fatigued, user B not', () => {
     const clock = makeMutableClock();
-    const detector = new FatigueDetector(
-      makeConfig({ thresholdPerHour: 5 }),
-      clock,
-    );
+    const detector = new FatigueDetector(makeConfig({ thresholdPerHour: 5 }), clock);
 
     // Fatigue user-a
     for (let i = 0; i < 5; i++) {

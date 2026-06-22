@@ -55,22 +55,12 @@ const TriageStatusSchema = z.enum([
 /**
  * Valid triage decisions (nullable -- null when untriaged).
  */
-const TriageDecisionSchema = z.enum([
-  'promote',
-  'dismiss',
-  'defer',
-  'investigate',
-]).nullable();
+const TriageDecisionSchema = z.enum(['promote', 'dismiss', 'defer', 'investigate']).nullable();
 
 /**
  * Data source status per the adapters/types.ts definition.
  */
-const DataSourceStatusSchema = z.enum([
-  'available',
-  'degraded',
-  'unreachable',
-  'not_configured',
-]);
+const DataSourceStatusSchema = z.enum(['available', 'degraded', 'unreachable', 'not_configured']);
 
 /**
  * Data sources sub-object in frontmatter.
@@ -86,10 +76,9 @@ const DataSourcesSchema = z.object({
  * Full observation report frontmatter schema (TDD section 4.1).
  */
 export const ObservationFrontmatterSchema = z.object({
-  id: z.string().regex(
-    /^OBS-\d{8}-\d{6}-[a-f0-9]{4}$/,
-    'id must match format OBS-YYYYMMDD-HHMMSS-<hex4>',
-  ),
+  id: z
+    .string()
+    .regex(/^OBS-\d{8}-\d{6}-[a-f0-9]{4}$/, 'id must match format OBS-YYYYMMDD-HHMMSS-<hex4>'),
   timestamp: z.string().datetime({ message: 'timestamp must be ISO 8601' }),
   service: z.string().min(1, 'service must not be empty'),
   repo: z.string().min(1, 'repo must not be empty'),
@@ -132,9 +121,9 @@ export function validateOnWrite(frontmatter: object): void {
   const result = ObservationFrontmatterSchema.safeParse(frontmatter);
   if (!result.success) {
     throw new SchemaValidationError(
-      `Observation report validation failed:\n${result.error.issues.map(
-        (i) => `  - ${i.path.join('.')}: ${i.message}`,
-      ).join('\n')}`,
+      `Observation report validation failed:\n${result.error.issues
+        .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+        .join('\n')}`,
     );
   }
 }
@@ -173,9 +162,7 @@ export function validateOnRead(content: string): ReadValidationResult {
   }
   return {
     valid: false,
-    errors: result.error.issues.map(
-      (i) => `${i.path.join('.')}: ${i.message}`,
-    ),
+    errors: result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
   };
 }
 

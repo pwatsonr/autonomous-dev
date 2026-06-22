@@ -20,7 +20,7 @@ const ANSI_RESET = '\x1b[0m';
  * Batch output is grouped by request ID, then by event type.
  */
 export class CliDeliveryAdapter implements DeliveryAdapter {
-  readonly method = "cli" as const;
+  readonly method = 'cli' as const;
 
   deliver(payload: NotificationPayload): DeliveryResult {
     try {

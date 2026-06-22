@@ -83,9 +83,7 @@ class StubEventBus implements EventBusLike {
   }
 }
 
-function createAssignment(
-  overrides: Partial<TrackAssignment> = {},
-): TrackAssignment {
+function createAssignment(overrides: Partial<TrackAssignment> = {}): TrackAssignment {
   return {
     trackName: 'track-a',
     worktreePath: '/tmp/fake-worktree',
@@ -233,9 +231,7 @@ describe('ProgressTracker', () => {
     });
 
     it('throws for unknown track', () => {
-      expect(() => tracker.getTrackProgress('nonexistent')).toThrow(
-        'Unknown track: nonexistent',
-      );
+      expect(() => tracker.getTrackProgress('nonexistent')).toThrow('Unknown track: nonexistent');
     });
 
     it('reports zero elapsed when startedAt is null', () => {
@@ -270,7 +266,12 @@ describe('ProgressTracker', () => {
       );
       tracker.registerTrack(
         'track-b',
-        createAssignment({ trackName: 'track-b', turnsUsed: 10, startedAt: new Date().toISOString(), spec: { name: 'b', complexity: 'small' } }),
+        createAssignment({
+          trackName: 'track-b',
+          turnsUsed: 10,
+          startedAt: new Date().toISOString(),
+          spec: { name: 'b', complexity: 'small' },
+        }),
         smExecuting,
       );
       tracker.registerTrack(
@@ -297,7 +298,12 @@ describe('ProgressTracker', () => {
       );
       tracker.registerTrack(
         'track-b',
-        createAssignment({ trackName: 'track-b', turnsUsed: 5, startedAt: new Date().toISOString(), spec: { name: 'b', complexity: 'small' } }),
+        createAssignment({
+          trackName: 'track-b',
+          turnsUsed: 5,
+          startedAt: new Date().toISOString(),
+          spec: { name: 'b', complexity: 'small' },
+        }),
         smExecuting,
       );
 
@@ -453,7 +459,7 @@ describe('ProgressTracker', () => {
             trackName: `track-${i}`,
             spec: { name: `spec-${i}`, complexity: 'medium' },
           }),
-          new StubStateMachine(i === 0 ? 'complete' : 'executing' as TrackState),
+          new StubStateMachine(i === 0 ? 'complete' : ('executing' as TrackState)),
         );
       }
 
@@ -535,7 +541,7 @@ describe('ProgressTracker', () => {
             trackName: `t-${i}`,
             spec: { name: `s-${i}`, complexity: 'medium' },
           }),
-          new StubStateMachine(i < 3 ? 'complete' : 'executing' as TrackState),
+          new StubStateMachine(i < 3 ? 'complete' : ('executing' as TrackState)),
         );
       }
 
@@ -568,9 +574,7 @@ describe('ProgressTracker', () => {
 
       setTimeout(() => {
         tracker.stopPeriodicReporting();
-        const progressEvents = bus.events.filter(
-          (e) => e.type === 'request.progress',
-        );
+        const progressEvents = bus.events.filter((e) => e.type === 'request.progress');
         expect(progressEvents.length).toBeGreaterThanOrEqual(1);
 
         const event = progressEvents[0];
@@ -595,14 +599,10 @@ describe('ProgressTracker', () => {
 
       setTimeout(() => {
         tracker.stopPeriodicReporting();
-        const countAtStop = bus.events.filter(
-          (e) => e.type === 'request.progress',
-        ).length;
+        const countAtStop = bus.events.filter((e) => e.type === 'request.progress').length;
 
         setTimeout(() => {
-          const countAfterStop = bus.events.filter(
-            (e) => e.type === 'request.progress',
-          ).length;
+          const countAfterStop = bus.events.filter((e) => e.type === 'request.progress').length;
           // No new events after stop
           expect(countAfterStop).toBe(countAtStop);
           done();
@@ -665,9 +665,7 @@ let spec51LogDir: string;
 let spec51StateDir: string;
 let spec51ArchiveDir: string;
 
-function makeMinimalStateChangedEvent(
-  overrides?: Partial<Record<string, unknown>>,
-): ParallelEvent {
+function makeMinimalStateChangedEvent(overrides?: Partial<Record<string, unknown>>): ParallelEvent {
   return {
     type: 'track.state_changed',
     requestId: 'r1',
@@ -685,9 +683,7 @@ function makeSpec51Config(overrides?: Partial<ParallelConfig>): ParallelConfig {
 }
 
 beforeEach(async () => {
-  spec51TmpDir = await fsp.mkdtemp(
-    path.join(os.tmpdir(), 'spec-006-5-1-test-'),
-  );
+  spec51TmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'spec-006-5-1-test-'));
   spec51LogDir = path.join(spec51TmpDir, 'logs');
   spec51StateDir = path.join(spec51TmpDir, 'state');
   spec51ArchiveDir = path.join(spec51TmpDir, 'archive');
@@ -899,18 +895,14 @@ describe('TrackStateMachine', () => {
     await sm.transition('reviewing', 'tests passed');
     await sm.transition('merging', 'review passed');
     await sm.transition('complete', 'merged');
-    await expect(sm.transition('queued', 'restart')).rejects.toThrow(
-      InvalidStateTransitionError,
-    );
+    await expect(sm.transition('queued', 'restart')).rejects.toThrow(InvalidStateTransitionError);
   });
 
   it('does not allow transition from escalated (terminal)', async () => {
     await sm.transition('queued', 'scheduled');
     await sm.transition('executing', 'agent spawned');
     await sm.transition('escalated', 'needs human');
-    await expect(sm.transition('queued', 'retry')).rejects.toThrow(
-      InvalidStateTransitionError,
-    );
+    await expect(sm.transition('queued', 'retry')).rejects.toThrow(InvalidStateTransitionError);
   });
 
   it('records all transitions with timestamps', async () => {
@@ -930,7 +922,9 @@ describe('TrackStateMachine', () => {
 
   it('emits track.state_changed event on transition', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.state_changed', (e) => { events.push(e); });
+    bus.on('track.state_changed', (e) => {
+      events.push(e);
+    });
     await sm.transition('queued', 'scheduled');
     expect(events.length).toBe(1);
     const evt = events[0] as any;
@@ -943,7 +937,9 @@ describe('TrackStateMachine', () => {
 
   it('does not emit event on invalid transition', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.state_changed', (e) => { events.push(e); });
+    bus.on('track.state_changed', (e) => {
+      events.push(e);
+    });
     await expect(sm.transition('complete', 'shortcut')).rejects.toThrow();
     expect(events.length).toBe(0);
   });
@@ -972,7 +968,10 @@ describe('TrackStateMachine', () => {
       { from: 'queued', to: 'executing', timestamp: '2026-01-01T00:01:00Z', reason: 'test' },
     ];
     const restored = TrackStateMachine.restore(
-      'r1', 't1', bus, persister,
+      'r1',
+      't1',
+      bus,
+      persister,
       'executing',
       transitions,
     );
@@ -988,7 +987,10 @@ describe('TrackStateMachine', () => {
       { from: 'queued', to: 'executing', timestamp: '2026-01-01T00:01:00Z', reason: 'test' },
     ];
     const restored = TrackStateMachine.restore(
-      'r1', 't1', bus, persister,
+      'r1',
+      't1',
+      bus,
+      persister,
       'executing',
       transitions,
     );
@@ -1050,7 +1052,9 @@ describe('StallDetector', () => {
 
   it('emits warning at stall timeout', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => { events.push(e); });
+    bus.on('track.stalled', (e) => {
+      events.push(e);
+    });
 
     detector.registerTrack('track-a');
     // Simulate passage of time: set lastActivity to 16 minutes ago
@@ -1066,7 +1070,9 @@ describe('StallDetector', () => {
 
   it('terminates at 2x stall timeout', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => { events.push(e); });
+    bus.on('track.stalled', (e) => {
+      events.push(e);
+    });
 
     detector.registerTrack('track-a');
     // Simulate 31 minutes of inactivity (2x 15 = 30 min threshold)
@@ -1081,7 +1087,9 @@ describe('StallDetector', () => {
 
   it('does not alert for recently active tracks', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => { events.push(e); });
+    bus.on('track.stalled', (e) => {
+      events.push(e);
+    });
 
     detector.registerTrack('track-a');
     detector.updateActivity('track-a'); // just now
@@ -1093,7 +1101,9 @@ describe('StallDetector', () => {
 
   it('updateActivity prevents stall alert', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => { events.push(e); });
+    bus.on('track.stalled', (e) => {
+      events.push(e);
+    });
 
     detector.registerTrack('track-a');
     // Set old activity
@@ -1113,7 +1123,9 @@ describe('StallDetector', () => {
 
     // Even if we try to check, no events
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => { events.push(e); });
+    bus.on('track.stalled', (e) => {
+      events.push(e);
+    });
     await (detector as any).checkAll();
     expect(events.length).toBe(0);
   });
@@ -1129,7 +1141,9 @@ describe('StallDetector', () => {
 
   it('handles multiple tracks independently', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => { events.push(e); });
+    bus.on('track.stalled', (e) => {
+      events.push(e);
+    });
 
     detector.registerTrack('track-a');
     detector.registerTrack('track-b');
@@ -1155,7 +1169,9 @@ describe('StallDetector', () => {
 
   it('setRequestId populates requestId in emitted events', async () => {
     const events: ParallelEvent[] = [];
-    bus.on('track.stalled', (e) => { events.push(e); });
+    bus.on('track.stalled', (e) => {
+      events.push(e);
+    });
 
     detector.setRequestId('req-42');
     detector.registerTrack('track-a');

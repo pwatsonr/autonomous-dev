@@ -142,14 +142,22 @@ function test_deterministic_canonicalization(): void {
   const canonical1 = canonicalize(event1);
   const canonical2 = canonicalize(event2);
 
-  assertEqual(canonical1, canonical2, 'same fields in different order should canonicalize identically');
+  assertEqual(
+    canonical1,
+    canonical2,
+    'same fields in different order should canonicalize identically',
+  );
 
   // Both should produce the same hash
   const computer = new HashChainComputer(true);
   const result1 = computer.computeHash(event1, GENESIS_HASH);
   const result2 = computer.computeHash(event2, GENESIS_HASH);
 
-  assertEqual(result1.hash, result2.hash, 'same events with different key order should hash identically');
+  assertEqual(
+    result1.hash,
+    result2.hash,
+    'same events with different key order should hash identically',
+  );
 
   console.log('PASS: test_deterministic_canonicalization');
 }
@@ -261,7 +269,11 @@ function test_same_payload_different_prev_hash(): void {
 
   // prev_hash values should reflect what was passed in
   assertEqual(result1.prev_hash, GENESIS_HASH, 'prev_hash should be GENESIS');
-  assertEqual(result2.prev_hash, 'some_other_hash_value', 'prev_hash should be the alternate value');
+  assertEqual(
+    result2.prev_hash,
+    'some_other_hash_value',
+    'prev_hash should be the alternate value',
+  );
 
   console.log('PASS: test_same_payload_different_prev_hash');
 }
@@ -288,10 +300,17 @@ function test_deep_sort_keys_edge_cases(): void {
   // deeply nested
   const input = { c: { z: { b: 1, a: 2 }, y: 3 }, a: 4 };
   const expected = '{"a":4,"c":{"y":3,"z":{"a":2,"b":1}}}';
-  assertEqual(JSON.stringify(deepSortKeys(input)), expected, 'deep nesting should be sorted at every level');
+  assertEqual(
+    JSON.stringify(deepSortKeys(input)),
+    expected,
+    'deep nesting should be sorted at every level',
+  );
 
   // array of objects
-  const arrInput = [{ b: 1, a: 2 }, { d: 3, c: 4 }];
+  const arrInput = [
+    { b: 1, a: 2 },
+    { d: 3, c: 4 },
+  ];
   const arrExpected = '[{"a":2,"b":1},{"c":4,"d":3}]';
   assertEqual(
     JSON.stringify(deepSortKeys(arrInput)),
@@ -306,14 +325,32 @@ function test_deep_sort_keys_edge_cases(): void {
 // Jest suite
 // ---------------------------------------------------------------------------
 
-describe("HashChainComputer (SPEC-009-5-2, Task 3)", () => {
-  it("computes genesis event hash", () => { test_genesis_event_hash(); });
-  it("continues chain across events", () => { test_chain_continuation(); });
-  it("uses deterministic canonicalization", () => { test_deterministic_canonicalization(); });
-  it("sorts nested object keys", () => { test_nested_objects_sorted(); });
-  it("preserves array order", () => { test_arrays_preserved_in_order(); });
-  it("returns empty in disabled mode", () => { test_disabled_mode_returns_empty(); });
-  it("produces different hashes for different payloads", () => { test_different_payloads_different_hashes(); });
-  it("produces different hash for same payload with different prevHash", () => { test_same_payload_different_prev_hash(); });
-  it("handles deep sort key edge cases", () => { test_deep_sort_keys_edge_cases(); });
+describe('HashChainComputer (SPEC-009-5-2, Task 3)', () => {
+  it('computes genesis event hash', () => {
+    test_genesis_event_hash();
+  });
+  it('continues chain across events', () => {
+    test_chain_continuation();
+  });
+  it('uses deterministic canonicalization', () => {
+    test_deterministic_canonicalization();
+  });
+  it('sorts nested object keys', () => {
+    test_nested_objects_sorted();
+  });
+  it('preserves array order', () => {
+    test_arrays_preserved_in_order();
+  });
+  it('returns empty in disabled mode', () => {
+    test_disabled_mode_returns_empty();
+  });
+  it('produces different hashes for different payloads', () => {
+    test_different_payloads_different_hashes();
+  });
+  it('produces different hash for same payload with different prevHash', () => {
+    test_same_payload_different_prev_hash();
+  });
+  it('handles deep sort key edge cases', () => {
+    test_deep_sort_keys_edge_cases();
+  });
 });

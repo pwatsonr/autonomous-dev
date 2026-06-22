@@ -2,8 +2,15 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import yaml from 'js-yaml';
-import { readPipelineState, writePipelineState } from '../../../src/pipeline/flow/pipeline-state-io';
-import { createInitialPipelineState, PipelineState, DocumentState } from '../../../src/pipeline/flow/pipeline-state';
+import {
+  readPipelineState,
+  writePipelineState,
+} from '../../../src/pipeline/flow/pipeline-state-io';
+import {
+  createInitialPipelineState,
+  PipelineState,
+  DocumentState,
+} from '../../../src/pipeline/flow/pipeline-state';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
 
@@ -49,7 +56,7 @@ describe('pipeline-state-io', () => {
       // No leftover .tmp files
       const pipeDir = directoryManager.getPipelineDir(pipelineId);
       const files = await fs.readdir(pipeDir);
-      const tmpFiles = files.filter(f => f.endsWith('.tmp'));
+      const tmpFiles = files.filter((f) => f.endsWith('.tmp'));
       expect(tmpFiles).toHaveLength(0);
     });
 
@@ -58,7 +65,7 @@ describe('pipeline-state-io', () => {
       const originalUpdatedAt = state.updatedAt;
 
       // Small delay to ensure timestamp difference
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       await writePipelineState(state, directoryManager);
 
       // The state object should have been mutated with a new updatedAt

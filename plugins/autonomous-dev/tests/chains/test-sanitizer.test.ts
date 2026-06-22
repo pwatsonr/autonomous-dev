@@ -45,9 +45,9 @@ describe('SPEC-022-3-02 sanitizer: path format', () => {
   });
 
   it('rejects URL-encoded `%2e%2e` defensively', () => {
-    expect(() =>
-      sanitizeArtifact('test', { p: 'a/%2e%2e/b' }, PATH_SCHEMA, WORKTREE),
-    ).toThrow(SanitizationError);
+    expect(() => sanitizeArtifact('test', { p: 'a/%2e%2e/b' }, PATH_SCHEMA, WORKTREE)).toThrow(
+      SanitizationError,
+    );
   });
 
   it('rejects empty path strings', () => {
@@ -99,12 +99,7 @@ describe('SPEC-022-3-02 sanitizer: uri format', () => {
 
   it('rejects javascript:', () => {
     expect(() =>
-      sanitizeArtifact(
-        'test',
-        { u: 'javascript:alert(1)' },
-        URI_SCHEMA,
-        WORKTREE,
-      ),
+      sanitizeArtifact('test', { u: 'javascript:alert(1)' }, URI_SCHEMA, WORKTREE),
     ).toThrow(SanitizationError);
   });
 
@@ -113,19 +108,14 @@ describe('SPEC-022-3-02 sanitizer: uri format', () => {
     ['data:', 'data:text/plain,hi'],
     ['ftp:', 'ftp://example.com'],
   ])('rejects %s scheme', (_label, uri) => {
-    expect(() =>
-      sanitizeArtifact('test', { u: uri }, URI_SCHEMA, WORKTREE),
-    ).toThrow(SanitizationError);
+    expect(() => sanitizeArtifact('test', { u: uri }, URI_SCHEMA, WORKTREE)).toThrow(
+      SanitizationError,
+    );
   });
 
   it('accepts https://', () => {
     expect(() =>
-      sanitizeArtifact(
-        'test',
-        { u: 'https://example.com/x' },
-        URI_SCHEMA,
-        WORKTREE,
-      ),
+      sanitizeArtifact('test', { u: 'https://example.com/x' }, URI_SCHEMA, WORKTREE),
     ).not.toThrow();
   });
 });
@@ -133,35 +123,22 @@ describe('SPEC-022-3-02 sanitizer: uri format', () => {
 describe('SPEC-022-3-02 sanitizer: shell-command format (opt-in permissive)', () => {
   it('accepts metacharacters in a shell-command field', () => {
     expect(() =>
-      sanitizeArtifact(
-        'test',
-        { c: 'cat a.txt | grep x; echo "$VAR"' },
-        SHELL_SCHEMA,
-        WORKTREE,
-      ),
+      sanitizeArtifact('test', { c: 'cat a.txt | grep x; echo "$VAR"' }, SHELL_SCHEMA, WORKTREE),
     ).not.toThrow();
   });
 });
 
 describe('SPEC-022-3-02 sanitizer: default-deny on free-form strings', () => {
-  it.each([';', '|', '&', '`', '$(', '${', '>', '<'])(
-    "rejects metachar '%s'",
-    (meta) => {
-      let caught: SanitizationError | null = null;
-      try {
-        sanitizeArtifact(
-          'test',
-          { s: `payload ${meta} malicious` },
-          FREEFORM_SCHEMA,
-          WORKTREE,
-        );
-      } catch (err) {
-        caught = err as SanitizationError;
-      }
-      expect(caught).toBeInstanceOf(SanitizationError);
-      expect(caught?.rule).toBe('shell-metacharacter');
-    },
-  );
+  it.each([';', '|', '&', '`', '$(', '${', '>', '<'])("rejects metachar '%s'", (meta) => {
+    let caught: SanitizationError | null = null;
+    try {
+      sanitizeArtifact('test', { s: `payload ${meta} malicious` }, FREEFORM_SCHEMA, WORKTREE);
+    } catch (err) {
+      caught = err as SanitizationError;
+    }
+    expect(caught).toBeInstanceOf(SanitizationError);
+    expect(caught?.rule).toBe('shell-metacharacter');
+  });
 
   it('accepts a clean string', () => {
     expect(() =>
@@ -205,12 +182,7 @@ describe('SPEC-022-3-02 sanitizer: recursion', () => {
     };
     let caught: SanitizationError | null = null;
     try {
-      sanitizeArtifact(
-        'test',
-        { paths: ['ok/file.ts', '../bad'] },
-        schema,
-        WORKTREE,
-      );
+      sanitizeArtifact('test', { paths: ['ok/file.ts', '../bad'] }, schema, WORKTREE);
     } catch (err) {
       caught = err as SanitizationError;
     }
@@ -229,12 +201,7 @@ describe('SPEC-022-3-02 sanitizer: recursion', () => {
     };
     let caught: SanitizationError | null = null;
     try {
-      sanitizeArtifact(
-        'test',
-        { a: '../first', b: '../second' },
-        schema,
-        WORKTREE,
-      );
+      sanitizeArtifact('test', { a: '../first', b: '../second' }, schema, WORKTREE);
     } catch (err) {
       caught = err as SanitizationError;
     }
@@ -245,12 +212,7 @@ describe('SPEC-022-3-02 sanitizer: recursion', () => {
     // Even if the schema declares the field as a plain string (no format),
     // shell metachars must trigger the default rule.
     expect(() =>
-      sanitizeArtifact(
-        'test',
-        { s: 'rm -rf / | sh' },
-        FREEFORM_SCHEMA,
-        WORKTREE,
-      ),
+      sanitizeArtifact('test', { s: 'rm -rf / | sh' }, FREEFORM_SCHEMA, WORKTREE),
     ).toThrow(SanitizationError);
   });
 
@@ -264,12 +226,7 @@ describe('SPEC-022-3-02 sanitizer: recursion', () => {
       },
     };
     expect(() =>
-      sanitizeArtifact(
-        'test',
-        { s: 'safe', n: 42, b: true },
-        schema,
-        WORKTREE,
-      ),
+      sanitizeArtifact('test', { s: 'safe', n: 42, b: true }, schema, WORKTREE),
     ).not.toThrow();
   });
 });
@@ -364,12 +321,7 @@ describe('SPEC-022-3-04 sanitizer: closeout coverage', () => {
     };
     let caught: SanitizationError | null = null;
     try {
-      sanitizeArtifact(
-        'test',
-        { known: 'safe', extra: 'rm -rf / | sh' },
-        schema,
-        WORKTREE,
-      );
+      sanitizeArtifact('test', { known: 'safe', extra: 'rm -rf / | sh' }, schema, WORKTREE);
     } catch (err) {
       caught = err as SanitizationError;
     }
@@ -384,12 +336,7 @@ describe('SPEC-022-3-02 sanitizer: error shape', () => {
   it('SanitizationError carries artifactType, fieldPath, rule, offendingValue', () => {
     let err: SanitizationError | null = null;
     try {
-      sanitizeArtifact(
-        'security-findings',
-        { p: '../etc/passwd' },
-        PATH_SCHEMA,
-        WORKTREE,
-      );
+      sanitizeArtifact('security-findings', { p: '../etc/passwd' }, PATH_SCHEMA, WORKTREE);
     } catch (e) {
       err = e as SanitizationError;
     }

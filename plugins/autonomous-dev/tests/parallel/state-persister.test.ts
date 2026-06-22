@@ -153,13 +153,8 @@ describe('loadState error handling', () => {
   });
 
   it('throws UnsupportedStateVersionError for version != 1', async () => {
-    fs.writeFileSync(
-      path.join(stateDir, 'v2.json'),
-      JSON.stringify({ version: 2 }),
-    );
-    await expect(persister.loadState('v2')).rejects.toThrow(
-      UnsupportedStateVersionError,
-    );
+    fs.writeFileSync(path.join(stateDir, 'v2.json'), JSON.stringify({ version: 2 }));
+    await expect(persister.loadState('v2')).rejects.toThrow(UnsupportedStateVersionError);
   });
 
   it('throws UnsupportedStateVersionError for missing version', async () => {
@@ -167,9 +162,7 @@ describe('loadState error handling', () => {
       path.join(stateDir, 'no-version.json'),
       JSON.stringify({ requestId: 'no-version' }),
     );
-    await expect(persister.loadState('no-version')).rejects.toThrow(
-      UnsupportedStateVersionError,
-    );
+    await expect(persister.loadState('no-version')).rejects.toThrow(UnsupportedStateVersionError);
   });
 
   it('StateNotFoundError includes requestId', async () => {
@@ -195,10 +188,7 @@ describe('loadState error handling', () => {
   });
 
   it('UnsupportedStateVersionError includes version', async () => {
-    fs.writeFileSync(
-      path.join(stateDir, 'v99.json'),
-      JSON.stringify({ version: 99 }),
-    );
+    fs.writeFileSync(path.join(stateDir, 'v99.json'), JSON.stringify({ version: 99 }));
     try {
       await persister.loadState('v99');
       fail('Expected UnsupportedStateVersionError');
@@ -248,10 +238,7 @@ describe('listInFlightRequests', () => {
   });
 
   it('returns empty array when state dir does not exist', async () => {
-    const emptyPersister = new StatePersister(
-      path.join(tmpDir, 'nonexistent'),
-      archiveDir,
-    );
+    const emptyPersister = new StatePersister(path.join(tmpDir, 'nonexistent'), archiveDir);
     const inFlight = await emptyPersister.listInFlightRequests();
     expect(inFlight).toEqual([]);
   });
@@ -266,9 +253,7 @@ describe('listInFlightRequests', () => {
       'escalated',
     ];
     for (let i = 0; i < activePhases.length; i++) {
-      await persister.saveState(
-        createTestState(`req-active-${i}`, { phase: activePhases[i] }),
-      );
+      await persister.saveState(createTestState(`req-active-${i}`, { phase: activePhases[i] }));
     }
     const inFlight = await persister.listInFlightRequests();
     expect(inFlight.length).toBe(activePhases.length);
@@ -295,9 +280,7 @@ describe('archiveState', () => {
     const archived = fs.readdirSync(archiveDir);
     const archivedFile = archived.find((f) => f.startsWith('req-002-'));
     expect(archivedFile).toBeDefined();
-    const content = JSON.parse(
-      fs.readFileSync(path.join(archiveDir, archivedFile!), 'utf-8'),
-    );
+    const content = JSON.parse(fs.readFileSync(path.join(archiveDir, archivedFile!), 'utf-8'));
     expect(content.requestId).toBe('req-002');
     expect(content.phase).toBe('merging');
   });

@@ -22,11 +22,13 @@ describe('listVersions', () => {
     await fs.rm(tmpDir, { recursive: true, force: true });
   });
 
-  function makeFrontmatter(opts: {
-    versionReason?: string;
-    updatedAt?: string;
-    authorAgent?: string;
-  } = {}): string {
+  function makeFrontmatter(
+    opts: {
+      versionReason?: string;
+      updatedAt?: string;
+      authorAgent?: string;
+    } = {},
+  ): string {
     const reason = opts.versionReason ?? 'INITIAL';
     const updated = opts.updatedAt ?? '2026-04-08T12:00:00.000Z';
     const author = opts.authorAgent ?? 'prd-author';
@@ -55,7 +57,7 @@ describe('listVersions', () => {
 
     const versions = await listVersions(pipelineId, DocumentType.PRD, documentId, dm);
     expect(versions).toHaveLength(3);
-    expect(versions.map(v => v.version)).toEqual(['1.0', '1.1', '1.2']);
+    expect(versions.map((v) => v.version)).toEqual(['1.0', '1.1', '1.2']);
   });
 
   it('ignores non-version files (current.md, reviews/, diffs/)', async () => {
@@ -91,7 +93,7 @@ describe('listVersions', () => {
     await writeVersionFile('1.2');
 
     const versions = await listVersions(pipelineId, DocumentType.PRD, documentId, dm);
-    expect(versions.map(v => v.version)).toEqual(['1.2', '1.9', '1.10']);
+    expect(versions.map((v) => v.version)).toEqual(['1.2', '1.9', '1.10']);
   });
 
   it('sorts versions: 1.10 before 2.0', async () => {
@@ -109,11 +111,14 @@ describe('listVersions', () => {
   });
 
   it('extracts metadata from frontmatter', async () => {
-    await writeVersionFile('1.0', makeFrontmatter({
-      versionReason: 'REVIEW_REVISION',
-      updatedAt: '2026-04-09T10:30:00.000Z',
-      authorAgent: 'reviewer-1',
-    }));
+    await writeVersionFile(
+      '1.0',
+      makeFrontmatter({
+        versionReason: 'REVIEW_REVISION',
+        updatedAt: '2026-04-09T10:30:00.000Z',
+        authorAgent: 'reviewer-1',
+      }),
+    );
 
     const versions = await listVersions(pipelineId, DocumentType.PRD, documentId, dm);
     expect(versions).toHaveLength(1);

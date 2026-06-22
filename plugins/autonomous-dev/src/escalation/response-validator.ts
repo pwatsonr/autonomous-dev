@@ -13,8 +13,12 @@
  * Checks are evaluated in order; the first failure short-circuits.
  */
 
-import type { EscalationConfig, EscalationOption } from "./types";
-import type { EscalationResponse, ValidationResult, ResponseValidationError } from "./response-types";
+import type { EscalationConfig, EscalationOption } from './types';
+import type {
+  EscalationResponse,
+  ValidationResult,
+  ResponseValidationError,
+} from './response-types';
 
 // ---------------------------------------------------------------------------
 // Dependency interfaces
@@ -29,7 +33,7 @@ export interface EscalationStore {
 export interface StoredEscalation {
   escalationId: string;
   requestId: string;
-  status: "pending" | "resolved" | "cancelled";
+  status: 'pending' | 'resolved' | 'cancelled';
   options: EscalationOption[];
   /** The pipeline gate that triggered this escalation. */
   gate?: string;
@@ -67,18 +71,18 @@ export class ResponseValidator {
       return {
         valid: false,
         error: {
-          code: "ESCALATION_NOT_FOUND",
+          code: 'ESCALATION_NOT_FOUND',
           message: `Escalation "${response.escalation_id}" not found.`,
         },
       };
     }
 
     // 2. Escalation is pending
-    if (escalation.status !== "pending") {
+    if (escalation.status !== 'pending') {
       return {
         valid: false,
         error: {
-          code: "ESCALATION_ALREADY_RESOLVED",
+          code: 'ESCALATION_ALREADY_RESOLVED',
           message: `Escalation "${response.escalation_id}" is already ${escalation.status}.`,
         },
       };
@@ -89,20 +93,20 @@ export class ResponseValidator {
       return {
         valid: false,
         error: {
-          code: "REQUEST_CANCELLED",
+          code: 'REQUEST_CANCELLED',
           message: `Request "${escalation.requestId}" has been cancelled.`,
         },
       };
     }
 
     // 4. Option response: option_id must exist in escalation's options
-    if (response.response_type === "option") {
+    if (response.response_type === 'option') {
       const validOptionIds = escalation.options.map((o) => o.option_id);
       if (!response.option_id || !validOptionIds.includes(response.option_id)) {
         return {
           valid: false,
           error: {
-            code: "INVALID_OPTION_ID",
+            code: 'INVALID_OPTION_ID',
             message: `Option "${response.option_id}" is not a valid option for escalation "${response.escalation_id}".`,
             availableOptions: escalation.options,
           },
@@ -111,13 +115,13 @@ export class ResponseValidator {
     }
 
     // 5. Delegate response: delegate_target must be a known routing target
-    if (response.response_type === "delegate") {
+    if (response.response_type === 'delegate') {
       const knownTargets = this.extractKnownTargets();
       if (!response.delegate_target || !knownTargets.includes(response.delegate_target)) {
         return {
           valid: false,
           error: {
-            code: "UNKNOWN_DELEGATE_TARGET",
+            code: 'UNKNOWN_DELEGATE_TARGET',
             message: `Delegate target "${response.delegate_target}" is not a known routing target.`,
             knownTargets,
           },
@@ -126,13 +130,13 @@ export class ResponseValidator {
     }
 
     // 6. Freetext response: must be non-empty after trim
-    if (response.response_type === "freetext") {
+    if (response.response_type === 'freetext') {
       if (!response.freetext || response.freetext.trim().length === 0) {
         return {
           valid: false,
           error: {
-            code: "INVALID_OPTION_ID",
-            message: "Empty free-text response not allowed",
+            code: 'INVALID_OPTION_ID',
+            message: 'Empty free-text response not allowed',
           },
         };
       }

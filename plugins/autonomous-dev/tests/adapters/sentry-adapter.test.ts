@@ -13,14 +13,8 @@ import {
   buildSentryQuery,
   extractStackTrace,
 } from '../../src/adapters/sentry-enrichment';
-import type {
-  McpToolCaller,
-  ConnectivityReport,
-} from '../../src/adapters/types';
-import {
-  DefaultQueryBudgetTracker,
-  AdapterTimeoutError,
-} from '../../src/adapters/types';
+import type { McpToolCaller, ConnectivityReport } from '../../src/adapters/types';
+import { DefaultQueryBudgetTracker, AdapterTimeoutError } from '../../src/adapters/types';
 import type {
   SentryAdapterConfig,
   SentryEvent,
@@ -32,9 +26,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 /** Builds a default Sentry adapter config. */
-function buildConfig(
-  overrides: Partial<SentryAdapterConfig> = {},
-): SentryAdapterConfig {
+function buildConfig(overrides: Partial<SentryAdapterConfig> = {}): SentryAdapterConfig {
   return {
     enabled: true,
     project_slug: 'test-project',
@@ -61,9 +53,10 @@ function buildMockMcp(response: unknown = []): {
 }
 
 /** Builds a mock MCP that returns different responses per tool name. */
-function buildRoutingMcp(
-  responses: Record<string, unknown>,
-): { mcp: McpToolCaller; calls: Array<{ toolName: string; params: Record<string, unknown> }> } {
+function buildRoutingMcp(responses: Record<string, unknown>): {
+  mcp: McpToolCaller;
+  calls: Array<{ toolName: string; params: Record<string, unknown> }>;
+} {
   const calls: Array<{ toolName: string; params: Record<string, unknown> }> = [];
   const mcp: McpToolCaller = {
     callTool: async (toolName, params) => {
@@ -76,7 +69,9 @@ function buildRoutingMcp(
 
 /** Builds a default query budget tracker. */
 function buildBudget(
-  overrides: Partial<Record<string, { max_queries_per_service: number; timeout_seconds: number }>> = {},
+  overrides: Partial<
+    Record<string, { max_queries_per_service: number; timeout_seconds: number }>
+  > = {},
 ): DefaultQueryBudgetTracker {
   return new DefaultQueryBudgetTracker({
     prometheus: { max_queries_per_service: 20, timeout_seconds: 30 },
@@ -129,13 +124,15 @@ function buildMockIssuesResponse(count: number = 3): unknown[] {
 }
 
 /** Builds a mock Sentry event with an exception entry and stack trace. */
-function buildMockEventResponse(options: {
-  message?: string;
-  exceptionType?: string;
-  exceptionValue?: string;
-  frames?: Array<Record<string, unknown>>;
-  requestData?: Record<string, unknown>;
-} = {}): unknown[] {
+function buildMockEventResponse(
+  options: {
+    message?: string;
+    exceptionType?: string;
+    exceptionValue?: string;
+    frames?: Array<Record<string, unknown>>;
+    requestData?: Record<string, unknown>;
+  } = {},
+): unknown[] {
   const defaultFrames = [
     {
       filename: 'app/handlers/api.py',
@@ -237,9 +234,7 @@ function buildTestScrubber(): DataScrubber {
 
   return {
     scrubText(text: string): string {
-      return text
-        .replace(emailRegex, '[REDACTED:email]')
-        .replace(secretRegex, '[SECRET_REDACTED]');
+      return text.replace(emailRegex, '[REDACTED:email]').replace(secretRegex, '[SECRET_REDACTED]');
     },
     scrubObject(obj: Record<string, unknown>): Record<string, unknown> {
       const result: Record<string, unknown> = {};
@@ -308,10 +303,12 @@ describe('SentryAdapter', () => {
 
   describe('TC-5-5-03: getIssueEvents with stack trace', () => {
     test('returns SentryEvent with scrubbed exception values and stack frames', async () => {
-      const { mcp } = buildMockMcp(buildMockEventResponse({
-        message: 'Error from user john@example.com',
-        exceptionValue: 'Connection from john@example.com failed',
-      }));
+      const { mcp } = buildMockMcp(
+        buildMockEventResponse({
+          message: 'Error from user john@example.com',
+          exceptionValue: 'Connection from john@example.com failed',
+        }),
+      );
       const budget = buildBudget();
       const scrubber = buildTestScrubber();
       const adapter = new SentryAdapter(buildConfig(), mcp, budget, scrubber);
@@ -443,9 +440,11 @@ describe('SentryAdapter', () => {
 
   describe('TC-5-5-08: PII scrubbing -- exception value', () => {
     test('exception message containing email is scrubbed', async () => {
-      const { mcp } = buildMockMcp(buildMockEventResponse({
-        exceptionValue: 'Failed for user john@example.com',
-      }));
+      const { mcp } = buildMockMcp(
+        buildMockEventResponse({
+          exceptionValue: 'Failed for user john@example.com',
+        }),
+      );
       const budget = buildBudget();
       const scrubber = buildTestScrubber();
       const adapter = new SentryAdapter(buildConfig(), mcp, budget, scrubber);
@@ -498,18 +497,20 @@ describe('SentryAdapter', () => {
 
   describe('TC-5-5-10: PII scrubbing -- request headers', () => {
     test('request entry Authorization header is scrubbed', async () => {
-      const { mcp } = buildMockMcp(buildMockEventResponse({
-        requestData: {
-          url: 'https://api.example.com/users',
-          method: 'GET',
-          headers: {
-            Authorization: 'Bearer token123abc',
-            'Content-Type': 'application/json',
+      const { mcp } = buildMockMcp(
+        buildMockEventResponse({
+          requestData: {
+            url: 'https://api.example.com/users',
+            method: 'GET',
+            headers: {
+              Authorization: 'Bearer token123abc',
+              'Content-Type': 'application/json',
+            },
+            query_string: 'email=user@test.com',
+            data: null,
           },
-          query_string: 'email=user@test.com',
-          data: null,
-        },
-      }));
+        }),
+      );
       const budget = buildBudget();
       const scrubber = buildTestScrubber();
       const adapter = new SentryAdapter(buildConfig(), mcp, budget, scrubber);
@@ -568,24 +569,26 @@ describe('SentryAdapter', () => {
   describe('TC-5-5-12: query timeout', () => {
     test('MCP call exceeding timeout throws AdapterTimeoutError', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       const budget = buildBudget();
       const config = buildConfig({ query_timeout_ms: 50 });
       const adapter = new SentryAdapter(config, slowMcp, budget);
 
-      await expect(
-        adapter.listIssues(undefined, 'date', 'api-gateway'),
-      ).rejects.toThrow(AdapterTimeoutError);
+      await expect(adapter.listIssues(undefined, 'date', 'api-gateway')).rejects.toThrow(
+        AdapterTimeoutError,
+      );
     });
 
     test('timeout error includes source and query name', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       const budget = buildBudget();
       const config = buildConfig({ query_timeout_ms: 50 });
@@ -604,9 +607,10 @@ describe('SentryAdapter', () => {
 
     test('query is still counted after timeout', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       const budget = buildBudget();
       const config = buildConfig({ query_timeout_ms: 50 });
@@ -708,11 +712,13 @@ describe('SentryAdapter', () => {
           {
             type: 'exception',
             data: {
-              values: [{
-                type: 'TestError',
-                value: 'test',
-                stacktrace: { frames },
-              }],
+              values: [
+                {
+                  type: 'TestError',
+                  value: 'test',
+                  stacktrace: { frames },
+                },
+              ],
             },
           },
         ],
@@ -814,9 +820,7 @@ describe('enrichWithSentry', () => {
       expect(enrichment.release_health).toBeNull();
 
       // Should not have called sentry_get_release_health
-      const releaseHealthCalls = calls.filter(
-        (c) => c.toolName === 'sentry_get_release_health',
-      );
+      const releaseHealthCalls = calls.filter((c) => c.toolName === 'sentry_get_release_health');
       expect(releaseHealthCalls).toHaveLength(0);
 
       // 1 listIssues + 2 getIssueEvents = 3 queries

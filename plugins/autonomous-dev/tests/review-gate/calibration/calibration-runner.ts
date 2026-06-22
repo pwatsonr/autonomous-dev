@@ -51,7 +51,10 @@ export interface ReviewPipelineAdapter {
    *
    * Returns the aggregate score, outcome, and findings by category.
    */
-  executeReview(documentPath: string, documentType: string): Promise<{
+  executeReview(
+    documentPath: string,
+    documentType: string,
+  ): Promise<{
     aggregate_score: number;
     outcome: 'approved' | 'changes_requested' | 'rejected';
     findings: { category_id: string; severity: string }[];
@@ -123,31 +126,30 @@ export class CalibrationRunner {
 
       // Count findings per expected category
       for (const ef of expectation.expected_findings) {
-        const count = reviewResult.findings.filter(
-          f => f.category_id === ef.category_id,
-        ).length;
+        const count = reviewResult.findings.filter((f) => f.category_id === ef.category_id).length;
         runFindingCounts.get(ef.category_id)!.push(count);
       }
     }
 
     // Compute average score for the primary result
-    const avgScore = runScores.length > 0
-      ? Math.round(runScores.reduce((a, b) => a + b, 0) / runScores.length * 100) / 100
-      : 0;
+    const avgScore =
+      runScores.length > 0
+        ? Math.round((runScores.reduce((a, b) => a + b, 0) / runScores.length) * 100) / 100
+        : 0;
 
     // Check score_in_range: ALL run scores fall within expected_range
     const scoreInRange = runScores.every(
-      s => s >= expectation.expected_score_range.min && s <= expectation.expected_score_range.max,
+      (s) => s >= expectation.expected_score_range.min && s <= expectation.expected_score_range.max,
     );
 
     // Check outcome_expected: ALL run outcomes are in expected_outcome list
-    const outcomeExpected = runOutcomes.every(
-      o => expectation.expected_outcome.includes(o as 'approved' | 'changes_requested' | 'rejected'),
+    const outcomeExpected = runOutcomes.every((o) =>
+      expectation.expected_outcome.includes(o as 'approved' | 'changes_requested' | 'rejected'),
     );
 
     // Check expected_findings: for each expected finding category,
     // at least min_count findings were generated in ALL runs
-    const expectedFindingsFound = expectation.expected_findings.map(ef => {
+    const expectedFindingsFound = expectation.expected_findings.map((ef) => {
       const counts = runFindingCounts.get(ef.category_id) ?? [];
       const minActual = counts.length > 0 ? Math.min(...counts) : 0;
       return {
@@ -165,7 +167,7 @@ export class CalibrationRunner {
     const withinTolerance = variance <= expectation.score_tolerance;
 
     // overall_pass = all checks pass
-    const allFindingsPass = expectedFindingsFound.every(f => f.pass);
+    const allFindingsPass = expectedFindingsFound.every((f) => f.pass);
     const overallPass = scoreInRange && outcomeExpected && allFindingsPass && withinTolerance;
 
     return {

@@ -75,9 +75,7 @@ describe('ReviewerAgentPool', () => {
     const instance = pool.createInstance(makeAssignment());
     pool.markActive(instance.instance_id);
 
-    expect(() => pool.markActive(instance.instance_id)).toThrow(
-      /already active/i,
-    );
+    expect(() => pool.markActive(instance.instance_id)).toThrow(/already active/i);
   });
 
   // Test 5: Non-existent instance throws
@@ -122,9 +120,7 @@ describe('ReviewerAgentPool', () => {
     pool.createInstance(makeAssignment({ reviewer_id: 'c', agent_seed: 3 }));
 
     // Mark one active to make sure active list is also cleared
-    const instances = [
-      pool.createInstance(makeAssignment({ reviewer_id: 'd', agent_seed: 4 })),
-    ];
+    const instances = [pool.createInstance(makeAssignment({ reviewer_id: 'd', agent_seed: 4 }))];
     // We already created 3 above, so let's just use those...
     pool.reset();
 

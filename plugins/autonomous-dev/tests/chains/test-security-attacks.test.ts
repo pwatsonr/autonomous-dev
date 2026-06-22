@@ -38,14 +38,8 @@ import {
 import { clearSchemaCache } from '../../intake/chains/schema-cache';
 import * as schemaCacheModule from '../../intake/chains/schema-cache';
 import { ChainAuditWriter } from '../../intake/chains/audit-writer';
-import {
-  cleanupTempDir,
-  createTempRequestDir,
-} from '../helpers/chain-fixtures';
-import type {
-  ChainAuditEntry,
-  ChainEventType,
-} from '../../intake/chains/audit-events';
+import { cleanupTempDir, createTempRequestDir } from '../helpers/chain-fixtures';
+import type { ChainAuditEntry, ChainEventType } from '../../intake/chains/audit-events';
 
 const FIXTURE_SCHEMA_ROOT = path.resolve(__dirname, 'fixtures', 'schemas');
 const KEYS_DIR = path.resolve(__dirname, 'fixtures', 'keys');
@@ -70,9 +64,7 @@ function ed25519SignerOf(privPem: string) {
   const key = createPrivateKey({ key: privPem, format: 'pem' });
   return {
     sign(_producer: string, canonical: string): string {
-      return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString(
-        'base64',
-      );
+      return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString('base64');
     },
   };
 }
@@ -181,9 +173,9 @@ describe('SPEC-022-3-04 adversarial security tests', () => {
       // Strict-schema strip: `extra_data` is gone from the consumer view.
       expect((out.payload as Record<string, unknown>).extra_data).toBeUndefined();
       // The findings are intact.
-      expect(
-        (out.payload as { findings: Array<Record<string, unknown>> }).findings,
-      ).toHaveLength(1);
+      expect((out.payload as { findings: Array<Record<string, unknown>> }).findings).toHaveLength(
+        1,
+      );
     } finally {
       await writer.close();
     }
@@ -216,30 +208,33 @@ describe('SPEC-022-3-04 adversarial security tests', () => {
     // The registry's read pipeline pulls the rawSchema from
     // `this.validators` via private state; we reach in directly because
     // the sanitizer is the layer under test, not the rawSchema accessor.
-    const validators = (reg as unknown as {
-      validators: Map<string, { rawSchema: { properties?: { patches?: { items?: { properties?: { file?: { format?: string } } } } } } }>;
-    }).validators;
+    const validators = (
+      reg as unknown as {
+        validators: Map<
+          string,
+          {
+            rawSchema: {
+              properties?: {
+                patches?: { items?: { properties?: { file?: { format?: string } } } };
+              };
+            };
+          }
+        >;
+      }
+    ).validators;
     const entry = validators.get('code-patches@1.0');
     expect(entry).toBeDefined();
     const fileSchema = entry!.rawSchema.properties?.patches?.items?.properties?.file;
     expect(fileSchema).toBeDefined();
     fileSchema!.format = 'path';
 
-    await reg.persist(
-      tempRoot,
-      'code-patches',
-      'v2-traversal',
-      { patches: [{ file: '../../../etc/passwd', hunks: ['@@'] }] },
-    );
+    await reg.persist(tempRoot, 'code-patches', 'v2-traversal', {
+      patches: [{ file: '../../../etc/passwd', hunks: ['@@'] }],
+    });
 
     let caught: SanitizationError | null = null;
     try {
-      await reg.read(
-        'code-patches',
-        'v2-traversal',
-        consumer('code-patches', '1.0'),
-        tempRoot,
-      );
+      await reg.read('code-patches', 'v2-traversal', consumer('code-patches', '1.0'), tempRoot);
     } catch (err) {
       caught = err as SanitizationError;
     }
@@ -274,12 +269,9 @@ describe('SPEC-022-3-04 adversarial security tests', () => {
   it('Vector 3 (HMAC tampering): consumer read throws ArtifactTamperedError after external mutation', async () => {
     const reg = new ArtifactRegistry({ hmacKey: TEST_HMAC_KEY });
     await reg.loadSchemas(FIXTURE_SCHEMA_ROOT);
-    await reg.persist(
-      tempRoot,
-      'security-findings',
-      'v3-tamper',
-      { findings: [{ file: 'src/x.ts', line: 1, rule_id: 'R1' }] },
-    );
+    await reg.persist(tempRoot, 'security-findings', 'v3-tamper', {
+      findings: [{ file: 'src/x.ts', line: 1, rule_id: 'R1' }],
+    });
 
     // Simulate an external attacker via direct fs.writeFile (NOT the
     // registry API) — this is the documented threat model.
@@ -334,12 +326,9 @@ describe('SPEC-022-3-04 adversarial security tests', () => {
   it('Vector 4 (capability denial): undeclared read throws CapabilityError with no schema compile or HMAC verify', async () => {
     const reg = new ArtifactRegistry({ hmacKey: TEST_HMAC_KEY });
     await reg.loadSchemas(FIXTURE_SCHEMA_ROOT);
-    await reg.persist(
-      tempRoot,
-      'code-patches',
-      'v4-cap',
-      { patches: [{ file: 'a', hunks: ['@@'] }] },
-    );
+    await reg.persist(tempRoot, 'code-patches', 'v4-cap', {
+      patches: [{ file: 'a', hunks: ['@@'] }],
+    });
 
     // Spy on the schema-cache compile path; a denied capability MUST
     // short-circuit before any schema work runs.

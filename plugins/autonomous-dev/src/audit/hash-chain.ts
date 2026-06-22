@@ -65,9 +65,7 @@ export function deepSortKeys(obj: unknown): unknown {
  * - Dates serialized as ISO 8601 strings (already strings in the event).
  * - undefined values excluded (JSON.stringify handles this).
  */
-export function canonicalize(
-  event: Omit<AuditEvent, 'hash' | 'prev_hash'>,
-): string {
+export function canonicalize(event: Omit<AuditEvent, 'hash' | 'prev_hash'>): string {
   const sorted = deepSortKeys(event);
   return JSON.stringify(sorted);
 }

@@ -5,7 +5,10 @@ import { DirectoryManager } from '../../../src/pipeline/storage/directory-manage
 import { TemplateEngine } from '../../../src/pipeline/template-engine/template-engine';
 import { InMemoryIdCounter } from '../../../src/pipeline/frontmatter/id-generator';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
-import { createDocument, CreateDocumentRequest } from '../../../src/pipeline/storage/document-creator';
+import {
+  createDocument,
+  CreateDocumentRequest,
+} from '../../../src/pipeline/storage/document-creator';
 import {
   readDocument,
   readVersion,
@@ -96,13 +99,7 @@ describe('document-reader', () => {
     it('returns content from specific version file', async () => {
       const handle = await createDocument(makeRequest(), dm, templateEngine, idCounter);
 
-      const content = await readVersion(
-        pipelineId,
-        DocumentType.PRD,
-        handle.documentId,
-        '1.0',
-        dm,
-      );
+      const content = await readVersion(pipelineId, DocumentType.PRD, handle.documentId, '1.0', dm);
 
       expect(content.rawContent).toBeDefined();
       expect(content.rawContent.length).toBeGreaterThan(0);

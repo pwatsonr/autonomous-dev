@@ -112,8 +112,7 @@ describe('renderStandardsSection', () => {
         makeRule({
           id: `pad:adv-${id}`,
           severity: 'advisory',
-          description:
-            'Advisory rule with deliberately verbose description '.repeat(3),
+          description: 'Advisory rule with deliberately verbose description '.repeat(3),
         }),
       );
     }

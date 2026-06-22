@@ -247,9 +247,15 @@ describe('TypedEventBus', () => {
     const bus = new TypedEventBus();
     const calls: number[] = [];
 
-    bus.subscribe('intake', () => { calls.push(1); });
-    bus.subscribe('intake', () => { calls.push(2); });
-    bus.subscribe('intake', () => { calls.push(3); });
+    bus.subscribe('intake', () => {
+      calls.push(1);
+    });
+    bus.subscribe('intake', () => {
+      calls.push(2);
+    });
+    bus.subscribe('intake', () => {
+      calls.push(3);
+    });
 
     await bus.emit('intake', {
       type: 'request_paused',
@@ -267,9 +273,15 @@ describe('TypedEventBus', () => {
     const intakeCalls: IntakeEvent[] = [];
     const pipelineCalls: PipelineEvent[] = [];
 
-    bus.subscribe('intake', (e) => { intakeCalls.push(e); });
-    bus.subscribe('intake', (e) => { intakeCalls.push(e); });
-    bus.subscribe('pipeline', (e) => { pipelineCalls.push(e); });
+    bus.subscribe('intake', (e) => {
+      intakeCalls.push(e);
+    });
+    bus.subscribe('intake', (e) => {
+      intakeCalls.push(e);
+    });
+    bus.subscribe('pipeline', (e) => {
+      pipelineCalls.push(e);
+    });
 
     bus.removeAllListeners();
 

@@ -95,10 +95,7 @@ export async function enrichWithSentry(
 
   // Step 3: Release health (if version known and budget allows)
   if (releaseVersion && adapter.remainingBudget > 0) {
-    enrichment.release_health = await adapter.getReleaseHealth(
-      releaseVersion,
-      budgetServiceName,
-    );
+    enrichment.release_health = await adapter.getReleaseHealth(releaseVersion, budgetServiceName);
     enrichment.queries_used++;
   }
 
@@ -125,10 +122,7 @@ export function buildSentryQuery(service: string, errorClass: string): string {
  * Extract and normalize a stack trace from a Sentry event.
  * Returns only in-app frames (filters out library code).
  */
-export function extractStackTrace(
-  event: SentryEvent,
-  issueId: string,
-): ScrubbledStackTrace | null {
+export function extractStackTrace(event: SentryEvent, issueId: string): ScrubbledStackTrace | null {
   for (const entry of event.entries ?? []) {
     if (entry.type !== 'exception') continue;
 

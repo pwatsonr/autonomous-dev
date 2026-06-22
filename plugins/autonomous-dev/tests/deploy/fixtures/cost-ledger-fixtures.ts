@@ -47,9 +47,7 @@ export async function buildLedgerAt(args: BuildLedgerArgs): Promise<{
   const total = (args.percent / 100) * cap;
   const entries = args.entries ?? 1;
   const per = total / entries;
-  const now =
-    args.now ??
-    (() => new Date(Date.UTC(2026, 4, 2, 12, 0, 0))); // 2026-05-02T12:00:00Z
+  const now = args.now ?? (() => new Date(Date.UTC(2026, 4, 2, 12, 0, 0))); // 2026-05-02T12:00:00Z
 
   const ledger = new CostLedger({
     dir: args.dir,

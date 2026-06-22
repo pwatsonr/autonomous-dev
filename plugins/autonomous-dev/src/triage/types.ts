@@ -9,12 +9,7 @@
 // Triage decision values
 // ---------------------------------------------------------------------------
 
-export const VALID_TRIAGE_DECISIONS = [
-  'promote',
-  'dismiss',
-  'defer',
-  'investigate',
-] as const;
+export const VALID_TRIAGE_DECISIONS = ['promote', 'dismiss', 'defer', 'investigate'] as const;
 
 export type TriageDecisionValue = (typeof VALID_TRIAGE_DECISIONS)[number];
 

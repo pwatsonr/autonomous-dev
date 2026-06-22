@@ -10,7 +10,7 @@
  *      human action.
  */
 
-import type { KillMode } from "./types";
+import type { KillMode } from './types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,7 +66,7 @@ const defaultLogger: ConfigLogger = {
 // Valid kill modes
 // ---------------------------------------------------------------------------
 
-const VALID_KILL_MODES: readonly KillMode[] = ["graceful", "hard"] as const;
+const VALID_KILL_MODES: readonly KillMode[] = ['graceful', 'hard'] as const;
 
 // ---------------------------------------------------------------------------
 // EmergencyConfigLoader
@@ -99,9 +99,7 @@ export class EmergencyConfigLoader {
 
     return {
       kill_default_mode: this.validateKillDefaultMode(raw.kill_default_mode),
-      restart_requires_human: this.enforceRestartRequiresHuman(
-        raw.restart_requires_human,
-      ),
+      restart_requires_human: this.enforceRestartRequiresHuman(raw.restart_requires_human),
     };
   }
 
@@ -115,10 +113,7 @@ export class EmergencyConfigLoader {
    * @returns A valid KillMode, defaulting to "graceful" on invalid input.
    */
   private validateKillDefaultMode(value: unknown): KillMode {
-    if (
-      typeof value === "string" &&
-      VALID_KILL_MODES.includes(value as KillMode)
-    ) {
+    if (typeof value === 'string' && VALID_KILL_MODES.includes(value as KillMode)) {
       return value as KillMode;
     }
 
@@ -128,7 +123,7 @@ export class EmergencyConfigLoader {
       );
     }
 
-    return "graceful";
+    return 'graceful';
   }
 
   /**
@@ -142,7 +137,7 @@ export class EmergencyConfigLoader {
   private enforceRestartRequiresHuman(value: unknown): true {
     if (value === false) {
       this.logger.error(
-        "restart_requires_human cannot be set to false. This is an immutable safety constraint. Forcing to true.",
+        'restart_requires_human cannot be set to false. This is an immutable safety constraint. Forcing to true.',
       );
     }
 

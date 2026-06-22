@@ -34,9 +34,7 @@ export type UpdateFingerprintStoreFn = (
  * @param fingerprintsDir Absolute path to `.autonomous-dev/fingerprints/`
  * @returns An UpdateFingerprintStoreFn that reads/writes fingerprint JSON files
  */
-export function createFingerprintStoreUpdater(
-  fingerprintsDir: string,
-): UpdateFingerprintStoreFn {
+export function createFingerprintStoreUpdater(fingerprintsDir: string): UpdateFingerprintStoreFn {
   return async (
     service: string,
     fingerprint: string,

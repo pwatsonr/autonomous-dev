@@ -18,9 +18,7 @@ import type { ObservationFrontmatter } from '../../src/engine/schema-validator';
  * Builds a fully valid observation frontmatter object.
  * All fields are set to valid values matching the schema.
  */
-function buildValidFrontmatter(
-  overrides: Record<string, unknown> = {},
-): Record<string, unknown> {
+function buildValidFrontmatter(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'OBS-20260408-143022-a1b2',
     timestamp: '2026-04-08T14:30:22Z',
@@ -84,7 +82,14 @@ describe('validateObservation - valid inputs', () => {
   });
 
   it('accepts all valid triage_status values', () => {
-    for (const status of ['pending', 'promoted', 'dismissed', 'deferred', 'investigating', 'cooldown']) {
+    for (const status of [
+      'pending',
+      'promoted',
+      'dismissed',
+      'deferred',
+      'investigating',
+      'cooldown',
+    ]) {
       const result = validateObservation(buildValidFrontmatter({ triage_status: status }));
       expect(result.valid).toBe(true);
     }
@@ -127,9 +132,9 @@ describe('validateObservation - valid inputs', () => {
   });
 
   it('accepts effectiveness_detail as null or undefined', () => {
-    expect(
-      validateObservation(buildValidFrontmatter({ effectiveness_detail: null })).valid,
-    ).toBe(true);
+    expect(validateObservation(buildValidFrontmatter({ effectiveness_detail: null })).valid).toBe(
+      true,
+    );
     const withoutDetail = buildValidFrontmatter();
     delete withoutDetail.effectiveness_detail;
     expect(validateObservation(withoutDetail).valid).toBe(true);
@@ -199,23 +204,17 @@ describe('validateObservation - invalid id format', () => {
   });
 
   it('rejects id missing hex suffix', () => {
-    const result = validateObservation(
-      buildValidFrontmatter({ id: 'OBS-20260408-143022' }),
-    );
+    const result = validateObservation(buildValidFrontmatter({ id: 'OBS-20260408-143022' }));
     expect(result.valid).toBe(false);
   });
 
   it('rejects id with uppercase hex', () => {
-    const result = validateObservation(
-      buildValidFrontmatter({ id: 'OBS-20260408-143022-A1B2' }),
-    );
+    const result = validateObservation(buildValidFrontmatter({ id: 'OBS-20260408-143022-A1B2' }));
     expect(result.valid).toBe(false);
   });
 
   it('rejects id with wrong prefix', () => {
-    const result = validateObservation(
-      buildValidFrontmatter({ id: 'ERR-20260408-143022-a1b2' }),
-    );
+    const result = validateObservation(buildValidFrontmatter({ id: 'ERR-20260408-143022-a1b2' }));
     expect(result.valid).toBe(false);
   });
 });

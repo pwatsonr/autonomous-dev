@@ -7,7 +7,10 @@ import { DocumentStorage } from '../../../src/pipeline/storage/document-storage'
 import { DEFAULT_PIPELINE_CONFIG, PipelineConfig } from '../../../src/pipeline/types/config';
 import { InMemoryIdCounter } from '../../../src/pipeline/frontmatter/id-generator';
 import { rollback } from '../../../src/pipeline/versioning/rollback-executor';
-import { createVersion, VersionCreateRequest } from '../../../src/pipeline/versioning/version-creator';
+import {
+  createVersion,
+  VersionCreateRequest,
+} from '../../../src/pipeline/versioning/version-creator';
 import { normalizeForHash } from '../../../src/pipeline/storage/version-writer';
 
 /**
@@ -55,8 +58,10 @@ describe('Rollback Integration', () => {
   }
 
   it('create v1.0 -> create v1.1 -> rollback to v1.0 -> v1.2 has v1.0 content', async () => {
-    const v10Content = '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Original\n\nOriginal v1.0 content here.\n';
-    const v11Content = '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Modified\n\nModified v1.1 content here.\n';
+    const v10Content =
+      '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Original\n\nOriginal v1.0 content here.\n';
+    const v11Content =
+      '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Modified\n\nModified v1.1 content here.\n';
 
     // Create v1.0
     const v10Request: VersionCreateRequest = {
@@ -84,7 +89,12 @@ describe('Rollback Integration', () => {
 
     // Rollback to v1.0
     const rollbackRecord = await rollback(
-      pipelineId, type, documentId, '1.0', 'rollback-agent', storage,
+      pipelineId,
+      type,
+      documentId,
+      '1.0',
+      'rollback-agent',
+      storage,
     );
 
     // Rollback creates v1.2 (minor increment from current 1.1)
@@ -97,28 +107,45 @@ describe('Rollback Integration', () => {
   });
 
   it('content hash of v1.2 matches content hash of v1.0', async () => {
-    const v10Content = '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Original\n\nOriginal content for hash test.\n';
-    const v11Content = '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Changed\n\nDifferent content for v1.1.\n';
+    const v10Content =
+      '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Original\n\nOriginal content for hash test.\n';
+    const v11Content =
+      '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Changed\n\nDifferent content for v1.1.\n';
 
     // Create v1.0
-    await createVersion({
-      pipelineId, type, documentId,
-      content: v10Content,
-      reason: 'INITIAL',
-      authorAgent: 'prd-author',
-    }, storage);
+    await createVersion(
+      {
+        pipelineId,
+        type,
+        documentId,
+        content: v10Content,
+        reason: 'INITIAL',
+        authorAgent: 'prd-author',
+      },
+      storage,
+    );
 
     // Create v1.1
-    await createVersion({
-      pipelineId, type, documentId,
-      content: v11Content,
-      reason: 'REVIEW_REVISION',
-      authorAgent: 'prd-author',
-    }, storage);
+    await createVersion(
+      {
+        pipelineId,
+        type,
+        documentId,
+        content: v11Content,
+        reason: 'REVIEW_REVISION',
+        authorAgent: 'prd-author',
+      },
+      storage,
+    );
 
     // Rollback to v1.0
     const rollbackRecord = await rollback(
-      pipelineId, type, documentId, '1.0', 'rollback-agent', storage,
+      pipelineId,
+      type,
+      documentId,
+      '1.0',
+      'rollback-agent',
+      storage,
     );
 
     // Read v1.0 and v1.2 to compare
@@ -133,31 +160,43 @@ describe('Rollback Integration', () => {
   });
 
   it('version history shows: v1.0, v1.1, v1.2', async () => {
-    const v10Content = '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Doc\n\nContent A.\n';
-    const v11Content = '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Doc\n\nContent B.\n';
+    const v10Content =
+      '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Doc\n\nContent A.\n';
+    const v11Content =
+      '---\nid: PRD-001\nversion: "1.0"\nupdated_at: "2026-01-01T00:00:00.000Z"\n---\n# Doc\n\nContent B.\n';
 
     // Create v1.0
-    await createVersion({
-      pipelineId, type, documentId,
-      content: v10Content,
-      reason: 'INITIAL',
-      authorAgent: 'prd-author',
-    }, storage);
+    await createVersion(
+      {
+        pipelineId,
+        type,
+        documentId,
+        content: v10Content,
+        reason: 'INITIAL',
+        authorAgent: 'prd-author',
+      },
+      storage,
+    );
 
     // Create v1.1
-    await createVersion({
-      pipelineId, type, documentId,
-      content: v11Content,
-      reason: 'REVIEW_REVISION',
-      authorAgent: 'prd-author',
-    }, storage);
+    await createVersion(
+      {
+        pipelineId,
+        type,
+        documentId,
+        content: v11Content,
+        reason: 'REVIEW_REVISION',
+        authorAgent: 'prd-author',
+      },
+      storage,
+    );
 
     // Rollback to v1.0
     await rollback(pipelineId, type, documentId, '1.0', 'rollback-agent', storage);
 
     // List all versions
     const versions = await storage.listVersions(pipelineId, type, documentId);
-    const versionStrings = versions.map(v => v.version);
+    const versionStrings = versions.map((v) => v.version);
 
     expect(versionStrings).toEqual(['1.0', '1.1', '1.2']);
   });

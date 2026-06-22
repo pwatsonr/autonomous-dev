@@ -13,34 +13,34 @@
  *   15. Archive preserves hash chain head
  */
 
-import { LogArchival } from "../../src/audit/log-archival";
-import type { ArchiveResult, ArchiveInfo } from "../../src/audit/log-archival";
-import type { AuditEvent } from "../../src/audit/types";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import * as crypto from "crypto";
+import { LogArchival } from '../../src/audit/log-archival';
+import type { ArchiveResult, ArchiveInfo } from '../../src/audit/log-archival';
+import type { AuditEvent } from '../../src/audit/types';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function makeTmpDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "archival-test-"));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'archival-test-'));
 }
 
 function makeEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
   return {
     event_id: overrides.event_id ?? `evt-${Math.random().toString(36).slice(2, 10)}`,
-    event_type: overrides.event_type ?? "gate_decision",
+    event_type: overrides.event_type ?? 'gate_decision',
     timestamp: overrides.timestamp ?? new Date().toISOString(),
-    request_id: overrides.request_id ?? "req-default",
-    repository: overrides.repository ?? "test-repo",
-    pipeline_phase: overrides.pipeline_phase ?? "review",
-    agent: overrides.agent ?? "test-agent",
-    payload: overrides.payload ?? { decision: "approved" },
-    hash: overrides.hash ?? "",
-    prev_hash: overrides.prev_hash ?? "",
+    request_id: overrides.request_id ?? 'req-default',
+    repository: overrides.repository ?? 'test-repo',
+    pipeline_phase: overrides.pipeline_phase ?? 'review',
+    agent: overrides.agent ?? 'test-agent',
+    payload: overrides.payload ?? { decision: 'approved' },
+    hash: overrides.hash ?? '',
+    prev_hash: overrides.prev_hash ?? '',
   };
 }
 
@@ -49,15 +49,15 @@ function writeEvents(logPath: string, events: AuditEvent[]): void {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  const content = events.map((e) => JSON.stringify(e)).join("\n") + "\n";
-  fs.writeFileSync(logPath, content, "utf-8");
+  const content = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
+  fs.writeFileSync(logPath, content, 'utf-8');
 }
 
 function readEvents(filePath: string): AuditEvent[] {
   if (!fs.existsSync(filePath)) return [];
-  const content = fs.readFileSync(filePath, "utf-8");
+  const content = fs.readFileSync(filePath, 'utf-8');
   return content
-    .split("\n")
+    .split('\n')
     .filter((l) => l.trim().length > 0)
     .map((l) => JSON.parse(l) as AuditEvent);
 }
@@ -89,16 +89,16 @@ function daysAgo(days: number): string {
 
 async function test_archive_old_events(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
   const oldEvents = [
-    makeEvent({ event_id: "old-1", timestamp: daysAgo(100) }),
-    makeEvent({ event_id: "old-2", timestamp: daysAgo(95) }),
+    makeEvent({ event_id: 'old-1', timestamp: daysAgo(100) }),
+    makeEvent({ event_id: 'old-2', timestamp: daysAgo(95) }),
   ];
   const recentEvents = [
-    makeEvent({ event_id: "recent-1", timestamp: daysAgo(10) }),
-    makeEvent({ event_id: "recent-2", timestamp: daysAgo(5) }),
+    makeEvent({ event_id: 'recent-1', timestamp: daysAgo(10) }),
+    makeEvent({ event_id: 'recent-2', timestamp: daysAgo(5) }),
   ];
   writeEvents(logPath, [...oldEvents, ...recentEvents]);
 
@@ -110,33 +110,24 @@ async function test_archive_old_events(): Promise<void> {
     result.archivedEventCount === 2,
     `Expected 2 archived events, got ${result.archivedEventCount}`,
   );
-  assert(
-    result.activeEventCount === 2,
-    `Expected 2 active events, got ${result.activeEventCount}`,
-  );
+  assert(result.activeEventCount === 2, `Expected 2 active events, got ${result.activeEventCount}`);
 
   // Verify archive file exists and has old events
-  assert(result.archiveFilePath !== "", "Archive file path should be set");
-  assert(fs.existsSync(result.archiveFilePath), "Archive file should exist");
+  assert(result.archiveFilePath !== '', 'Archive file path should be set');
+  assert(fs.existsSync(result.archiveFilePath), 'Archive file should exist');
   const archivedEvents = readEvents(result.archiveFilePath);
-  assert(
-    archivedEvents.length === 2,
-    `Archive should have 2 events, got ${archivedEvents.length}`,
-  );
-  assert(archivedEvents[0].event_id === "old-1", "First archived event should be old-1");
-  assert(archivedEvents[1].event_id === "old-2", "Second archived event should be old-2");
+  assert(archivedEvents.length === 2, `Archive should have 2 events, got ${archivedEvents.length}`);
+  assert(archivedEvents[0].event_id === 'old-1', 'First archived event should be old-1');
+  assert(archivedEvents[1].event_id === 'old-2', 'Second archived event should be old-2');
 
   // Verify active log has only recent events
   const activeEvents = readEvents(logPath);
-  assert(
-    activeEvents.length === 2,
-    `Active log should have 2 events, got ${activeEvents.length}`,
-  );
-  assert(activeEvents[0].event_id === "recent-1", "First active event should be recent-1");
-  assert(activeEvents[1].event_id === "recent-2", "Second active event should be recent-2");
+  assert(activeEvents.length === 2, `Active log should have 2 events, got ${activeEvents.length}`);
+  assert(activeEvents[0].event_id === 'recent-1', 'First active event should be recent-1');
+  assert(activeEvents[1].event_id === 'recent-2', 'Second active event should be recent-2');
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_archive_old_events");
+  console.log('PASS: test_archive_old_events');
 }
 
 // ---------------------------------------------------------------------------
@@ -145,8 +136,8 @@ async function test_archive_old_events(): Promise<void> {
 
 async function test_no_events_to_archive(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
   const recentEvents = [
     makeEvent({ timestamp: daysAgo(10) }),
@@ -162,11 +153,8 @@ async function test_no_events_to_archive(): Promise<void> {
     result.archivedEventCount === 0,
     `Expected 0 archived events, got ${result.archivedEventCount}`,
   );
-  assert(
-    result.activeEventCount === 3,
-    `Expected 3 active events, got ${result.activeEventCount}`,
-  );
-  assert(result.archiveFilePath === "", "Archive file path should be empty");
+  assert(result.activeEventCount === 3, `Expected 3 active events, got ${result.activeEventCount}`);
+  assert(result.archiveFilePath === '', 'Archive file path should be empty');
 
   // Active log should be unchanged
   const activeEvents = readEvents(logPath);
@@ -176,7 +164,7 @@ async function test_no_events_to_archive(): Promise<void> {
   );
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_no_events_to_archive");
+  console.log('PASS: test_no_events_to_archive');
 }
 
 // ---------------------------------------------------------------------------
@@ -185,12 +173,12 @@ async function test_no_events_to_archive(): Promise<void> {
 
 async function test_archive_file_naming(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
   const events = [
-    makeEvent({ timestamp: "2024-06-15T10:00:00.000Z" }),
-    makeEvent({ timestamp: "2024-07-20T10:00:00.000Z" }),
+    makeEvent({ timestamp: '2024-06-15T10:00:00.000Z' }),
+    makeEvent({ timestamp: '2024-07-20T10:00:00.000Z' }),
     makeEvent({ timestamp: daysAgo(1) }), // Recent, should stay in active
   ];
   writeEvents(logPath, events);
@@ -201,12 +189,12 @@ async function test_archive_file_naming(): Promise<void> {
   // Archive file should be named events-YYYY-MM-DD-to-YYYY-MM-DD.jsonl
   const archiveBasename = path.basename(result.archiveFilePath);
   assert(
-    archiveBasename === "events-2024-06-15-to-2024-07-20.jsonl",
+    archiveBasename === 'events-2024-06-15-to-2024-07-20.jsonl',
     `Archive file should be named events-2024-06-15-to-2024-07-20.jsonl, got ${archiveBasename}`,
   );
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_archive_file_naming");
+  console.log('PASS: test_archive_file_naming');
 }
 
 // ---------------------------------------------------------------------------
@@ -215,12 +203,12 @@ async function test_archive_file_naming(): Promise<void> {
 
 async function test_metadata_sidecar(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
-  const hashValue = crypto.randomBytes(32).toString("hex");
+  const hashValue = crypto.randomBytes(32).toString('hex');
   const events = [
-    makeEvent({ timestamp: daysAgo(100), hash: "abc123" }),
+    makeEvent({ timestamp: daysAgo(100), hash: 'abc123' }),
     makeEvent({ timestamp: daysAgo(95), hash: hashValue }),
     makeEvent({ timestamp: daysAgo(1) }),
   ];
@@ -230,34 +218,22 @@ async function test_metadata_sidecar(): Promise<void> {
   const result = await archiver.archive();
 
   // Check metadata sidecar exists
-  const metaPath = result.archiveFilePath + ".meta.json";
-  assert(fs.existsSync(metaPath), "Metadata sidecar should exist");
+  const metaPath = result.archiveFilePath + '.meta.json';
+  assert(fs.existsSync(metaPath), 'Metadata sidecar should exist');
 
   // Parse and validate metadata
-  const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+  assert(typeof meta.dateRange === 'object', 'Metadata should have dateRange object');
+  assert(typeof meta.dateRange.from === 'string', 'dateRange should have from string');
+  assert(typeof meta.dateRange.to === 'string', 'dateRange should have to string');
+  assert(meta.eventCount === 2, `Metadata eventCount should be 2, got ${meta.eventCount}`);
   assert(
-    typeof meta.dateRange === "object",
-    "Metadata should have dateRange object",
-  );
-  assert(
-    typeof meta.dateRange.from === "string",
-    "dateRange should have from string",
-  );
-  assert(
-    typeof meta.dateRange.to === "string",
-    "dateRange should have to string",
-  );
-  assert(
-    meta.eventCount === 2,
-    `Metadata eventCount should be 2, got ${meta.eventCount}`,
-  );
-  assert(
-    typeof meta.chainHeadHash === "string" && meta.chainHeadHash.length > 0,
-    "Metadata should have non-empty chainHeadHash",
+    typeof meta.chainHeadHash === 'string' && meta.chainHeadHash.length > 0,
+    'Metadata should have non-empty chainHeadHash',
   );
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_metadata_sidecar");
+  console.log('PASS: test_metadata_sidecar');
 }
 
 // ---------------------------------------------------------------------------
@@ -266,16 +242,14 @@ async function test_metadata_sidecar(): Promise<void> {
 
 async function test_active_log_intact_after_archive(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
-  const recentIds = ["keep-1", "keep-2", "keep-3"];
+  const recentIds = ['keep-1', 'keep-2', 'keep-3'];
   const events = [
-    makeEvent({ event_id: "old-1", timestamp: daysAgo(100) }),
-    makeEvent({ event_id: "old-2", timestamp: daysAgo(95) }),
-    ...recentIds.map((id) =>
-      makeEvent({ event_id: id, timestamp: daysAgo(10) }),
-    ),
+    makeEvent({ event_id: 'old-1', timestamp: daysAgo(100) }),
+    makeEvent({ event_id: 'old-2', timestamp: daysAgo(95) }),
+    ...recentIds.map((id) => makeEvent({ event_id: id, timestamp: daysAgo(10) })),
   ];
   writeEvents(logPath, events);
 
@@ -284,10 +258,7 @@ async function test_active_log_intact_after_archive(): Promise<void> {
 
   // Active log should be readable and contain only recent events
   const activeEvents = readEvents(logPath);
-  assert(
-    activeEvents.length === 3,
-    `Active log should have 3 events, got ${activeEvents.length}`,
-  );
+  assert(activeEvents.length === 3, `Active log should have 3 events, got ${activeEvents.length}`);
 
   const activeIds = activeEvents.map((e) => e.event_id);
   for (const id of recentIds) {
@@ -295,8 +266,8 @@ async function test_active_log_intact_after_archive(): Promise<void> {
   }
 
   // Each line should be valid JSON
-  const content = fs.readFileSync(logPath, "utf-8");
-  const lines = content.split("\n").filter((l) => l.trim().length > 0);
+  const content = fs.readFileSync(logPath, 'utf-8');
+  const lines = content.split('\n').filter((l) => l.trim().length > 0);
   for (let i = 0; i < lines.length; i++) {
     try {
       JSON.parse(lines[i]);
@@ -306,7 +277,7 @@ async function test_active_log_intact_after_archive(): Promise<void> {
   }
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_active_log_intact_after_archive");
+  console.log('PASS: test_active_log_intact_after_archive');
 }
 
 // ---------------------------------------------------------------------------
@@ -315,17 +286,17 @@ async function test_active_log_intact_after_archive(): Promise<void> {
 
 async function test_crash_safety_archive_before_rewrite(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
   const events = [
-    makeEvent({ event_id: "old-1", timestamp: daysAgo(100) }),
-    makeEvent({ event_id: "recent-1", timestamp: daysAgo(10) }),
+    makeEvent({ event_id: 'old-1', timestamp: daysAgo(100) }),
+    makeEvent({ event_id: 'recent-1', timestamp: daysAgo(10) }),
   ];
   writeEvents(logPath, events);
 
   // Save the original active log content for comparison
-  const originalContent = fs.readFileSync(logPath, "utf-8");
+  const originalContent = fs.readFileSync(logPath, 'utf-8');
 
   // To verify crash safety, we intercept fs.renameSync to simulate
   // a crash after the archive is written but before the active log
@@ -343,49 +314,34 @@ async function test_crash_safety_archive_before_rewrite(): Promise<void> {
   const result = await archiver.archive();
 
   // Archive file should exist
-  assert(
-    fs.existsSync(result.archiveFilePath),
-    "Archive file should exist after archival",
-  );
+  assert(fs.existsSync(result.archiveFilePath), 'Archive file should exist after archival');
 
   // Verify the archive has the old event
   const archivedEvents = readEvents(result.archiveFilePath);
-  assert(
-    archivedEvents.length === 1,
-    `Archive should have 1 event, got ${archivedEvents.length}`,
-  );
-  assert(
-    archivedEvents[0].event_id === "old-1",
-    "Archive should contain old-1",
-  );
+  assert(archivedEvents.length === 1, `Archive should have 1 event, got ${archivedEvents.length}`);
+  assert(archivedEvents[0].event_id === 'old-1', 'Archive should contain old-1');
 
   // Active log should have been rewritten with only recent event
   const activeEvents = readEvents(logPath);
-  assert(
-    activeEvents.length === 1,
-    `Active log should have 1 event, got ${activeEvents.length}`,
-  );
-  assert(
-    activeEvents[0].event_id === "recent-1",
-    "Active log should contain recent-1",
-  );
+  assert(activeEvents.length === 1, `Active log should have 1 event, got ${activeEvents.length}`);
+  assert(activeEvents[0].event_id === 'recent-1', 'Active log should contain recent-1');
 
   // Key safety property: if we simulate a crash by restoring the
   // original active log, both archive AND original data exist
   // (events duplicated, not lost)
-  fs.writeFileSync(logPath, originalContent, "utf-8");
+  fs.writeFileSync(logPath, originalContent, 'utf-8');
   const restoredEvents = readEvents(logPath);
   assert(
     restoredEvents.length === 2,
-    "After simulated crash recovery, original active log should have 2 events",
+    'After simulated crash recovery, original active log should have 2 events',
   );
   assert(
     fs.existsSync(result.archiveFilePath),
-    "After simulated crash, archive still exists (data not lost)",
+    'After simulated crash, archive still exists (data not lost)',
   );
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_crash_safety_archive_before_rewrite");
+  console.log('PASS: test_crash_safety_archive_before_rewrite');
 }
 
 // ---------------------------------------------------------------------------
@@ -394,12 +350,12 @@ async function test_crash_safety_archive_before_rewrite(): Promise<void> {
 
 async function test_atomic_active_log_rewrite(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
   const events = [
-    makeEvent({ event_id: "old-1", timestamp: daysAgo(100) }),
-    makeEvent({ event_id: "recent-1", timestamp: daysAgo(10) }),
+    makeEvent({ event_id: 'old-1', timestamp: daysAgo(100) }),
+    makeEvent({ event_id: 'recent-1', timestamp: daysAgo(10) }),
   ];
   writeEvents(logPath, events);
 
@@ -408,7 +364,7 @@ async function test_atomic_active_log_rewrite(): Promise<void> {
   // Use `require('fs')` so we can reassign the property
   // (PRD-016 triage batch 3).
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const fsCjs = require("fs");
+  const fsCjs = require('fs');
   const originalRename = fsCjs.renameSync;
   const renameCalls: Array<{ oldPath: string; newPath: string }> = [];
 
@@ -433,34 +389,25 @@ async function test_atomic_active_log_rewrite(): Promise<void> {
     );
 
     // Verify one rename targets the archive path
-    const archiveRename = renameCalls.find((c) =>
-      c.newPath.includes("archives") && c.newPath.endsWith(".jsonl"),
+    const archiveRename = renameCalls.find(
+      (c) => c.newPath.includes('archives') && c.newPath.endsWith('.jsonl'),
     );
-    assert(
-      archiveRename !== undefined,
-      "Should have a rename call targeting archive path",
-    );
-    assert(
-      archiveRename!.oldPath.includes(".tmp."),
-      "Archive rename source should be a temp file",
-    );
+    assert(archiveRename !== undefined, 'Should have a rename call targeting archive path');
+    assert(archiveRename!.oldPath.includes('.tmp.'), 'Archive rename source should be a temp file');
 
     // Verify one rename targets the active log path
     const activeRename = renameCalls.find((c) => c.newPath === logPath);
+    assert(activeRename !== undefined, 'Should have a rename call targeting active log path');
     assert(
-      activeRename !== undefined,
-      "Should have a rename call targeting active log path",
-    );
-    assert(
-      activeRename!.oldPath.includes(".tmp."),
-      "Active log rename source should be a temp file",
+      activeRename!.oldPath.includes('.tmp.'),
+      'Active log rename source should be a temp file',
     );
   } finally {
     fsCjs.renameSync = originalRename;
   }
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_atomic_active_log_rewrite");
+  console.log('PASS: test_atomic_active_log_rewrite');
 }
 
 // ---------------------------------------------------------------------------
@@ -469,8 +416,8 @@ async function test_atomic_active_log_rewrite(): Promise<void> {
 
 async function test_list_archives(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
   // Run archival twice with different date ranges
   // First run: events from 200 days ago
@@ -498,29 +445,26 @@ async function test_list_archives(): Promise<void> {
   // listArchives should return 2 entries
   const archives = archiver.listArchives();
 
-  assert(
-    archives.length === 2,
-    `Expected 2 archive entries, got ${archives.length}`,
-  );
+  assert(archives.length === 2, `Expected 2 archive entries, got ${archives.length}`);
 
   // Each archive should have metadata
   for (const archive of archives) {
-    assert(typeof archive.filePath === "string", "Should have filePath");
-    assert(typeof archive.dateRange.from === "string", "Should have dateRange.from");
-    assert(typeof archive.dateRange.to === "string", "Should have dateRange.to");
-    assert(typeof archive.eventCount === "number", "Should have eventCount");
-    assert(typeof archive.chainHeadHash === "string", "Should have chainHeadHash");
-    assert(archive.eventCount > 0, "Event count should be > 0");
+    assert(typeof archive.filePath === 'string', 'Should have filePath');
+    assert(typeof archive.dateRange.from === 'string', 'Should have dateRange.from');
+    assert(typeof archive.dateRange.to === 'string', 'Should have dateRange.to');
+    assert(typeof archive.eventCount === 'number', 'Should have eventCount');
+    assert(typeof archive.chainHeadHash === 'string', 'Should have chainHeadHash');
+    assert(archive.eventCount > 0, 'Event count should be > 0');
   }
 
   // Archives should be sorted by date
   assert(
     archives[0].dateRange.from <= archives[1].dateRange.from,
-    "Archives should be sorted by date ascending",
+    'Archives should be sorted by date ascending',
   );
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_list_archives");
+  console.log('PASS: test_list_archives');
 }
 
 // ---------------------------------------------------------------------------
@@ -529,14 +473,14 @@ async function test_list_archives(): Promise<void> {
 
 async function test_archive_preserves_hash_chain_head(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
-  const chainHeadHash = crypto.randomBytes(32).toString("hex");
+  const chainHeadHash = crypto.randomBytes(32).toString('hex');
   const events = [
     makeEvent({
       timestamp: daysAgo(100),
-      hash: "first-hash",
+      hash: 'first-hash',
     }),
     makeEvent({
       timestamp: daysAgo(95),
@@ -556,15 +500,15 @@ async function test_archive_preserves_hash_chain_head(): Promise<void> {
   );
 
   // Metadata sidecar should also contain the chain head hash
-  const metaPath = result.archiveFilePath + ".meta.json";
-  const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+  const metaPath = result.archiveFilePath + '.meta.json';
+  const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
   assert(
     meta.chainHeadHash === chainHeadHash,
     `Metadata sidecar chain head hash should match: expected ${chainHeadHash}, got ${meta.chainHeadHash}`,
   );
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_archive_preserves_hash_chain_head");
+  console.log('PASS: test_archive_preserves_hash_chain_head');
 }
 
 // ---------------------------------------------------------------------------
@@ -573,11 +517,11 @@ async function test_archive_preserves_hash_chain_head(): Promise<void> {
 
 async function test_empty_log_file(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'archives');
 
   // Create empty log file
-  fs.writeFileSync(logPath, "", "utf-8");
+  fs.writeFileSync(logPath, '', 'utf-8');
 
   const archiver = new LogArchival(logPath, archivePath, 90);
   const result = await archiver.archive();
@@ -592,7 +536,7 @@ async function test_empty_log_file(): Promise<void> {
   );
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_empty_log_file");
+  console.log('PASS: test_empty_log_file');
 }
 
 // ---------------------------------------------------------------------------
@@ -601,8 +545,8 @@ async function test_empty_log_file(): Promise<void> {
 
 async function test_list_archives_no_directory(): Promise<void> {
   const tmpDir = makeTmpDir();
-  const logPath = path.join(tmpDir, "events.jsonl");
-  const archivePath = path.join(tmpDir, "nonexistent-archives");
+  const logPath = path.join(tmpDir, 'events.jsonl');
+  const archivePath = path.join(tmpDir, 'nonexistent-archives');
 
   const archiver = new LogArchival(logPath, archivePath, 90);
   const archives = archiver.listArchives();
@@ -610,23 +554,45 @@ async function test_list_archives_no_directory(): Promise<void> {
   assert(archives.length === 0, `Expected empty array when archive dir doesn't exist`);
 
   cleanupDir(tmpDir);
-  console.log("PASS: test_list_archives_no_directory");
+  console.log('PASS: test_list_archives_no_directory');
 }
 
 // ---------------------------------------------------------------------------
 // Test runner
 // ---------------------------------------------------------------------------
 
-describe("LogArchival (SPEC-009-5-3, Task 6)", () => {
-  it("archives old events", async () => { await test_archive_old_events(); });
-  it("handles no events to archive", async () => { await test_no_events_to_archive(); });
-  it("uses correct archive file naming", async () => { await test_archive_file_naming(); });
-  it("writes metadata sidecar", async () => { await test_metadata_sidecar(); });
-  it("keeps active log intact after archive", async () => { await test_active_log_intact_after_archive(); });
-  it("preserves crash safety: archive written before active rewrite", async () => { await test_crash_safety_archive_before_rewrite(); });
-  it("performs atomic active log rewrite (temp+rename)", async () => { await test_atomic_active_log_rewrite(); });
-  it("lists archives", async () => { await test_list_archives(); });
-  it("preserves hash chain head", async () => { await test_archive_preserves_hash_chain_head(); });
-  it("handles empty log file", async () => { await test_empty_log_file(); });
-  it("listArchives returns empty when archive dir missing", async () => { await test_list_archives_no_directory(); });
+describe('LogArchival (SPEC-009-5-3, Task 6)', () => {
+  it('archives old events', async () => {
+    await test_archive_old_events();
+  });
+  it('handles no events to archive', async () => {
+    await test_no_events_to_archive();
+  });
+  it('uses correct archive file naming', async () => {
+    await test_archive_file_naming();
+  });
+  it('writes metadata sidecar', async () => {
+    await test_metadata_sidecar();
+  });
+  it('keeps active log intact after archive', async () => {
+    await test_active_log_intact_after_archive();
+  });
+  it('preserves crash safety: archive written before active rewrite', async () => {
+    await test_crash_safety_archive_before_rewrite();
+  });
+  it('performs atomic active log rewrite (temp+rename)', async () => {
+    await test_atomic_active_log_rewrite();
+  });
+  it('lists archives', async () => {
+    await test_list_archives();
+  });
+  it('preserves hash chain head', async () => {
+    await test_archive_preserves_hash_chain_head();
+  });
+  it('handles empty log file', async () => {
+    await test_empty_log_file();
+  });
+  it('listArchives returns empty when archive dir missing', async () => {
+    await test_list_archives_no_directory();
+  });
 });

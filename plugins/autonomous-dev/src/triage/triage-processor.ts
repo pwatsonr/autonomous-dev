@@ -38,10 +38,7 @@ import { VALID_TRIAGE_DECISIONS, type TriageDecisionValue } from './types';
  * Recursively finds all .md files in a directory.
  * Returns paths relative to the base directory.
  */
-async function findMarkdownFiles(
-  baseDir: string,
-  currentDir: string = baseDir,
-): Promise<string[]> {
+async function findMarkdownFiles(baseDir: string, currentDir: string = baseDir): Promise<string[]> {
   const results: string[] = [];
 
   let entries: Dirent[];
@@ -199,19 +196,12 @@ export async function processPendingTriage(
     // Step 2: Detect files where triage_decision is set but triage_status is still 'pending'
     if (fm.triage_decision !== null && fm.triage_status === 'pending') {
       // Validate the decision value
-      if (
-        !(VALID_TRIAGE_DECISIONS as readonly string[]).includes(
-          fm.triage_decision as string,
-        )
-      ) {
+      if (!(VALID_TRIAGE_DECISIONS as readonly string[]).includes(fm.triage_decision as string)) {
         result.errors.push({
           file: filePath,
           error: `Invalid triage_decision: "${fm.triage_decision}". Must be one of: ${VALID_TRIAGE_DECISIONS.join(', ')}`,
         });
-        auditLog.logError(
-          fm.id,
-          `Invalid decision: ${fm.triage_decision}`,
-        );
+        auditLog.logError(fm.id, `Invalid decision: ${fm.triage_decision}`);
         continue;
       }
 

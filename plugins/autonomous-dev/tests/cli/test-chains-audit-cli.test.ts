@@ -18,10 +18,7 @@ import * as path from 'node:path';
 import { Writable } from 'node:stream';
 
 import { ChainAuditWriter } from '../../intake/chains/audit-writer';
-import {
-  runChainsAuditQuery,
-  runChainsAuditVerify,
-} from '../../intake/cli/chains_audit_command';
+import { runChainsAuditQuery, runChainsAuditVerify } from '../../intake/cli/chains_audit_command';
 
 const KEY = Buffer.alloc(32, 13);
 
@@ -178,7 +175,10 @@ describe('chains audit query', () => {
       { stdout, stderr: new CapturingStream() },
     );
     expect(code).toBe(0);
-    const lines = stdout.text().split('\n').filter((l) => l.length > 0);
+    const lines = stdout
+      .text()
+      .split('\n')
+      .filter((l) => l.length > 0);
     expect(lines).toHaveLength(4);
     for (const l of lines) {
       expect(l).toMatch(/CH-A/);
@@ -192,7 +192,10 @@ describe('chains audit query', () => {
       { stdout, stderr: new CapturingStream() },
     );
     expect(code).toBe(0);
-    const lines = stdout.text().split('\n').filter((l) => l.length > 0);
+    const lines = stdout
+      .text()
+      .split('\n')
+      .filter((l) => l.length > 0);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/plugin_invoked/);
   });
@@ -204,7 +207,10 @@ describe('chains audit query', () => {
       { stdout, stderr: new CapturingStream() },
     );
     expect(code).toBe(0);
-    const lines = stdout.text().split('\n').filter((l) => l.length > 0);
+    const lines = stdout
+      .text()
+      .split('\n')
+      .filter((l) => l.length > 0);
     // p1 appears in plugin_invoked + plugin_completed.
     expect(lines).toHaveLength(2);
   });
@@ -216,15 +222,16 @@ describe('chains audit query', () => {
       { stdout, stderr: new CapturingStream() },
     );
     expect(code).toBe(0);
-    const lines = stdout.text().split('\n').filter((l) => l.length > 0);
+    const lines = stdout
+      .text()
+      .split('\n')
+      .filter((l) => l.length > 0);
     // Entries 4 (CH-A chain_completed at index 3) and 5 (CH-B chain_started at 4)
     // are at or after the cutoff.
     expect(lines.length).toBeGreaterThanOrEqual(1);
     for (const l of lines) {
       const ts = l.split('\t')[0];
-      expect(Date.parse(ts)).toBeGreaterThanOrEqual(
-        Date.parse('2026-04-29T00:00:03.000Z'),
-      );
+      expect(Date.parse(ts)).toBeGreaterThanOrEqual(Date.parse('2026-04-29T00:00:03.000Z'));
     }
   });
 
@@ -235,7 +242,10 @@ describe('chains audit query', () => {
       { stdout, stderr: new CapturingStream() },
     );
     expect(code).toBe(0);
-    const lines = stdout.text().split('\n').filter((l) => l.length > 0);
+    const lines = stdout
+      .text()
+      .split('\n')
+      .filter((l) => l.length > 0);
     for (const l of lines) {
       const parsed = JSON.parse(l);
       expect(parsed.chain_id).toBe('CH-A');

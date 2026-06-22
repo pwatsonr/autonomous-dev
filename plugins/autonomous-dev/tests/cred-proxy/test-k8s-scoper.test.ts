@@ -107,9 +107,7 @@ function makeClients(clusters: Record<string, K8sClusterInfo>): {
         audiences: body.spec.audiences,
       });
       const status = state.tokenResponse;
-      return state.bodyShape === 'body'
-        ? { body: { status } }
-        : { status };
+      return state.bodyShape === 'body' ? { body: { status } } : { status };
     },
   };
   const clients: K8sClients = {
@@ -139,9 +137,7 @@ describe('K8sCredentialScoper.scope', () => {
     ]);
     expect(state.rolesCreated).toHaveLength(1);
     expect(state.rolesCreated[0].ns).toBe('app-ns');
-    expect(state.rolesCreated[0].name).toBe(
-      'cred-proxy-deploy-abcd1234-role',
-    );
+    expect(state.rolesCreated[0].name).toBe('cred-proxy-deploy-abcd1234-role');
     expect(state.rolesCreated[0].rules).toEqual([
       {
         apiGroups: ['apps'],
@@ -202,9 +198,7 @@ describe('K8sCredentialScoper.scope', () => {
     const { clients, state } = makeClients({ c1: CLUSTER });
     const scoper = new K8sCredentialScoper(cfg, clients);
     await scoper.scope('deploy', SCOPE);
-    expect(state.serviceAccountsCreated[0].name).toMatch(
-      /^cred-proxy-deploy-[0-9a-f]{8}$/,
-    );
+    expect(state.serviceAccountsCreated[0].name).toMatch(/^cred-proxy-deploy-[0-9a-f]{8}$/);
   });
 
   it('all created resource names are ≤ 63 characters', async () => {
@@ -238,9 +232,7 @@ describe('K8sCredentialScoper.scope', () => {
   it('throws when cluster is not in admin kubeconfig', async () => {
     const { clients } = makeClients({});
     const scoper = new K8sCredentialScoper(cfg, clients);
-    await expect(scoper.scope('deploy', SCOPE)).rejects.toThrow(
-      /not in admin kubeconfig/,
-    );
+    await expect(scoper.scope('deploy', SCOPE)).rejects.toThrow(/not in admin kubeconfig/);
   });
 
   it('throws when TokenRequest returns empty token', async () => {
@@ -256,9 +248,7 @@ describe('K8sCredentialScoper.scope', () => {
   it('throws on unknown operation', async () => {
     const { clients } = makeClients({ c1: CLUSTER });
     const scoper = new K8sCredentialScoper(cfg, clients);
-    await expect(scoper.scope('UnknownOp', SCOPE)).rejects.toThrow(
-      /unknown K8s operation/,
-    );
+    await expect(scoper.scope('UnknownOp', SCOPE)).rejects.toThrow(/unknown K8s operation/);
   });
 
   it('throws when a required scope key is missing', async () => {

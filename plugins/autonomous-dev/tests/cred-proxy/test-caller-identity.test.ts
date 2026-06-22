@@ -42,9 +42,7 @@ describe('resolveCaller', () => {
   });
 
   it('throws CALLER_UNKNOWN when env var is unset (socket path)', () => {
-    expect(() =>
-      resolveCaller({ socketPeer: { pid: 1, uid: 1000 } }),
-    ).toThrow(SecurityError);
+    expect(() => resolveCaller({ socketPeer: { pid: 1, uid: 1000 } })).toThrow(SecurityError);
   });
 
   it('returns env value on stdin path (no socket peer)', () => {
@@ -56,17 +54,13 @@ describe('resolveCaller', () => {
   it('returns env value when socket peer matches registered backend', () => {
     process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-a';
     registerLiveBackend({ pid: 1234, uid: 1000, pluginId: 'plugin-a' });
-    expect(
-      resolveCaller({ socketPeer: { pid: 1234, uid: 1000 } }),
-    ).toBe('plugin-a');
+    expect(resolveCaller({ socketPeer: { pid: 1234, uid: 1000 } })).toBe('plugin-a');
   });
 
   it('throws CALLER_SPOOFED when peer pid is not registered', () => {
     process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-a';
     // No registration for pid 9999
-    expect(() =>
-      resolveCaller({ socketPeer: { pid: 9999, uid: 1000 } }),
-    ).toThrow(SecurityError);
+    expect(() => resolveCaller({ socketPeer: { pid: 9999, uid: 1000 } })).toThrow(SecurityError);
     try {
       resolveCaller({ socketPeer: { pid: 9999, uid: 1000 } });
     } catch (err) {
@@ -77,9 +71,7 @@ describe('resolveCaller', () => {
   it('throws CALLER_SPOOFED when env says plugin-a but registry says plugin-b', () => {
     process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-a';
     registerLiveBackend({ pid: 1234, uid: 1000, pluginId: 'plugin-b' });
-    expect(() =>
-      resolveCaller({ socketPeer: { pid: 1234, uid: 1000 } }),
-    ).toThrow(SecurityError);
+    expect(() => resolveCaller({ socketPeer: { pid: 1234, uid: 1000 } })).toThrow(SecurityError);
     try {
       resolveCaller({ socketPeer: { pid: 1234, uid: 1000 } });
     } catch (err) {
@@ -90,18 +82,14 @@ describe('resolveCaller', () => {
   it('throws CALLER_SPOOFED when uid does not match', () => {
     process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-a';
     registerLiveBackend({ pid: 1234, uid: 1000, pluginId: 'plugin-a' });
-    expect(() =>
-      resolveCaller({ socketPeer: { pid: 1234, uid: 9999 } }),
-    ).toThrow(SecurityError);
+    expect(() => resolveCaller({ socketPeer: { pid: 1234, uid: 9999 } })).toThrow(SecurityError);
   });
 
   it('rejects after unregisterLiveBackend', () => {
     process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-a';
     registerLiveBackend({ pid: 1234, uid: 1000, pluginId: 'plugin-a' });
     unregisterLiveBackend(1234);
-    expect(() =>
-      resolveCaller({ socketPeer: { pid: 1234, uid: 1000 } }),
-    ).toThrow(SecurityError);
+    expect(() => resolveCaller({ socketPeer: { pid: 1234, uid: 1000 } })).toThrow(SecurityError);
   });
 });
 
@@ -119,10 +107,6 @@ describe('SecurityError', () => {
       new SecurityError('CALLER_UNKNOWN', 'x').code,
       new SecurityError('CALLER_SPOOFED', 'x').code,
     ];
-    expect(codes).toEqual([
-      'NOT_ALLOWLISTED',
-      'CALLER_UNKNOWN',
-      'CALLER_SPOOFED',
-    ]);
+    expect(codes).toEqual(['NOT_ALLOWLISTED', 'CALLER_UNKNOWN', 'CALLER_SPOOFED']);
   });
 });

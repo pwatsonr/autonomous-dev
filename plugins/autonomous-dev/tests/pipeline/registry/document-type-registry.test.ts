@@ -18,7 +18,7 @@ describe('DocumentTypeRegistry', () => {
 
   test('getDefinition throws for unknown type', () => {
     expect(() => registry.getDefinition('UNKNOWN' as DocumentType)).toThrow(
-      'No definition registered for document type: UNKNOWN'
+      'No definition registered for document type: UNKNOWN',
     );
   });
 

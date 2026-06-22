@@ -36,38 +36,83 @@ export function validateManifest(raw: unknown, manifestPath: string): DiscoveryE
 
   for (const field of ['id', 'name', 'version'] as const) {
     if (typeof m[field] !== 'string' || !(m[field] as string).length) {
-      errors.push({ manifestPath, code: 'SCHEMA_ERROR', message: `missing or invalid ${field}`, pointer: `/${field}` });
+      errors.push({
+        manifestPath,
+        code: 'SCHEMA_ERROR',
+        message: `missing or invalid ${field}`,
+        pointer: `/${field}`,
+      });
     }
   }
 
   if (typeof m.id === 'string' && !KEBAB_RE.test(m.id)) {
-    errors.push({ manifestPath, code: 'SCHEMA_ERROR', message: 'id must be kebab-case', pointer: '/id' });
+    errors.push({
+      manifestPath,
+      code: 'SCHEMA_ERROR',
+      message: 'id must be kebab-case',
+      pointer: '/id',
+    });
   }
 
   if (!Array.isArray(m.hooks)) {
-    errors.push({ manifestPath, code: 'SCHEMA_ERROR', message: 'hooks must be an array', pointer: '/hooks' });
+    errors.push({
+      manifestPath,
+      code: 'SCHEMA_ERROR',
+      message: 'hooks must be an array',
+      pointer: '/hooks',
+    });
     return errors;
   }
 
   m.hooks.forEach((h, i) => {
     if (typeof h !== 'object' || h === null) {
-      errors.push({ manifestPath, code: 'SCHEMA_ERROR', message: 'hook must be object', pointer: `/hooks/${i}` });
+      errors.push({
+        manifestPath,
+        code: 'SCHEMA_ERROR',
+        message: 'hook must be object',
+        pointer: `/hooks/${i}`,
+      });
       return;
     }
     const hook = h as Record<string, unknown>;
     for (const field of ['id', 'hook_point', 'entry_point', 'failure_mode'] as const) {
       if (typeof hook[field] !== 'string') {
-        errors.push({ manifestPath, code: 'SCHEMA_ERROR', message: `hooks[${i}].${field} missing`, pointer: `/hooks/${i}/${field}` });
+        errors.push({
+          manifestPath,
+          code: 'SCHEMA_ERROR',
+          message: `hooks[${i}].${field} missing`,
+          pointer: `/hooks/${i}/${field}`,
+        });
       }
     }
-    if (typeof hook.priority !== 'number' || hook.priority < 0 || hook.priority > 1000 || !Number.isInteger(hook.priority)) {
-      errors.push({ manifestPath, code: 'SCHEMA_ERROR', message: `hooks[${i}].priority must be integer 0..1000`, pointer: `/hooks/${i}/priority` });
+    if (
+      typeof hook.priority !== 'number' ||
+      hook.priority < 0 ||
+      hook.priority > 1000 ||
+      !Number.isInteger(hook.priority)
+    ) {
+      errors.push({
+        manifestPath,
+        code: 'SCHEMA_ERROR',
+        message: `hooks[${i}].priority must be integer 0..1000`,
+        pointer: `/hooks/${i}/priority`,
+      });
     }
     if (typeof hook.hook_point === 'string' && !HOOK_POINTS.includes(hook.hook_point)) {
-      errors.push({ manifestPath, code: 'SCHEMA_ERROR', message: `hooks[${i}].hook_point invalid`, pointer: `/hooks/${i}/hook_point` });
+      errors.push({
+        manifestPath,
+        code: 'SCHEMA_ERROR',
+        message: `hooks[${i}].hook_point invalid`,
+        pointer: `/hooks/${i}/hook_point`,
+      });
     }
     if (typeof hook.failure_mode === 'string' && !FAILURE_MODES.includes(hook.failure_mode)) {
-      errors.push({ manifestPath, code: 'SCHEMA_ERROR', message: `hooks[${i}].failure_mode invalid`, pointer: `/hooks/${i}/failure_mode` });
+      errors.push({
+        manifestPath,
+        code: 'SCHEMA_ERROR',
+        message: `hooks[${i}].failure_mode invalid`,
+        pointer: `/hooks/${i}/failure_mode`,
+      });
     }
   });
 

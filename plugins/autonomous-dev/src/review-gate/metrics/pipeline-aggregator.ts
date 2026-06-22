@@ -67,10 +67,7 @@ export function percentile(sorted: number[], p: number): number {
 /**
  * Compute score distribution statistics for an array of scores.
  */
-export function computeDistribution(
-  categoryId: string,
-  scores: number[]
-): ScoreDistribution {
+export function computeDistribution(categoryId: string, scores: number[]): ScoreDistribution {
   if (scores.length === 0) {
     return {
       category_id: categoryId,
@@ -115,9 +112,7 @@ export class PipelineAggregator {
    */
   async computeAggregates(windowDays: number = 30): Promise<PipelineAggregates> {
     const windowEnd = new Date().toISOString();
-    const windowStart = new Date(
-      Date.now() - windowDays * 24 * 60 * 60 * 1000
-    ).toISOString();
+    const windowStart = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
 
     const records = await this.store.query({
       from_timestamp: windowStart,
@@ -152,22 +147,20 @@ export class PipelineAggregator {
    */
   private computeTypeAggregates(
     docType: DocumentType,
-    records: ReviewMetricsRecord[]
+    records: ReviewMetricsRecord[],
   ): DocumentTypeAggregates {
     const total = records.length;
 
     // First pass rate: approved on iteration 1
     const firstPassCount = records.filter(
-      (r) => r.iteration_count === 1 && r.outcome === 'approved'
+      (r) => r.iteration_count === 1 && r.outcome === 'approved',
     ).length;
     const firstPassRate = total > 0 ? (firstPassCount / total) * 100 : 0;
 
     // Mean iterations to approval
     const approvedRecords = records.filter((r) => r.outcome === 'approved');
     const meanIterationsToApproval =
-      approvedRecords.length > 0
-        ? mean(approvedRecords.map((r) => r.iteration_count))
-        : 0;
+      approvedRecords.length > 0 ? mean(approvedRecords.map((r) => r.iteration_count)) : 0;
 
     // Escalation rate
     const escalatedCount = records.filter((r) => r.human_escalation).length;
@@ -201,7 +194,7 @@ export class PipelineAggregator {
    * Compute score distributions for each category that appears in the records.
    */
   private computeCategoryDistributions(
-    records: ReviewMetricsRecord[]
+    records: ReviewMetricsRecord[],
   ): Record<string, ScoreDistribution> {
     // Collect all scores per category
     const categoryScores = new Map<string, number[]>();
@@ -225,9 +218,7 @@ export class PipelineAggregator {
   /**
    * Compute overall aggregates across all document types.
    */
-  private computeOverallAggregates(
-    records: ReviewMetricsRecord[]
-  ): OverallAggregates {
+  private computeOverallAggregates(records: ReviewMetricsRecord[]): OverallAggregates {
     const total = records.length;
 
     return {

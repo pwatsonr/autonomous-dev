@@ -28,7 +28,17 @@ export async function detectGaps(
   pipelineId: string,
   storage: DocumentStorage,
   chains: TraceChain[],
-  docMap: Map<string, { id: string; type: DocumentType; status: string; tracesFrom: string[]; tracesTo: string[]; parentId: string | null }>,
+  docMap: Map<
+    string,
+    {
+      id: string;
+      type: DocumentType;
+      status: string;
+      tracesFrom: string[];
+      tracesTo: string[];
+      parentId: string | null;
+    }
+  >,
 ): Promise<TraceGap[]> {
   // Determine which levels have been reached
   const reachedLevels = new Set<DocumentType>();

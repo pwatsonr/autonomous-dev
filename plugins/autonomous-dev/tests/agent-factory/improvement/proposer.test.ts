@@ -15,7 +15,14 @@ import {
   buildImprovementPrompt,
   computeUnifiedDiff,
 } from '../../../src/agent-factory/improvement/proposer';
-import { ParsedAgent, IAgentRegistry, AgentRecord, AgentState, RankedAgent, RegistryLoadResult } from '../../../src/agent-factory/types';
+import {
+  ParsedAgent,
+  IAgentRegistry,
+  AgentRecord,
+  AgentState,
+  RankedAgent,
+  RegistryLoadResult,
+} from '../../../src/agent-factory/types';
 import { AuditLogger } from '../../../src/agent-factory/audit';
 import { WeaknessReport, ConstraintViolation } from '../../../src/agent-factory/improvement/types';
 
@@ -110,13 +117,12 @@ function baseAgent(overrides?: Partial<ParsedAgent>): ParsedAgent {
       { name: 'quality', weight: 0.3, description: 'Clean code' },
       { name: 'coverage', weight: 0.3, description: 'Adequate test coverage' },
     ],
-    version_history: [
-      { version: '1.0.0', date: '2026-01-01', change: 'Initial release' },
-    ],
+    version_history: [{ version: '1.0.0', date: '2026-01-01', change: 'Initial release' }],
     risk_tier: 'medium',
     frozen: false,
     description: 'Executes code changes based on specs',
-    system_prompt: '# System Prompt\n\nYou are a code executor agent.\nYou write clean, tested code.',
+    system_prompt:
+      '# System Prompt\n\nYou are a code executor agent.\nYou write clean, tested code.',
   };
   return { ...base, ...overrides };
 }
@@ -141,7 +147,7 @@ function sampleWeaknessReport(): WeaknessReport {
     recommendation: 'propose_modification',
     metrics_summary: {
       invocation_count: 25,
-      approval_rate: 0.80,
+      approval_rate: 0.8,
       avg_quality_score: 3.6,
       trend_direction: 'declining',
       active_alerts: 1,
@@ -217,7 +223,9 @@ class MockLLM implements LLMInvoker {
   public failMessage: string = 'LLM error';
 
   constructor(response?: string) {
-    this.response = response ?? `Here is the improved agent:\n\n\`\`\`markdown\n${proposedAgentMd()}\n\`\`\`\n\nThis should address the test coverage weakness.`;
+    this.response =
+      response ??
+      `Here is the improved agent:\n\n\`\`\`markdown\n${proposedAgentMd()}\n\`\`\`\n\nThis should address the test coverage weakness.`;
   }
 
   async invoke(prompt: string, model: string): Promise<string> {
@@ -288,7 +296,7 @@ function test_tools_field_change_rejected(): void {
 
   const violations = enforceConstraints(current, proposed);
   assert(violations.length >= 1, `expected at least 1 violation, got ${violations.length}`);
-  const toolViolation = violations.find(v => v.rule === 'IMMUTABLE_TOOLS');
+  const toolViolation = violations.find((v) => v.rule === 'IMMUTABLE_TOOLS');
   assert(toolViolation !== undefined, 'expected IMMUTABLE_TOOLS violation');
   assert(toolViolation!.field === 'tools', `expected field=tools, got ${toolViolation!.field}`);
   console.log('PASS: test_tools_field_change_rejected');
@@ -299,7 +307,7 @@ function test_role_field_change_rejected(): void {
   const proposed = baseAgent({ role: 'author' });
 
   const violations = enforceConstraints(current, proposed);
-  const roleViolation = violations.find(v => v.rule === 'IMMUTABLE_ROLE');
+  const roleViolation = violations.find((v) => v.rule === 'IMMUTABLE_ROLE');
   assert(roleViolation !== undefined, 'expected IMMUTABLE_ROLE violation');
   assert(roleViolation!.field === 'role', `expected field=role`);
   assert(roleViolation!.current_value === 'executor', `current_value mismatch`);
@@ -312,7 +320,7 @@ function test_new_expertise_tag_rejected(): void {
   const proposed = baseAgent({ expertise: ['TypeScript', 'testing', 'python'] });
 
   const violations = enforceConstraints(current, proposed);
-  const expertiseViolation = violations.find(v => v.rule === 'NO_NEW_EXPERTISE');
+  const expertiseViolation = violations.find((v) => v.rule === 'NO_NEW_EXPERTISE');
   assert(expertiseViolation !== undefined, 'expected NO_NEW_EXPERTISE violation');
   assert(expertiseViolation!.field === 'expertise', `expected field=expertise`);
   console.log('PASS: test_new_expertise_tag_rejected');
@@ -323,8 +331,11 @@ function test_expertise_refinement_allowed(): void {
   const proposed = baseAgent({ expertise: ['typescript', 'Testing'] });
 
   const violations = enforceConstraints(current, proposed);
-  const expertiseViolation = violations.find(v => v.rule === 'NO_NEW_EXPERTISE');
-  assert(expertiseViolation === undefined, 'expected no NO_NEW_EXPERTISE violation for case changes');
+  const expertiseViolation = violations.find((v) => v.rule === 'NO_NEW_EXPERTISE');
+  assert(
+    expertiseViolation === undefined,
+    'expected no NO_NEW_EXPERTISE violation for case changes',
+  );
   console.log('PASS: test_expertise_refinement_allowed');
 }
 
@@ -339,7 +350,7 @@ function test_rubric_dimension_removal_rejected(): void {
   });
 
   const violations = enforceConstraints(current, proposed);
-  const rubricViolation = violations.find(v => v.rule === 'NO_RUBRIC_REMOVAL');
+  const rubricViolation = violations.find((v) => v.rule === 'NO_RUBRIC_REMOVAL');
   assert(rubricViolation !== undefined, 'expected NO_RUBRIC_REMOVAL violation');
   assert(rubricViolation!.field === 'evaluation_rubric', `expected field=evaluation_rubric`);
   console.log('PASS: test_rubric_dimension_removal_rejected');
@@ -355,7 +366,7 @@ function test_rubric_dimension_addition_allowed(): void {
   });
 
   const violations = enforceConstraints(current, proposed);
-  const rubricViolation = violations.find(v => v.rule === 'NO_RUBRIC_REMOVAL');
+  const rubricViolation = violations.find((v) => v.rule === 'NO_RUBRIC_REMOVAL');
   assert(rubricViolation === undefined, 'expected no NO_RUBRIC_REMOVAL violation for additions');
   console.log('PASS: test_rubric_dimension_addition_allowed');
 }
@@ -372,8 +383,11 @@ function test_rubric_weight_change_allowed(): void {
 
   const violations = enforceConstraints(current, proposed);
   // Weight changes should not produce any of our 4 constraint violations
-  const rubricViolation = violations.find(v => v.rule === 'NO_RUBRIC_REMOVAL');
-  assert(rubricViolation === undefined, 'expected no NO_RUBRIC_REMOVAL violation for weight changes');
+  const rubricViolation = violations.find((v) => v.rule === 'NO_RUBRIC_REMOVAL');
+  assert(
+    rubricViolation === undefined,
+    'expected no NO_RUBRIC_REMOVAL violation for weight changes',
+  );
   console.log('PASS: test_rubric_weight_change_allowed');
 }
 
@@ -386,7 +400,7 @@ function test_multiple_violations_all_reported(): void {
 
   const violations = enforceConstraints(current, proposed);
   assert(violations.length >= 2, `expected at least 2 violations, got ${violations.length}`);
-  const rules = violations.map(v => v.rule);
+  const rules = violations.map((v) => v.rule);
   assert(rules.includes('IMMUTABLE_TOOLS'), 'expected IMMUTABLE_TOOLS');
   assert(rules.includes('NO_NEW_EXPERTISE'), 'expected NO_NEW_EXPERTISE');
   console.log('PASS: test_multiple_violations_all_reported');
@@ -406,10 +420,14 @@ function test_no_violations_when_identical(): void {
 // ---------------------------------------------------------------------------
 
 function test_extraction_from_markdown_code_block(): void {
-  const response = 'Here is the improved agent:\n\n```markdown\n---\nname: test\n---\nBody\n```\n\nDone.';
+  const response =
+    'Here is the improved agent:\n\n```markdown\n---\nname: test\n---\nBody\n```\n\nDone.';
   const extracted = extractDefinitionFromResponse(response);
   assert(extracted !== null, 'expected non-null extraction');
-  assert(extracted!.startsWith('---'), `expected to start with ---, got: ${extracted!.substring(0, 10)}`);
+  assert(
+    extracted!.startsWith('---'),
+    `expected to start with ---, got: ${extracted!.substring(0, 10)}`,
+  );
   assert(extracted!.includes('name: test'), 'expected to include name field');
   console.log('PASS: test_extraction_from_markdown_code_block');
 }
@@ -471,10 +489,22 @@ function test_prompt_includes_constraints(): void {
   const content = validAgentMd();
 
   const prompt = buildImprovementPrompt(agent, content, report);
-  assert(prompt.includes('Do NOT change the `tools` field'), 'prompt should include tools constraint');
-  assert(prompt.includes('Do NOT change the `role` field'), 'prompt should include role constraint');
-  assert(prompt.includes('Do NOT add new expertise tags'), 'prompt should include expertise constraint');
-  assert(prompt.includes('Do NOT remove any `evaluation_rubric` dimensions'), 'prompt should include rubric constraint');
+  assert(
+    prompt.includes('Do NOT change the `tools` field'),
+    'prompt should include tools constraint',
+  );
+  assert(
+    prompt.includes('Do NOT change the `role` field'),
+    'prompt should include role constraint',
+  );
+  assert(
+    prompt.includes('Do NOT add new expertise tags'),
+    'prompt should include expertise constraint',
+  );
+  assert(
+    prompt.includes('Do NOT remove any `evaluation_rubric` dimensions'),
+    'prompt should include rubric constraint',
+  );
   console.log('PASS: test_prompt_includes_constraints');
 }
 
@@ -531,7 +561,10 @@ async function test_generate_proposal_success(): Promise<void> {
 
   const proposal = result.proposal!;
   assert(proposal.agent_name === 'code-executor', `agent_name mismatch: ${proposal.agent_name}`);
-  assert(proposal.current_version === '1.0.0', `current_version mismatch: ${proposal.current_version}`);
+  assert(
+    proposal.current_version === '1.0.0',
+    `current_version mismatch: ${proposal.current_version}`,
+  );
   assert(proposal.weakness_report_id === 'report-001', `weakness_report_id mismatch`);
   assert(proposal.status === 'pending_meta_review', `status mismatch: ${proposal.status}`);
   assert(proposal.diff.length > 0, 'diff should not be empty');
@@ -548,8 +581,10 @@ async function test_proposal_links_to_weakness_report(): Promise<void> {
 
   const result = await generator.generateProposal('code-executor', report);
   assert(result.success === true, `expected success`);
-  assert(result.proposal!.weakness_report_id === report.report_id,
-    `weakness_report_id should match: ${result.proposal!.weakness_report_id} !== ${report.report_id}`);
+  assert(
+    result.proposal!.weakness_report_id === report.report_id,
+    `weakness_report_id should match: ${result.proposal!.weakness_report_id} !== ${report.report_id}`,
+  );
 
   cleanupTempDir(agentsDir);
   console.log('PASS: test_proposal_links_to_weakness_report');
@@ -561,8 +596,10 @@ async function test_proposal_status_pending_meta_review(): Promise<void> {
 
   const result = await generator.generateProposal('code-executor', report);
   assert(result.success === true, 'expected success');
-  assert(result.proposal!.status === 'pending_meta_review',
-    `expected pending_meta_review, got ${result.proposal!.status}`);
+  assert(
+    result.proposal!.status === 'pending_meta_review',
+    `expected pending_meta_review, got ${result.proposal!.status}`,
+  );
 
   cleanupTempDir(agentsDir);
   console.log('PASS: test_proposal_status_pending_meta_review');
@@ -598,15 +635,16 @@ async function test_proposal_includes_diff(): Promise<void> {
 
 async function test_proposal_extraction_failure(): Promise<void> {
   const llmResponse = 'Here is some text without any code blocks at all.';
-  const { generator, agentsDir } = createTestSetup(
-    llmResponse,
-  );
+  const { generator, agentsDir } = createTestSetup(llmResponse);
   const report = sampleWeaknessReport();
 
   const result = await generator.generateProposal('code-executor', report);
   assert(result.success === false, 'expected failure');
   assert(result.error !== undefined, 'error should be defined');
-  assert(result.error!.includes('no code block'), `error should mention code block: ${result.error}`);
+  assert(
+    result.error!.includes('no code block'),
+    `error should mention code block: ${result.error}`,
+  );
 
   cleanupTempDir(agentsDir);
   console.log('PASS: test_proposal_extraction_failure');
@@ -635,7 +673,10 @@ async function test_llm_invocation_failure(): Promise<void> {
   const result = await generator.generateProposal('code-executor', report);
   assert(result.success === false, 'expected failure');
   assert(result.error !== undefined, 'error should be defined');
-  assert(result.error!.includes('API timeout'), `error should include failure message: ${result.error}`);
+  assert(
+    result.error!.includes('API timeout'),
+    `error should include failure message: ${result.error}`,
+  );
 
   cleanupTempDir(agentsDir);
   console.log('PASS: test_llm_invocation_failure');
@@ -682,7 +723,7 @@ async function test_constraint_violation_rejects_before_meta_review(): Promise<v
   assert(result.success === false, 'expected failure due to constraint violation');
   assert(result.constraintViolations !== undefined, 'constraintViolations should be defined');
   assert(result.constraintViolations!.length > 0, 'should have at least one violation');
-  const toolViolation = result.constraintViolations!.find(v => v.rule === 'IMMUTABLE_TOOLS');
+  const toolViolation = result.constraintViolations!.find((v) => v.rule === 'IMMUTABLE_TOOLS');
   assert(toolViolation !== undefined, 'expected IMMUTABLE_TOOLS violation');
 
   cleanupTempDir(agentsDir);
@@ -731,10 +772,11 @@ async function test_violation_logged_to_audit(): Promise<void> {
   const auditDir = path.dirname(auditLogPath);
   if (fs.existsSync(auditLogPath)) {
     const logContent = fs.readFileSync(auditLogPath, 'utf-8');
-    assert(logContent.includes('proposal_rejected_constraint_violation'),
-      'audit log should contain constraint violation event');
-    assert(logContent.includes('IMMUTABLE_TOOLS'),
-      'audit log should contain the violation rule');
+    assert(
+      logContent.includes('proposal_rejected_constraint_violation'),
+      'audit log should contain constraint violation event',
+    );
+    assert(logContent.includes('IMMUTABLE_TOOLS'), 'audit log should contain the violation rule');
   } else {
     throw new Error(`Audit log file not found at ${auditLogPath}`);
   }
@@ -793,13 +835,16 @@ describe('proposer', () => {
   it('test_diff_identical_content', test_diff_identical_content);
   it('test_constraint_check_is_hard_coded', test_constraint_check_is_hard_coded);
   it('test_generate_proposal_success', async () => await test_generate_proposal_success());
-  it('test_proposal_links_to_weakness_report', async () => await test_proposal_links_to_weakness_report());
-  it('test_proposal_status_pending_meta_review', async () => await test_proposal_status_pending_meta_review());
+  it('test_proposal_links_to_weakness_report', async () =>
+    await test_proposal_links_to_weakness_report());
+  it('test_proposal_status_pending_meta_review', async () =>
+    await test_proposal_status_pending_meta_review());
   it('test_proposal_version_incremented', async () => await test_proposal_version_incremented());
   it('test_proposal_includes_diff', async () => await test_proposal_includes_diff());
   it('test_proposal_extraction_failure', async () => await test_proposal_extraction_failure());
   it('test_agent_not_found', async () => await test_agent_not_found());
   it('test_llm_invocation_failure', async () => await test_llm_invocation_failure());
-  it('test_constraint_violation_rejects_before_meta_review', async () => await test_constraint_violation_rejects_before_meta_review());
+  it('test_constraint_violation_rejects_before_meta_review', async () =>
+    await test_constraint_violation_rejects_before_meta_review());
   it('test_violation_logged_to_audit', async () => await test_violation_logged_to_audit());
 });

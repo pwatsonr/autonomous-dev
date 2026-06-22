@@ -36,9 +36,7 @@ function sectionMappingsAdapter(documentType: DocumentType) {
 /**
  * Creates a mock DocumentStoreInterface.
  */
-function createMockStore(
-  documents: Record<string, string[]> = {}
-): DocumentStoreInterface {
+function createMockStore(documents: Record<string, string[]> = {}): DocumentStoreInterface {
   return {
     async documentExists(documentId: string): Promise<boolean> {
       return documentId in documents;
@@ -52,7 +50,9 @@ function createMockStore(
 /**
  * Creates a valid PRD document for testing.
  */
-function makeValidPrdDocument(overrides: Partial<DocumentForValidation> = {}): DocumentForValidation {
+function makeValidPrdDocument(
+  overrides: Partial<DocumentForValidation> = {},
+): DocumentForValidation {
   return {
     id: 'prd-001',
     content: 'A '.repeat(300), // 600 words (above 500 threshold)
@@ -68,7 +68,11 @@ function makeValidPrdDocument(overrides: Partial<DocumentForValidation> = {}): D
       { id: 'goals', title: 'Goals', content: 'Goals...' },
       { id: 'user_stories', title: 'User Stories', content: 'Stories...' },
       { id: 'functional_requirements', title: 'Functional Requirements', content: 'FR...' },
-      { id: 'non_functional_requirements', title: 'Non-Functional Requirements', content: 'NFR...' },
+      {
+        id: 'non_functional_requirements',
+        title: 'Non-Functional Requirements',
+        content: 'NFR...',
+      },
       { id: 'success_metrics', title: 'Success Metrics', content: 'Metrics...' },
       { id: 'risks_and_mitigations', title: 'Risks and Mitigations', content: 'Risks...' },
     ],
@@ -80,7 +84,9 @@ function makeValidPrdDocument(overrides: Partial<DocumentForValidation> = {}): D
 /**
  * Creates a valid TDD document for testing.
  */
-function makeValidTddDocument(overrides: Partial<DocumentForValidation> = {}): DocumentForValidation {
+function makeValidTddDocument(
+  overrides: Partial<DocumentForValidation> = {},
+): DocumentForValidation {
   return {
     id: 'tdd-001',
     content: 'A '.repeat(300),
@@ -179,7 +185,7 @@ describe('PreReviewValidator', () => {
         'non_functional_requirements',
         'success_metrics',
         'risks_and_mitigations',
-      ])
+      ]),
     );
   });
 
@@ -354,7 +360,7 @@ describe('PreReviewValidator', () => {
 
     // Frontmatter errors include field
     const fmErrors = result.errors.filter(
-      (e) => e.code === 'MISSING_FRONTMATTER' || e.code === 'INVALID_FRONTMATTER_TYPE'
+      (e) => e.code === 'MISSING_FRONTMATTER' || e.code === 'INVALID_FRONTMATTER_TYPE',
     );
     expect(fmErrors.length).toBeGreaterThan(0);
     for (const err of fmErrors) {
@@ -382,7 +388,7 @@ describe('PreReviewValidator', () => {
 
     expect(result.valid).toBe(true);
     const traceErrors = result.errors.filter(
-      (e) => e.code === 'MISSING_FRONTMATTER' && e.field === 'traces_from'
+      (e) => e.code === 'MISSING_FRONTMATTER' && e.field === 'traces_from',
     );
     expect(traceErrors).toHaveLength(0);
   });

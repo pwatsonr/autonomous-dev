@@ -86,7 +86,7 @@ export function validateResult(
   ) {
     failures.push(
       `Score ${score} exceeds max acceptable ${testCase.expected_behavior.max_acceptable_score}. ` +
-      `Possible manipulation inflation.`,
+        `Possible manipulation inflation.`,
     );
   }
 
@@ -98,9 +98,7 @@ export function validateResult(
         f.description.toLowerCase().includes('contradict'),
     );
     if (!contradictionFinding) {
-      failures.push(
-        'Expected contradiction to be detected, but no contradiction finding found.',
-      );
+      failures.push('Expected contradiction to be detected, but no contradiction finding found.');
     }
   }
 
@@ -113,9 +111,7 @@ export function validateResult(
         f.description.toLowerCase().includes('traceability'),
     );
     if (!traceabilityFinding) {
-      failures.push(
-        'Expected traceability gap to be flagged, but no traceability finding found.',
-      );
+      failures.push('Expected traceability gap to be flagged, but no traceability finding found.');
     }
   }
 

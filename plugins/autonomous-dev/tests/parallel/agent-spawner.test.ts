@@ -41,9 +41,7 @@ import { loadConfig, ParallelConfig } from '../../src/parallel/config';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createAssignment(
-  overrides: Partial<TrackAssignment> = {},
-): TrackAssignment {
+function createAssignment(overrides: Partial<TrackAssignment> = {}): TrackAssignment {
   return {
     trackName: 'track-a',
     worktreePath: '/tmp/fake-worktree',
@@ -65,9 +63,7 @@ function createAssignment(
   };
 }
 
-function createBundle(
-  overrides: Partial<ContextBundle> = {},
-): ContextBundle {
+function createBundle(overrides: Partial<ContextBundle> = {}): ContextBundle {
   return {
     systemPrompt: 'You are a test agent.',
     specContent: '# Test Spec',
@@ -229,10 +225,7 @@ describe('AgentSpawner', () => {
         return { id: 'sess-1', terminate: async () => {} };
       };
       const s = new AgentSpawner(config, emitter, factory);
-      await s.spawnAgent(
-        createAssignment({ worktreePath: worktreeDir }),
-        createBundle(),
-      );
+      await s.spawnAgent(createAssignment({ worktreePath: worktreeDir }), createBundle());
       expect(typeof received).toBe('function');
     });
 
@@ -251,9 +244,7 @@ describe('AgentSpawner', () => {
       // Escape to a sibling path is blocked, and a violation is emitted.
       const violations: unknown[] = [];
       emitter.on('security.isolation_violation', (e) => violations.push(e));
-      await expect(
-        hook.validate('Read', { file_path: '/etc/passwd' }),
-      ).resolves.toBe(false);
+      await expect(hook.validate('Read', { file_path: '/etc/passwd' })).resolves.toBe(false);
       expect(violations.length).toBe(1);
     });
 
@@ -353,9 +344,7 @@ describe('AgentSpawner', () => {
     });
 
     it('throws for unknown session ID', async () => {
-      await expect(spawner.trackTurn('nonexistent')).rejects.toThrow(
-        /Unknown agent session/,
-      );
+      await expect(spawner.trackTurn('nonexistent')).rejects.toThrow(/Unknown agent session/);
     });
 
     it('emits warning on each turn at or above 90%', async () => {
@@ -433,9 +422,7 @@ describe('AgentSpawner', () => {
     });
 
     it('is safe to call on nonexistent session', async () => {
-      await expect(
-        spawner.terminateAgent('nonexistent'),
-      ).resolves.not.toThrow();
+      await expect(spawner.terminateAgent('nonexistent')).resolves.not.toThrow();
     });
   });
 
@@ -503,10 +490,7 @@ describe('AgentSpawner', () => {
       );
 
       // Create integration branch
-      execSync(
-        `git -C "${repoRoot}" branch auto/req-001/integration main`,
-        { encoding: 'utf-8' },
-      );
+      execSync(`git -C "${repoRoot}" branch auto/req-001/integration main`, { encoding: 'utf-8' });
 
       // Create a worktree for track-a
       const wtPath = path.join(worktreeDir, 'req-001', 'track-a');
@@ -553,10 +537,7 @@ describe('AgentSpawner', () => {
       const wtPath = path.join(worktreeDir, 'req-001', 'track-a');
 
       // Agent made a commit in its worktree
-      execSync(
-        `git -C "${wtPath}" commit --allow-empty -m "partial work"`,
-        { encoding: 'utf-8' },
-      );
+      execSync(`git -C "${wtPath}" commit --allow-empty -m "partial work"`, { encoding: 'utf-8' });
 
       const assignment = createAssignment({
         worktreePath: wtPath,
@@ -708,13 +689,15 @@ describe('buildAgentSystemPrompt', () => {
 
   it('includes interface contracts when present', () => {
     const assignment = createAssignment({
-      interfaceContracts: [{
-        producer: 'track-a',
-        consumer: 'track-b',
-        contractType: 'type-definition',
-        definition: 'export interface User { id: string; }',
-        filePath: 'src/types.ts',
-      }],
+      interfaceContracts: [
+        {
+          producer: 'track-a',
+          consumer: 'track-b',
+          contractType: 'type-definition',
+          definition: 'export interface User { id: string; }',
+          filePath: 'src/types.ts',
+        },
+      ],
     });
     const prompt = buildAgentSystemPrompt(assignment);
     expect(prompt).toContain('track-a');
@@ -803,13 +786,15 @@ describe('prepareContextBundle', () => {
 
   it('includes interface contracts', async () => {
     const assignment = createAssignment({
-      interfaceContracts: [{
-        producer: 'track-a',
-        consumer: 'track-b',
-        contractType: 'type-definition',
-        definition: 'export interface User { id: string; }',
-        filePath: 'src/types.ts',
-      }],
+      interfaceContracts: [
+        {
+          producer: 'track-a',
+          consumer: 'track-b',
+          contractType: 'type-definition',
+          definition: 'export interface User { id: string; }',
+          filePath: 'src/types.ts',
+        },
+      ],
     });
     setupFiles(assignment);
 
@@ -978,10 +963,9 @@ describe('preCommitSharedTypes', () => {
     await preCommitSharedTypes('req-001', contracts, worktreeManager, repoRoot);
 
     // Verify the commit exists on the integration branch
-    const log = execSync(
-      `git -C "${repoRoot}" log --oneline auto/req-001/integration -1`,
-      { encoding: 'utf-8' },
-    ).trim();
+    const log = execSync(`git -C "${repoRoot}" log --oneline auto/req-001/integration -1`, {
+      encoding: 'utf-8',
+    }).trim();
     expect(log).toContain('shared types');
   });
 
@@ -1009,10 +993,9 @@ describe('preCommitSharedTypes', () => {
   it('is a no-op when no contracts', async () => {
     await preCommitSharedTypes('req-001', [], worktreeManager, repoRoot);
     // No error, no commit created -- integration branch should still point to init
-    const log = execSync(
-      `git -C "${repoRoot}" log --oneline auto/req-001/integration`,
-      { encoding: 'utf-8' },
-    ).trim();
+    const log = execSync(`git -C "${repoRoot}" log --oneline auto/req-001/integration`, {
+      encoding: 'utf-8',
+    }).trim();
     expect(log).not.toContain('shared types');
   });
 
@@ -1031,8 +1014,6 @@ describe('preCommitSharedTypes', () => {
 
     // Temp worktree should be removed
     const worktrees = await worktreeManager.listWorktrees('req-001');
-    expect(
-      worktrees.find((w) => w.trackName === 'shared-types-commit'),
-    ).toBeUndefined();
+    expect(worktrees.find((w) => w.trackName === 'shared-types-commit')).toBeUndefined();
   });
 });

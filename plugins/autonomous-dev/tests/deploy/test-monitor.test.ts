@@ -17,10 +17,7 @@ import type {
   HealthStatus,
   RollbackResult,
 } from '../../intake/deploy/types';
-import type {
-  EscalationMessage,
-  SlaConfig,
-} from '../../intake/deploy/monitor-types';
+import type { EscalationMessage, SlaConfig } from '../../intake/deploy/monitor-types';
 
 function makeRecord(deployId: string): DeploymentRecord {
   return {

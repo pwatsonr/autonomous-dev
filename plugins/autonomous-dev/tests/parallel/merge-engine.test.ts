@@ -103,11 +103,7 @@ describe('computeMergeOrder', () => {
 
   beforeEach(() => {
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      '/tmp/unused',
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, '/tmp/unused', emitter);
   });
 
   it('TDD 2.3: track-a before track-c in cluster 0', () => {
@@ -185,11 +181,7 @@ describe('mergeTrack - clean merge', () => {
       },
     });
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -197,11 +189,7 @@ describe('mergeTrack - clean merge', () => {
   });
 
   it('commits clean merge with conventional message', async () => {
-    const result = await mergeEngine.mergeTrack(
-      'req-001',
-      'track-a',
-      'auto/req-001/integration',
-    );
+    const result = await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(result.conflictCount).toBe(0);
     expect(result.resolutionStrategy).toBe('clean');
     expect(result.mergeCommitSha).toBeTruthy();
@@ -214,8 +202,8 @@ describe('mergeTrack - clean merge', () => {
 
   it('emits merge.started and merge.completed', async () => {
     const events: any[] = [];
-    emitter.on('merge.started', e => events.push(e));
-    emitter.on('merge.completed', e => events.push(e));
+    emitter.on('merge.started', (e) => events.push(e));
+    emitter.on('merge.completed', (e) => events.push(e));
     await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(events.length).toBe(2);
     expect(events[0].type).toBe('merge.started');
@@ -223,41 +211,25 @@ describe('mergeTrack - clean merge', () => {
   });
 
   it('captures merge commit SHA', async () => {
-    const result = await mergeEngine.mergeTrack(
-      'req-001',
-      'track-a',
-      'auto/req-001/integration',
-    );
+    const result = await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     const headSha = git(repoRoot, 'rev-parse HEAD');
     expect(result.mergeCommitSha).toBe(headSha);
   });
 
   it('includes timing in result', async () => {
-    const result = await mergeEngine.mergeTrack(
-      'req-001',
-      'track-a',
-      'auto/req-001/integration',
-    );
+    const result = await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(result.resolutionDurationMs).toBeGreaterThanOrEqual(0);
     expect(typeof result.resolutionDurationMs).toBe('number');
   });
 
   it('includes ISO timestamp in result', async () => {
-    const result = await mergeEngine.mergeTrack(
-      'req-001',
-      'track-a',
-      'auto/req-001/integration',
-    );
+    const result = await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     // Should be a valid ISO-8601 string
     expect(new Date(result.timestamp).toISOString()).toBe(result.timestamp);
   });
 
   it('sets trackBranch and integrationBranch in result', async () => {
-    const result = await mergeEngine.mergeTrack(
-      'req-001',
-      'track-a',
-      'auto/req-001/integration',
-    );
+    const result = await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(result.trackBranch).toBe('auto/req-001/track-a');
     expect(result.integrationBranch).toBe('auto/req-001/integration');
   });
@@ -309,11 +281,7 @@ describe('mergeTrack - conflict handling', () => {
 
     repoRoot = tmpDir;
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -322,20 +290,12 @@ describe('mergeTrack - conflict handling', () => {
 
   it('detects conflicted files', async () => {
     // Default resolveConflicts throws, so result will be 'failed'
-    const result = await mergeEngine.mergeTrack(
-      'req-001',
-      'track-a',
-      'auto/req-001/integration',
-    );
+    const result = await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(result.conflictCount).toBeGreaterThan(0);
   });
 
   it('aborts merge on resolution failure', async () => {
-    const result = await mergeEngine.mergeTrack(
-      'req-001',
-      'track-a',
-      'auto/req-001/integration',
-    );
+    const result = await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(result.resolutionStrategy).toBe('failed');
     expect(result.mergeCommitSha).toBeNull();
 
@@ -346,7 +306,7 @@ describe('mergeTrack - conflict handling', () => {
 
   it('emits merge.failed on resolution failure', async () => {
     const events: any[] = [];
-    emitter.on('merge.failed', e => events.push(e));
+    emitter.on('merge.failed', (e) => events.push(e));
     await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(events.length).toBe(1);
     expect(events[0].type).toBe('merge.failed');
@@ -355,8 +315,8 @@ describe('mergeTrack - conflict handling', () => {
 
   it('still emits merge.started before failure', async () => {
     const events: any[] = [];
-    emitter.on('merge.started', e => events.push(e));
-    emitter.on('merge.failed', e => events.push(e));
+    emitter.on('merge.started', (e) => events.push(e));
+    emitter.on('merge.failed', (e) => events.push(e));
     await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(events[0].type).toBe('merge.started');
     expect(events[1].type).toBe('merge.failed');
@@ -364,7 +324,7 @@ describe('mergeTrack - conflict handling', () => {
 
   it('reports resolution failure reason in event', async () => {
     const events: any[] = [];
-    emitter.on('merge.failed', e => events.push(e));
+    emitter.on('merge.failed', (e) => events.push(e));
     await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     expect(events[0].reason).toContain('Conflict resolution not implemented');
   });
@@ -386,11 +346,7 @@ describe('mergeTrack - idempotency', () => {
       },
     });
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -405,11 +361,7 @@ describe('mergeTrack - idempotency', () => {
     const sha1 = git(repoRoot, 'rev-parse HEAD');
 
     // Second merge: track branch is already merged
-    const result = await mergeEngine.mergeTrack(
-      'req-001',
-      'track-a',
-      'auto/req-001/integration',
-    );
+    const result = await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
     const sha2 = git(repoRoot, 'rev-parse HEAD');
 
     // Should be clean (nothing to merge) or result in same state
@@ -434,11 +386,7 @@ describe('mergeCluster', () => {
       },
     });
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -495,11 +443,7 @@ describe('mergeCluster', () => {
     git(conflictRepo, 'add shared.ts');
     git(conflictRepo, 'commit -m "integration change"');
 
-    const conflictEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      conflictRepo,
-      emitter,
-    );
+    const conflictEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, conflictRepo, emitter);
 
     const dag = buildAndScheduleDAG('req-001', [
       { name: 'track-a', complexity: 'medium', dependsOn: [] },
@@ -563,27 +507,22 @@ describe('merge circuit breaker', () => {
   });
 
   it('does not trip below threshold', () => {
-    const results = Array.from({ length: 4 }, (_, i) =>
-      makeMergeResult('failed', `track-${i}`),
-    );
+    const results = Array.from({ length: 4 }, (_, i) => makeMergeResult('failed', `track-${i}`));
     // threshold is 5, count is 4
     expect(() => mergeEngine.checkCircuitBreaker('req-001', results)).not.toThrow();
   });
 
   it('does not trip at exactly the threshold', () => {
-    const results = Array.from({ length: 5 }, (_, i) =>
-      makeMergeResult('failed', `track-${i}`),
-    );
+    const results = Array.from({ length: 5 }, (_, i) => makeMergeResult('failed', `track-${i}`));
     // threshold is 5, count is 5, trips only when > threshold
     expect(() => mergeEngine.checkCircuitBreaker('req-001', results)).not.toThrow();
   });
 
   it('trips when count exceeds threshold', () => {
-    const results = Array.from({ length: 6 }, (_, i) =>
-      makeMergeResult('failed', `track-${i}`),
+    const results = Array.from({ length: 6 }, (_, i) => makeMergeResult('failed', `track-${i}`));
+    expect(() => mergeEngine.checkCircuitBreaker('req-001', results)).toThrow(
+      MergeCircuitBreakerError,
     );
-    expect(() => mergeEngine.checkCircuitBreaker('req-001', results))
-      .toThrow(MergeCircuitBreakerError);
   });
 
   it('only counts unresolved conflicts', () => {
@@ -600,21 +539,18 @@ describe('merge circuit breaker', () => {
   });
 
   it('counts escalated as unresolved', () => {
-    const results = Array.from({ length: 6 }, (_, i) =>
-      makeMergeResult('escalated', `track-${i}`),
+    const results = Array.from({ length: 6 }, (_, i) => makeMergeResult('escalated', `track-${i}`));
+    expect(() => mergeEngine.checkCircuitBreaker('req-001', results)).toThrow(
+      MergeCircuitBreakerError,
     );
-    expect(() => mergeEngine.checkCircuitBreaker('req-001', results))
-      .toThrow(MergeCircuitBreakerError);
   });
 
   it('emits request.escalated on trip', () => {
     const events: any[] = [];
-    emitter.on('request.escalated', e => events.push(e));
+    emitter.on('request.escalated', (e) => events.push(e));
 
     try {
-      const results = Array.from({ length: 6 }, (_, i) =>
-        makeMergeResult('failed', `track-${i}`),
-      );
+      const results = Array.from({ length: 6 }, (_, i) => makeMergeResult('failed', `track-${i}`));
       mergeEngine.checkCircuitBreaker('req-001', results);
     } catch {
       // Expected
@@ -630,25 +566,20 @@ describe('merge circuit breaker', () => {
 
   it('accumulates across multiple calls', () => {
     // First call: 3 failures
-    const batch1 = Array.from({ length: 3 }, (_, i) =>
-      makeMergeResult('failed', `track-a${i}`),
-    );
+    const batch1 = Array.from({ length: 3 }, (_, i) => makeMergeResult('failed', `track-a${i}`));
     expect(() => mergeEngine.checkCircuitBreaker('req-001', batch1)).not.toThrow();
     expect(mergeEngine.getUnresolvedCount('req-001')).toBe(3);
 
     // Second call: 3 more failures -> total 6, trips at > 5
-    const batch2 = Array.from({ length: 3 }, (_, i) =>
-      makeMergeResult('failed', `track-b${i}`),
+    const batch2 = Array.from({ length: 3 }, (_, i) => makeMergeResult('failed', `track-b${i}`));
+    expect(() => mergeEngine.checkCircuitBreaker('req-001', batch2)).toThrow(
+      MergeCircuitBreakerError,
     );
-    expect(() => mergeEngine.checkCircuitBreaker('req-001', batch2))
-      .toThrow(MergeCircuitBreakerError);
     expect(mergeEngine.getUnresolvedCount('req-001')).toBe(6);
   });
 
   it('tracks separate counts per request', () => {
-    const batch = Array.from({ length: 3 }, (_, i) =>
-      makeMergeResult('failed', `track-${i}`),
-    );
+    const batch = Array.from({ length: 3 }, (_, i) => makeMergeResult('failed', `track-${i}`));
 
     mergeEngine.checkCircuitBreaker('req-001', batch);
     mergeEngine.checkCircuitBreaker('req-002', batch);
@@ -658,9 +589,7 @@ describe('merge circuit breaker', () => {
   });
 
   it('resetCircuitBreaker clears the counter', () => {
-    const batch = Array.from({ length: 3 }, (_, i) =>
-      makeMergeResult('failed', `track-${i}`),
-    );
+    const batch = Array.from({ length: 3 }, (_, i) => makeMergeResult('failed', `track-${i}`));
 
     mergeEngine.checkCircuitBreaker('req-001', batch);
     expect(mergeEngine.getUnresolvedCount('req-001')).toBe(3);
@@ -674,9 +603,7 @@ describe('merge circuit breaker', () => {
   });
 
   it('error contains correct metadata', () => {
-    const results = Array.from({ length: 6 }, (_, i) =>
-      makeMergeResult('failed', `track-${i}`),
-    );
+    const results = Array.from({ length: 6 }, (_, i) => makeMergeResult('failed', `track-${i}`));
 
     try {
       mergeEngine.checkCircuitBreaker('req-001', results);
@@ -726,11 +653,7 @@ describe('rollbackTrackMerge', () => {
       },
     });
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -759,7 +682,7 @@ describe('rollbackTrackMerge', () => {
     await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
 
     const events: any[] = [];
-    emitter.on('merge.rolledback', e => events.push(e));
+    emitter.on('merge.rolledback', (e) => events.push(e));
 
     await mergeEngine.rollbackTrackMerge('req-001', 'track-a');
 
@@ -772,18 +695,16 @@ describe('rollbackTrackMerge', () => {
   });
 
   it('throws if no merge commit found', async () => {
-    await expect(
-      mergeEngine.rollbackTrackMerge('req-001', 'nonexistent-track'),
-    ).rejects.toThrow(/no merge commit/i);
+    await expect(mergeEngine.rollbackTrackMerge('req-001', 'nonexistent-track')).rejects.toThrow(
+      /no merge commit/i,
+    );
   });
 
   it('integration branch has auto/ prefix (safety check passes)', async () => {
     await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
 
     // Should not throw since integration branch is auto/
-    await expect(
-      mergeEngine.rollbackTrackMerge('req-001', 'track-a'),
-    ).resolves.not.toThrow();
+    await expect(mergeEngine.rollbackTrackMerge('req-001', 'track-a')).resolves.not.toThrow();
   });
 });
 
@@ -805,11 +726,7 @@ describe('rollbackIntegration', () => {
       },
     });
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -847,7 +764,7 @@ describe('rollbackIntegration', () => {
     await mergeEngine.mergeTrack('req-001', 'track-a', 'auto/req-001/integration');
 
     const events: any[] = [];
-    emitter.on('merge.integration_reset', e => events.push(e));
+    emitter.on('merge.integration_reset', (e) => events.push(e));
 
     await mergeEngine.rollbackIntegration('req-001');
 
@@ -884,11 +801,7 @@ describe('validateInterfaceContracts', () => {
     git(repoRoot, 'commit -m "add types"');
 
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -990,11 +903,7 @@ describe('validateMigrationSequence', () => {
     git(repoRoot, 'commit -m "add migrations"');
 
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -1016,7 +925,9 @@ describe('validateMigrationSequence', () => {
 
     const result = await mergeEngine.validateMigrationSequence('db/migrations');
     expect(result.valid).toBe(false);
-    expect(result.issues.some(i => i.severity === 'error' && i.message.includes('Duplicate'))).toBe(true);
+    expect(
+      result.issues.some((i) => i.severity === 'error' && i.message.includes('Duplicate')),
+    ).toBe(true);
   });
 
   it('detects gaps in migration sequence', async () => {
@@ -1028,7 +939,9 @@ describe('validateMigrationSequence', () => {
 
     const result = await mergeEngine.validateMigrationSequence('db/migrations');
     expect(result.valid).toBe(true); // Gaps are warnings, not errors
-    expect(result.issues.some(i => i.severity === 'warning' && i.message.includes('Gap'))).toBe(true);
+    expect(result.issues.some((i) => i.severity === 'warning' && i.message.includes('Gap'))).toBe(
+      true,
+    );
   });
 
   it('returns valid for nonexistent migration directory', async () => {
@@ -1102,11 +1015,7 @@ describe('TDD 2.3 full merge scenario', () => {
 
     repoRoot = tmpDir;
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -1164,7 +1073,9 @@ describe('TDD 2.3 full merge scenario', () => {
     const files = execSync(
       `git -C "${repoRoot}" ls-tree --name-only -r auto/req-001/integration src/`,
       { encoding: 'utf-8' },
-    ).trim().split('\n');
+    )
+      .trim()
+      .split('\n');
 
     expect(files).toContain('src/user-model.ts');
     expect(files).toContain('src/auth-controller.ts');
@@ -1183,10 +1094,9 @@ describe('TDD 2.3 full merge scenario', () => {
     );
     expect(authController).toContain('authenticate');
 
-    const logger = execSync(
-      `git -C "${repoRoot}" show auto/req-001/integration:src/logger.ts`,
-      { encoding: 'utf-8' },
-    );
+    const logger = execSync(`git -C "${repoRoot}" show auto/req-001/integration:src/logger.ts`, {
+      encoding: 'utf-8',
+    });
     expect(logger).toContain('track-c changes');
   });
 
@@ -1240,11 +1150,7 @@ describe('merge idempotency', () => {
       },
     });
     emitter = new EventEmitter();
-    mergeEngine = new MergeEngine(
-      { ...DEFAULT_PARALLEL_CONFIG },
-      repoRoot,
-      emitter,
-    );
+    mergeEngine = new MergeEngine({ ...DEFAULT_PARALLEL_CONFIG }, repoRoot, emitter);
   });
 
   afterEach(() => {
@@ -1267,10 +1173,9 @@ describe('merge idempotency', () => {
     expect(r2.conflictCount).toBe(0);
 
     // File content should be identical
-    const content = execSync(
-      `git -C "${repoRoot}" show auto/req-001/integration:file-a.ts`,
-      { encoding: 'utf-8' },
-    );
+    const content = execSync(`git -C "${repoRoot}" show auto/req-001/integration:file-a.ts`, {
+      encoding: 'utf-8',
+    });
     expect(content).toBe('export const a = 1;\n');
   });
 
@@ -1279,14 +1184,12 @@ describe('merge idempotency', () => {
     await mergeEngine.mergeTrack('req-001', 'track-b', 'auto/req-001/integration');
 
     // Both files should be present
-    const fileA = execSync(
-      `git -C "${repoRoot}" show auto/req-001/integration:file-a.ts`,
-      { encoding: 'utf-8' },
-    );
-    const fileB = execSync(
-      `git -C "${repoRoot}" show auto/req-001/integration:file-b.ts`,
-      { encoding: 'utf-8' },
-    );
+    const fileA = execSync(`git -C "${repoRoot}" show auto/req-001/integration:file-a.ts`, {
+      encoding: 'utf-8',
+    });
+    const fileB = execSync(`git -C "${repoRoot}" show auto/req-001/integration:file-b.ts`, {
+      encoding: 'utf-8',
+    });
 
     expect(fileA).toBe('export const a = 1;\n');
     expect(fileB).toBe('export const b = 2;\n');

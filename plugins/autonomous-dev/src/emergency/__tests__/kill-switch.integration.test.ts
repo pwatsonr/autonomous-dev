@@ -13,28 +13,28 @@
  *   11. Cancel during active pipeline (single request, others unaffected)
  */
 
-import * as path from "path";
-import { AbortManager } from "../abort-manager";
-import { KillSwitch } from "../kill-switch";
+import * as path from 'path';
+import { AbortManager } from '../abort-manager';
+import { KillSwitch } from '../kill-switch';
 import type {
   AuditTrail,
   EscalationCanceller,
   Notifier,
   NotificationPayload,
-} from "../kill-switch";
-import { StateSnapshotCapture } from "../state-snapshot";
-import type { FileSystem } from "../state-snapshot";
-import { HaltedGate } from "../halted-gate";
-import type { AbortReason, KillResult, StateSnapshot } from "../types";
-import { StatePersistence } from "../state-persistence";
-import type { PipelineState, StatePersistenceFs } from "../state-persistence";
+} from '../kill-switch';
+import { StateSnapshotCapture } from '../state-snapshot';
+import type { FileSystem } from '../state-snapshot';
+import { HaltedGate } from '../halted-gate';
+import type { AbortReason, KillResult, StateSnapshot } from '../types';
+import { StatePersistence } from '../state-persistence';
+import type { PipelineState, StatePersistenceFs } from '../state-persistence';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const STATE_DIR = "/test/.autonomous-dev/state";
-const PHASES = ["prd_approval", "tdd_approval", "code_review", "deployment"];
+const STATE_DIR = '/test/.autonomous-dev/state';
+const PHASES = ['prd_approval', 'tdd_approval', 'code_review', 'deployment'];
 
 // ---------------------------------------------------------------------------
 // Mock pipeline executor
@@ -73,7 +73,7 @@ function createMockExecutor(
 ): MockExecutor {
   const signal = abortManager.registerRequest(requestId);
   const completedPhases: string[] = [];
-  let currentPhase = "pending";
+  let currentPhase = 'pending';
   let aborted = false;
   let started = false;
   let finished = false;
@@ -100,7 +100,7 @@ function createMockExecutor(
       const pipelineState: PipelineState = {
         requestId,
         currentPhase: phase,
-        phaseStatus: "running",
+        phaseStatus: 'running',
         completedPhases: [...completedPhases],
         trustLevel: 2,
         lastUpdated: new Date().toISOString(),
@@ -120,7 +120,7 @@ function createMockExecutor(
         const completedState: PipelineState = {
           requestId,
           currentPhase: phase,
-          phaseStatus: "completed",
+          phaseStatus: 'completed',
           completedPhases: [...completedPhases],
           trustLevel: 2,
           lastUpdated: new Date().toISOString(),
@@ -135,7 +135,7 @@ function createMockExecutor(
       const completedState: PipelineState = {
         requestId,
         currentPhase: phase,
-        phaseStatus: "completed",
+        phaseStatus: 'completed',
         completedPhases: [...completedPhases],
         trustLevel: 2,
         lastUpdated: new Date().toISOString(),
@@ -144,7 +144,7 @@ function createMockExecutor(
     }
 
     finished = true;
-    currentPhase = "done";
+    currentPhase = 'done';
   })();
 
   const executor: MockExecutor = {
@@ -204,7 +204,7 @@ function createMockStatePersistenceFs(): {
       const content = store.get(filePath);
       if (content === undefined) {
         const err = new Error(`ENOENT`) as NodeJS.ErrnoException;
-        err.code = "ENOENT";
+        err.code = 'ENOENT';
         throw err;
       }
       return content;
@@ -233,7 +233,7 @@ function createMockSnapshotFs(): {
     readFile: jest.fn(async (filePath: string) => {
       const content = store.get(filePath);
       if (content === undefined) {
-        throw new Error("ENOENT");
+        throw new Error('ENOENT');
       }
       return content;
     }),
@@ -302,8 +302,7 @@ function createMockNotifier(): Notifier & { payloads: NotificationPayload[] } {
 function createIntegrationSetup() {
   const abortManager = new AbortManager();
   const { mockFs: snapshotFs, store: snapshotStore } = createMockSnapshotFs();
-  const { mockFs: persistenceFs, store: persistenceStore } =
-    createMockStatePersistenceFs();
+  const { mockFs: persistenceFs, store: persistenceStore } = createMockStatePersistenceFs();
 
   const snapshotCapture = new StateSnapshotCapture(STATE_DIR, snapshotFs);
   const statePersistence = new StatePersistence(STATE_DIR, persistenceFs);
@@ -340,20 +339,20 @@ function createIntegrationSetup() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("Kill Switch Integration Tests", () => {
+describe('Kill Switch Integration Tests', () => {
   // -----------------------------------------------------------------------
   // Test 7: Graceful kill during active phases
   // -----------------------------------------------------------------------
 
-  describe("Graceful kill during active phases", () => {
-    it("stops all 3 executors at the next atomic boundary", async () => {
+  describe('Graceful kill during active phases', () => {
+    it('stops all 3 executors at the next atomic boundary', async () => {
       const setup = createIntegrationSetup();
 
       // Step a: Create 3 mock pipeline executors
       const executors = [
-        createMockExecutor("req-1", setup.abortManager, setup.statePersistence),
-        createMockExecutor("req-2", setup.abortManager, setup.statePersistence),
-        createMockExecutor("req-3", setup.abortManager, setup.statePersistence),
+        createMockExecutor('req-1', setup.abortManager, setup.statePersistence),
+        createMockExecutor('req-2', setup.abortManager, setup.statePersistence),
+        createMockExecutor('req-3', setup.abortManager, setup.statePersistence),
       ];
 
       // Step b: Start all 3 and wait for them to begin executing
@@ -364,7 +363,7 @@ describe("Kill Switch Integration Tests", () => {
       expect(executors.every((e) => e.started)).toBe(true);
 
       // Step c: Issue graceful kill
-      const result = await setup.killSwitch.kill("graceful", "admin");
+      const result = await setup.killSwitch.kill('graceful', 'admin');
 
       // Wait for executors to finish their current phase
       await Promise.all(executors.map((e) => e.done));
@@ -373,13 +372,11 @@ describe("Kill Switch Integration Tests", () => {
       expect(executors.every((e) => e.aborted)).toBe(true);
 
       // Step e: Kill snapshot file exists with 3 request entries
-      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter(
-        (k) => k.includes("kill-snapshot"),
+      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter((k) =>
+        k.includes('kill-snapshot'),
       );
       expect(snapshotFiles.length).toBe(1);
-      const snapshotContent = JSON.parse(
-        setup.snapshotStore.get(snapshotFiles[0]!)!,
-      );
+      const snapshotContent = JSON.parse(setup.snapshotStore.get(snapshotFiles[0]!)!);
       expect(snapshotContent.total_active_requests).toBe(3);
       expect(snapshotContent.snapshots).toHaveLength(3);
 
@@ -387,10 +384,10 @@ describe("Kill Switch Integration Tests", () => {
       expect(setup.killSwitch.isHalted()).toBe(true);
 
       // Step g: HALTED gate rejects new request
-      const gateResult = setup.haltedGate.checkAccess("req-new");
+      const gateResult = setup.haltedGate.checkAccess('req-new');
       expect(gateResult.allowed).toBe(false);
       if (!gateResult.allowed) {
-        expect(gateResult.error.code).toBe("SYSTEM_HALTED");
+        expect(gateResult.error.code).toBe('SYSTEM_HALTED');
       }
     });
   });
@@ -399,36 +396,34 @@ describe("Kill Switch Integration Tests", () => {
   // Test 8: Hard kill during active phases
   // -----------------------------------------------------------------------
 
-  describe("Hard kill during active phases", () => {
-    it("stops all 3 executors immediately", async () => {
+  describe('Hard kill during active phases', () => {
+    it('stops all 3 executors immediately', async () => {
       const setup = createIntegrationSetup();
 
       // Step a: Same setup as graceful
       const executors = [
-        createMockExecutor("req-1", setup.abortManager, setup.statePersistence),
-        createMockExecutor("req-2", setup.abortManager, setup.statePersistence),
-        createMockExecutor("req-3", setup.abortManager, setup.statePersistence),
+        createMockExecutor('req-1', setup.abortManager, setup.statePersistence),
+        createMockExecutor('req-2', setup.abortManager, setup.statePersistence),
+        createMockExecutor('req-3', setup.abortManager, setup.statePersistence),
       ];
 
       executors.forEach((e) => e.start());
       await new Promise((r) => setTimeout(r, 25));
 
       // Step b: Issue hard kill
-      const result = await setup.killSwitch.kill("hard", "admin");
+      const result = await setup.killSwitch.kill('hard', 'admin');
 
       // Step c: All executors stop (abort signal fires immediately)
       await Promise.all(executors.map((e) => e.done));
       expect(executors.every((e) => e.aborted)).toBe(true);
 
       // Step d: Snapshot captured before abort
-      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter(
-        (k) => k.includes("kill-snapshot"),
+      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter((k) =>
+        k.includes('kill-snapshot'),
       );
       expect(snapshotFiles.length).toBe(1);
-      const snapshotContent = JSON.parse(
-        setup.snapshotStore.get(snapshotFiles[0]!)!,
-      );
-      expect(snapshotContent.kill_mode).toBe("hard");
+      const snapshotContent = JSON.parse(setup.snapshotStore.get(snapshotFiles[0]!)!);
+      expect(snapshotContent.kill_mode).toBe('hard');
       expect(snapshotContent.total_active_requests).toBe(3);
 
       // Verify halted
@@ -440,35 +435,17 @@ describe("Kill Switch Integration Tests", () => {
   // Test 9: Kill switch drill (TDD Section 8.3)
   // -----------------------------------------------------------------------
 
-  describe("Kill switch drill (TDD 8.3)", () => {
-    it("completes the full drill scenario: start -> kill -> verify -> reenable -> verify", async () => {
+  describe('Kill switch drill (TDD 8.3)', () => {
+    it('completes the full drill scenario: start -> kill -> verify -> reenable -> verify', async () => {
       const setup = createIntegrationSetup();
 
       // ---------------------------------------------------------------
       // Step 1: Start 3 synthetic pipeline requests
       // ---------------------------------------------------------------
       const executors = [
-        createMockExecutor(
-          "drill-req-1",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          20,
-        ),
-        createMockExecutor(
-          "drill-req-2",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          20,
-        ),
-        createMockExecutor(
-          "drill-req-3",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          20,
-        ),
+        createMockExecutor('drill-req-1', setup.abortManager, setup.statePersistence, PHASES, 20),
+        createMockExecutor('drill-req-2', setup.abortManager, setup.statePersistence, PHASES, 20),
+        createMockExecutor('drill-req-3', setup.abortManager, setup.statePersistence, PHASES, 20),
       ];
 
       // ---------------------------------------------------------------
@@ -485,7 +462,7 @@ describe("Kill Switch Integration Tests", () => {
       // Step 3: Issue /kill graceful
       // ---------------------------------------------------------------
       const killStartTime = Date.now();
-      const killResult = await setup.killSwitch.kill("graceful", "drill-admin");
+      const killResult = await setup.killSwitch.kill('graceful', 'drill-admin');
 
       // Wait for all executors to finish
       await Promise.all(executors.map((e) => e.done));
@@ -510,13 +487,11 @@ describe("Kill Switch Integration Tests", () => {
       // ---------------------------------------------------------------
       // Step 6: Assert state snapshot file written with all 3 requests
       // ---------------------------------------------------------------
-      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter(
-        (k) => k.includes("kill-snapshot"),
+      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter((k) =>
+        k.includes('kill-snapshot'),
       );
       expect(snapshotFiles.length).toBe(1);
-      const snapshotContent = JSON.parse(
-        setup.snapshotStore.get(snapshotFiles[0]!)!,
-      );
+      const snapshotContent = JSON.parse(setup.snapshotStore.get(snapshotFiles[0]!)!);
       expect(snapshotContent.total_active_requests).toBe(3);
       expect(snapshotContent.snapshots).toHaveLength(3);
 
@@ -535,30 +510,30 @@ describe("Kill Switch Integration Tests", () => {
       // ---------------------------------------------------------------
       // Step 9: Assert HALTED gate rejects new request
       // ---------------------------------------------------------------
-      const gateResult = setup.haltedGate.checkAccess("drill-req-new");
+      const gateResult = setup.haltedGate.checkAccess('drill-req-new');
       expect(gateResult.allowed).toBe(false);
       if (!gateResult.allowed) {
-        expect(gateResult.error.code).toBe("SYSTEM_HALTED");
+        expect(gateResult.error.code).toBe('SYSTEM_HALTED');
       }
 
       // ---------------------------------------------------------------
       // Step 10: Issue reenable
       // ---------------------------------------------------------------
-      setup.killSwitch.reenable("drill-admin");
+      setup.killSwitch.reenable('drill-admin');
 
       // ---------------------------------------------------------------
       // Step 11: Assert system accepts new requests
       // ---------------------------------------------------------------
-      const gateAfterReenable = setup.haltedGate.checkAccess("drill-req-new");
+      const gateAfterReenable = setup.haltedGate.checkAccess('drill-req-new');
       expect(gateAfterReenable.allowed).toBe(true);
       expect(setup.killSwitch.isHalted()).toBe(false);
-      expect(setup.killSwitch.getState()).toBe("running");
+      expect(setup.killSwitch.getState()).toBe('running');
 
       // ---------------------------------------------------------------
       // Step 12: Start 1 new request; verify it executes normally
       // ---------------------------------------------------------------
       const newExecutor = createMockExecutor(
-        "drill-req-new",
+        'drill-req-new',
         setup.abortManager,
         setup.statePersistence,
         PHASES,
@@ -572,31 +547,13 @@ describe("Kill Switch Integration Tests", () => {
       expect(newExecutor.completedPhases).toEqual(PHASES);
     });
 
-    it("meets timing constraint: signals received within 5 seconds", async () => {
+    it('meets timing constraint: signals received within 5 seconds', async () => {
       const setup = createIntegrationSetup();
 
       const executors = [
-        createMockExecutor(
-          "timing-req-1",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          50,
-        ),
-        createMockExecutor(
-          "timing-req-2",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          50,
-        ),
-        createMockExecutor(
-          "timing-req-3",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          50,
-        ),
+        createMockExecutor('timing-req-1', setup.abortManager, setup.statePersistence, PHASES, 50),
+        createMockExecutor('timing-req-2', setup.abortManager, setup.statePersistence, PHASES, 50),
+        createMockExecutor('timing-req-3', setup.abortManager, setup.statePersistence, PHASES, 50),
       ];
 
       executors.forEach((e) => e.start());
@@ -605,13 +562,13 @@ describe("Kill Switch Integration Tests", () => {
       // Record when each signal is received
       const signalTimes: number[] = [];
       for (const executor of executors) {
-        executor.signal.addEventListener("abort", () => {
+        executor.signal.addEventListener('abort', () => {
           signalTimes.push(Date.now());
         });
       }
 
       const killIssueTime = Date.now();
-      await setup.killSwitch.kill("graceful", "timing-admin");
+      await setup.killSwitch.kill('graceful', 'timing-admin');
 
       // All signals should have been received already (synchronous dispatch)
       // But wait for executors to finish their current phases
@@ -626,75 +583,55 @@ describe("Kill Switch Integration Tests", () => {
   // Test 10: Kill then reenable then kill again
   // -----------------------------------------------------------------------
 
-  describe("Kill -> reenable -> kill cycle", () => {
-    it("produces a fresh snapshot on the second kill", async () => {
+  describe('Kill -> reenable -> kill cycle', () => {
+    it('produces a fresh snapshot on the second kill', async () => {
       const setup = createIntegrationSetup();
 
       // First cycle: register requests and kill
       const executors1 = [
-        createMockExecutor(
-          "cycle1-req-1",
-          setup.abortManager,
-          setup.statePersistence,
-        ),
-        createMockExecutor(
-          "cycle1-req-2",
-          setup.abortManager,
-          setup.statePersistence,
-        ),
+        createMockExecutor('cycle1-req-1', setup.abortManager, setup.statePersistence),
+        createMockExecutor('cycle1-req-2', setup.abortManager, setup.statePersistence),
       ];
       executors1.forEach((e) => e.start());
       await new Promise((r) => setTimeout(r, 15));
 
-      const firstResult = await setup.killSwitch.kill("graceful", "admin");
+      const firstResult = await setup.killSwitch.kill('graceful', 'admin');
       await Promise.all(executors1.map((e) => e.done));
 
       expect(setup.killSwitch.isHalted()).toBe(true);
       expect(firstResult.totalActiveRequests).toBe(2);
 
       // Reenable
-      setup.killSwitch.reenable("admin");
+      setup.killSwitch.reenable('admin');
       expect(setup.killSwitch.isHalted()).toBe(false);
-      expect(setup.killSwitch.getState()).toBe("running");
+      expect(setup.killSwitch.getState()).toBe('running');
 
       // Second cycle: register new requests and kill again
       const executors2 = [
-        createMockExecutor(
-          "cycle2-req-1",
-          setup.abortManager,
-          setup.statePersistence,
-        ),
-        createMockExecutor(
-          "cycle2-req-2",
-          setup.abortManager,
-          setup.statePersistence,
-        ),
-        createMockExecutor(
-          "cycle2-req-3",
-          setup.abortManager,
-          setup.statePersistence,
-        ),
+        createMockExecutor('cycle2-req-1', setup.abortManager, setup.statePersistence),
+        createMockExecutor('cycle2-req-2', setup.abortManager, setup.statePersistence),
+        createMockExecutor('cycle2-req-3', setup.abortManager, setup.statePersistence),
       ];
       executors2.forEach((e) => e.start());
       await new Promise((r) => setTimeout(r, 15));
 
-      const secondResult = await setup.killSwitch.kill("hard", "admin");
+      const secondResult = await setup.killSwitch.kill('hard', 'admin');
       await Promise.all(executors2.map((e) => e.done));
 
       // Second kill produces fresh result (not the same as first)
       expect(secondResult).not.toBe(firstResult);
-      expect(secondResult.mode).toBe("hard");
+      expect(secondResult.mode).toBe('hard');
       expect(secondResult.totalActiveRequests).toBe(3);
 
       // Two separate snapshot files written
-      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter(
-        (k) => k.includes("kill-snapshot"),
+      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter((k) =>
+        k.includes('kill-snapshot'),
       );
       expect(snapshotFiles.length).toBe(2);
 
       // State is consistent
       expect(setup.killSwitch.isHalted()).toBe(true);
-      expect(setup.killSwitch.getState()).toBe("halted");
+      expect(setup.killSwitch.getState()).toBe('halted');
     });
   });
 
@@ -702,26 +639,26 @@ describe("Kill Switch Integration Tests", () => {
   // Test 11: Cancel during active pipeline
   // -----------------------------------------------------------------------
 
-  describe("Cancel single request during active pipeline", () => {
-    it("cancels req-2 while req-1 and req-3 continue", async () => {
+  describe('Cancel single request during active pipeline', () => {
+    it('cancels req-2 while req-1 and req-3 continue', async () => {
       const setup = createIntegrationSetup();
 
       const executor1 = createMockExecutor(
-        "req-1",
+        'req-1',
         setup.abortManager,
         setup.statePersistence,
         PHASES,
         15,
       );
       const executor2 = createMockExecutor(
-        "req-2",
+        'req-2',
         setup.abortManager,
         setup.statePersistence,
         PHASES,
         15,
       );
       const executor3 = createMockExecutor(
-        "req-3",
+        'req-3',
         setup.abortManager,
         setup.statePersistence,
         PHASES,
@@ -735,16 +672,16 @@ describe("Kill Switch Integration Tests", () => {
       await new Promise((r) => setTimeout(r, 20));
 
       // Cancel only req-2
-      const cancelResult = await setup.killSwitch.cancel("req-2", "admin");
+      const cancelResult = await setup.killSwitch.cancel('req-2', 'admin');
 
       // Wait for req-2 to stop
       await executor2.done;
 
       // Verify req-2 is aborted
       expect(executor2.aborted).toBe(true);
-      expect(cancelResult.requestId).toBe("req-2");
-      expect(cancelResult.cancelledBy).toBe("admin");
-      expect(cancelResult.snapshot.requestId).toBe("req-2");
+      expect(cancelResult.requestId).toBe('req-2');
+      expect(cancelResult.cancelledBy).toBe('admin');
+      expect(cancelResult.snapshot.requestId).toBe('req-2');
 
       // Verify req-1 and req-3 continue executing
       // Give them time to finish
@@ -757,29 +694,25 @@ describe("Kill Switch Integration Tests", () => {
 
       // System is NOT halted (cancel != kill)
       expect(setup.killSwitch.isHalted()).toBe(false);
-      expect(setup.killSwitch.getState()).toBe("running");
+      expect(setup.killSwitch.getState()).toBe('running');
     });
 
-    it("captures snapshot for cancelled request", async () => {
+    it('captures snapshot for cancelled request', async () => {
       const setup = createIntegrationSetup();
 
-      const executor = createMockExecutor(
-        "req-cancel",
-        setup.abortManager,
-        setup.statePersistence,
-      );
+      const executor = createMockExecutor('req-cancel', setup.abortManager, setup.statePersistence);
       executor.start();
       await new Promise((r) => setTimeout(r, 15));
 
-      const result = await setup.killSwitch.cancel("req-cancel", "admin");
+      const result = await setup.killSwitch.cancel('req-cancel', 'admin');
 
       // Cancel result contains a snapshot of the cancelled request
       expect(result.snapshot).toBeDefined();
-      expect(result.snapshot.requestId).toBe("req-cancel");
+      expect(result.snapshot.requestId).toBe('req-cancel');
 
       // No kill snapshot file is created (cancel != kill)
-      const killSnapshotFiles = Array.from(setup.snapshotStore.keys()).filter(
-        (k) => k.includes("kill-snapshot"),
+      const killSnapshotFiles = Array.from(setup.snapshotStore.keys()).filter((k) =>
+        k.includes('kill-snapshot'),
       );
       expect(killSnapshotFiles.length).toBe(0);
     });
@@ -789,39 +722,21 @@ describe("Kill Switch Integration Tests", () => {
   // Additional: Hard kill drill variant
   // -----------------------------------------------------------------------
 
-  describe("Hard kill drill variant", () => {
-    it("hard kill stops executors faster than graceful", async () => {
+  describe('Hard kill drill variant', () => {
+    it('hard kill stops executors faster than graceful', async () => {
       const setup = createIntegrationSetup();
 
       const executors = [
-        createMockExecutor(
-          "hard-drill-1",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          50,
-        ),
-        createMockExecutor(
-          "hard-drill-2",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          50,
-        ),
-        createMockExecutor(
-          "hard-drill-3",
-          setup.abortManager,
-          setup.statePersistence,
-          PHASES,
-          50,
-        ),
+        createMockExecutor('hard-drill-1', setup.abortManager, setup.statePersistence, PHASES, 50),
+        createMockExecutor('hard-drill-2', setup.abortManager, setup.statePersistence, PHASES, 50),
+        createMockExecutor('hard-drill-3', setup.abortManager, setup.statePersistence, PHASES, 50),
       ];
 
       executors.forEach((e) => e.start());
       await new Promise((r) => setTimeout(r, 60));
 
       const startTime = Date.now();
-      await setup.killSwitch.kill("hard", "hard-drill-admin");
+      await setup.killSwitch.kill('hard', 'hard-drill-admin');
       await Promise.all(executors.map((e) => e.done));
       const elapsed = Date.now() - startTime;
 
@@ -830,12 +745,12 @@ describe("Kill Switch Integration Tests", () => {
       expect(executors.every((e) => e.aborted)).toBe(true);
 
       // Verify snapshot
-      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter(
-        (k) => k.includes("kill-snapshot"),
+      const snapshotFiles = Array.from(setup.snapshotStore.keys()).filter((k) =>
+        k.includes('kill-snapshot'),
       );
       expect(snapshotFiles.length).toBe(1);
       const content = JSON.parse(setup.snapshotStore.get(snapshotFiles[0]!)!);
-      expect(content.kill_mode).toBe("hard");
+      expect(content.kill_mode).toBe('hard');
     });
   });
 
@@ -843,39 +758,33 @@ describe("Kill Switch Integration Tests", () => {
   // Additional: Audit events are correctly emitted throughout the drill
   // -----------------------------------------------------------------------
 
-  describe("Audit events during drill", () => {
-    it("emits kill_issued and system_reenabled events in sequence", async () => {
+  describe('Audit events during drill', () => {
+    it('emits kill_issued and system_reenabled events in sequence', async () => {
       const setup = createIntegrationSetup();
 
-      const executor = createMockExecutor(
-        "audit-req",
-        setup.abortManager,
-        setup.statePersistence,
-      );
+      const executor = createMockExecutor('audit-req', setup.abortManager, setup.statePersistence);
       executor.start();
       await new Promise((r) => setTimeout(r, 15));
 
       // Kill
-      await setup.killSwitch.kill("graceful", "audit-admin");
+      await setup.killSwitch.kill('graceful', 'audit-admin');
       await executor.done;
 
       // Verify kill_issued event
-      const killEvent = setup.auditTrail.events.find(
-        (e) => e.event_type === "kill_issued",
-      );
+      const killEvent = setup.auditTrail.events.find((e) => e.event_type === 'kill_issued');
       expect(killEvent).toBeDefined();
-      expect(killEvent!.payload.mode).toBe("graceful");
-      expect(killEvent!.payload.issuedBy).toBe("audit-admin");
+      expect(killEvent!.payload.mode).toBe('graceful');
+      expect(killEvent!.payload.issuedBy).toBe('audit-admin');
 
       // Reenable
-      setup.killSwitch.reenable("audit-admin");
+      setup.killSwitch.reenable('audit-admin');
 
       // Verify system_reenabled event
       const reenabledEvent = setup.auditTrail.events.find(
-        (e) => e.event_type === "system_reenabled",
+        (e) => e.event_type === 'system_reenabled',
       );
       expect(reenabledEvent).toBeDefined();
-      expect(reenabledEvent!.payload.issuedBy).toBe("audit-admin");
+      expect(reenabledEvent!.payload.issuedBy).toBe('audit-admin');
     });
   });
 });

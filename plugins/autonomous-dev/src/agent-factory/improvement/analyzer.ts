@@ -15,10 +15,7 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 
 import type { IAgentRegistry, AgentRecord } from '../types';
-import type {
-  IMetricsEngine,
-  InvocationMetric,
-} from '../metrics/types';
+import type { IMetricsEngine, InvocationMetric } from '../metrics/types';
 import type { ObservationTracker } from '../metrics/observation';
 import type { AuditLogger } from '../audit';
 import type { AgentRuntime } from '../runtime';
@@ -149,9 +146,7 @@ export class PerformanceAnalyzer {
       // Step 3: Collect analysis input data
       const input = this.collectInput(agentRecord);
       if (!input) {
-        return this.errorResult(
-          `No aggregate metrics available for agent '${agentName}'`,
-        );
+        return this.errorResult(`No aggregate metrics available for agent '${agentName}'`);
       }
 
       // Step 4: Format the structured prompt
@@ -160,9 +155,7 @@ export class PerformanceAnalyzer {
       // Step 5: Invoke the performance-analyst agent
       const agentOutput = await this.invokeAnalyst(analystRecord, prompt);
       if (agentOutput === null) {
-        return this.errorResult(
-          `Performance-analyst invocation failed for agent '${agentName}'`,
-        );
+        return this.errorResult(`Performance-analyst invocation failed for agent '${agentName}'`);
       }
 
       // Step 6: Parse the agent's output into a WeaknessReport
@@ -175,9 +168,7 @@ export class PerformanceAnalyzer {
 
       // Step 7: Persist the report
       this.reportStore.append(report);
-      this.logger.info(
-        `Weakness report ${report.report_id} persisted for '${agentName}'`,
-      );
+      this.logger.info(`Weakness report ${report.report_id} persisted for '${agentName}'`);
 
       // Step 8: Decide the next action
       const nextAction = decideNextAction(report);
@@ -292,7 +283,8 @@ export class PerformanceAnalyzer {
    */
   formatPrompt(input: AnalysisInput): string {
     const { agent, metrics } = input;
-    const { aggregate, per_dimension_scores, domain_breakdown, active_alerts, recent_invocations } = metrics;
+    const { aggregate, per_dimension_scores, domain_breakdown, active_alerts, recent_invocations } =
+      metrics;
 
     // Header
     const lines: string[] = [
@@ -311,9 +303,7 @@ export class PerformanceAnalyzer {
     lines.push('| Dimension | Avg Score | Median | Stddev | Trend | Worst Domains |');
     lines.push('|-----------|-----------|--------|--------|-------|---------------|');
     for (const dim of per_dimension_scores) {
-      const worstDomains = dim.worst_domains.length > 0
-        ? dim.worst_domains.join(', ')
-        : 'none';
+      const worstDomains = dim.worst_domains.length > 0 ? dim.worst_domains.join(', ') : 'none';
       lines.push(
         `| ${dim.dimension} | ${dim.avg_score.toFixed(2)} | ${dim.median_score.toFixed(2)} | ${dim.stddev.toFixed(2)} | ${dim.trend_slope >= 0 ? '+' : ''}${dim.trend_slope.toFixed(4)} | ${worstDomains} |`,
       );
@@ -358,7 +348,9 @@ export class PerformanceAnalyzer {
     lines.push('');
     lines.push('Produce a structured weakness report with:');
     lines.push('1. overall_assessment: "healthy" | "needs_improvement" | "critical"');
-    lines.push('2. weaknesses: array of { dimension, severity, evidence, affected_domains, suggested_focus }');
+    lines.push(
+      '2. weaknesses: array of { dimension, severity, evidence, affected_domains, suggested_focus }',
+    );
     lines.push('3. strengths: array of strings');
     lines.push('4. recommendation: "no_action" | "propose_modification" | "propose_specialist"');
     lines.push('');
@@ -376,10 +368,7 @@ export class PerformanceAnalyzer {
    *
    * Returns the agent's text output, or null on failure.
    */
-  private async invokeAnalyst(
-    analystRecord: AgentRecord,
-    prompt: string,
-  ): Promise<string | null> {
+  private async invokeAnalyst(analystRecord: AgentRecord, prompt: string): Promise<string | null> {
     try {
       if (this.createRuntime) {
         const runtime = this.createRuntime(analystRecord);
@@ -399,9 +388,7 @@ export class PerformanceAnalyzer {
 
       // Fallback: no runtime factory provided; this is a structural
       // placeholder.  In production the createRuntime factory is required.
-      this.logger.warn(
-        'No runtime factory provided; returning null from analyst invocation',
-      );
+      this.logger.warn('No runtime factory provided; returning null from analyst invocation');
       return null;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -424,10 +411,7 @@ export class PerformanceAnalyzer {
    *
    * Returns null if parsing fails.
    */
-  parseReport(
-    output: string,
-    agentRecord: AgentRecord,
-  ): WeaknessReport | null {
+  parseReport(output: string, agentRecord: AgentRecord): WeaknessReport | null {
     const json = extractJson(output);
     if (!json) {
       this.logger.error('Failed to extract JSON from performance-analyst output');
@@ -439,15 +423,11 @@ export class PerformanceAnalyzer {
 
       // Validate required fields
       if (!isValidOverallAssessment(parsed.overall_assessment)) {
-        this.logger.error(
-          `Invalid overall_assessment: '${parsed.overall_assessment}'`,
-        );
+        this.logger.error(`Invalid overall_assessment: '${parsed.overall_assessment}'`);
         return null;
       }
       if (!isValidRecommendation(parsed.recommendation)) {
-        this.logger.error(
-          `Invalid recommendation: '${parsed.recommendation}'`,
-        );
+        this.logger.error(`Invalid recommendation: '${parsed.recommendation}'`);
         return null;
       }
       if (!Array.isArray(parsed.weaknesses)) {
@@ -476,9 +456,7 @@ export class PerformanceAnalyzer {
           dimension: w.dimension ?? '',
           severity: isValidWeaknessSeverity(w.severity) ? w.severity : 'low',
           evidence: w.evidence ?? '',
-          affected_domains: Array.isArray(w.affected_domains)
-            ? w.affected_domains
-            : [],
+          affected_domains: Array.isArray(w.affected_domains) ? w.affected_domains : [],
           suggested_focus: w.suggested_focus ?? '',
         })),
         strengths: parsed.strengths,
@@ -520,9 +498,7 @@ export class PerformanceAnalyzer {
     switch (nextAction) {
       case 'no_action':
         this.observationTracker.resetForPromotion(agentName, currentVersion);
-        this.logger.info(
-          `Agent '${agentName}' is healthy; observation counter reset`,
-        );
+        this.logger.info(`Agent '${agentName}' is healthy; observation counter reset`);
         break;
 
       case 'propose_modification':
@@ -564,13 +540,13 @@ export class PerformanceAnalyzer {
       }
     }
 
-    const taskDomain = affectedDomains.size > 0
-      ? Array.from(affectedDomains).join(', ')
-      : 'unknown';
+    const taskDomain =
+      affectedDomains.size > 0 ? Array.from(affectedDomains).join(', ') : 'unknown';
 
-    const description = descriptions.length > 0
-      ? descriptions.join('; ')
-      : 'Specialist agent recommended based on performance analysis';
+    const description =
+      descriptions.length > 0
+        ? descriptions.join('; ')
+        : 'Specialist agent recommended based on performance analysis';
 
     const entry: DomainGapEntry = {
       gap_id: randomUUID(),
@@ -655,8 +631,7 @@ export function decideNextAction(
 
   if (
     report.recommendation === 'propose_modification' &&
-    (report.overall_assessment === 'needs_improvement' ||
-      report.overall_assessment === 'critical')
+    (report.overall_assessment === 'needs_improvement' || report.overall_assessment === 'critical')
   ) {
     return 'propose_modification';
   }
@@ -676,16 +651,11 @@ export function decideNextAction(
  * then computes average, median, standard deviation, trend slope, and
  * identifies worst-performing domains for each dimension.
  */
-export function computeDimensionBreakdowns(
-  invocations: InvocationMetric[],
-): DimensionBreakdown[] {
+export function computeDimensionBreakdowns(invocations: InvocationMetric[]): DimensionBreakdown[] {
   if (invocations.length === 0) return [];
 
   // Group scores by dimension
-  const dimMap = new Map<
-    string,
-    Array<{ score: number; domain: string; index: number }>
-  >();
+  const dimMap = new Map<string, Array<{ score: number; domain: string; index: number }>>();
 
   for (let i = 0; i < invocations.length; i++) {
     const inv = invocations[i];
@@ -727,9 +697,7 @@ export function computeDimensionBreakdowns(
     domainAvgs.sort((a, b) => a.avg - b.avg);
 
     // Worst domains: bottom half or domains below the overall average
-    const worstDomains = domainAvgs
-      .filter((d) => d.avg < avg)
-      .map((d) => d.domain);
+    const worstDomains = domainAvgs.filter((d) => d.avg < avg).map((d) => d.domain);
 
     breakdowns.push({
       dimension,
@@ -781,12 +749,18 @@ export function extractJson(output: string): string | null {
 // Validation helpers
 // ---------------------------------------------------------------------------
 
-function isValidOverallAssessment(value: unknown): value is 'healthy' | 'needs_improvement' | 'critical' {
+function isValidOverallAssessment(
+  value: unknown,
+): value is 'healthy' | 'needs_improvement' | 'critical' {
   return value === 'healthy' || value === 'needs_improvement' || value === 'critical';
 }
 
-function isValidRecommendation(value: unknown): value is 'no_action' | 'propose_modification' | 'propose_specialist' {
-  return value === 'no_action' || value === 'propose_modification' || value === 'propose_specialist';
+function isValidRecommendation(
+  value: unknown,
+): value is 'no_action' | 'propose_modification' | 'propose_specialist' {
+  return (
+    value === 'no_action' || value === 'propose_modification' || value === 'propose_specialist'
+  );
 }
 
 function isValidWeaknessSeverity(value: unknown): value is 'low' | 'medium' | 'high' {

@@ -57,20 +57,16 @@ interface ExpectedDetections {
 /**
  * Default location of the repo fixture corpus. Resolved at module load.
  */
-export const REPOS_ROOT = path.resolve(
-  __dirname,
-  '..',
-  'fixtures',
-  'standards',
-  'repos',
-);
+export const REPOS_ROOT = path.resolve(__dirname, '..', 'fixtures', 'standards', 'repos');
 
 /** Compute the per-signal precision report across every repo fixture. */
 export async function computePrecisionReport(
   reposRoot: string = REPOS_ROOT,
 ): Promise<PrecisionReport> {
-  const counts: Record<SignalKind, { tp: number; fp: number; ignored: number }> =
-    {} as Record<SignalKind, { tp: number; fp: number; ignored: number }>;
+  const counts: Record<SignalKind, { tp: number; fp: number; ignored: number }> = {} as Record<
+    SignalKind,
+    { tp: number; fp: number; ignored: number }
+  >;
   for (const sig of ALL_SIGNALS) counts[sig] = { tp: 0, fp: 0, ignored: 0 };
 
   const perRepo: PrecisionReport['perRepo'] = [];
@@ -86,9 +82,7 @@ export async function computePrecisionReport(
 
     let expectations: ExpectedDetections;
     try {
-      expectations = JSON.parse(
-        await fs.readFile(expectedPath, 'utf8'),
-      ) as ExpectedDetections;
+      expectations = JSON.parse(await fs.readFile(expectedPath, 'utf8')) as ExpectedDetections;
     } catch {
       // Skip directories without an expectations file; they aren't fixtures.
       continue;

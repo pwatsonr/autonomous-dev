@@ -61,24 +61,28 @@ export function checkDecompositionLimits(
   // 1. Child limit
   const childLimit = config.decomposition.maxChildrenPerDecomposition;
   if (proposedChildCount > childLimit) {
-    errors.push(new DecompositionLimitError(
-      'CHILD_LIMIT_EXCEEDED',
-      childLimit,
-      proposedChildCount,
-      `Proposed ${proposedChildCount} children exceeds limit of ${childLimit}`,
-    ));
+    errors.push(
+      new DecompositionLimitError(
+        'CHILD_LIMIT_EXCEEDED',
+        childLimit,
+        proposedChildCount,
+        `Proposed ${proposedChildCount} children exceeds limit of ${childLimit}`,
+      ),
+    );
   }
 
   // 2. Depth limit (hardcoded 4, not configurable)
   const childDepth = parentDepth + 1;
   const maxDepth = 4; // config.pipeline.maxDepth is always 4
   if (childDepth > maxDepth) {
-    errors.push(new DecompositionLimitError(
-      'DEPTH_LIMIT_EXCEEDED',
-      maxDepth,
-      childDepth,
-      `Child depth ${childDepth} exceeds maximum depth ${maxDepth}`,
-    ));
+    errors.push(
+      new DecompositionLimitError(
+        'DEPTH_LIMIT_EXCEEDED',
+        maxDepth,
+        childDepth,
+        `Child depth ${childDepth} exceeds maximum depth ${maxDepth}`,
+      ),
+    );
   }
 
   // 3. Total node limit
@@ -86,17 +90,19 @@ export function checkDecompositionLimits(
   const newTotal = currentTotal + proposedChildCount;
   const nodeLimit = config.decomposition.maxTotalNodes;
   if (newTotal > nodeLimit) {
-    errors.push(new DecompositionLimitError(
-      'TOTAL_NODE_LIMIT_EXCEEDED',
-      nodeLimit,
-      newTotal,
-      `Total nodes ${newTotal} exceeds limit of ${nodeLimit}`,
-    ));
+    errors.push(
+      new DecompositionLimitError(
+        'TOTAL_NODE_LIMIT_EXCEEDED',
+        nodeLimit,
+        newTotal,
+        `Total nodes ${newTotal} exceeds limit of ${nodeLimit}`,
+      ),
+    );
   }
 
   // 4. Explosion threshold (warning, not error)
   const explosionThreshold = Math.floor(
-    nodeLimit * config.decomposition.explosionThresholdPercent / 100,
+    (nodeLimit * config.decomposition.explosionThresholdPercent) / 100,
   );
   if (newTotal > explosionThreshold && newTotal <= nodeLimit) {
     explosionWarning = true;

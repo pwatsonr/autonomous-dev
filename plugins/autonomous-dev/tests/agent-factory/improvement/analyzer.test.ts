@@ -96,9 +96,7 @@ function baseAgent(overrides?: Partial<ParsedAgent>): ParsedAgent {
       { name: 'quality', weight: 0.3, description: 'Clean code' },
       { name: 'coverage', weight: 0.3, description: 'Adequate test coverage' },
     ],
-    version_history: [
-      { version: '1.0.0', date: '2026-01-01', change: 'Initial release' },
-    ],
+    version_history: [{ version: '1.0.0', date: '2026-01-01', change: 'Initial release' }],
     risk_tier: 'medium',
     frozen: false,
     description: 'Executes code changes based on specs',
@@ -398,9 +396,7 @@ function createHarness(opts: {
 }): Harness {
   const tmpDir = makeTempDir();
 
-  const records: AgentRecord[] = [
-    makeAgentRecord(baseAgent(), opts.targetState ?? 'ACTIVE'),
-  ];
+  const records: AgentRecord[] = [makeAgentRecord(baseAgent(), opts.targetState ?? 'ACTIVE')];
   if (opts.includeAnalyst !== false) {
     records.push(makeAgentRecord(analystAgent(), opts.analystState ?? 'ACTIVE'));
   }
@@ -468,19 +464,41 @@ function reportWith(
 function test_decide_next_action_routing(): void {
   // healthy always -> no_action regardless of recommendation
   assert(decideNextAction(reportWith('healthy', 'no_action')) === 'no_action', 'healthy/no_action');
-  assert(decideNextAction(reportWith('healthy', 'propose_modification')) === 'no_action', 'healthy overrides modification');
-  assert(decideNextAction(reportWith('healthy', 'propose_specialist')) === 'no_action', 'healthy overrides specialist');
+  assert(
+    decideNextAction(reportWith('healthy', 'propose_modification')) === 'no_action',
+    'healthy overrides modification',
+  );
+  assert(
+    decideNextAction(reportWith('healthy', 'propose_specialist')) === 'no_action',
+    'healthy overrides specialist',
+  );
 
   // propose_specialist -> log_domain_gap (when not healthy)
-  assert(decideNextAction(reportWith('needs_improvement', 'propose_specialist')) === 'log_domain_gap', 'needs_improvement/specialist');
-  assert(decideNextAction(reportWith('critical', 'propose_specialist')) === 'log_domain_gap', 'critical/specialist');
+  assert(
+    decideNextAction(reportWith('needs_improvement', 'propose_specialist')) === 'log_domain_gap',
+    'needs_improvement/specialist',
+  );
+  assert(
+    decideNextAction(reportWith('critical', 'propose_specialist')) === 'log_domain_gap',
+    'critical/specialist',
+  );
 
   // propose_modification + (needs_improvement | critical) -> propose_modification
-  assert(decideNextAction(reportWith('needs_improvement', 'propose_modification')) === 'propose_modification', 'needs_improvement/modification');
-  assert(decideNextAction(reportWith('critical', 'propose_modification')) === 'propose_modification', 'critical/modification');
+  assert(
+    decideNextAction(reportWith('needs_improvement', 'propose_modification')) ===
+      'propose_modification',
+    'needs_improvement/modification',
+  );
+  assert(
+    decideNextAction(reportWith('critical', 'propose_modification')) === 'propose_modification',
+    'critical/modification',
+  );
 
   // unexpected combo (not healthy but no_action recommendation) -> no_action default
-  assert(decideNextAction(reportWith('needs_improvement', 'no_action')) === 'no_action', 'needs_improvement/no_action default');
+  assert(
+    decideNextAction(reportWith('needs_improvement', 'no_action')) === 'no_action',
+    'needs_improvement/no_action default',
+  );
   console.log('PASS: test_decide_next_action_routing');
 }
 
@@ -502,10 +520,16 @@ function test_compute_dimension_breakdowns(): void {
   const breakdown = computeDimensionBreakdowns(invs);
   const coverage = breakdown.find((b) => b.dimension === 'coverage');
   assert(coverage !== undefined, 'coverage dimension computed');
-  assert(Math.abs(coverage!.avg_score - 3.0) < 1e-9, `coverage avg should be 3.0, got ${coverage!.avg_score}`);
+  assert(
+    Math.abs(coverage!.avg_score - 3.0) < 1e-9,
+    `coverage avg should be 3.0, got ${coverage!.avg_score}`,
+  );
   // python (2.0) is below the avg (3.0) -> a worst domain; typescript is not.
   assert(coverage!.worst_domains.includes('python'), 'python should be a worst domain');
-  assert(!coverage!.worst_domains.includes('typescript'), 'typescript should not be a worst domain');
+  assert(
+    !coverage!.worst_domains.includes('typescript'),
+    'typescript should not be a worst domain',
+  );
   console.log('PASS: test_compute_dimension_breakdowns');
 }
 
@@ -526,7 +550,10 @@ async function test_analyze_degraded_proposes_modification(): Promise<void> {
     const result = await h.analyzer.analyze('code-executor');
 
     assert(result.success === true, `expected success, got error: ${result.error}`);
-    assert(result.nextAction === 'propose_modification', `expected propose_modification, got ${result.nextAction}`);
+    assert(
+      result.nextAction === 'propose_modification',
+      `expected propose_modification, got ${result.nextAction}`,
+    );
     assert(result.report !== undefined, 'report should be present');
 
     // Well-formed WeaknessReport.
@@ -539,8 +566,14 @@ async function test_analyze_degraded_proposes_modification(): Promise<void> {
     assert(report.weaknesses.length === 1, 'weakness parsed');
     assert(report.weaknesses[0].dimension === 'coverage', 'weakness dimension parsed');
     // metrics_summary is rebuilt from the (faked) aggregate.
-    assert(report.metrics_summary.invocation_count === 25, 'metrics_summary.invocation_count from aggregate');
-    assert(report.metrics_summary.trend_direction === 'declining', 'metrics_summary.trend_direction from aggregate');
+    assert(
+      report.metrics_summary.invocation_count === 25,
+      'metrics_summary.invocation_count from aggregate',
+    );
+    assert(
+      report.metrics_summary.trend_direction === 'declining',
+      'metrics_summary.trend_direction from aggregate',
+    );
 
     // Persisted to the real WeaknessReportStore (JSONL).
     const stored = h.reportStore.getReports('code-executor');
@@ -548,7 +581,10 @@ async function test_analyze_degraded_proposes_modification(): Promise<void> {
     assert(stored[0].report_id === report.report_id, 'persisted report id matches returned report');
 
     // Side effect: target transitioned to UNDER_REVIEW.
-    assert(h.registry.getState('code-executor') === 'UNDER_REVIEW', 'target should be UNDER_REVIEW');
+    assert(
+      h.registry.getState('code-executor') === 'UNDER_REVIEW',
+      'target should be UNDER_REVIEW',
+    );
 
     // Runtime was actually invoked with a prompt mentioning the agent.
     assert(h.runtime.invokeCount === 1, 'analyst runtime should be invoked once');
@@ -570,7 +606,13 @@ async function test_analyze_healthy_no_action(): Promise<void> {
       aggregate: makeAggregate({
         approval_rate: 0.97,
         avg_quality_score: 4.5,
-        trend: { direction: 'improving', slope: 0.04, confidence: 0.8, sample_size: 30, low_confidence: false },
+        trend: {
+          direction: 'improving',
+          slope: 0.04,
+          confidence: 0.8,
+          sample_size: 30,
+          low_confidence: false,
+        },
       }),
       invocations: [makeInvocation({ output_quality_score: 4.6, input_domain: 'typescript' })],
       alerts: [],
@@ -580,7 +622,10 @@ async function test_analyze_healthy_no_action(): Promise<void> {
     // Seed the observation tracker so we can assert it gets reset to 0.
     h.observationTracker.recordInvocation('code-executor', '1.0.0');
     h.observationTracker.recordInvocation('code-executor', '1.0.0');
-    assert(h.observationTracker.getState('code-executor').invocations_since_promotion === 2, 'precondition: counter at 2');
+    assert(
+      h.observationTracker.getState('code-executor').invocations_since_promotion === 2,
+      'precondition: counter at 2',
+    );
 
     const result = await h.analyzer.analyze('code-executor');
 
@@ -589,7 +634,10 @@ async function test_analyze_healthy_no_action(): Promise<void> {
     assert(result.report!.overall_assessment === 'healthy', 'assessment healthy');
 
     // Persisted even when healthy.
-    assert(h.reportStore.getReports('code-executor').length === 1, 'healthy report still persisted');
+    assert(
+      h.reportStore.getReports('code-executor').length === 1,
+      'healthy report still persisted',
+    );
 
     // Side effect: observation counter reset to 0; state unchanged (ACTIVE).
     assert(
@@ -623,20 +671,32 @@ async function test_analyze_specialist_logs_domain_gap(): Promise<void> {
     const result = await h.analyzer.analyze('code-executor');
 
     assert(result.success === true, `expected success, got error: ${result.error}`);
-    assert(result.nextAction === 'log_domain_gap', `expected log_domain_gap, got ${result.nextAction}`);
+    assert(
+      result.nextAction === 'log_domain_gap',
+      `expected log_domain_gap, got ${result.nextAction}`,
+    );
 
     // The domain-gaps JSONL inside the harness tmpDir should have one entry.
     const gapsFile = path.join(h.tmpDir, 'domain-gaps.jsonl');
     assert(fs.existsSync(gapsFile), 'domain-gaps.jsonl should be written');
-    const lines = fs.readFileSync(gapsFile, 'utf-8').split('\n').filter((l) => l.trim() !== '');
+    const lines = fs
+      .readFileSync(gapsFile, 'utf-8')
+      .split('\n')
+      .filter((l) => l.trim() !== '');
     assert(lines.length === 1, `expected 1 domain-gap line, got ${lines.length}`);
     const gap = JSON.parse(lines[0]);
     assert(gap.source_agent === 'code-executor', 'domain gap source_agent');
     assert(gap.status === 'specialist_recommended', 'domain gap status');
-    assert(typeof gap.task_domain === 'string' && gap.task_domain.includes('python'), 'domain gap names affected domain');
+    assert(
+      typeof gap.task_domain === 'string' && gap.task_domain.includes('python'),
+      'domain gap names affected domain',
+    );
 
     // State is NOT moved to UNDER_REVIEW for a specialist recommendation.
-    assert(h.registry.getState('code-executor') === 'ACTIVE', 'state stays ACTIVE on specialist path');
+    assert(
+      h.registry.getState('code-executor') === 'ACTIVE',
+      'state stays ACTIVE on specialist path',
+    );
     // Report still persisted.
     assert(h.reportStore.getReports('code-executor').length === 1, 'specialist report persisted');
     console.log('PASS: test_analyze_specialist_logs_domain_gap');
@@ -659,7 +719,10 @@ async function test_analyze_target_not_found(): Promise<void> {
     const result = await h.analyzer.analyze('no-such-agent');
     assert(result.success === false, 'expected failure for missing target');
     assert(result.nextAction === 'error', `expected error action, got ${result.nextAction}`);
-    assert((result.error ?? '').includes('not found'), `error should mention not found: ${result.error}`);
+    assert(
+      (result.error ?? '').includes('not found'),
+      `error should mention not found: ${result.error}`,
+    );
     assert(h.reportStore.getReports().length === 0, 'no report persisted on error');
     console.log('PASS: test_analyze_target_not_found');
   } finally {
@@ -676,7 +739,10 @@ async function test_analyze_analyst_missing(): Promise<void> {
   try {
     const result = await h.analyzer.analyze('code-executor');
     assert(result.success === false, 'expected failure when performance-analyst absent');
-    assert((result.error ?? '').includes('performance-analyst'), `error should mention analyst: ${result.error}`);
+    assert(
+      (result.error ?? '').includes('performance-analyst'),
+      `error should mention analyst: ${result.error}`,
+    );
     console.log('PASS: test_analyze_analyst_missing');
   } finally {
     teardown(h);
@@ -691,7 +757,10 @@ async function test_analyze_no_aggregate(): Promise<void> {
   try {
     const result = await h.analyzer.analyze('code-executor');
     assert(result.success === false, 'expected failure when no aggregate metrics');
-    assert((result.error ?? '').includes('No aggregate metrics'), `error should mention aggregate: ${result.error}`);
+    assert(
+      (result.error ?? '').includes('No aggregate metrics'),
+      `error should mention aggregate: ${result.error}`,
+    );
     // Analyst should not have been invoked (we bail before formatting a prompt).
     assert(h.runtime.invokeCount === 0, 'analyst should not be invoked without aggregate');
     console.log('PASS: test_analyze_no_aggregate');
@@ -708,7 +777,10 @@ async function test_analyze_unparseable_output(): Promise<void> {
   try {
     const result = await h.analyzer.analyze('code-executor');
     assert(result.success === false, 'expected failure on unparseable analyst output');
-    assert((result.error ?? '').toLowerCase().includes('parse'), `error should mention parse: ${result.error}`);
+    assert(
+      (result.error ?? '').toLowerCase().includes('parse'),
+      `error should mention parse: ${result.error}`,
+    );
     assert(h.reportStore.getReports().length === 0, 'no report persisted when parse fails');
     console.log('PASS: test_analyze_unparseable_output');
   } finally {
@@ -725,7 +797,10 @@ async function test_analyze_runtime_failure(): Promise<void> {
   try {
     const result = await h.analyzer.analyze('code-executor');
     assert(result.success === false, 'expected failure when runtime invocation fails');
-    assert((result.error ?? '').includes('invocation failed'), `error should mention invocation failure: ${result.error}`);
+    assert(
+      (result.error ?? '').includes('invocation failed'),
+      `error should mention invocation failure: ${result.error}`,
+    );
     console.log('PASS: test_analyze_runtime_failure');
   } finally {
     teardown(h);
@@ -739,9 +814,11 @@ async function test_analyze_runtime_failure(): Promise<void> {
 describe('performance analyzer', () => {
   it('test_decide_next_action_routing', test_decide_next_action_routing);
   it('test_compute_dimension_breakdowns', test_compute_dimension_breakdowns);
-  it('test_analyze_degraded_proposes_modification', async () => await test_analyze_degraded_proposes_modification());
+  it('test_analyze_degraded_proposes_modification', async () =>
+    await test_analyze_degraded_proposes_modification());
   it('test_analyze_healthy_no_action', async () => await test_analyze_healthy_no_action());
-  it('test_analyze_specialist_logs_domain_gap', async () => await test_analyze_specialist_logs_domain_gap());
+  it('test_analyze_specialist_logs_domain_gap', async () =>
+    await test_analyze_specialist_logs_domain_gap());
   it('test_analyze_target_not_found', async () => await test_analyze_target_not_found());
   it('test_analyze_analyst_missing', async () => await test_analyze_analyst_missing());
   it('test_analyze_no_aggregate', async () => await test_analyze_no_aggregate());

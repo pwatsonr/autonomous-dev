@@ -29,13 +29,12 @@ function baseAgent(overrides?: Partial<ParsedAgent>): ParsedAgent {
       { name: 'quality', weight: 0.3, description: 'Clean code' },
       { name: 'coverage', weight: 0.3, description: 'Adequate test coverage' },
     ],
-    version_history: [
-      { version: '1.0.0', date: '2026-01-01', change: 'Initial release' },
-    ],
+    version_history: [{ version: '1.0.0', date: '2026-01-01', change: 'Initial release' }],
     risk_tier: 'medium',
     frozen: false,
     description: 'Executes code changes',
-    system_prompt: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10',
+    system_prompt:
+      'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10',
   };
   return { ...base, ...overrides };
 }
@@ -76,7 +75,10 @@ function test_major_bump_new_expertise_tags(): void {
 
   const result = classifyVersionBump(current, proposed, '');
   assert(result.bump === 'major', `expected major, got ${result.bump}`);
-  assert(result.frontmatterChanges.includes('expertise_new_tags'), 'should include expertise_new_tags');
+  assert(
+    result.frontmatterChanges.includes('expertise_new_tags'),
+    'should include expertise_new_tags',
+  );
   console.log('PASS: test_major_bump_new_expertise_tags');
 }
 
@@ -90,7 +92,10 @@ function test_major_bump_large_body_change(): void {
   const result = classifyVersionBump(current, proposed, '');
   assert(result.bump === 'major', `expected major, got ${result.bump}`);
   assert(result.bodyChangePercent > 50, `expected >50%, got ${result.bodyChangePercent}%`);
-  assert(result.reason.includes('>50% body changed'), `reason should mention body change: ${result.reason}`);
+  assert(
+    result.reason.includes('>50% body changed'),
+    `reason should mention body change: ${result.reason}`,
+  );
   console.log('PASS: test_major_bump_large_body_change');
 }
 
@@ -106,7 +111,10 @@ function test_minor_bump_rubric_change(): void {
 
   const result = classifyVersionBump(current, proposed, '');
   assert(result.bump === 'minor', `expected minor, got ${result.bump}`);
-  assert(result.frontmatterChanges.includes('evaluation_rubric'), 'should include evaluation_rubric');
+  assert(
+    result.frontmatterChanges.includes('evaluation_rubric'),
+    'should include evaluation_rubric',
+  );
   console.log('PASS: test_minor_bump_rubric_change');
 }
 
@@ -117,12 +125,15 @@ function test_minor_bump_medium_body_change(): void {
   // Actually, we need careful line construction.
   // Use: keep 7 lines same, change 3 lines
   const proposed = baseAgent({
-    system_prompt: 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nChanged 8\nChanged 9\nChanged 10',
+    system_prompt:
+      'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nChanged 8\nChanged 9\nChanged 10',
   });
 
   const result = classifyVersionBump(current, proposed, '');
-  assert(result.bodyChangePercent >= 10 && result.bodyChangePercent <= 50,
-    `expected 10-50%, got ${result.bodyChangePercent}%`);
+  assert(
+    result.bodyChangePercent >= 10 && result.bodyChangePercent <= 50,
+    `expected 10-50%, got ${result.bodyChangePercent}%`,
+  );
   assert(result.bump === 'minor', `expected minor, got ${result.bump}`);
   console.log('PASS: test_minor_bump_medium_body_change');
 }
@@ -259,7 +270,10 @@ function test_frontmatter_detects_temperature_change(): void {
   const proposed = baseAgent({ temperature: 0.7 });
 
   const changes = detectFrontmatterChanges(current, proposed);
-  assert(changes.includes('temperature'), `expected temperature change, got ${JSON.stringify(changes)}`);
+  assert(
+    changes.includes('temperature'),
+    `expected temperature change, got ${JSON.stringify(changes)}`,
+  );
   console.log('PASS: test_frontmatter_detects_temperature_change');
 }
 
@@ -277,7 +291,10 @@ function test_frontmatter_detects_turn_limit_change(): void {
   const proposed = baseAgent({ turn_limit: 50 });
 
   const changes = detectFrontmatterChanges(current, proposed);
-  assert(changes.includes('turn_limit'), `expected turn_limit change, got ${JSON.stringify(changes)}`);
+  assert(
+    changes.includes('turn_limit'),
+    `expected turn_limit change, got ${JSON.stringify(changes)}`,
+  );
   console.log('PASS: test_frontmatter_detects_turn_limit_change');
 }
 
@@ -293,7 +310,10 @@ function test_frontmatter_rubric_weight_small_change_no_flag(): void {
   });
 
   const changes = detectFrontmatterChanges(current, proposed);
-  assert(!changes.includes('evaluation_rubric'), `expected no rubric change for small weight delta, got ${JSON.stringify(changes)}`);
+  assert(
+    !changes.includes('evaluation_rubric'),
+    `expected no rubric change for small weight delta, got ${JSON.stringify(changes)}`,
+  );
   console.log('PASS: test_frontmatter_rubric_weight_small_change_no_flag');
 }
 
@@ -307,7 +327,10 @@ function test_frontmatter_rubric_dimension_added_flags(): void {
   });
 
   const changes = detectFrontmatterChanges(current, proposed);
-  assert(changes.includes('evaluation_rubric'), `expected rubric change for new dimension, got ${JSON.stringify(changes)}`);
+  assert(
+    changes.includes('evaluation_rubric'),
+    `expected rubric change for new dimension, got ${JSON.stringify(changes)}`,
+  );
   console.log('PASS: test_frontmatter_rubric_dimension_added_flags');
 }
 
@@ -316,7 +339,10 @@ function test_frontmatter_expertise_case_insensitive(): void {
   const proposed = baseAgent({ expertise: ['typescript', 'Testing'] });
 
   const changes = detectFrontmatterChanges(current, proposed);
-  assert(!changes.includes('expertise_new_tags'), `expected no new expertise tags for case changes, got ${JSON.stringify(changes)}`);
+  assert(
+    !changes.includes('expertise_new_tags'),
+    `expected no new expertise tags for case changes, got ${JSON.stringify(changes)}`,
+  );
   console.log('PASS: test_frontmatter_expertise_case_insensitive');
 }
 
@@ -377,13 +403,25 @@ describe('version classifier', () => {
   it('test_boundary_9_percent_is_patch', test_boundary_9_percent_is_patch);
   it('test_body_change_percent_empty_current', test_body_change_percent_empty_current);
   it('test_body_change_percent_identical', test_body_change_percent_identical);
-  it('test_body_change_percent_completely_different', test_body_change_percent_completely_different);
-  it('test_frontmatter_change_detection_excludes_version', test_frontmatter_change_detection_excludes_version);
+  it(
+    'test_body_change_percent_completely_different',
+    test_body_change_percent_completely_different,
+  );
+  it(
+    'test_frontmatter_change_detection_excludes_version',
+    test_frontmatter_change_detection_excludes_version,
+  );
   it('test_frontmatter_detects_temperature_change', test_frontmatter_detects_temperature_change);
   it('test_frontmatter_detects_model_change', test_frontmatter_detects_model_change);
   it('test_frontmatter_detects_turn_limit_change', test_frontmatter_detects_turn_limit_change);
-  it('test_frontmatter_rubric_weight_small_change_no_flag', test_frontmatter_rubric_weight_small_change_no_flag);
-  it('test_frontmatter_rubric_dimension_added_flags', test_frontmatter_rubric_dimension_added_flags);
+  it(
+    'test_frontmatter_rubric_weight_small_change_no_flag',
+    test_frontmatter_rubric_weight_small_change_no_flag,
+  );
+  it(
+    'test_frontmatter_rubric_dimension_added_flags',
+    test_frontmatter_rubric_dimension_added_flags,
+  );
   it('test_frontmatter_expertise_case_insensitive', test_frontmatter_expertise_case_insensitive);
   it('test_increment_major', test_increment_major);
   it('test_increment_minor', test_increment_minor);

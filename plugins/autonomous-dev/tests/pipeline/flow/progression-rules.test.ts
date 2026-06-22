@@ -6,7 +6,11 @@ import {
   isPhaseComplete,
   ProgressionError,
 } from '../../../src/pipeline/flow/progression-rules';
-import { createInitialPipelineState, PipelineState, DocumentState } from '../../../src/pipeline/flow/pipeline-state';
+import {
+  createInitialPipelineState,
+  PipelineState,
+  DocumentState,
+} from '../../../src/pipeline/flow/pipeline-state';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
 
 function makeDocState(overrides: Partial<DocumentState> & { documentId: string }): DocumentState {
@@ -51,9 +55,7 @@ describe('checkNoSkipping', () => {
       makeDocState({ documentId: 'PRD-001', type: DocumentType.PRD, status: 'draft' }),
     ]);
     expect(() => checkNoSkipping(DocumentType.TDD, 'PRD-001', state)).toThrow(ProgressionError);
-    expect(() => checkNoSkipping(DocumentType.TDD, 'PRD-001', state)).toThrow(
-      /must be "approved"/,
-    );
+    expect(() => checkNoSkipping(DocumentType.TDD, 'PRD-001', state)).toThrow(/must be "approved"/);
   });
 
   it('rejects when parent not found in state', () => {
@@ -149,8 +151,18 @@ describe('checkGateRequired', () => {
 describe('getReadyParallelSiblings', () => {
   it('returns draft siblings with met dependencies', () => {
     const state = makeState([
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'draft', blockedBy: [] }),
-      makeDocState({ documentId: 'TDD-002', type: DocumentType.TDD, status: 'draft', blockedBy: [] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: [],
+      }),
+      makeDocState({
+        documentId: 'TDD-002',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: [],
+      }),
     ]);
     const ready = getReadyParallelSiblings(['TDD-001', 'TDD-002'], state);
     expect(ready).toEqual(['TDD-001', 'TDD-002']);
@@ -158,8 +170,18 @@ describe('getReadyParallelSiblings', () => {
 
   it('excludes siblings with unmet dependencies', () => {
     const state = makeState([
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'draft', blockedBy: [] }),
-      makeDocState({ documentId: 'TDD-002', type: DocumentType.TDD, status: 'draft', blockedBy: ['TDD-001'] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: [],
+      }),
+      makeDocState({
+        documentId: 'TDD-002',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: ['TDD-001'],
+      }),
     ]);
     const ready = getReadyParallelSiblings(['TDD-001', 'TDD-002'], state);
     expect(ready).toEqual(['TDD-001']);
@@ -167,8 +189,18 @@ describe('getReadyParallelSiblings', () => {
 
   it('includes siblings whose blockers are approved', () => {
     const state = makeState([
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'approved', blockedBy: [] }),
-      makeDocState({ documentId: 'TDD-002', type: DocumentType.TDD, status: 'draft', blockedBy: ['TDD-001'] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'approved',
+        blockedBy: [],
+      }),
+      makeDocState({
+        documentId: 'TDD-002',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: ['TDD-001'],
+      }),
     ]);
     const ready = getReadyParallelSiblings(['TDD-001', 'TDD-002'], state);
     // TDD-001 is approved (not draft), so excluded; TDD-002 blocker is approved, so included
@@ -177,9 +209,24 @@ describe('getReadyParallelSiblings', () => {
 
   it('excludes non-draft siblings', () => {
     const state = makeState([
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'in-review', blockedBy: [] }),
-      makeDocState({ documentId: 'TDD-002', type: DocumentType.TDD, status: 'approved', blockedBy: [] }),
-      makeDocState({ documentId: 'TDD-003', type: DocumentType.TDD, status: 'draft', blockedBy: [] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'in-review',
+        blockedBy: [],
+      }),
+      makeDocState({
+        documentId: 'TDD-002',
+        type: DocumentType.TDD,
+        status: 'approved',
+        blockedBy: [],
+      }),
+      makeDocState({
+        documentId: 'TDD-003',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: [],
+      }),
     ]);
     const ready = getReadyParallelSiblings(['TDD-001', 'TDD-002', 'TDD-003'], state);
     expect(ready).toEqual(['TDD-003']);
@@ -187,7 +234,12 @@ describe('getReadyParallelSiblings', () => {
 
   it('returns empty array when no siblings are ready', () => {
     const state = makeState([
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'in-review', blockedBy: [] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'in-review',
+        blockedBy: [],
+      }),
     ]);
     const ready = getReadyParallelSiblings(['TDD-001'], state);
     expect(ready).toEqual([]);
@@ -203,7 +255,12 @@ describe('getReadyParallelSiblings', () => {
 describe('areDependenciesMet', () => {
   it('returns true when no blockers', () => {
     const state = makeState([
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'draft', blockedBy: [] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: [],
+      }),
     ]);
     expect(areDependenciesMet('TDD-001', state)).toBe(true);
   });
@@ -212,7 +269,12 @@ describe('areDependenciesMet', () => {
     const state = makeState([
       makeDocState({ documentId: 'PRD-001', type: DocumentType.PRD, status: 'approved' }),
       makeDocState({ documentId: 'PRD-002', type: DocumentType.PRD, status: 'approved' }),
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'draft', blockedBy: ['PRD-001', 'PRD-002'] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: ['PRD-001', 'PRD-002'],
+      }),
     ]);
     expect(areDependenciesMet('TDD-001', state)).toBe(true);
   });
@@ -221,7 +283,12 @@ describe('areDependenciesMet', () => {
     const state = makeState([
       makeDocState({ documentId: 'PRD-001', type: DocumentType.PRD, status: 'approved' }),
       makeDocState({ documentId: 'PRD-002', type: DocumentType.PRD, status: 'draft' }),
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'draft', blockedBy: ['PRD-001', 'PRD-002'] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: ['PRD-001', 'PRD-002'],
+      }),
     ]);
     expect(areDependenciesMet('TDD-001', state)).toBe(false);
   });
@@ -233,7 +300,12 @@ describe('areDependenciesMet', () => {
 
   it('returns false when blocker not found in state', () => {
     const state = makeState([
-      makeDocState({ documentId: 'TDD-001', type: DocumentType.TDD, status: 'draft', blockedBy: ['PRD-MISSING'] }),
+      makeDocState({
+        documentId: 'TDD-001',
+        type: DocumentType.TDD,
+        status: 'draft',
+        blockedBy: ['PRD-MISSING'],
+      }),
     ]);
     expect(areDependenciesMet('TDD-001', state)).toBe(false);
   });

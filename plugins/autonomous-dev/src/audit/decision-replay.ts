@@ -13,9 +13,9 @@
  *   - Phase 2 extension point: `replayStream` for async iteration.
  */
 
-import * as fs from "fs";
-import * as readline from "readline";
-import type { AuditEvent } from "./types";
+import * as fs from 'fs';
+import * as readline from 'readline';
+import type { AuditEvent } from './types';
 
 // ---------------------------------------------------------------------------
 // DecisionReplay
@@ -47,7 +47,7 @@ export class DecisionReplay {
     const results: AuditEvent[] = [];
 
     // Stream line-by-line -- do not load full file into memory
-    const fileStream = fs.createReadStream(this.logPath, { encoding: "utf-8" });
+    const fileStream = fs.createReadStream(this.logPath, { encoding: 'utf-8' });
     const rl = readline.createInterface({
       input: fileStream,
       crlfDelay: Infinity,
@@ -92,13 +92,13 @@ export class DecisionReplay {
  */
 function summarizePayload(payload: Record<string, unknown>): string {
   // Try common payload fields first
-  if (typeof payload.decision === "string") {
+  if (typeof payload.decision === 'string') {
     return payload.decision;
   }
-  if (typeof payload.reason === "string") {
+  if (typeof payload.reason === 'string') {
     return payload.reason;
   }
-  if (typeof payload.details === "string") {
+  if (typeof payload.details === 'string') {
     return payload.details;
   }
 
@@ -108,7 +108,7 @@ function summarizePayload(payload: Record<string, unknown>): string {
   if (json.length <= MAX_LEN) {
     return json;
   }
-  return json.slice(0, MAX_LEN) + "...";
+  return json.slice(0, MAX_LEN) + '...';
 }
 
 /**
@@ -122,8 +122,6 @@ function summarizePayload(payload: Record<string, unknown>): string {
  */
 export function formatNarrative(events: AuditEvent[]): string {
   return events
-    .map(
-      (e) => `[${e.timestamp}] ${e.event_type}: ${summarizePayload(e.payload)}`,
-    )
-    .join("\n");
+    .map((e) => `[${e.timestamp}] ${e.event_type}: ${summarizePayload(e.payload)}`)
+    .join('\n');
 }

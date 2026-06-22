@@ -33,8 +33,8 @@ function readEventsFromFile(filePath: string): AuditEvent[] {
   const content = fs.readFileSync(filePath, 'utf-8');
   return content
     .split('\n')
-    .filter(line => line.trim().length > 0)
-    .map(line => JSON.parse(line));
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line));
 }
 
 // ---------------------------------------------------------------------------
@@ -64,13 +64,7 @@ describe('AuditTrailEngine Integration', () => {
     const writer = new AuditEventWriter(logPath, hashChain);
     const replay = new DecisionReplay(logPath);
     const verifier = new HashChainVerifier(hashChain);
-    const engine = new AuditTrailEngine(
-      writer,
-      hashChain,
-      replay,
-      verifier,
-      logPath,
-    );
+    const engine = new AuditTrailEngine(writer, hashChain, replay, verifier, logPath);
 
     // Write 20 events
     for (let i = 0; i < 20; i++) {
@@ -102,13 +96,7 @@ describe('AuditTrailEngine Integration', () => {
     const writer = new AuditEventWriter(logPath, hashChain);
     const replay = new DecisionReplay(logPath);
     const verifier = new HashChainVerifier(hashChain);
-    const engine = new AuditTrailEngine(
-      writer,
-      hashChain,
-      replay,
-      verifier,
-      logPath,
-    );
+    const engine = new AuditTrailEngine(writer, hashChain, replay, verifier, logPath);
 
     // Write 20 events
     for (let i = 0; i < 20; i++) {
@@ -125,7 +113,7 @@ describe('AuditTrailEngine Integration', () => {
     // Tamper with event 10 (0-indexed: line 10 in the file)
     const events = readEventsFromFile(logPath);
     events[9].payload = { index: 999, tampered: true };
-    const content = events.map(e => JSON.stringify(e)).join('\n') + '\n';
+    const content = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
     fs.writeFileSync(logPath, content, 'utf-8');
 
     // Verify
@@ -135,9 +123,7 @@ describe('AuditTrailEngine Integration', () => {
     expect(result.errors.length).toBeGreaterThan(0);
 
     // The error should be at or near event 10
-    const hashError = result.errors.find(
-      e => e.errorType === 'hash_mismatch',
-    );
+    const hashError = result.errors.find((e) => e.errorType === 'hash_mismatch');
     expect(hashError).toBeDefined();
   });
 
@@ -150,13 +136,7 @@ describe('AuditTrailEngine Integration', () => {
     const writer = new AuditEventWriter(logPath, hashChain);
     const replay = new DecisionReplay(logPath);
     const verifier = new HashChainVerifier(hashChain);
-    const engine = new AuditTrailEngine(
-      writer,
-      hashChain,
-      replay,
-      verifier,
-      logPath,
-    );
+    const engine = new AuditTrailEngine(writer, hashChain, replay, verifier, logPath);
 
     // Write 50 events across 5 requests (10 events each)
     for (let i = 0; i < 50; i++) {
@@ -174,13 +154,11 @@ describe('AuditTrailEngine Integration', () => {
     const req3Events = await engine.replay('req-3');
 
     expect(req3Events).toHaveLength(10);
-    expect(req3Events.every(e => e.request_id === 'req-3')).toBe(true);
+    expect(req3Events.every((e) => e.request_id === 'req-3')).toBe(true);
 
     // Events should be in chronological order
     for (let i = 1; i < req3Events.length; i++) {
-      expect(req3Events[i].timestamp >= req3Events[i - 1].timestamp).toBe(
-        true,
-      );
+      expect(req3Events[i].timestamp >= req3Events[i - 1].timestamp).toBe(true);
     }
   });
 
@@ -212,7 +190,7 @@ describe('AuditTrailEngine Integration', () => {
       });
     }
 
-    const content = events.map(e => JSON.stringify(e)).join('\n') + '\n';
+    const content = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
     fs.mkdirSync(path.dirname(logPath), { recursive: true });
     fs.writeFileSync(logPath, content, 'utf-8');
 
@@ -223,9 +201,7 @@ describe('AuditTrailEngine Integration', () => {
     // Events older than 90 days should be archived
     expect(result.archivedEventCount).toBeGreaterThan(0);
     expect(result.activeEventCount).toBeGreaterThan(0);
-    expect(result.archivedEventCount + result.activeEventCount).toBe(
-      events.length,
-    );
+    expect(result.archivedEventCount + result.activeEventCount).toBe(events.length);
 
     // Active log should have ~30 days of events
     const activeEvents = readEventsFromFile(logPath);

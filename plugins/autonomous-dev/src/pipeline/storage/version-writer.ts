@@ -62,20 +62,22 @@ export async function writeVersion(
   const normalizedContent = normalizeForHash(request.content);
 
   // 2. Hash
-  const contentHash = crypto
-    .createHash('sha256')
-    .update(normalizedContent, 'utf-8')
-    .digest('hex');
+  const contentHash = crypto.createHash('sha256').update(normalizedContent, 'utf-8').digest('hex');
 
   // 3. Write version file
   const filePath = directoryManager.getVersionFilePath(
-    request.pipelineId, request.type, request.documentId, request.version,
+    request.pipelineId,
+    request.type,
+    request.documentId,
+    request.version,
   );
   await atomicWrite(filePath, request.content);
 
   // 4. Update symlink
   const symlinkPath = directoryManager.getCurrentSymlinkPath(
-    request.pipelineId, request.type, request.documentId,
+    request.pipelineId,
+    request.type,
+    request.documentId,
   );
   await atomicSymlink(`v${request.version}.md`, symlinkPath);
 
@@ -98,10 +100,10 @@ export async function writeVersion(
  */
 export function normalizeForHash(content: string): string {
   return content
-    .replace(/^\uFEFF/, '')          // Strip BOM
-    .replace(/\r\n/g, '\n')          // CRLF -> LF
-    .replace(/\r/g, '\n')            // CR -> LF
+    .replace(/^\uFEFF/, '') // Strip BOM
+    .replace(/\r\n/g, '\n') // CRLF -> LF
+    .replace(/\r/g, '\n') // CR -> LF
     .split('\n')
-    .map(line => line.trimEnd())     // Trim trailing whitespace per line
+    .map((line) => line.trimEnd()) // Trim trailing whitespace per line
     .join('\n');
 }

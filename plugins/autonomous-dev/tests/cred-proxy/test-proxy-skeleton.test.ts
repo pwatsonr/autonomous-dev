@@ -12,22 +12,10 @@
  *   - Missing scoper throws generic Error (not SecurityError).
  */
 
-import {
-  ActiveTokenRegistry,
-} from '../../intake/cred-proxy/active-tokens';
-import {
-  CredentialAuditEmitter,
-  type AuditSink,
-} from '../../intake/cred-proxy/audit-emitter';
-import {
-  CredentialProxy,
-  TTL_SECONDS,
-} from '../../intake/cred-proxy/proxy';
-import {
-  SecurityError,
-  type CredentialScoper,
-  type Provider,
-} from '../../intake/cred-proxy/types';
+import { ActiveTokenRegistry } from '../../intake/cred-proxy/active-tokens';
+import { CredentialAuditEmitter, type AuditSink } from '../../intake/cred-proxy/audit-emitter';
+import { CredentialProxy, TTL_SECONDS } from '../../intake/cred-proxy/proxy';
+import { SecurityError, type CredentialScoper, type Provider } from '../../intake/cred-proxy/types';
 import {
   __resetLiveBackendsForTests,
   registerLiveBackend,
@@ -48,13 +36,13 @@ class SpyScoper implements CredentialScoper {
   }
 }
 
-function buildProxy(opts: {
-  privileged?: string[];
-  scopers?: ReadonlyMap<Provider, CredentialScoper>;
-} = {}) {
-  const scopers =
-    opts.scopers ??
-    new Map<Provider, CredentialScoper>([['aws', new SpyScoper()]]);
+function buildProxy(
+  opts: {
+    privileged?: string[];
+    scopers?: ReadonlyMap<Provider, CredentialScoper>;
+  } = {},
+) {
+  const scopers = opts.scopers ?? new Map<Provider, CredentialScoper>([['aws', new SpyScoper()]]);
   const sink: AuditSink = { append: () => undefined };
   return {
     proxy: new CredentialProxy({
@@ -91,9 +79,9 @@ describe('CredentialProxy.acquire allowlist enforcement', () => {
 
   it('throws CALLER_UNKNOWN when env identity is missing', async () => {
     const { proxy } = buildProxy({ privileged: ['plugin-a'] });
-    await expect(
-      proxy.acquire('aws', 'op', { region: 'us-east-1' }),
-    ).rejects.toMatchObject({ code: 'CALLER_UNKNOWN' });
+    await expect(proxy.acquire('aws', 'op', { region: 'us-east-1' })).rejects.toMatchObject({
+      code: 'CALLER_UNKNOWN',
+    });
   });
 
   it('throws NOT_ALLOWLISTED for non-allowlisted caller and never invokes scoper', async () => {
@@ -103,9 +91,9 @@ describe('CredentialProxy.acquire allowlist enforcement', () => {
       privileged: ['plugin-good'],
       scopers: new Map<Provider, CredentialScoper>([['aws', spy]]),
     });
-    await expect(
-      proxy.acquire('aws', 'op', { region: 'us-east-1' }),
-    ).rejects.toMatchObject({ code: 'NOT_ALLOWLISTED' });
+    await expect(proxy.acquire('aws', 'op', { region: 'us-east-1' })).rejects.toMatchObject({
+      code: 'NOT_ALLOWLISTED',
+    });
     expect(spy.calls).toBe(0);
   });
 
@@ -113,12 +101,7 @@ describe('CredentialProxy.acquire allowlist enforcement', () => {
     process.env.AUTONOMOUS_DEV_PLUGIN_ID = 'plugin-a';
     const { proxy } = buildProxy({ privileged: ['plugin-a'] });
     await expect(
-      proxy.acquire(
-        'aws',
-        'op',
-        { region: 'us-east-1' },
-        { socketPeer: { pid: 9999, uid: 1000 } },
-      ),
+      proxy.acquire('aws', 'op', { region: 'us-east-1' }, { socketPeer: { pid: 9999, uid: 1000 } }),
     ).rejects.toMatchObject({ code: 'CALLER_SPOOFED' });
   });
 
@@ -127,12 +110,7 @@ describe('CredentialProxy.acquire allowlist enforcement', () => {
     registerLiveBackend({ pid: 1234, uid: 1000, pluginId: 'plugin-b' });
     const { proxy } = buildProxy({ privileged: ['plugin-a', 'plugin-b'] });
     await expect(
-      proxy.acquire(
-        'aws',
-        'op',
-        { region: 'us-east-1' },
-        { socketPeer: { pid: 1234, uid: 1000 } },
-      ),
+      proxy.acquire('aws', 'op', { region: 'us-east-1' }, { socketPeer: { pid: 1234, uid: 1000 } }),
     ).rejects.toMatchObject({ code: 'CALLER_SPOOFED' });
   });
 

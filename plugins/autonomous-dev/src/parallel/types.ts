@@ -65,16 +65,16 @@ export interface DAGNode {
   specName: string;
   specPath: string;
   complexity: 'small' | 'medium' | 'large';
-  estimatedMinutes: number;       // small=5, medium=15, large=30
-  priority: number;               // base + critical path bonus + dependency bonus
-  basePriority: number;           // priority before bonuses
-  inDegree: number;               // count of incoming edges (dependencies)
-  outDegree: number;              // count of outgoing edges (dependents)
-  cluster: number;                // assigned cluster index, -1 if unassigned
-  filesModified: string[];        // declared file modification list from spec
-  interfacesProduced: string[];   // interface names this spec produces
-  interfacesConsumed: string[];   // interface names this spec consumes
-  dependsOn: string[];            // explicit dependency declarations
+  estimatedMinutes: number; // small=5, medium=15, large=30
+  priority: number; // base + critical path bonus + dependency bonus
+  basePriority: number; // priority before bonuses
+  inDegree: number; // count of incoming edges (dependencies)
+  outDegree: number; // count of outgoing edges (dependents)
+  cluster: number; // assigned cluster index, -1 if unassigned
+  filesModified: string[]; // declared file modification list from spec
+  interfacesProduced: string[]; // interface names this spec produces
+  interfacesConsumed: string[]; // interface names this spec consumes
+  dependsOn: string[]; // explicit dependency declarations
 }
 
 /**
@@ -91,8 +91,8 @@ export type DependencyType = 'explicit' | 'file-overlap' | 'interface-contract';
  * `from` must complete before `to` can start.
  */
 export interface DAGEdge {
-  from: string;   // specName of the dependency (must complete first)
-  to: string;     // specName of the dependent
+  from: string; // specName of the dependency (must complete first)
+  to: string; // specName of the dependent
   type: DependencyType;
   reason: string; // human-readable explanation
 }
@@ -103,8 +103,8 @@ export interface DAGEdge {
  */
 export interface DAGCluster {
   index: number;
-  nodes: string[];       // specNames in this cluster
-  dependsOnClusters: number[];  // cluster indices that must complete before this one
+  nodes: string[]; // specNames in this cluster
+  dependsOnClusters: number[]; // cluster indices that must complete before this one
 }
 
 /**
@@ -114,10 +114,10 @@ export interface DependencyDAG {
   requestId: string;
   nodes: Map<string, DAGNode>;
   edges: DAGEdge[];
-  reducedEdges: DAGEdge[];   // after transitive reduction
-  originalEdges: DAGEdge[];  // before reduction (audit log)
+  reducedEdges: DAGEdge[]; // after transitive reduction
+  originalEdges: DAGEdge[]; // before reduction (audit log)
   clusters: DAGCluster[];
-  criticalPath: string[];    // ordered specNames on the longest path
+  criticalPath: string[]; // ordered specNames on the longest path
   validated: boolean;
 }
 
@@ -125,14 +125,14 @@ export interface DependencyDAG {
  * Input metadata for a single spec, consumed by the DAG constructor.
  */
 export interface SpecMetadata {
-  name: string;                     // unique spec name
-  path?: string;                    // file path to spec
+  name: string; // unique spec name
+  path?: string; // file path to spec
   complexity?: 'small' | 'medium' | 'large';
-  dependsOn?: string[];             // explicit dependency declarations
-  filesModified?: string[];         // files this spec will modify
-  interfacesProduced?: string[];    // interfaces this spec exports
-  interfacesConsumed?: string[];    // interfaces this spec imports
-  estimatedMinutes?: number;        // override for default complexity-based estimate
+  dependsOn?: string[]; // explicit dependency declarations
+  filesModified?: string[]; // files this spec will modify
+  interfacesProduced?: string[]; // interfaces this spec exports
+  interfacesConsumed?: string[]; // interfaces this spec imports
+  estimatedMinutes?: number; // override for default complexity-based estimate
 }
 
 // ============================================================================
@@ -158,11 +158,11 @@ export enum AgentLifecyclePhase {
  * the other consumes it.
  */
 export interface InterfaceContract {
-  producer: string;           // specName of the producing track
-  consumer: string;           // specName of the consuming track
+  producer: string; // specName of the producing track
+  consumer: string; // specName of the consuming track
   contractType: 'type-definition' | 'function-signature' | 'api-endpoint';
-  definition: string;         // the interface definition text (e.g., TypeScript type)
-  filePath: string;           // where the definition lives
+  definition: string; // the interface definition text (e.g., TypeScript type)
+  filePath: string; // where the definition lives
 }
 
 /**
@@ -172,18 +172,18 @@ export interface InterfaceContract {
 export interface TrackAssignment {
   trackName: string;
   worktreePath: string;
-  branchName: string;         // e.g. "auto/req-001/track-a"
+  branchName: string; // e.g. "auto/req-001/track-a"
   agentSessionId: string | null;
   spec: SpecMetadata;
-  parentPlan: string;         // path to parent plan document
-  parentTDD: string;          // path to parent TDD document
-  parentPRD: string;          // path to parent PRD document
+  parentPlan: string; // path to parent plan document
+  parentTDD: string; // path to parent TDD document
+  parentPRD: string; // path to parent PRD document
   turnBudget: number;
   turnsUsed: number;
   retryCount: number;
   lifecyclePhase: AgentLifecyclePhase;
   interfaceContracts: InterfaceContract[];
-  lastActivityAt: string;     // ISO-8601
+  lastActivityAt: string; // ISO-8601
   startedAt: string | null;
   completedAt: string | null;
 }
@@ -194,19 +194,19 @@ export interface TrackAssignment {
  * cross-track communication.
  */
 export interface ContextBundle {
-  systemPrompt: string;       // instructions about scope, isolation, commit format
-  specContent: string;        // full spec document content
+  systemPrompt: string; // instructions about scope, isolation, commit format
+  specContent: string; // full spec document content
   parentExcerpts: {
-    plan: string;             // relevant sections of parent plan
-    tdd: string;              // relevant sections of parent TDD
-    prd: string;              // relevant sections of parent PRD
+    plan: string; // relevant sections of parent plan
+    tdd: string; // relevant sections of parent TDD
+    prd: string; // relevant sections of parent PRD
   };
   turnBudget: number;
   complexity: 'small' | 'medium' | 'large';
   interfaceContracts: InterfaceContract[];
-  sharedTypeDefinitions: string[];  // contents of shared type files from integration branch
-  commitFormat: string;       // template for commit messages
-  workingDirectory: string;   // absolute path to worktree
+  sharedTypeDefinitions: string[]; // contents of shared type files from integration branch
+  commitFormat: string; // template for commit messages
+  workingDirectory: string; // absolute path to worktree
 }
 
 /**
@@ -240,7 +240,7 @@ export interface MergeResult {
   trackName: string;
   integrationBranch: string;
   trackBranch: string;
-  mergeCommitSha: string | null;   // null if merge failed
+  mergeCommitSha: string | null; // null if merge failed
   conflictCount: number;
   conflicts: ConflictDetail[];
   resolutionStrategy: 'clean' | 'auto-resolved' | 'ai-resolved' | 'escalated' | 'failed';
@@ -255,8 +255,8 @@ export interface ConflictDetail {
   file: string;
   conflictType: ConflictType;
   resolution: 'auto' | 'ai' | 'human' | 'unresolved';
-  confidence: number;          // 0.0 - 1.0
-  resolvedContent?: string;    // the final merged content (for audit)
+  confidence: number; // 0.0 - 1.0
+  resolvedContent?: string; // the final merged content (for audit)
 }
 
 /**
@@ -274,16 +274,16 @@ export enum ConflictType {
  * Persistent record of a conflict and its resolution, used for audit logging.
  */
 export interface ConflictRecord {
-  id: string;                    // unique identifier
+  id: string; // unique identifier
   requestId: string;
   file: string;
-  trackA: string;                // the integration branch side
-  trackB: string;                // the track being merged
+  trackA: string; // the integration branch side
+  trackB: string; // the track being merged
   conflictType: ConflictType;
   resolutionStrategy: 'auto' | 'ai' | 'human';
   aiConfidence: number | null;
-  resolution: string;            // the resolved content or description
-  integrationTestsPassed: boolean | null;  // populated after integration tests
+  resolution: string; // the resolved content or description
+  integrationTestsPassed: boolean | null; // populated after integration tests
   timestamp: string;
 }
 
@@ -295,11 +295,11 @@ export interface ConflictResolutionRequest {
   requestId: string;
   trackA: string;
   trackB: string;
-  baseContent: string;     // git stage 1 (common ancestor)
-  oursContent: string;     // git stage 2 (integration branch)
-  theirsContent: string;   // git stage 3 (track branch)
-  specA: string;           // spec for trackA
-  specB: string;           // spec for trackB
+  baseContent: string; // git stage 1 (common ancestor)
+  oursContent: string; // git stage 2 (integration branch)
+  theirsContent: string; // git stage 3 (track branch)
+  specA: string; // spec for trackA
+  specB: string; // spec for trackB
   interfaceContracts: InterfaceContract[];
 }
 

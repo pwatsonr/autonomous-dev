@@ -11,7 +11,7 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
  */
 export interface FatigueState {
   recipientId: string;
-  deliveryTimestamps: Date[];     // Sliding window entries
+  deliveryTimestamps: Date[]; // Sliding window entries
   fatigued: boolean;
   fatiguedSince?: Date;
   cooldownEndsAt?: Date;
@@ -61,7 +61,7 @@ export class FatigueDetector {
 
     // Prune entries older than 1 hour
     const cutoff = new Date(now.getTime() - ONE_HOUR_MS);
-    state.deliveryTimestamps = state.deliveryTimestamps.filter(t => t >= cutoff);
+    state.deliveryTimestamps = state.deliveryTimestamps.filter((t) => t >= cutoff);
 
     // Check if this record call crosses the fatigue threshold
     if (
@@ -71,9 +71,7 @@ export class FatigueDetector {
     ) {
       state.fatigued = true;
       state.fatiguedSince = now;
-      state.cooldownEndsAt = new Date(
-        now.getTime() + this.config.cooldownMinutes * 60 * 1000,
-      );
+      state.cooldownEndsAt = new Date(now.getTime() + this.config.cooldownMinutes * 60 * 1000);
 
       const metaNotification = createFatigueMetaNotification(
         recipientId,
@@ -115,16 +113,12 @@ export class FatigueDetector {
 
     // Check threshold against sliding window
     const cutoff = new Date(now.getTime() - ONE_HOUR_MS);
-    const recentCount = state.deliveryTimestamps.filter(
-      t => t >= cutoff,
-    ).length;
+    const recentCount = state.deliveryTimestamps.filter((t) => t >= cutoff).length;
 
     if (recentCount >= this.config.thresholdPerHour) {
       state.fatigued = true;
       state.fatiguedSince = now;
-      state.cooldownEndsAt = new Date(
-        now.getTime() + this.config.cooldownMinutes * 60 * 1000,
-      );
+      state.cooldownEndsAt = new Date(now.getTime() + this.config.cooldownMinutes * 60 * 1000);
       return true;
     }
 

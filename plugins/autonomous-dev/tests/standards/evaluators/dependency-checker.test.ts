@@ -23,7 +23,10 @@ describe('dependency-checker', () => {
   it('package.json runtime hit', async () => {
     const w = ws();
     try {
-      writeFileSync(join(w.root, 'package.json'), JSON.stringify({ dependencies: { axios: '^1.0' } }));
+      writeFileSync(
+        join(w.root, 'package.json'),
+        JSON.stringify({ dependencies: { axios: '^1.0' } }),
+      );
       const r = await dependencyChecker([], { dependency_present: 'axios' }, ctx(w.root));
       expect(r.passed).toBe(true);
     } finally {
@@ -34,8 +37,15 @@ describe('dependency-checker', () => {
   it('runtime-only check ignores devDependencies (jest in devDeps, dev:false)', async () => {
     const w = ws();
     try {
-      writeFileSync(join(w.root, 'package.json'), JSON.stringify({ devDependencies: { jest: '^29' } }));
-      const r = await dependencyChecker([], { dependency_present: 'jest', dev: false }, ctx(w.root));
+      writeFileSync(
+        join(w.root, 'package.json'),
+        JSON.stringify({ devDependencies: { jest: '^29' } }),
+      );
+      const r = await dependencyChecker(
+        [],
+        { dependency_present: 'jest', dev: false },
+        ctx(w.root),
+      );
       expect(r.passed).toBe(false);
     } finally {
       w.cleanup();
@@ -45,7 +55,10 @@ describe('dependency-checker', () => {
   it('dev:true includes devDependencies', async () => {
     const w = ws();
     try {
-      writeFileSync(join(w.root, 'package.json'), JSON.stringify({ devDependencies: { jest: '^29' } }));
+      writeFileSync(
+        join(w.root, 'package.json'),
+        JSON.stringify({ devDependencies: { jest: '^29' } }),
+      );
       const r = await dependencyChecker([], { dependency_present: 'jest', dev: true }, ctx(w.root));
       expect(r.passed).toBe(true);
     } finally {
@@ -71,7 +84,11 @@ describe('dependency-checker', () => {
         join(w.root, 'pyproject.toml'),
         '[tool.poetry.dev-dependencies]\npytest = "^7.0"\n',
       );
-      const r = await dependencyChecker([], { dependency_present: 'pytest', dev: true }, ctx(w.root));
+      const r = await dependencyChecker(
+        [],
+        { dependency_present: 'pytest', dev: true },
+        ctx(w.root),
+      );
       expect(r.passed).toBe(true);
     } finally {
       w.cleanup();
@@ -92,7 +109,10 @@ describe('dependency-checker', () => {
   it('miss produces structured finding mentioning the dep name', async () => {
     const w = ws();
     try {
-      writeFileSync(join(w.root, 'package.json'), JSON.stringify({ dependencies: { axios: '^1.0' } }));
+      writeFileSync(
+        join(w.root, 'package.json'),
+        JSON.stringify({ dependencies: { axios: '^1.0' } }),
+      );
       const r = await dependencyChecker([], { dependency_present: 'lodash' }, ctx(w.root));
       expect(r.passed).toBe(false);
       expect(r.findings[0].message).toContain('lodash');

@@ -85,7 +85,7 @@ export async function regenerate(
   }
 
   // Step 3: Build forward chains from PRD sections
-  const prdDocs = allDocs.filter(d => d.type === DocumentType.PRD);
+  const prdDocs = allDocs.filter((d) => d.type === DocumentType.PRD);
   const chains: TraceChain[] = [];
 
   for (const prdDoc of prdDocs) {
@@ -112,7 +112,7 @@ export async function regenerate(
   // Attach gaps to their respective chains
   for (const gap of gaps) {
     const reqId = `${gap.sourceId}:${gap.sourceSectionId}`;
-    const chain = chains.find(c => c.requirementId === reqId);
+    const chain = chains.find((c) => c.requirementId === reqId);
     if (chain) {
       chain.gaps.push(gap);
     }
@@ -183,7 +183,7 @@ function buildForwardChain(
     // Find links from any current source document to target type
     // that trace from the relevant section
     const matchingLinks = links.filter(
-      l =>
+      (l) =>
         currentSourceIds.includes(l.sourceId) &&
         l.sourceSectionId === currentSectionId &&
         l.targetType === targetType,
@@ -204,7 +204,7 @@ function buildForwardChain(
         // Update sources for next level: the target becomes the source
         // For the next level, we look for documents that have this target as parent
         // and trace from any of its sections
-        currentSourceIds = matchingLinks.map(l => l.targetId);
+        currentSourceIds = matchingLinks.map((l) => l.targetId);
 
         // For transitivity, the section being traced shifts:
         // child documents at the next level trace from sections of the current target.

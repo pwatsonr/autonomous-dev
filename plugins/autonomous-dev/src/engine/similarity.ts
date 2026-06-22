@@ -14,21 +14,17 @@
  * decision. Fuzzy matches are NOT automatically merged.
  */
 
-import type {
-  CandidateObservation,
-  ObservationSummary,
-  SimilarityMatch,
-} from './types';
+import type { CandidateObservation, ObservationSummary, SimilarityMatch } from './types';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** Minimum Jaccard similarity score to flag a stack-frame match. */
-const JACCARD_THRESHOLD = 0.80;
+const JACCARD_THRESHOLD = 0.8;
 
 /** Minimum Levenshtein similarity score to flag a message match. */
-const LEVENSHTEIN_THRESHOLD = 0.80;
+const LEVENSHTEIN_THRESHOLD = 0.8;
 
 /** Maximum time difference (ms) for temporal correlation. */
 const TEMPORAL_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
@@ -70,8 +66,8 @@ export function levenshteinDistance(a: string, b: string): number {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,        // deletion
-        matrix[i][j - 1] + 1,        // insertion
+        matrix[i - 1][j] + 1, // deletion
+        matrix[i][j - 1] + 1, // insertion
         matrix[i - 1][j - 1] + cost, // substitution
       );
     }

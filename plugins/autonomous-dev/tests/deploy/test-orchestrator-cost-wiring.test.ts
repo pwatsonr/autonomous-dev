@@ -16,9 +16,7 @@ function mkEstimate(overrides: Partial<EstimateResult> = {}): EstimateResult {
   return {
     estimated_cost_usd: 50,
     currency: 'USD',
-    breakdown: [
-      { label: 'a', quantity: 1, unit: 'u', unit_price_usd: 50, subtotal_usd: 50 },
-    ],
+    breakdown: [{ label: 'a', quantity: 1, unit: 'u', unit_price_usd: 50, subtotal_usd: 50 }],
     confidence: 0.85,
     ...overrides,
   };
@@ -44,11 +42,11 @@ function mkEstimator(result: EstimateResult | Error): {
   } as any;
 }
 
-function mkLedger(opts: {
-  capOk: boolean;
-  capUsd?: number;
-  currentUsd?: number;
-}): { ledger: CostLedger; recorded: any[]; capChecks: any[] } {
+function mkLedger(opts: { capOk: boolean; capUsd?: number; currentUsd?: number }): {
+  ledger: CostLedger;
+  recorded: any[];
+  capChecks: any[];
+} {
   const recorded: any[] = [];
   const capChecks: any[] = [];
   const ledger: CostLedger = {
@@ -80,7 +78,11 @@ describe('runEstimateAndCapCheck', () => {
   test('proceeds when estimate < cap and records the estimate', async () => {
     const e = mkEstimator(mkEstimate({ estimated_cost_usd: 50 }));
     const l = mkLedger({ capOk: true, capUsd: 100, currentUsd: 0 });
-    const r = await runEstimateAndCapCheck({ ...baseArgs, estimator: e.estimator, ledger: l.ledger });
+    const r = await runEstimateAndCapCheck({
+      ...baseArgs,
+      estimator: e.estimator,
+      ledger: l.ledger,
+    });
     expect(r.estimated_cost_usd).toBe(50);
     expect(l.recorded).toHaveLength(1);
     expect(l.recorded[0]).toMatchObject({
@@ -143,9 +145,9 @@ describe('runEstimateAndCapCheck', () => {
       },
     };
     const l = mkLedger({ capOk: true });
-    await expect(
-      runEstimateAndCapCheck({ ...baseArgs, estimator, ledger: l.ledger }),
-    ).rejects.toBe(boom);
+    await expect(runEstimateAndCapCheck({ ...baseArgs, estimator, ledger: l.ledger })).rejects.toBe(
+      boom,
+    );
     expect(l.capChecks).toHaveLength(0);
     expect(l.recorded).toHaveLength(0);
   });

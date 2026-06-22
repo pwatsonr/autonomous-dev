@@ -124,10 +124,9 @@ export class ContractValidator {
     // Read the producer's file from the integration branch
     let producerContent: string;
     try {
-      producerContent = execSync(
-        `git -C "${this.repoRoot}" show ${branch}:${contract.filePath}`,
-        { encoding: 'utf-8' },
-      );
+      producerContent = execSync(`git -C "${this.repoRoot}" show ${branch}:${contract.filePath}`, {
+        encoding: 'utf-8',
+      });
     } catch {
       failures.push({
         contract,
@@ -152,9 +151,7 @@ export class ContractValidator {
     const typeName = typeNameMatch[1];
 
     // Check that the type is exported in the producer file
-    const exportRegex = new RegExp(
-      `export\\s+(?:interface|type|class|enum)\\s+${typeName}\\b`,
-    );
+    const exportRegex = new RegExp(`export\\s+(?:interface|type|class|enum)\\s+${typeName}\\b`);
     if (!exportRegex.test(producerContent)) {
       failures.push({
         contract,
@@ -190,10 +187,9 @@ export class ContractValidator {
 
     let producerContent: string;
     try {
-      producerContent = execSync(
-        `git -C "${this.repoRoot}" show ${branch}:${contract.filePath}`,
-        { encoding: 'utf-8' },
-      );
+      producerContent = execSync(`git -C "${this.repoRoot}" show ${branch}:${contract.filePath}`, {
+        encoding: 'utf-8',
+      });
     } catch {
       failures.push({
         contract,
@@ -229,9 +225,7 @@ export class ContractValidator {
     warnings: ContractWarning[],
   ): Promise<void> {
     // Extract endpoint path from definition (e.g., "GET /api/users")
-    const endpointMatch = contract.definition.match(
-      /(GET|POST|PUT|DELETE|PATCH)\s+(\/[^\s]+)/,
-    );
+    const endpointMatch = contract.definition.match(/(GET|POST|PUT|DELETE|PATCH)\s+(\/[^\s]+)/);
     if (!endpointMatch) {
       warnings.push({
         contract,
@@ -244,10 +238,9 @@ export class ContractValidator {
 
     let producerContent: string;
     try {
-      producerContent = execSync(
-        `git -C "${this.repoRoot}" show ${branch}:${contract.filePath}`,
-        { encoding: 'utf-8' },
-      );
+      producerContent = execSync(`git -C "${this.repoRoot}" show ${branch}:${contract.filePath}`, {
+        encoding: 'utf-8',
+      });
     } catch {
       failures.push({
         contract,
@@ -344,18 +337,13 @@ export class ContractValidator {
       for (let i = 0; i < sequences.length; i++) {
         const newSeq = i + 1; // 1-based contiguous numbering
         const oldBasename = path.basename(sequences[i].file);
-        const newBasename = oldBasename.replace(
-          seqRegex,
-          `${String(newSeq).padStart(3, '0')}_`,
-        );
+        const newBasename = oldBasename.replace(seqRegex, `${String(newSeq).padStart(3, '0')}_`);
         if (oldBasename !== newBasename) {
           const newFile = path.join(path.dirname(sequences[i].file), newBasename);
           renumbered.set(sequences[i].file, newFile);
 
           // Perform the rename on the integration branch
-          execSync(
-            `git -C "${this.repoRoot}" mv "${sequences[i].file}" "${newFile}"`,
-          );
+          execSync(`git -C "${this.repoRoot}" mv "${sequences[i].file}" "${newFile}"`);
         }
       }
 

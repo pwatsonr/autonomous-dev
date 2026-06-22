@@ -9,15 +9,8 @@
  */
 
 import type { Finding, FindingSeverity } from '../../../src/review-gate/types';
-import {
-  AdversarialRunner,
-  ADVERSARIAL_TESTS,
-  validateResult,
-} from './adversarial-runner';
-import type {
-  AdversarialTestCase,
-  ReviewerExecutorAdapter,
-} from './adversarial-runner';
+import { AdversarialRunner, ADVERSARIAL_TESTS, validateResult } from './adversarial-runner';
+import type { AdversarialTestCase, ReviewerExecutorAdapter } from './adversarial-runner';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -89,9 +82,7 @@ describe('Adversarial Manipulation Tests', () => {
     });
 
     test('score at threshold boundary passes (75)', () => {
-      const findings = [
-        makeFinding({ category_id: 'goals_measurability', severity: 'major' }),
-      ];
+      const findings = [makeFinding({ category_id: 'goals_measurability', severity: 'major' })];
       const result = validateResult(testCase, 75, 'changes_requested', findings);
       expect(result.pass).toBe(true);
     });
@@ -164,9 +155,7 @@ describe('Adversarial Manipulation Tests', () => {
       const result = validateResult(testCase, 50, 'changes_requested', findings);
       expect(result.pass).toBe(false);
       expect(result.failures).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("'requirements_completeness'"),
-        ]),
+        expect.arrayContaining([expect.stringContaining("'requirements_completeness'")]),
       );
     });
 
@@ -185,9 +174,7 @@ describe('Adversarial Manipulation Tests', () => {
       const result = validateResult(testCase, 50, 'changes_requested', findings);
       expect(result.pass).toBe(false);
       expect(result.failures).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining("severity 'major'"),
-        ]),
+        expect.arrayContaining([expect.stringContaining("severity 'major'")]),
       );
     });
   });

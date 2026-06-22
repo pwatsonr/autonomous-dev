@@ -40,16 +40,11 @@ function fakeToken(overrides: Partial<ActiveTokenView> = {}): ActiveTokenView {
 describe('cred-proxy status', () => {
   it('prints a table including all required columns', async () => {
     const { stdout, stderr } = makeStreams();
-    const send = async (
-      _req: CredProxyIpcRequest,
-    ): Promise<CredProxyIpcResponse> => ({
+    const send = async (_req: CredProxyIpcRequest): Promise<CredProxyIpcResponse> => ({
       status: 'ok',
       payload: { tokens: [fakeToken()] },
     });
-    const code = await runCredProxyStatus(
-      { json: false },
-      { send, stdout, stderr },
-    );
+    const code = await runCredProxyStatus({ json: false }, { send, stdout, stderr });
     expect(code).toBe(0);
     expect(stdout.buf).toContain('token_id');
     expect(stdout.buf).toContain('caller');
@@ -68,10 +63,7 @@ describe('cred-proxy status', () => {
       status: 'ok',
       payload: { tokens: [fakeToken()] },
     });
-    const code = await runCredProxyStatus(
-      { json: true },
-      { send, stdout, stderr },
-    );
+    const code = await runCredProxyStatus({ json: true }, { send, stdout, stderr });
     expect(code).toBe(0);
     const parsed = JSON.parse(stdout.buf);
     expect(Array.isArray(parsed)).toBe(true);
@@ -86,10 +78,7 @@ describe('cred-proxy status', () => {
       status: 'ok',
       payload: { tokens: [] },
     });
-    const code = await runCredProxyStatus(
-      { json: false },
-      { send, stdout, stderr },
-    );
+    const code = await runCredProxyStatus({ json: false }, { send, stdout, stderr });
     expect(code).toBe(0);
     expect(stdout.buf).toContain('(no active tokens)');
   });
@@ -100,20 +89,14 @@ describe('cred-proxy status', () => {
       status: 'error',
       error: 'daemon is not running',
     });
-    const code = await runCredProxyStatus(
-      { json: false },
-      { send, stdout, stderr },
-    );
+    const code = await runCredProxyStatus({ json: false }, { send, stdout, stderr });
     expect(code).toBe(1);
     expect(stderr.buf).toContain('daemon is not running');
   });
 
   it('exits 1 with daemon-not-running when send is omitted (default)', async () => {
     const { stdout, stderr } = makeStreams();
-    const code = await runCredProxyStatus(
-      { json: false },
-      { stdout, stderr },
-    );
+    const code = await runCredProxyStatus({ json: false }, { stdout, stderr });
     expect(code).toBe(1);
     expect(stderr.buf).toContain('daemon is not running');
   });
@@ -125,9 +108,7 @@ describe('cred-proxy revoke', () => {
 
   it('revokes an existing token and prints confirmation', async () => {
     const { stdout, stderr } = makeStreams();
-    const send = async (
-      req: CredProxyIpcRequest,
-    ): Promise<CredProxyIpcResponse> => {
+    const send = async (req: CredProxyIpcRequest): Promise<CredProxyIpcResponse> => {
       expect(req.command).toBe('cred-proxy.revoke');
       expect(req.token_id).toBe('abc');
       return { status: 'ok', payload: { revoked: true } };
@@ -184,9 +165,7 @@ describe('cred-proxy allow', () => {
   it('adds a plugin to privileged_backends and prints confirmation', async () => {
     const { stdout, stderr } = makeStreams();
     let received: CredProxyIpcRequest | null = null;
-    const send = async (
-      req: CredProxyIpcRequest,
-    ): Promise<CredProxyIpcResponse> => {
+    const send = async (req: CredProxyIpcRequest): Promise<CredProxyIpcResponse> => {
       received = req;
       return { status: 'ok' };
     };

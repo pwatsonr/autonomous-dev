@@ -23,10 +23,7 @@ import {
   computeDistribution,
 } from '../../../src/review-gate/metrics/pipeline-aggregator';
 import { MetricsStore } from '../../../src/review-gate/metrics/metrics-store';
-import {
-  ReviewMetricsRecord,
-  MetricsFilter,
-} from '../../../src/review-gate/metrics/metrics-types';
+import { ReviewMetricsRecord, MetricsFilter } from '../../../src/review-gate/metrics/metrics-types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -162,7 +159,7 @@ describe('PipelineAggregator', () => {
   test('mean_iterations_to_approval: [1, 2, 2, 3, 2] => 2.0', async () => {
     const iterationCounts = [1, 2, 2, 3, 2];
     const records = iterationCounts.map((ic) =>
-      makeRecord({ outcome: 'approved', iteration_count: ic })
+      makeRecord({ outcome: 'approved', iteration_count: ic }),
     );
 
     const store = createMockStore(records);
@@ -229,16 +226,13 @@ describe('PipelineAggregator', () => {
   // -----------------------------------------------------------------------
   test('category score distribution for problem_clarity [60, 70, 80, 90, 100]', async () => {
     const scores = [60, 70, 80, 90, 100];
-    const records = scores.map((s) =>
-      makeRecord({ category_scores: { problem_clarity: s } })
-    );
+    const records = scores.map((s) => makeRecord({ category_scores: { problem_clarity: s } }));
 
     const store = createMockStore(records);
     const aggregator = new PipelineAggregator(store);
     const result = await aggregator.computeAggregates(30);
 
-    const dist =
-      result.by_document_type['PRD']!.category_score_distributions['problem_clarity'];
+    const dist = result.by_document_type['PRD']!.category_score_distributions['problem_clarity'];
     expect(dist).toBeDefined();
     expect(dist.min).toBe(60);
     expect(dist.max).toBe(100);
@@ -317,12 +311,42 @@ describe('PipelineAggregator', () => {
   test('overall aggregates: correct sums across all types', async () => {
     const records: ReviewMetricsRecord[] = [
       // 3 approved PRD
-      makeRecord({ document_type: 'PRD', outcome: 'approved', human_escalation: false, review_duration_ms: 2000, iteration_count: 1 }),
-      makeRecord({ document_type: 'PRD', outcome: 'approved', human_escalation: false, review_duration_ms: 4000, iteration_count: 2 }),
-      makeRecord({ document_type: 'PRD', outcome: 'approved', human_escalation: true, review_duration_ms: 6000, iteration_count: 3 }),
+      makeRecord({
+        document_type: 'PRD',
+        outcome: 'approved',
+        human_escalation: false,
+        review_duration_ms: 2000,
+        iteration_count: 1,
+      }),
+      makeRecord({
+        document_type: 'PRD',
+        outcome: 'approved',
+        human_escalation: false,
+        review_duration_ms: 4000,
+        iteration_count: 2,
+      }),
+      makeRecord({
+        document_type: 'PRD',
+        outcome: 'approved',
+        human_escalation: true,
+        review_duration_ms: 6000,
+        iteration_count: 3,
+      }),
       // 2 TDD: 1 rejected, 1 approved
-      makeRecord({ document_type: 'TDD', outcome: 'rejected', human_escalation: true, review_duration_ms: 3000, iteration_count: 2 }),
-      makeRecord({ document_type: 'TDD', outcome: 'approved', human_escalation: false, review_duration_ms: 5000, iteration_count: 1 }),
+      makeRecord({
+        document_type: 'TDD',
+        outcome: 'rejected',
+        human_escalation: true,
+        review_duration_ms: 3000,
+        iteration_count: 2,
+      }),
+      makeRecord({
+        document_type: 'TDD',
+        outcome: 'approved',
+        human_escalation: false,
+        review_duration_ms: 5000,
+        iteration_count: 1,
+      }),
     ];
 
     const store = createMockStore(records);

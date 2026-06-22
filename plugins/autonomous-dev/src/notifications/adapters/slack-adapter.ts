@@ -47,7 +47,7 @@ interface SlackPayload {
  * Batch delivery: single message with dividers between grouped notifications.
  */
 export class SlackDeliveryAdapter implements DeliveryAdapter {
-  readonly method = "slack" as const;
+  readonly method = 'slack' as const;
 
   deliver(payload: NotificationPayload): DeliveryResult {
     try {

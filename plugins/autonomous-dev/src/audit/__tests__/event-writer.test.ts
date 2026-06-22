@@ -25,9 +25,7 @@ function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'audit-writer-test-'));
 }
 
-function makePartialEvent(
-  overrides: Partial<PartialAuditEvent> = {},
-): PartialAuditEvent {
+function makePartialEvent(overrides: Partial<PartialAuditEvent> = {}): PartialAuditEvent {
   return {
     event_type: 'gate_decision',
     request_id: 'req-001',
@@ -43,8 +41,8 @@ function readEvents(logPath: string): Array<Record<string, unknown>> {
   const content = fs.readFileSync(logPath, 'utf-8');
   return content
     .split('\n')
-    .filter(line => line.trim().length > 0)
-    .map(line => JSON.parse(line));
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line));
 }
 
 // ---------------------------------------------------------------------------
@@ -103,9 +101,7 @@ describe('AuditEventWriter', () => {
     expect(event1.hash).toBeTruthy();
     expect(event1.prev_hash).toBe('GENESIS');
 
-    const event2 = await writer.append(
-      makePartialEvent({ request_id: 'req-002' }),
-    );
+    const event2 = await writer.append(makePartialEvent({ request_id: 'req-002' }));
     expect(event2.hash).toBeTruthy();
     expect(event2.prev_hash).toBe(event1.hash);
   });
@@ -129,11 +125,7 @@ describe('AuditEventWriter', () => {
 
     const events = readEvents(logPath);
     expect(events).toHaveLength(3);
-    expect(events.map(e => e.request_id)).toEqual([
-      'req-001',
-      'req-002',
-      'req-003',
-    ]);
+    expect(events.map((e) => e.request_id)).toEqual(['req-001', 'req-002', 'req-003']);
   });
 
   // Test Case 6: creates parent directory if it does not exist

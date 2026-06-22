@@ -12,10 +12,7 @@
  */
 
 import { ReviewerScheduler } from '../../intake/reviewers/scheduler';
-import type {
-  ChangeSetContext,
-  ReviewerEntry,
-} from '../../intake/reviewers/types';
+import type { ChangeSetContext, ReviewerEntry } from '../../intake/reviewers/types';
 
 function context(over: Partial<ChangeSetContext> = {}): ChangeSetContext {
   return {
@@ -33,8 +30,20 @@ const featureChain: ReviewerEntry[] = [
   { name: 'code-reviewer', type: 'built-in', blocking: true, threshold: 80 },
   { name: 'security-reviewer', type: 'built-in', blocking: true, threshold: 85 },
   { name: 'qa-edge-case-reviewer', type: 'specialist', blocking: true, threshold: 80 },
-  { name: 'ux-ui-reviewer', type: 'specialist', blocking: false, threshold: 75, trigger: 'frontend' },
-  { name: 'accessibility-reviewer', type: 'specialist', blocking: false, threshold: 75, trigger: 'frontend' },
+  {
+    name: 'ux-ui-reviewer',
+    type: 'specialist',
+    blocking: false,
+    threshold: 75,
+    trigger: 'frontend',
+  },
+  {
+    name: 'accessibility-reviewer',
+    type: 'specialist',
+    blocking: false,
+    threshold: 75,
+    trigger: 'frontend',
+  },
   { name: 'rule-set-enforcement-reviewer', type: 'specialist', blocking: true, threshold: 90 },
 ];
 
@@ -98,14 +107,26 @@ describe('ReviewerScheduler', () => {
     const sched = new ReviewerScheduler();
     const split: ReviewerEntry[] = [
       { name: 'code-reviewer', type: 'built-in', blocking: true, threshold: 80 },
-      { name: 'ux-ui-reviewer', type: 'specialist', blocking: false, threshold: 75, trigger: 'frontend' },
+      {
+        name: 'ux-ui-reviewer',
+        type: 'specialist',
+        blocking: false,
+        threshold: 75,
+        trigger: 'frontend',
+      },
       { name: 'qa-edge-case-reviewer', type: 'specialist', blocking: true, threshold: 80 },
-      { name: 'accessibility-reviewer', type: 'specialist', blocking: false, threshold: 75, trigger: 'frontend' },
+      {
+        name: 'accessibility-reviewer',
+        type: 'specialist',
+        blocking: false,
+        threshold: 75,
+        trigger: 'frontend',
+      },
     ];
     const out = sched.schedule(split, context({ isFrontendChange: true }));
     // Must contain a single group with both ux + a11y.
-    const frontendGroup = out.groups.find(
-      (g) => g.some((inv) => inv.entry.name === 'ux-ui-reviewer'),
+    const frontendGroup = out.groups.find((g) =>
+      g.some((inv) => inv.entry.name === 'ux-ui-reviewer'),
     );
     expect(frontendGroup).toBeDefined();
     expect(frontendGroup!.map((inv) => inv.entry.name).sort()).toEqual([

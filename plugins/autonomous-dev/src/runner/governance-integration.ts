@@ -20,10 +20,16 @@ import * as path from 'path';
 import * as yaml from 'js-yaml';
 
 import { evaluateEffectiveness } from '../governance/effectiveness';
-import { writeEffectivenessResult, findPendingEffectivenessObservations } from '../governance/effectiveness-writeback';
+import {
+  writeEffectivenessResult,
+  findPendingEffectivenessObservations,
+} from '../governance/effectiveness-writeback';
 import { checkCooldown } from '../governance/cooldown';
 import { checkOscillation, buildOscillationWarningMarkdown } from '../governance/oscillation';
-import { findRecentFixDeployment, findObservationsByServiceAndError } from '../governance/observation-store';
+import {
+  findRecentFixDeployment,
+  findObservationsByServiceAndError,
+} from '../governance/observation-store';
 import type {
   GovernanceConfig,
   CooldownResult,
@@ -96,9 +102,7 @@ export async function runEffectivenessEvaluations(
     }
 
     try {
-      const result = await evaluateEffectiveness(
-        observation, config, getDeployment, prometheus,
-      );
+      const result = await evaluateEffectiveness(observation, config, getDeployment, prometheus);
 
       if (result.status !== 'pending') {
         const writeResult = await writeEffectivenessResult(filePath, result);
@@ -107,7 +111,7 @@ export async function runEffectivenessEvaluations(
           summary[result.status]++;
           logger.info(
             `Effectiveness evaluated: ${observation.id} -> ${result.status}` +
-            (result.detail ? ` (${result.detail.improvement_pct}%)` : ''),
+              (result.detail ? ` (${result.detail.improvement_pct}%)` : ''),
           );
         }
       } else {
@@ -144,25 +148,17 @@ export async function applyGovernanceChecks(
   logger: AuditLogger,
 ): Promise<GovernanceFlags> {
   // 3e.i -- Check cooldown
-  const cooldownResult = checkCooldown(
-    service,
-    errorClass,
-    config,
-    (svc, ec) => findRecentFixDeploymentFromStore(rootDir, svc, ec, readDeploymentMetadata),
+  const cooldownResult = checkCooldown(service, errorClass, config, (svc, ec) =>
+    findRecentFixDeploymentFromStore(rootDir, svc, ec, readDeploymentMetadata),
   );
 
   if (cooldownResult.active) {
-    logger.info(
-      `Cooldown active for ${service}/${errorClass}: ${cooldownResult.reason}`,
-    );
+    logger.info(`Cooldown active for ${service}/${errorClass}: ${cooldownResult.reason}`);
   }
 
   // 3e.ii -- Check oscillation
-  const oscillationResult = checkOscillation(
-    service,
-    errorClass,
-    config,
-    (svc, ec, after) => findObservationsByServiceAndErrorFromStore(rootDir, svc, ec, after),
+  const oscillationResult = checkOscillation(service, errorClass, config, (svc, ec, after) =>
+    findObservationsByServiceAndErrorFromStore(rootDir, svc, ec, after),
   );
 
   let oscillationMarkdown = '';
@@ -179,7 +175,7 @@ export async function applyGovernanceChecks(
     oscillationMarkdown = buildOscillationWarningMarkdown(oscillationResult);
     logger.warn(
       `Oscillation detected for ${service}/${errorClass}: ` +
-      `${oscillationResult.count} observations in ${oscillationResult.window_days} days`,
+        `${oscillationResult.count} observations in ${oscillationResult.window_days} days`,
     );
   }
 

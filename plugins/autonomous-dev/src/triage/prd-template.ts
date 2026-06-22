@@ -237,8 +237,7 @@ export function buildPrdPrompt(
   severity: string,
   previousSummary: string,
 ): string {
-  return PRD_GENERATION_PROMPT
-    .replace('{observation_report_full_text}', observationFullText)
+  return PRD_GENERATION_PROMPT.replace('{observation_report_full_text}', observationFullText)
     .replace('{service}', service)
     .replace('{repo}', repo)
     .replace('{criticality}', severity)

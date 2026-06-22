@@ -24,9 +24,7 @@ import type {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makePayload(
-  overrides: Partial<NotificationPayload> = {},
-): NotificationPayload {
+function makePayload(overrides: Partial<NotificationPayload> = {}): NotificationPayload {
   return {
     notification_id: 'notif-001',
     event_type: 'pipeline_completed',
@@ -40,10 +38,7 @@ function makePayload(
   };
 }
 
-function makeAdapter(
-  method: DeliveryMethod,
-  success: boolean,
-): DeliveryAdapter {
+function makeAdapter(method: DeliveryMethod, success: boolean): DeliveryAdapter {
   return {
     method,
     deliver(_payload: NotificationPayload): DeliveryResult {
@@ -76,12 +71,7 @@ describe('DeliveryManager', () => {
       ['slack', makeAdapter('slack', true)],
       ['cli', makeAdapter('cli', true)],
     ]);
-    const dm = new DeliveryManager(
-      adapters,
-      'slack',
-      new Map(),
-      jest.fn(),
-    );
+    const dm = new DeliveryManager(adapters, 'slack', new Map(), jest.fn());
 
     const result = dm.deliver(makePayload());
 
@@ -95,12 +85,7 @@ describe('DeliveryManager', () => {
       ['slack', makeAdapter('slack', false)],
       ['cli', makeAdapter('cli', true)],
     ]);
-    const dm = new DeliveryManager(
-      adapters,
-      'slack',
-      new Map(),
-      jest.fn(),
-    );
+    const dm = new DeliveryManager(adapters, 'slack', new Map(), jest.fn());
 
     const result = dm.deliver(makePayload());
 
@@ -115,12 +100,7 @@ describe('DeliveryManager', () => {
       ['cli', makeAdapter('cli', false)],
       ['file_drop', makeAdapter('file_drop', true)],
     ]);
-    const dm = new DeliveryManager(
-      adapters,
-      'slack',
-      new Map(),
-      jest.fn(),
-    );
+    const dm = new DeliveryManager(adapters, 'slack', new Map(), jest.fn());
 
     const result = dm.deliver(makePayload());
 
@@ -136,12 +116,7 @@ describe('DeliveryManager', () => {
       ['cli', makeAdapter('cli', false)],
       ['file_drop', makeAdapter('file_drop', false)],
     ]);
-    const dm = new DeliveryManager(
-      adapters,
-      'slack',
-      new Map(),
-      onAllFailed,
-    );
+    const dm = new DeliveryManager(adapters, 'slack', new Map(), onAllFailed);
 
     const result = dm.deliver(makePayload());
 
@@ -155,19 +130,10 @@ describe('DeliveryManager', () => {
       ['cli', makeAdapter('cli', true)],
       ['slack', makeAdapter('slack', true)],
     ]);
-    const overrides = new Map<NotificationEventType, DeliveryMethod>([
-      ['escalation', 'slack'],
-    ]);
-    const dm = new DeliveryManager(
-      adapters,
-      'cli',
-      overrides,
-      jest.fn(),
-    );
+    const overrides = new Map<NotificationEventType, DeliveryMethod>([['escalation', 'slack']]);
+    const dm = new DeliveryManager(adapters, 'cli', overrides, jest.fn());
 
-    const result = dm.deliver(
-      makePayload({ event_type: 'escalation' }),
-    );
+    const result = dm.deliver(makePayload({ event_type: 'escalation' }));
 
     expect(result.success).toBe(true);
     expect(result.method).toBe('slack');
@@ -179,19 +145,10 @@ describe('DeliveryManager', () => {
       ['slack', makeAdapter('slack', false)],
       ['cli', makeAdapter('cli', true)],
     ]);
-    const overrides = new Map<NotificationEventType, DeliveryMethod>([
-      ['escalation', 'slack'],
-    ]);
-    const dm = new DeliveryManager(
-      adapters,
-      'cli',
-      overrides,
-      jest.fn(),
-    );
+    const overrides = new Map<NotificationEventType, DeliveryMethod>([['escalation', 'slack']]);
+    const dm = new DeliveryManager(adapters, 'cli', overrides, jest.fn());
 
-    const result = dm.deliver(
-      makePayload({ event_type: 'escalation' }),
-    );
+    const result = dm.deliver(makePayload({ event_type: 'escalation' }));
 
     expect(result.success).toBe(true);
     expect(result.method).toBe('cli');
@@ -203,12 +160,7 @@ describe('DeliveryManager', () => {
       ['discord', makeAdapter('discord', false)],
       ['cli', makeAdapter('cli', true)],
     ]);
-    const dm = new DeliveryManager(
-      adapters,
-      'discord',
-      new Map(),
-      jest.fn(),
-    );
+    const dm = new DeliveryManager(adapters, 'discord', new Map(), jest.fn());
 
     const result = dm.deliverBatch([makePayload(), makePayload()]);
 
@@ -218,12 +170,7 @@ describe('DeliveryManager', () => {
 
   // Empty batch returns success
   test('deliverBatch with empty array returns success', () => {
-    const dm = new DeliveryManager(
-      new Map(),
-      'cli',
-      new Map(),
-      jest.fn(),
-    );
+    const dm = new DeliveryManager(new Map(), 'cli', new Map(), jest.fn());
 
     const result = dm.deliverBatch([]);
 

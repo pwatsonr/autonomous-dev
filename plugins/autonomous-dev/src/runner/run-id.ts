@@ -29,9 +29,7 @@ export function generateRunId(now: Date = new Date()): string {
  * @returns The Date represented by the run ID, or null if the format is invalid
  */
 export function parseRunId(runId: string): Date | null {
-  const match = runId.match(
-    /^RUN-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/,
-  );
+  const match = runId.match(/^RUN-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/);
   if (!match) return null;
 
   const [, year, month, day, hours, minutes, seconds] = match;

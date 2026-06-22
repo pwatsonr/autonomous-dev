@@ -61,10 +61,12 @@ function consumer(
   };
 }
 
-async function makeRegistry(opts: {
-  hmacKey?: Buffer;
-  signer?: unknown;
-} = {}): Promise<ArtifactRegistry> {
+async function makeRegistry(
+  opts: {
+    hmacKey?: Buffer;
+    signer?: unknown;
+  } = {},
+): Promise<ArtifactRegistry> {
   const reg = new ArtifactRegistry({
     hmacKey: opts.hmacKey ?? TEST_HMAC_KEY,
   });
@@ -97,13 +99,7 @@ describe('SPEC-022-3-02: HMAC artifact signing on persist()', () => {
     );
     const onDisk = JSON.parse(
       await fs.readFile(
-        path.join(
-          tempRoot,
-          '.autonomous-dev',
-          'artifacts',
-          'security-findings',
-          'scan-1.json',
-        ),
+        path.join(tempRoot, '.autonomous-dev', 'artifacts', 'security-findings', 'scan-1.json'),
         'utf-8',
       ),
     );
@@ -148,22 +144,18 @@ describe('SPEC-022-3-02: HMAC artifact signing on persist()', () => {
 
   it('round-trip: persist + read() returns the producer payload (after strict-strip)', async () => {
     const reg = await makeRegistry();
-    await reg.persist(
-      tempRoot,
-      'security-findings',
-      'scan-rt',
-      { findings: [{ file: 'a.ts', line: 1, rule_id: 'R' }] },
-    );
+    await reg.persist(tempRoot, 'security-findings', 'scan-rt', {
+      findings: [{ file: 'a.ts', line: 1, rule_id: 'R' }],
+    });
     const out = await reg.read(
       'security-findings',
       'scan-rt',
       consumer('security-findings', '1.0'),
       tempRoot,
     );
-    expect(
-      (out.payload as { findings: Array<Record<string, unknown>> }).findings[0]
-        .rule_id,
-    ).toBe('R');
+    expect((out.payload as { findings: Array<Record<string, unknown>> }).findings[0].rule_id).toBe(
+      'R',
+    );
   });
 });
 
@@ -184,18 +176,10 @@ describe('SPEC-022-3-02: HMAC verification on read()', () => {
    * Helper: write an arbitrary JSON shape to disk under the artifact path.
    * Used to inject pre-PLAN-022-3 (unsigned) and tampered shapes.
    */
-  async function writeRaw(
-    artifactType: string,
-    artifactId: string,
-    body: unknown,
-  ): Promise<void> {
+  async function writeRaw(artifactType: string, artifactId: string, body: unknown): Promise<void> {
     const dir = path.join(tempRoot, '.autonomous-dev', 'artifacts', artifactType);
     await fs.mkdir(dir, { recursive: true, mode: 0o700 });
-    await fs.writeFile(
-      path.join(dir, `${artifactId}.json`),
-      JSON.stringify(body),
-      { mode: 0o600 },
-    );
+    await fs.writeFile(path.join(dir, `${artifactId}.json`), JSON.stringify(body), { mode: 0o600 });
   }
 
   it('throws ArtifactUnsignedError when on-disk has no _chain_hmac', async () => {
@@ -204,23 +188,15 @@ describe('SPEC-022-3-02: HMAC verification on read()', () => {
       findings: [{ file: 'a', line: 1, rule_id: 'R' }],
     });
     await expect(
-      reg.read(
-        'security-findings',
-        'unsigned',
-        consumer('security-findings', '1.0'),
-        tempRoot,
-      ),
+      reg.read('security-findings', 'unsigned', consumer('security-findings', '1.0'), tempRoot),
     ).rejects.toBeInstanceOf(ArtifactUnsignedError);
   });
 
   it('throws ArtifactTamperedError when payload is mutated post-persist', async () => {
     const reg = await makeRegistry();
-    await reg.persist(
-      tempRoot,
-      'security-findings',
-      'tamper-payload',
-      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
-    );
+    await reg.persist(tempRoot, 'security-findings', 'tamper-payload', {
+      findings: [{ file: 'a', line: 1, rule_id: 'R' }],
+    });
     const filePath = path.join(
       tempRoot,
       '.autonomous-dev',
@@ -244,12 +220,9 @@ describe('SPEC-022-3-02: HMAC verification on read()', () => {
 
   it('throws ArtifactTamperedError when _chain_hmac itself is replaced', async () => {
     const reg = await makeRegistry();
-    await reg.persist(
-      tempRoot,
-      'security-findings',
-      'tamper-hmac',
-      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
-    );
+    await reg.persist(tempRoot, 'security-findings', 'tamper-hmac', {
+      findings: [{ file: 'a', line: 1, rule_id: 'R' }],
+    });
     const filePath = path.join(
       tempRoot,
       '.autonomous-dev',
@@ -262,23 +235,15 @@ describe('SPEC-022-3-02: HMAC verification on read()', () => {
     await fs.writeFile(filePath, JSON.stringify(onDisk));
 
     await expect(
-      reg.read(
-        'security-findings',
-        'tamper-hmac',
-        consumer('security-findings', '1.0'),
-        tempRoot,
-      ),
+      reg.read('security-findings', 'tamper-hmac', consumer('security-findings', '1.0'), tempRoot),
     ).rejects.toBeInstanceOf(ArtifactTamperedError);
   });
 
   it('rejects HMAC of mismatched length (timingSafeEqual length-guard)', async () => {
     const reg = await makeRegistry();
-    await reg.persist(
-      tempRoot,
-      'security-findings',
-      'len-mismatch',
-      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
-    );
+    await reg.persist(tempRoot, 'security-findings', 'len-mismatch', {
+      findings: [{ file: 'a', line: 1, rule_id: 'R' }],
+    });
     const filePath = path.join(
       tempRoot,
       '.autonomous-dev',
@@ -291,12 +256,7 @@ describe('SPEC-022-3-02: HMAC verification on read()', () => {
     await fs.writeFile(filePath, JSON.stringify(onDisk));
 
     await expect(
-      reg.read(
-        'security-findings',
-        'len-mismatch',
-        consumer('security-findings', '1.0'),
-        tempRoot,
-      ),
+      reg.read('security-findings', 'len-mismatch', consumer('security-findings', '1.0'), tempRoot),
     ).rejects.toBeInstanceOf(ArtifactTamperedError);
   });
 
@@ -335,9 +295,7 @@ describe('SPEC-022-3-02: HMAC verification on read()', () => {
     }
     expect(caught).toBeInstanceOf(ArtifactTamperedError);
     // Negative assertion: must not be a SchemaValidationError.
-    expect((caught as { code?: string }).code).not.toBe(
-      'SCHEMA_VALIDATION_FAILED',
-    );
+    expect((caught as { code?: string }).code).not.toBe('SCHEMA_VALIDATION_FAILED');
   });
 });
 
@@ -368,9 +326,7 @@ describe('SPEC-022-3-02: privileged-chain Ed25519 signing', () => {
     const key = createPrivateKey({ key: privateKeyPem, format: 'pem' });
     return {
       sign(_producerPluginId: string, canonical: string): string {
-        return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString(
-          'base64',
-        );
+        return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString('base64');
       },
     };
   }
@@ -411,13 +367,7 @@ describe('SPEC-022-3-02: privileged-chain Ed25519 signing', () => {
     );
     const onDisk = JSON.parse(
       await fs.readFile(
-        path.join(
-          tempRoot,
-          '.autonomous-dev',
-          'artifacts',
-          'security-findings',
-          'priv-1.json',
-        ),
+        path.join(tempRoot, '.autonomous-dev', 'artifacts', 'security-findings', 'priv-1.json'),
         'utf-8',
       ),
     );
@@ -442,20 +392,12 @@ describe('SPEC-022-3-02: privileged-chain Ed25519 signing', () => {
     );
     const onDisk = JSON.parse(
       await fs.readFile(
-        path.join(
-          tempRoot,
-          '.autonomous-dev',
-          'artifacts',
-          'security-findings',
-          'nonpriv-1.json',
-        ),
+        path.join(tempRoot, '.autonomous-dev', 'artifacts', 'security-findings', 'nonpriv-1.json'),
         'utf-8',
       ),
     );
     // Field absent — NOT null.
-    expect(Object.prototype.hasOwnProperty.call(onDisk, '_chain_signature')).toBe(
-      false,
-    );
+    expect(Object.prototype.hasOwnProperty.call(onDisk, '_chain_signature')).toBe(false);
   });
 
   it('read() under privileged policy with valid signature succeeds', async () => {
@@ -694,9 +636,7 @@ describe('SPEC-022-3-04: signing closeout coverage', () => {
     const key = createPrivateKey({ key: privateKeyPem, format: 'pem' });
     return {
       sign(_producerPluginId: string, canonical: string): string {
-        return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString(
-          'base64',
-        );
+        return ed25519Sign(null, Buffer.from(canonical, 'utf8'), key).toString('base64');
       },
     };
   }
@@ -705,12 +645,9 @@ describe('SPEC-022-3-04: signing closeout coverage', () => {
     // Defense against operators running two daemons with mismatched keys.
     const persistReg = new ArtifactRegistry({ hmacKey: TEST_HMAC_KEY });
     await persistReg.loadSchemas(FIXTURE_SCHEMA_ROOT);
-    await persistReg.persist(
-      tempRoot,
-      'security-findings',
-      'mismatched-key',
-      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
-    );
+    await persistReg.persist(tempRoot, 'security-findings', 'mismatched-key', {
+      findings: [{ file: 'a', line: 1, rule_id: 'R' }],
+    });
 
     const readReg = new ArtifactRegistry({ hmacKey: ALT_HMAC_KEY });
     await readReg.loadSchemas(FIXTURE_SCHEMA_ROOT);
@@ -836,9 +773,7 @@ describe('SPEC-022-3-02: chain HMAC key resolution', () => {
   const logger = { warn: (m: string) => warnings.push(m) };
 
   beforeEach(async () => {
-    tempHome = await fs.mkdtemp(
-      path.join(require('node:os').tmpdir(), 'chain-key-'),
-    );
+    tempHome = await fs.mkdtemp(path.join(require('node:os').tmpdir(), 'chain-key-'));
     warnings = [];
     resetChainKeyCacheForTest();
   });
@@ -883,11 +818,7 @@ describe('SPEC-022-3-02: chain HMAC key resolution', () => {
 
   it('second call returns cached key (no I/O)', () => {
     const keyPath = path.join(tempHome, 'k.key');
-    fsSync.writeFileSync(
-      keyPath,
-      Buffer.alloc(32, 0xcc).toString('base64'),
-      { mode: 0o600 },
-    );
+    fsSync.writeFileSync(keyPath, Buffer.alloc(32, 0xcc).toString('base64'), { mode: 0o600 });
     const k1 = getChainHmacKey({ env: {}, keyPath, logger });
     // Delete the on-disk file: a non-cached resolution path would now
     // either re-generate (different bytes) or throw. The cached path must
@@ -902,9 +833,7 @@ describe('SPEC-022-3-02: chain HMAC key resolution', () => {
 
 describe('SPEC-022-3-02: canonicalJSON', () => {
   it('sorts keys lexicographically at every level', () => {
-    expect(canonicalJSON({ b: 1, a: { c: 2, b: 1 } })).toBe(
-      '{"a":{"b":1,"c":2},"b":1}',
-    );
+    expect(canonicalJSON({ b: 1, a: { c: 2, b: 1 } })).toBe('{"a":{"b":1,"c":2},"b":1}');
   });
 
   it('preserves array order', () => {
@@ -929,9 +858,7 @@ describe('SPEC-022-3-02: canonicalJSON', () => {
   });
 
   it('rejects non-finite numbers', () => {
-    expect(() => canonicalJSON({ x: Number.POSITIVE_INFINITY })).toThrow(
-      TypeError,
-    );
+    expect(() => canonicalJSON({ x: Number.POSITIVE_INFINITY })).toThrow(TypeError);
     expect(() => canonicalJSON({ x: NaN })).toThrow(TypeError);
   });
 

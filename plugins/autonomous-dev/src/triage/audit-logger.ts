@@ -17,7 +17,11 @@ import type { TriageAuditEntry, TriageAuditLogger } from './types';
 
 export class DefaultTriageAuditLogger implements TriageAuditLogger {
   private readonly entries: TriageAuditEntry[] = [];
-  private readonly errorEntries: Array<{ observationId: string; message: string; timestamp: string }> = [];
+  private readonly errorEntries: Array<{
+    observationId: string;
+    message: string;
+    timestamp: string;
+  }> = [];
   private readonly logPath: string;
 
   /**

@@ -14,19 +14,9 @@
 
 import { Writable } from 'node:stream';
 
-import {
-  runChainsApprove,
-  type ChainsApproveDeps,
-} from '../../intake/cli/chains_approve_command';
-import {
-  runChainsReject,
-  type ChainsRejectDeps,
-} from '../../intake/cli/chains_reject_command';
-import type {
-  ApprovalMarker,
-  ChainPausedState,
-  RejectionMarker,
-} from '../../intake/chains/types';
+import { runChainsApprove, type ChainsApproveDeps } from '../../intake/cli/chains_approve_command';
+import { runChainsReject, type ChainsRejectDeps } from '../../intake/cli/chains_reject_command';
+import type { ApprovalMarker, ChainPausedState, RejectionMarker } from '../../intake/chains/types';
 import { StateStore } from '../../intake/chains/state-store';
 import type { ChainExecutor } from '../../intake/chains/executor';
 
@@ -143,10 +133,7 @@ describe('SPEC-022-2-04: chains approve', () => {
       approvedByResolver: () => 'tester',
       now: () => new Date(),
     };
-    const code = await runChainsApprove(
-      { artifactId: 'patches-1', notes: 'looks good' },
-      deps,
-    );
+    const code = await runChainsApprove({ artifactId: 'patches-1', notes: 'looks good' }, deps);
     expect(code).toBe(0);
     expect((store.written[0].marker as ApprovalMarker).notes).toBe('looks good');
   });
@@ -335,10 +322,7 @@ describe('SPEC-022-2-04: chains reject', () => {
         throw new Error('not an admin');
       },
     };
-    const code = await runChainsReject(
-      { artifactId: 'p', reason: 'nope' },
-      deps,
-    );
+    const code = await runChainsReject({ artifactId: 'p', reason: 'nope' }, deps);
     expect(code).toBe(1);
     expect(stderr.text()).toMatch(/auth failed: not an admin/);
   });
@@ -352,10 +336,7 @@ describe('SPEC-022-2-04: chains reject', () => {
       locateChainStateByArtifact: async () => null,
       requireAdminAuth: async () => {},
     };
-    const code = await runChainsReject(
-      { artifactId: 'GONE', reason: 'because' },
-      deps,
-    );
+    const code = await runChainsReject({ artifactId: 'GONE', reason: 'because' }, deps);
     expect(code).toBe(1);
     expect(stderr.text()).toMatch(/No paused chain found for artifact GONE/);
   });
@@ -371,10 +352,7 @@ describe('SPEC-022-2-04: chains reject', () => {
       locateChainStateByArtifact: async () => makePausedState(),
       requireAdminAuth: async () => {},
     };
-    const code = await runChainsReject(
-      { artifactId: 'p', reason: 'nope' },
-      deps,
-    );
+    const code = await runChainsReject({ artifactId: 'p', reason: 'nope' }, deps);
     expect(code).toBe(1);
     expect(stderr.text()).toMatch(/failed to write rejection marker: EACCES/);
     expect(store.deleted).toHaveLength(0);
@@ -391,10 +369,7 @@ describe('SPEC-022-2-04: chains reject', () => {
       locateChainStateByArtifact: async () => makePausedState(),
       requireAdminAuth: async () => {},
     };
-    const code = await runChainsReject(
-      { artifactId: 'p', reason: 'nope' },
-      deps,
-    );
+    const code = await runChainsReject({ artifactId: 'p', reason: 'nope' }, deps);
     expect(code).toBe(1);
     expect(stderr.text()).toMatch(/failed to delete chain state: EBUSY/);
   });
@@ -410,10 +385,7 @@ describe('SPEC-022-2-04: chains reject', () => {
       },
       requireAdminAuth: async () => {},
     };
-    const code = await runChainsReject(
-      { artifactId: 'p', reason: 'nope' },
-      deps,
-    );
+    const code = await runChainsReject({ artifactId: 'p', reason: 'nope' }, deps);
     expect(code).toBe(1);
     expect(stderr.text()).toMatch(/failed to locate chain state: disk on fire/);
   });

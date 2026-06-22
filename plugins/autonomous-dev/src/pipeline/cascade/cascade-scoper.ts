@@ -43,7 +43,7 @@ export async function scopeCascade(
     // Read child's traces_from
     // Need to determine child's type from pipeline state
     const allDocs = await storage.listDocuments(pipelineId);
-    const childDoc = allDocs.find(d => d.documentId === childId);
+    const childDoc = allDocs.find((d) => d.documentId === childId);
     if (!childDoc) {
       unaffectedChildren.push(childId);
       continue;
@@ -52,7 +52,7 @@ export async function scopeCascade(
     const fullChild = await storage.readDocument(pipelineId, childDoc.type, childId);
     const tracesFrom = (fullChild.frontmatter.traces_from as string[]) ?? [];
 
-    const isAffected = tracesFrom.some(t => affectedSectionSet.has(t));
+    const isAffected = tracesFrom.some((t) => affectedSectionSet.has(t));
     if (isAffected) {
       affectedChildren.push(childId);
     } else {

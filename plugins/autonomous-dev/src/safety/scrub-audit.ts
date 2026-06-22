@@ -8,12 +8,7 @@
  * validation status, and any SCRUB_FAILED fields.
  */
 
-import type {
-  AuditLogger,
-  ScrubAuditEntry,
-  ScrubContext,
-  ScrubResult,
-} from './types';
+import type { AuditLogger, ScrubAuditEntry, ScrubContext, ScrubResult } from './types';
 
 // ---------------------------------------------------------------------------
 // ScrubAuditLogger

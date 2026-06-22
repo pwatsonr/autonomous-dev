@@ -36,11 +36,7 @@ describe('pattern-grep', () => {
     const w = ws();
     try {
       writeFileSync(join(w.root, 'a.py'), 'query.format("...")\n');
-      const r = await patternGrep(
-        ['a.py'],
-        { excludes_pattern: '\\.format\\(' },
-        ctx(w.root),
-      );
+      const r = await patternGrep(['a.py'], { excludes_pattern: '\\.format\\(' }, ctx(w.root));
       expect(r.passed).toBe(false);
       expect(r.findings).toHaveLength(1);
       expect(r.findings[0].file).toContain('a.py');
@@ -52,11 +48,7 @@ describe('pattern-grep', () => {
   it('both uses_pattern and excludes_pattern → configuration finding', async () => {
     const w = ws();
     try {
-      const r = await patternGrep(
-        [],
-        { uses_pattern: 'a', excludes_pattern: 'b' },
-        ctx(w.root),
-      );
+      const r = await patternGrep([], { uses_pattern: 'a', excludes_pattern: 'b' }, ctx(w.root));
       expect(r.passed).toBe(false);
       expect(r.findings[0].message).toContain('uses_pattern or excludes_pattern');
     } finally {
@@ -102,11 +94,7 @@ describe('pattern-grep', () => {
     const w = ws();
     try {
       writeFileSync(join(w.root, 'a.ts'), 'no-match-here\n');
-      const r = await patternGrep(
-        ['a.ts'],
-        { uses_pattern: 'will-not-match' },
-        ctx(w.root),
-      );
+      const r = await patternGrep(['a.ts'], { uses_pattern: 'will-not-match' }, ctx(w.root));
       expect(r.passed).toBe(false);
       expect(r.findings[0].message).toContain('1 scanned files');
     } finally {
@@ -124,9 +112,7 @@ describe('pattern-grep', () => {
       const spy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
       await patternGrep(['a.ts'], { uses_pattern: 'foo' }, ctx(w.root));
       await patternGrep(['a.ts'], { uses_pattern: 'foo' }, ctx(w.root));
-      const stubWarns = spy.mock.calls.filter((c) =>
-        String(c[0] ?? '').includes('stub'),
-      );
+      const stubWarns = spy.mock.calls.filter((c) => String(c[0] ?? '').includes('stub'));
       expect(stubWarns.length).toBe(1);
       spy.mockRestore();
     } finally {

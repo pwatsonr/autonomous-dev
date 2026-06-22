@@ -58,24 +58,20 @@ export function parseTriageCommand(input: string): TriageCommand | null {
   const trimmed = input.trim();
 
   // /promote OBS-YYYYMMDD-HHMMSS-xxxx <reason>
-  const promoteMatch = trimmed.match(
-    /^\/promote\s+(OBS-\d{8}-\d{6}-[a-f0-9]{4})\s+(.+)$/i
-  );
+  const promoteMatch = trimmed.match(/^\/promote\s+(OBS-\d{8}-\d{6}-[a-f0-9]{4})\s+(.+)$/i);
   if (promoteMatch) {
     return { action: 'promote', observation_id: promoteMatch[1], reason: promoteMatch[2] };
   }
 
   // /dismiss OBS-YYYYMMDD-HHMMSS-xxxx <reason>
-  const dismissMatch = trimmed.match(
-    /^\/dismiss\s+(OBS-\d{8}-\d{6}-[a-f0-9]{4})\s+(.+)$/i
-  );
+  const dismissMatch = trimmed.match(/^\/dismiss\s+(OBS-\d{8}-\d{6}-[a-f0-9]{4})\s+(.+)$/i);
   if (dismissMatch) {
     return { action: 'dismiss', observation_id: dismissMatch[1], reason: dismissMatch[2] };
   }
 
   // /defer OBS-YYYYMMDD-HHMMSS-xxxx YYYY-MM-DD <reason>
   const deferMatch = trimmed.match(
-    /^\/defer\s+(OBS-\d{8}-\d{6}-[a-f0-9]{4})\s+(\d{4}-\d{2}-\d{2})\s+(.+)$/i
+    /^\/defer\s+(OBS-\d{8}-\d{6}-[a-f0-9]{4})\s+(\d{4}-\d{2}-\d{2})\s+(.+)$/i,
   );
   if (deferMatch) {
     return {
@@ -87,9 +83,7 @@ export function parseTriageCommand(input: string): TriageCommand | null {
   }
 
   // /investigate OBS-YYYYMMDD-HHMMSS-xxxx
-  const investigateMatch = trimmed.match(
-    /^\/investigate\s+(OBS-\d{8}-\d{6}-[a-f0-9]{4})$/i
-  );
+  const investigateMatch = trimmed.match(/^\/investigate\s+(OBS-\d{8}-\d{6}-[a-f0-9]{4})$/i);
   if (investigateMatch) {
     return { action: 'investigate', observation_id: investigateMatch[1] };
   }
@@ -105,10 +99,7 @@ export function parseTriageCommand(input: string): TriageCommand | null {
  * Locate an observation file by its ID within the observations directory.
  * Searches recursively through year/month subdirectories.
  */
-export function findObservationFileById(
-  rootDir: string,
-  observationId: string
-): string | null {
+export function findObservationFileById(rootDir: string, observationId: string): string | null {
   const obsDir = path.join(rootDir, '.autonomous-dev', 'observations');
 
   try {
@@ -119,11 +110,7 @@ export function findObservationFileById(
   }
 }
 
-function findFileRecursive(
-  fsSync: any,
-  dir: string,
-  observationId: string
-): string | null {
+function findFileRecursive(fsSync: any, dir: string, observationId: string): string | null {
   let entries: any[];
   try {
     entries = fsSync.readdirSync(dir, { withFileTypes: true });
@@ -140,7 +127,10 @@ function findFileRecursive(
       // Check if file contains the observation ID in frontmatter
       try {
         const content = fsSync.readFileSync(fullPath, 'utf-8');
-        if (content.includes(`id: ${observationId}`) || content.includes(`id: "${observationId}"`)) {
+        if (
+          content.includes(`id: ${observationId}`) ||
+          content.includes(`id: "${observationId}"`)
+        ) {
           return fullPath;
         }
       } catch {
@@ -165,7 +155,7 @@ export async function applyTriageCommand(
   command: TriageCommand,
   actor: string,
   rootDir: string,
-  logger: AuditLogger
+  logger: AuditLogger,
 ): Promise<ApplyTriageResult> {
   // Find the observation file by ID
   const filePath = findObservationFileById(rootDir, command.observation_id);
@@ -191,7 +181,7 @@ export async function applyTriageCommand(
 
     logger.info(
       `Triage command applied from notification channel: ` +
-      `${command.action} on ${command.observation_id} by ${actor}`
+        `${command.action} on ${command.observation_id} by ${actor}`,
     );
 
     return { applied: true };

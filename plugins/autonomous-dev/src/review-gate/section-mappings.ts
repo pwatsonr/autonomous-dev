@@ -30,7 +30,11 @@ const PRD_SECTION_MAPPINGS: DocumentSectionMappings = {
     { section_id: 'user_stories', category_ids: ['user_story_coverage', 'internal_consistency'] },
     {
       section_id: 'functional_requirements',
-      category_ids: ['requirements_completeness', 'requirements_testability', 'internal_consistency'],
+      category_ids: [
+        'requirements_completeness',
+        'requirements_testability',
+        'internal_consistency',
+      ],
     },
     {
       section_id: 'non_functional_requirements',
@@ -85,7 +89,10 @@ const SPEC_SECTION_MAPPINGS: DocumentSectionMappings = {
   document_type: DocumentType.SPEC,
   word_count_threshold: 500,
   mappings: [
-    { section_id: 'acceptance_criteria', category_ids: ['acceptance_criteria_precision', 'plan_alignment'] },
+    {
+      section_id: 'acceptance_criteria',
+      category_ids: ['acceptance_criteria_precision', 'plan_alignment'],
+    },
     { section_id: 'files_to_create_modify', category_ids: ['file_path_accuracy'] },
     { section_id: 'test_cases', category_ids: ['test_case_coverage'] },
     { section_id: 'implementation_details', category_ids: ['code_pattern_clarity'] },
@@ -101,7 +108,10 @@ const CODE_SECTION_MAPPINGS: DocumentSectionMappings = {
   document_type: DocumentType.CODE,
   word_count_threshold: 500,
   mappings: [
-    { section_id: 'implementation', category_ids: ['spec_compliance', 'code_quality', 'maintainability'] },
+    {
+      section_id: 'implementation',
+      category_ids: ['spec_compliance', 'code_quality', 'maintainability'],
+    },
     { section_id: 'tests', category_ids: ['test_coverage'] },
     { section_id: 'documentation', category_ids: ['documentation_completeness'] },
     { section_id: 'performance_paths', category_ids: ['performance'] },
@@ -162,7 +172,10 @@ export function getSectionsForCategory(documentType: DocumentType, categoryId: s
  * Returns true if the document should use document-level scoring
  * (word count below threshold or no mappings exist).
  */
-export function shouldUseDocumentLevelScoring(documentType: DocumentType, wordCount: number): boolean {
+export function shouldUseDocumentLevelScoring(
+  documentType: DocumentType,
+  wordCount: number,
+): boolean {
   const mappings = MAPPINGS_REGISTRY[documentType];
   if (!mappings) {
     return true;

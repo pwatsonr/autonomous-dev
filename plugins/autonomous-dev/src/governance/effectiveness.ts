@@ -133,11 +133,7 @@ export async function evaluateEffectiveness(
   }
 
   // Compute improvement percentage
-  const improvementPct = computeImprovement(
-    observation.metric_direction,
-    preAvg,
-    postAvg,
-  );
+  const improvementPct = computeImprovement(observation.metric_direction, preAvg, postAvg);
 
   const detail: EffectivenessDetail = {
     pre_fix_avg: round(preAvg, 2),

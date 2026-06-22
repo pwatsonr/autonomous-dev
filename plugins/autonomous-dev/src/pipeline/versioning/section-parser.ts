@@ -94,10 +94,10 @@ export function parseSections(content: string): DocumentSections {
 export function toSectionId(heading: string): string {
   return heading
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')  // remove non-alphanumeric (keep spaces and hyphens)
-    .replace(/\s+/g, '-')           // spaces to hyphens
-    .replace(/-+/g, '-')            // collapse multiple hyphens
-    .replace(/^-|-$/g, '');          // trim leading/trailing hyphens
+    .replace(/[^a-z0-9\s-]/g, '') // remove non-alphanumeric (keep spaces and hyphens)
+    .replace(/\s+/g, '-') // spaces to hyphens
+    .replace(/-+/g, '-') // collapse multiple hyphens
+    .replace(/^-|-$/g, ''); // trim leading/trailing hyphens
 }
 
 /**
@@ -117,9 +117,10 @@ export function countWords(text: string): number {
  * Separates frontmatter from body lines.
  * Frontmatter is delimited by --- on the first line and a closing ---.
  */
-function separateFrontmatter(
-  lines: string[],
-): { frontmatter: Record<string, unknown> | null; bodyLines: string[] } {
+function separateFrontmatter(lines: string[]): {
+  frontmatter: Record<string, unknown> | null;
+  bodyLines: string[];
+} {
   if (lines.length === 0 || lines[0].trim() !== '---') {
     return { frontmatter: null, bodyLines: lines };
   }
@@ -199,10 +200,7 @@ function parseYamlValue(raw: string): unknown {
   if (raw === 'false') return false;
 
   // Remove surrounding quotes
-  if (
-    (raw.startsWith('"') && raw.endsWith('"')) ||
-    (raw.startsWith("'") && raw.endsWith("'"))
-  ) {
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
     return raw.slice(1, -1);
   }
 
@@ -263,16 +261,12 @@ interface FlatSection {
  * heading line (or end of document). This means a parent section's content
  * only includes text before its first child heading.
  */
-function buildFlatSections(
-  headings: HeadingEntry[],
-  bodyLines: string[],
-): FlatSection[] {
+function buildFlatSections(headings: HeadingEntry[], bodyLines: string[]): FlatSection[] {
   const sections: FlatSection[] = [];
 
   for (let i = 0; i < headings.length; i++) {
     const startLine = headings[i].lineIndex + 1; // line after heading
-    const endLine =
-      i + 1 < headings.length ? headings[i + 1].lineIndex : bodyLines.length;
+    const endLine = i + 1 < headings.length ? headings[i + 1].lineIndex : bodyLines.length;
 
     const contentLines = bodyLines.slice(startLine, endLine);
     const content = contentLines.join('\n');

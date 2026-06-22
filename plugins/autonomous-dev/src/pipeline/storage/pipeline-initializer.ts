@@ -19,8 +19,8 @@ export interface PipelineInitResult {
  */
 export function generatePipelineId(date: Date, sequence: number): string {
   const yyyy = date.getFullYear().toString();
-  const mmdd = String(date.getMonth() + 1).padStart(2, '0')
-    + String(date.getDate()).padStart(2, '0');
+  const mmdd =
+    String(date.getMonth() + 1).padStart(2, '0') + String(date.getDate()).padStart(2, '0');
   const seq = String(sequence).padStart(3, '0');
   return `PIPE-${yyyy}-${mmdd}-${seq}`;
 }

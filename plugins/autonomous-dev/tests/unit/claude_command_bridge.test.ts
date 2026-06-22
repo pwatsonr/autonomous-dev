@@ -26,10 +26,7 @@ import {
   parseSubcommandArgv,
   validateSubcommandArgs,
 } from '../../intake/adapters/claude_command_bridge';
-import type {
-  CommandResult,
-  IncomingCommand,
-} from '../../intake/adapters/adapter_interface';
+import type { CommandResult, IncomingCommand } from '../../intake/adapters/adapter_interface';
 import type { IntakeRouter } from '../../intake/adapters/claude_adapter';
 
 // ---------------------------------------------------------------------------
@@ -50,16 +47,20 @@ function captureMain(
   const original = process.stdout.write.bind(process.stdout);
   // Reassigning process.stdout.write — the standard signature is broader than
   // (chunk) => boolean, but for tests we only invoke it with a single chunk.
-  (process.stdout as unknown as { write: (chunk: string | Uint8Array) => boolean }).write = (chunk: string | Uint8Array): boolean => {
+  (process.stdout as unknown as { write: (chunk: string | Uint8Array) => boolean }).write = (
+    chunk: string | Uint8Array,
+  ): boolean => {
     writes.push(typeof chunk === 'string' ? chunk : chunk.toString());
     return true;
   };
 
   const fakeRouter: IntakeRouter = {
-    route: jest.fn(async (_cmd: IncomingCommand): Promise<CommandResult> => ({
-      success: true,
-      data: { ok: true },
-    })),
+    route: jest.fn(
+      async (_cmd: IncomingCommand): Promise<CommandResult> => ({
+        success: true,
+        data: { ok: true },
+      }),
+    ),
     ...(routerOverride as IntakeRouter | undefined),
   } as IntakeRouter;
 
@@ -71,9 +72,7 @@ function captureMain(
   return main(argv, deps).then((exit) => {
     process.stdout.write = original;
     const raw = writes.join('');
-    const envelope = JSON.parse(raw.trim()) as
-      | CliSuccessEnvelope
-      | CliErrorEnvelope;
+    const envelope = JSON.parse(raw.trim()) as CliSuccessEnvelope | CliErrorEnvelope;
     return { exit, envelope, raw };
   });
 }
@@ -135,12 +134,7 @@ describe('parseSubcommandArgv', () => {
   });
 
   test('mixed positionals and flags', () => {
-    const r = parseSubcommandArgv([
-      'REQ-000001',
-      '--priority=high',
-      'extra',
-      '--verbose',
-    ]);
+    const r = parseSubcommandArgv(['REQ-000001', '--priority=high', 'extra', '--verbose']);
     expect(r.positionals).toEqual(['REQ-000001', 'extra']);
     expect(r.flags).toEqual({ priority: 'high', verbose: true });
   });
@@ -188,9 +182,9 @@ describe('validateSubcommandArgs', () => {
   });
 
   test('submit without description throws INVALID_ARGUMENT', () => {
-    expect(() =>
-      validateSubcommandArgs('submit', { positionals: [], flags: {} }),
-    ).toThrow(BridgeError);
+    expect(() => validateSubcommandArgs('submit', { positionals: [], flags: {} })).toThrow(
+      BridgeError,
+    );
   });
 
   test('submit with bad --priority throws INVALID_ARGUMENT', () => {
@@ -205,9 +199,9 @@ describe('validateSubcommandArgs', () => {
   test.each(['status', 'cancel', 'pause', 'resume', 'logs', 'kill'] as const)(
     '%s requires a request_id',
     (sub) => {
-      expect(() =>
-        validateSubcommandArgs(sub, { positionals: [], flags: {} }),
-      ).toThrow(/Missing required argument 'request_id'/);
+      expect(() => validateSubcommandArgs(sub, { positionals: [], flags: {} })).toThrow(
+        /Missing required argument 'request_id'/,
+      );
     },
   );
 
@@ -221,15 +215,15 @@ describe('validateSubcommandArgs', () => {
   });
 
   test('priority without request_id at all throws', () => {
-    expect(() =>
-      validateSubcommandArgs('priority', { positionals: [], flags: {} }),
-    ).toThrow(/Missing required argument 'request_id'/);
+    expect(() => validateSubcommandArgs('priority', { positionals: [], flags: {} })).toThrow(
+      /Missing required argument 'request_id'/,
+    );
   });
 
   test('feedback without request_id at all throws', () => {
-    expect(() =>
-      validateSubcommandArgs('feedback', { positionals: [], flags: {} }),
-    ).toThrow(/Missing required argument 'request_id'/);
+    expect(() => validateSubcommandArgs('feedback', { positionals: [], flags: {} })).toThrow(
+      /Missing required argument 'request_id'/,
+    );
   });
 
   test('priority rejects invalid priority values', () => {
@@ -260,9 +254,7 @@ describe('validateSubcommandArgs', () => {
   });
 
   test('list with no args is valid', () => {
-    expect(() =>
-      validateSubcommandArgs('list', { positionals: [], flags: {} }),
-    ).not.toThrow();
+    expect(() => validateSubcommandArgs('list', { positionals: [], flags: {} })).not.toThrow();
   });
 
   test('unknown flag throws INVALID_ARGUMENT', () => {
@@ -424,26 +416,23 @@ describe('EXIT_CODE_BY_ERROR', () => {
 // ===========================================================================
 
 describe('main() — happy path per subcommand', () => {
-  test.each(ALLOWED_SUBCOMMANDS)(
-    '%s subcommand routes to fake router and exits 0',
-    async (sub) => {
-      const argvBySubcommand: Record<AllowedSubcommand, string[]> = {
-        submit: [sub, 'build a thing', '--priority=high'],
-        status: [sub, 'REQ-000001'],
-        list: [sub, '--state=active'],
-        cancel: [sub, 'REQ-000001'],
-        pause: [sub, 'REQ-000001'],
-        resume: [sub, 'REQ-000001'],
-        priority: [sub, 'REQ-000001', 'low'],
-        logs: [sub, 'REQ-000001'],
-        feedback: [sub, 'REQ-000001', 'message body'],
-        kill: [sub, 'REQ-000001'],
-      };
-      const result = await captureMain(argvBySubcommand[sub]);
-      expect(result.exit).toBe(0);
-      expect(result.envelope.ok).toBe(true);
-    },
-  );
+  test.each(ALLOWED_SUBCOMMANDS)('%s subcommand routes to fake router and exits 0', async (sub) => {
+    const argvBySubcommand: Record<AllowedSubcommand, string[]> = {
+      submit: [sub, 'build a thing', '--priority=high'],
+      status: [sub, 'REQ-000001'],
+      list: [sub, '--state=active'],
+      cancel: [sub, 'REQ-000001'],
+      pause: [sub, 'REQ-000001'],
+      resume: [sub, 'REQ-000001'],
+      priority: [sub, 'REQ-000001', 'low'],
+      logs: [sub, 'REQ-000001'],
+      feedback: [sub, 'REQ-000001', 'message body'],
+      kill: [sub, 'REQ-000001'],
+    };
+    const result = await captureMain(argvBySubcommand[sub]);
+    expect(result.exit).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+  });
 });
 
 // ===========================================================================
@@ -534,15 +523,10 @@ describe('main() — error envelopes', () => {
       error: 'simulated router failure',
       errorCode: 'INTERNAL_ERROR',
     });
-    const { exit, envelope } = await captureMain(
-      ['status', 'REQ-000001'],
-      failingRouter,
-    );
+    const { exit, envelope } = await captureMain(['status', 'REQ-000001'], failingRouter);
     expect(exit).toBe(2);
     expect((envelope as CliErrorEnvelope).errorCode).toBe('INTERNAL_ERROR');
-    expect((envelope as CliErrorEnvelope).message).toContain(
-      'simulated router failure',
-    );
+    expect((envelope as CliErrorEnvelope).message).toContain('simulated router failure');
   });
 
   test('error envelope includes resolution hint when present', async () => {
@@ -576,10 +560,7 @@ describe('main() — VERSION_MISMATCH', () => {
 
   test('mismatched expected version -> VERSION_MISMATCH, exit 2', async () => {
     process.env.AUTONOMOUS_DEV_EXPECTED_VERSION = '99.99.99-not-installed';
-    const { exit, envelope } = await captureMain([
-      'status',
-      'REQ-000001',
-    ]);
+    const { exit, envelope } = await captureMain(['status', 'REQ-000001']);
     expect(exit).toBe(2);
     expect((envelope as CliErrorEnvelope).errorCode).toBe('VERSION_MISMATCH');
   });

@@ -136,9 +136,7 @@ export interface QueryBudgetTracker {
 export class DefaultQueryBudgetTracker implements QueryBudgetTracker {
   private readonly counts = new Map<string, number>();
 
-  constructor(
-    private readonly budgets: Record<string, QueryBudgetConfig>,
-  ) {}
+  constructor(private readonly budgets: Record<string, QueryBudgetConfig>) {}
 
   private key(source: DataSourceName, serviceName: string): string {
     return `${source}:${serviceName}`;

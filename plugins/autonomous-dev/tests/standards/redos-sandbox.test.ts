@@ -77,9 +77,7 @@ describe('evaluateRegex — ReDoS protection', () => {
   it('10 concurrent ReDoS calls all timeout within 1.5s', async () => {
     const start = Date.now();
     const results = await Promise.all(
-      Array.from({ length: 10 }, () =>
-        evaluateRegex('^(a+)+$', 'a'.repeat(30) + 'X'),
-      ),
+      Array.from({ length: 10 }, () => evaluateRegex('^(a+)+$', 'a'.repeat(30) + 'X')),
     );
     const elapsed = Date.now() - start;
     expect(results.every((r) => r.timedOut === true)).toBe(true);

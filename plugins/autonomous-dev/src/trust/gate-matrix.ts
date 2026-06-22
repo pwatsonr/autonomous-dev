@@ -1,4 +1,4 @@
-import type { TrustLevel, PipelineGate, GateAuthority } from "./types";
+import type { TrustLevel, PipelineGate, GateAuthority } from './types';
 
 /**
  * The authoritative 4x7 Trust Gate Matrix from TDD Section 3.1.4.
@@ -13,40 +13,40 @@ import type { TrustLevel, PipelineGate, GateAuthority } from "./types";
  */
 export const TRUST_GATE_MATRIX = {
   0: {
-    prd_approval: "human",
-    code_review: "human",
-    test_review: "human",
-    deployment_approval: "human",
-    security_review: "human",
-    cost_approval: "human",
-    quality_gate: "human",
+    prd_approval: 'human',
+    code_review: 'human',
+    test_review: 'human',
+    deployment_approval: 'human',
+    security_review: 'human',
+    cost_approval: 'human',
+    quality_gate: 'human',
   },
   1: {
-    prd_approval: "human",
-    code_review: "human",
-    test_review: "system",
-    deployment_approval: "human",
-    security_review: "human",
-    cost_approval: "human",
-    quality_gate: "system",
+    prd_approval: 'human',
+    code_review: 'human',
+    test_review: 'system',
+    deployment_approval: 'human',
+    security_review: 'human',
+    cost_approval: 'human',
+    quality_gate: 'system',
   },
   2: {
-    prd_approval: "system",
-    code_review: "human",
-    test_review: "system",
-    deployment_approval: "human",
-    security_review: "human",
-    cost_approval: "system",
-    quality_gate: "system",
+    prd_approval: 'system',
+    code_review: 'human',
+    test_review: 'system',
+    deployment_approval: 'human',
+    security_review: 'human',
+    cost_approval: 'system',
+    quality_gate: 'system',
   },
   3: {
-    prd_approval: "system",
-    code_review: "system",
-    test_review: "system",
-    deployment_approval: "system",
-    security_review: "human",
-    cost_approval: "system",
-    quality_gate: "system",
+    prd_approval: 'system',
+    code_review: 'system',
+    test_review: 'system',
+    deployment_approval: 'system',
+    security_review: 'human',
+    cost_approval: 'system',
+    quality_gate: 'system',
   },
 } as const satisfies Record<TrustLevel, Record<PipelineGate, GateAuthority>>;
 
@@ -58,13 +58,10 @@ export const TRUST_GATE_MATRIX = {
  * security_review cells, but this function enforces it programmatically
  * as a second layer.
  */
-export function lookupGateAuthority(
-  level: TrustLevel,
-  gate: PipelineGate,
-): GateAuthority {
+export function lookupGateAuthority(level: TrustLevel, gate: PipelineGate): GateAuthority {
   // Defense-in-depth: security_review is always human, enforced independently
-  if (gate === "security_review") {
-    return "human";
+  if (gate === 'security_review') {
+    return 'human';
   }
 
   return TRUST_GATE_MATRIX[level][gate];

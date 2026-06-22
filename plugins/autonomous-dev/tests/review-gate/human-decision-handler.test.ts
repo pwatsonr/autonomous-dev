@@ -201,13 +201,23 @@ describe('HumanDecisionHandler', () => {
 
     // approve_with_notes
     const notesDecision = makeDecision({ action: 'approve_with_notes', notes: 'Some notes.' });
-    const notesResult = handler.processDecision(notesDecision, gateId, documentId, originalAiOutcome);
+    const notesResult = handler.processDecision(
+      notesDecision,
+      gateId,
+      documentId,
+      originalAiOutcome,
+    );
     expect(notesResult.audit_record.action).toBe('approve_with_notes');
     expect(notesResult.audit_record.decision_id).toMatch(/^audit-/);
 
     // revise
     const reviseDecision = makeDecision({ action: 'revise', guidance: 'Fix section 2.' });
-    const reviseResult = handler.processDecision(reviseDecision, gateId, documentId, originalAiOutcome);
+    const reviseResult = handler.processDecision(
+      reviseDecision,
+      gateId,
+      documentId,
+      originalAiOutcome,
+    );
     expect(reviseResult.audit_record.action).toBe('revise');
     expect(reviseResult.audit_record.decision_id).toMatch(/^audit-/);
   });

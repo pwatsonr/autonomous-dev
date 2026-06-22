@@ -3,7 +3,10 @@ import * as path from 'path';
 import * as os from 'os';
 import { changePriority, InvalidPriorityError } from '../../../src/pipeline/flow/priority-handler';
 import { createInitialPipelineState } from '../../../src/pipeline/flow/pipeline-state';
-import { writePipelineState, readPipelineState } from '../../../src/pipeline/flow/pipeline-state-io';
+import {
+  writePipelineState,
+  readPipelineState,
+} from '../../../src/pipeline/flow/pipeline-state-io';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
 import { Priority } from '../../../src/pipeline/types/frontmatter';
 

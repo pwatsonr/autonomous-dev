@@ -146,7 +146,7 @@ export class ReviewerExecutor {
 
     // Execute all reviewers concurrently
     const results = await Promise.allSettled(
-      assignments.map(assignment =>
+      assignments.map((assignment) =>
         this.executeReviewer(assignment, prompts.get(assignment.reviewer_id)!, rubric, panelSize),
       ),
     );

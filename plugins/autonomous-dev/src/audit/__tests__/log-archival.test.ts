@@ -45,7 +45,7 @@ function writeEventsToFile(filePath: string, events: AuditEvent[]): void {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  const content = events.map(e => JSON.stringify(e)).join('\n') + '\n';
+  const content = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
   fs.writeFileSync(filePath, content, 'utf-8');
 }
 
@@ -53,8 +53,8 @@ function readEventsFromFile(filePath: string): AuditEvent[] {
   const content = fs.readFileSync(filePath, 'utf-8');
   return content
     .split('\n')
-    .filter(line => line.trim().length > 0)
-    .map(line => JSON.parse(line));
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line));
 }
 
 // ---------------------------------------------------------------------------

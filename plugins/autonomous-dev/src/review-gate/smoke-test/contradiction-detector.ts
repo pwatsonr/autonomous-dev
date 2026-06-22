@@ -41,13 +41,18 @@ export function extractEntities(content: string): Map<string, string[]> {
   const entities = new Map<string, string[]>();
 
   // Split content into sentences for statement association
-  const sentences = content.split(/[.!?\n]+/).map((s) => s.trim()).filter(Boolean);
+  const sentences = content
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   // Pattern 1: Known technology names (capitalized words that look like tech)
-  const techPattern = /\b((?:[A-Z][a-zA-Z]*(?:SQL|DB|MQ|API))|(?:PostgreSQL|MongoDB|MySQL|Redis|Kafka|RabbitMQ|GraphQL|REST|gRPC|Docker|Kubernetes|Terraform|AWS|GCP|Azure))\b/g;
+  const techPattern =
+    /\b((?:[A-Z][a-zA-Z]*(?:SQL|DB|MQ|API))|(?:PostgreSQL|MongoDB|MySQL|Redis|Kafka|RabbitMQ|GraphQL|REST|gRPC|Docker|Kubernetes|Terraform|AWS|GCP|Azure))\b/g;
 
   // Pattern 2: "use X" / "uses X" / "using X" patterns
-  const usePattern = /\b(?:use|uses|using|adopt|adopts|adopting|implement|implements|implementing)\s+([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)?)\b/g;
+  const usePattern =
+    /\b(?:use|uses|using|adopt|adopts|adopting|implement|implements|implementing)\s+([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)?)\b/g;
 
   // Pattern 3: "X for Y" patterns (technology for purpose)
   const forPattern = /\b([A-Z][a-zA-Z0-9]+)\s+(?:for|as)\s+(?:the\s+)?(\w+(?:\s+\w+){0,3})\b/g;
@@ -127,12 +132,13 @@ function getTechCategory(entity: string): string | undefined {
  * Looks for patterns like "timeout: 30s", "max_retries: 3", "limit 100".
  */
 function extractNumericProperties(
-  sentence: string
+  sentence: string,
 ): { property: string; value: number; unit: string; raw: string }[] {
   const results: { property: string; value: number; unit: string; raw: string }[] = [];
 
   // Pattern: "property: NUMBERunit" or "property NUMBERunit"
-  const numericPattern = /\b(\w+)[\s:=]+(\d+(?:\.\d+)?)\s*(s|ms|seconds?|minutes?|hours?|%|mb|gb|kb)?\b/gi;
+  const numericPattern =
+    /\b(\w+)[\s:=]+(\d+(?:\.\d+)?)\s*(s|ms|seconds?|minutes?|hours?|%|mb|gb|kb)?\b/gi;
   let match: RegExpExecArray | null;
 
   while ((match = numericPattern.exec(sentence)) !== null) {
@@ -292,12 +298,12 @@ export class ContradictionDetector {
 
     // Filter to report threshold
     const reportedContradictions = allContradictions.filter(
-      (c) => c.confidence >= CONFIDENCE_REPORT_THRESHOLD
+      (c) => c.confidence >= CONFIDENCE_REPORT_THRESHOLD,
     );
 
     // pass = no contradictions with confidence >= 0.7
     const blockingContradictions = reportedContradictions.filter(
-      (c) => c.confidence >= CONFIDENCE_BLOCK_THRESHOLD
+      (c) => c.confidence >= CONFIDENCE_BLOCK_THRESHOLD,
     );
 
     return {

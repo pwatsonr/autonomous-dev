@@ -82,9 +82,10 @@ describe('probeSource', () => {
   // -------------------------------------------------------------------------
 
   test('TC-1-2-03: classifies a timed-out probe as unreachable', async () => {
-    const probeCall = () => new Promise<void>(() => {
-      // Never resolves -- simulates a hanging connection.
-    });
+    const probeCall = () =>
+      new Promise<void>(() => {
+        // Never resolves -- simulates a hanging connection.
+      });
 
     // Use a very short timeout to keep the test fast.
     const result = await probeSource('opensearch', probeCall, 50);
@@ -140,16 +141,18 @@ describe('checkConnectivity', () => {
 
   test('TC-1-2-06: sets all_unreachable when every configured source is unreachable', async () => {
     const mcpCalls: Record<string, () => Promise<unknown>> = {
-      prometheus: async () => { throw new Error('connection refused'); },
-      grafana: async () => { throw new Error('connection refused'); },
-      opensearch: async () => { throw new Error('connection refused'); },
+      prometheus: async () => {
+        throw new Error('connection refused');
+      },
+      grafana: async () => {
+        throw new Error('connection refused');
+      },
+      opensearch: async () => {
+        throw new Error('connection refused');
+      },
     };
 
-    const report = await checkConnectivity(
-      mcpCalls,
-      ['prometheus', 'grafana', 'opensearch'],
-      100,
-    );
+    const report = await checkConnectivity(mcpCalls, ['prometheus', 'grafana', 'opensearch'], 100);
 
     expect(report.all_unreachable).toBe(true);
     expect(report.results).toHaveLength(3);
@@ -259,11 +262,7 @@ describe('checkConnectivity', () => {
       prometheus: async () => ({ status: 'ok' }),
     };
 
-    const report = await checkConnectivity(
-      mcpCalls,
-      ['prometheus', 'grafana', 'sentry'],
-      100,
-    );
+    const report = await checkConnectivity(mcpCalls, ['prometheus', 'grafana', 'sentry'], 100);
 
     expect(report.all_unreachable).toBe(false);
     const promResult = report.results.find((r) => r.source === 'prometheus')!;

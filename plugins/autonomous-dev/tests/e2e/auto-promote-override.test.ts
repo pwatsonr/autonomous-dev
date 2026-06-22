@@ -179,7 +179,13 @@ async function processPendingOverrides(
     if (!observation) continue;
 
     const prdPath = path.join(rootDir, '.autonomous-dev', 'prd', `${override.prd_id}.md`);
-    const cancelledPath = path.join(rootDir, '.autonomous-dev', 'prd', 'cancelled', `${override.prd_id}.md`);
+    const cancelledPath = path.join(
+      rootDir,
+      '.autonomous-dev',
+      'prd',
+      'cancelled',
+      `${override.prd_id}.md`,
+    );
 
     if (
       observation.triage_decision !== 'promote' ||
@@ -208,7 +214,10 @@ async function processPendingOverrides(
   return result;
 }
 
-async function findObservationById(rootDir: string, id: string): Promise<Record<string, any> | null> {
+async function findObservationById(
+  rootDir: string,
+  id: string,
+): Promise<Record<string, any> | null> {
   const obsDir = path.join(rootDir, '.autonomous-dev', 'observations');
 
   const walkDir = async (dir: string): Promise<Record<string, any> | null> => {
@@ -237,7 +246,7 @@ async function findObservationById(rootDir: string, id: string): Promise<Record<
           if (val === 'null' || val === '') val = null;
           else if (val === 'true') val = true;
           else if (val === 'false') val = false;
-          else if ((val.startsWith('"') && val.endsWith('"'))) val = val.slice(1, -1);
+          else if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
           fm[key] = val;
         }
         if (fm.id === id) return fm;
@@ -287,7 +296,12 @@ describe('E2E: auto-promote with override', () => {
 
     // Step 2: Run auto-promote evaluation
     const autoResult = await simulateAutoPromote(
-      rootDir, obs.id, obs.filePath, config, clock, webhook,
+      rootDir,
+      obs.id,
+      obs.filePath,
+      config,
+      clock,
+      webhook,
     );
 
     expect(autoResult).not.toBeNull();
@@ -312,24 +326,30 @@ describe('E2E: auto-promote with override', () => {
 
     // Step 3: PM Lead overrides within the window (1 hour later)
     clock.advanceHours(1);
-    await processPmOverride(obs.filePath, {
-      decision: 'dismiss',
-      actor: 'pm-lead',
-      reason: 'False positive, metric spike was a deploy artifact',
-    }, clock);
+    await processPmOverride(
+      obs.filePath,
+      {
+        decision: 'dismiss',
+        actor: 'pm-lead',
+        reason: 'False positive, metric spike was a deploy artifact',
+      },
+      clock,
+    );
 
     // Step 4: Process pending overrides (2+ hours after auto-promote)
     clock.advanceHours(2);
-    const overrideResult = await processPendingOverrides(
-      rootDir, mockLogger(), clock.now(),
-    );
+    const overrideResult = await processPendingOverrides(rootDir, mockLogger(), clock.now());
 
     expect(overrideResult.overridden).toBe(1);
 
     // Step 5: Verify PRD was cancelled
     expect(await fileExists(prdPath)).toBe(false);
     const cancelledPath = path.join(
-      rootDir, '.autonomous-dev', 'prd', 'cancelled', `${autoResult!.prdId}.md`,
+      rootDir,
+      '.autonomous-dev',
+      'prd',
+      'cancelled',
+      `${autoResult!.prdId}.md`,
     );
     expect(await fileExists(cancelledPath)).toBe(true);
 
@@ -361,7 +381,12 @@ describe('E2E: auto-promote with override', () => {
     });
 
     const autoResult = await simulateAutoPromote(
-      rootDir, obs.id, obs.filePath, config, clock, webhook,
+      rootDir,
+      obs.id,
+      obs.filePath,
+      config,
+      clock,
+      webhook,
     );
 
     expect(autoResult).not.toBeNull();
@@ -369,9 +394,7 @@ describe('E2E: auto-promote with override', () => {
     // Step 2: Advance past override window WITHOUT any human action
     clock.advanceHours(3);
 
-    const result = await processPendingOverrides(
-      rootDir, mockLogger(), clock.now(),
-    );
+    const result = await processPendingOverrides(rootDir, mockLogger(), clock.now());
 
     expect(result.confirmed).toBe(1);
     expect(result.overridden).toBe(0);
@@ -398,9 +421,7 @@ describe('E2E: auto-promote with override', () => {
       triage_status: 'pending',
     });
 
-    const result = await simulateAutoPromote(
-      rootDir, obs.id, obs.filePath, config, clock, webhook,
-    );
+    const result = await simulateAutoPromote(rootDir, obs.id, obs.filePath, config, clock, webhook);
 
     expect(result).toBeNull();
     expect(webhook.messages).toHaveLength(0);
@@ -423,9 +444,7 @@ describe('E2E: auto-promote with override', () => {
       triage_status: 'pending',
     });
 
-    const result = await simulateAutoPromote(
-      rootDir, obs.id, obs.filePath, config, clock, webhook,
-    );
+    const result = await simulateAutoPromote(rootDir, obs.id, obs.filePath, config, clock, webhook);
 
     expect(result).toBeNull();
   });
@@ -447,16 +466,12 @@ describe('E2E: auto-promote with override', () => {
       triage_status: 'pending',
     });
 
-    await simulateAutoPromote(
-      rootDir, obs.id, obs.filePath, config, clock, webhook,
-    );
+    await simulateAutoPromote(rootDir, obs.id, obs.filePath, config, clock, webhook);
 
     // Only advance 1 hour (deadline is 2 hours)
     clock.advanceHours(1);
 
-    const result = await processPendingOverrides(
-      rootDir, mockLogger(), clock.now(),
-    );
+    const result = await processPendingOverrides(rootDir, mockLogger(), clock.now());
 
     expect(result.still_pending).toBe(1);
     expect(result.confirmed).toBe(0);

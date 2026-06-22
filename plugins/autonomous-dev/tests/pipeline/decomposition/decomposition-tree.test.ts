@@ -4,7 +4,9 @@ import {
   DecompositionNode,
 } from '../../../src/pipeline/decomposition/decomposition-tree';
 
-function makeNode(overrides: Partial<DecompositionNode> & { documentId: string }): DecompositionNode {
+function makeNode(
+  overrides: Partial<DecompositionNode> & { documentId: string },
+): DecompositionNode {
   return {
     type: DocumentType.PRD,
     status: 'draft',
@@ -112,7 +114,7 @@ describe('DecompositionTree', () => {
 
     const subtree = tree.getSubtree('PRD-001');
     expect(subtree).toHaveLength(4);
-    expect(subtree.map(n => n.documentId)).toEqual([
+    expect(subtree.map((n) => n.documentId)).toEqual([
       'PRD-001',
       'TDD-001-01',
       'PLAN-001-01-01',
@@ -153,10 +155,7 @@ describe('DecompositionTree', () => {
 
     const subtree = tree.getSubtree('TDD-001-01');
     expect(subtree).toHaveLength(2);
-    expect(subtree.map(n => n.documentId)).toEqual([
-      'TDD-001-01',
-      'PLAN-001-01-01',
-    ]);
+    expect(subtree.map((n) => n.documentId)).toEqual(['TDD-001-01', 'PLAN-001-01-01']);
   });
 
   test('getTotalNodeCount counts all nodes', () => {
@@ -183,7 +182,9 @@ describe('DecompositionTree', () => {
     tree.addNode(makeNode({ documentId: 'PLAN-001-01-01', type: DocumentType.PLAN, depth: 2 }));
     expect(tree.getMaxDepth()).toBe(2);
 
-    tree.addNode(makeNode({ documentId: 'CODE-001-01-01-01-01', type: DocumentType.CODE, depth: 4 }));
+    tree.addNode(
+      makeNode({ documentId: 'CODE-001-01-01-01-01', type: DocumentType.CODE, depth: 4 }),
+    );
     expect(tree.getMaxDepth()).toBe(4);
   });
 
@@ -215,40 +216,46 @@ describe('DecompositionTree', () => {
 
     const allNodes = tree.getAllNodes();
     expect(allNodes).toHaveLength(2);
-    const ids = allNodes.map(n => n.documentId).sort();
+    const ids = allNodes.map((n) => n.documentId).sort();
     expect(ids).toEqual(['PRD-001', 'TDD-001-01']);
   });
 
   test('validateDependencyDAG returns true for valid DAG', () => {
     const tree = new DecompositionTree();
     // A -> B (B depends on A)
-    tree.addNode(makeNode({
-      documentId: 'PLAN-001-01-01',
-      type: DocumentType.PLAN,
-      depth: 2,
-      parentId: 'TDD-001-01',
-      siblingIndex: 0,
-      siblingCount: 3,
-      dependsOn: [],
-    }));
-    tree.addNode(makeNode({
-      documentId: 'PLAN-001-01-02',
-      type: DocumentType.PLAN,
-      depth: 2,
-      parentId: 'TDD-001-01',
-      siblingIndex: 1,
-      siblingCount: 3,
-      dependsOn: ['PLAN-001-01-01'],
-    }));
-    tree.addNode(makeNode({
-      documentId: 'PLAN-001-01-03',
-      type: DocumentType.PLAN,
-      depth: 2,
-      parentId: 'TDD-001-01',
-      siblingIndex: 2,
-      siblingCount: 3,
-      dependsOn: ['PLAN-001-01-01', 'PLAN-001-01-02'],
-    }));
+    tree.addNode(
+      makeNode({
+        documentId: 'PLAN-001-01-01',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parentId: 'TDD-001-01',
+        siblingIndex: 0,
+        siblingCount: 3,
+        dependsOn: [],
+      }),
+    );
+    tree.addNode(
+      makeNode({
+        documentId: 'PLAN-001-01-02',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parentId: 'TDD-001-01',
+        siblingIndex: 1,
+        siblingCount: 3,
+        dependsOn: ['PLAN-001-01-01'],
+      }),
+    );
+    tree.addNode(
+      makeNode({
+        documentId: 'PLAN-001-01-03',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parentId: 'TDD-001-01',
+        siblingIndex: 2,
+        siblingCount: 3,
+        dependsOn: ['PLAN-001-01-01', 'PLAN-001-01-02'],
+      }),
+    );
 
     expect(tree.validateDependencyDAG()).toBe(true);
   });
@@ -256,36 +263,42 @@ describe('DecompositionTree', () => {
   test('validateDependencyDAG returns false for circular dependency', () => {
     const tree = new DecompositionTree();
     // A depends on B, B depends on A -> cycle
-    tree.addNode(makeNode({
-      documentId: 'PLAN-001-01-01',
-      type: DocumentType.PLAN,
-      depth: 2,
-      parentId: 'TDD-001-01',
-      siblingIndex: 0,
-      siblingCount: 2,
-      dependsOn: ['PLAN-001-01-02'],
-    }));
-    tree.addNode(makeNode({
-      documentId: 'PLAN-001-01-02',
-      type: DocumentType.PLAN,
-      depth: 2,
-      parentId: 'TDD-001-01',
-      siblingIndex: 1,
-      siblingCount: 2,
-      dependsOn: ['PLAN-001-01-01'],
-    }));
+    tree.addNode(
+      makeNode({
+        documentId: 'PLAN-001-01-01',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parentId: 'TDD-001-01',
+        siblingIndex: 0,
+        siblingCount: 2,
+        dependsOn: ['PLAN-001-01-02'],
+      }),
+    );
+    tree.addNode(
+      makeNode({
+        documentId: 'PLAN-001-01-02',
+        type: DocumentType.PLAN,
+        depth: 2,
+        parentId: 'TDD-001-01',
+        siblingIndex: 1,
+        siblingCount: 2,
+        dependsOn: ['PLAN-001-01-01'],
+      }),
+    );
 
     expect(tree.validateDependencyDAG()).toBe(false);
   });
 
   test('validateDependencyDAG returns false for self-referencing dependency', () => {
     const tree = new DecompositionTree();
-    tree.addNode(makeNode({
-      documentId: 'PLAN-001-01-01',
-      type: DocumentType.PLAN,
-      depth: 2,
-      dependsOn: ['PLAN-001-01-01'],
-    }));
+    tree.addNode(
+      makeNode({
+        documentId: 'PLAN-001-01-01',
+        type: DocumentType.PLAN,
+        depth: 2,
+        dependsOn: ['PLAN-001-01-01'],
+      }),
+    );
 
     expect(tree.validateDependencyDAG()).toBe(false);
   });

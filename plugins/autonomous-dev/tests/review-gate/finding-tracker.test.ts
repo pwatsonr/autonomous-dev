@@ -269,8 +269,8 @@ describe('FindingTracker', () => {
     // Subsets: recurred + new + persistent = tracked
     expect(
       result.recurred_findings.length +
-      result.new_findings.length +
-      result.persistent_findings.length,
+        result.new_findings.length +
+        result.persistent_findings.length,
     ).toBe(result.tracked_findings.length);
   });
 
@@ -278,9 +278,7 @@ describe('FindingTracker', () => {
   // Test 26: No previous findings (first iteration) -- alias of test 19
   // -----------------------------------------------------------------------
   test('26. No previous findings (first iteration): previousIterationFindings is null', () => {
-    const current = [
-      makeMergedFinding({ section_id: 'goals', category_id: 'measurability' }),
-    ];
+    const current = [makeMergedFinding({ section_id: 'goals', category_id: 'measurability' })];
 
     const result = tracker.trackFindings(current, null);
 

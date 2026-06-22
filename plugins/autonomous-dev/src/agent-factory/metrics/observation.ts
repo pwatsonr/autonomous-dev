@@ -106,10 +106,7 @@ export class ObservationTracker {
    *   3. Update `status` to `threshold_reached` if count >= threshold.
    *   4. Persist state to disk.
    */
-  recordInvocation(
-    agentName: string,
-    agentVersion: string,
-  ): ObservationState {
+  recordInvocation(agentName: string, agentVersion: string): ObservationState {
     const threshold = this.resolveThreshold(agentName);
     let state = this.agents.get(agentName);
 
@@ -194,9 +191,7 @@ export class ObservationTracker {
 
     this.persistState();
 
-    this.logger.info(
-      `Observation counter reset for '${agentName}' at version ${newVersion}`,
-    );
+    this.logger.info(`Observation counter reset for '${agentName}' at version ${newVersion}`);
   }
 
   /**
@@ -252,8 +247,7 @@ export class ObservationTracker {
    *   2. Global default from `config.observation.defaultThreshold`.
    */
   private resolveThreshold(agentName: string): number {
-    const override =
-      this.config.observation.perAgentOverrides[agentName];
+    const override = this.config.observation.perAgentOverrides[agentName];
     if (override !== undefined && override !== null) {
       return override;
     }
@@ -277,11 +271,9 @@ export class ObservationTracker {
       if (persisted.agents && typeof persisted.agents === 'object') {
         for (const [name, agentState] of Object.entries(persisted.agents)) {
           this.agents.set(name, {
-            invocations_since_promotion:
-              agentState.invocations_since_promotion ?? 0,
+            invocations_since_promotion: agentState.invocations_since_promotion ?? 0,
             status: agentState.status ?? 'collecting',
-            last_promotion_version:
-              agentState.last_promotion_version ?? '',
+            last_promotion_version: agentState.last_promotion_version ?? '',
           });
         }
       }
@@ -315,11 +307,9 @@ export class ObservationTracker {
     }
 
     try {
-      fs.writeFileSync(
-        this.statePath,
-        JSON.stringify(persisted, null, 2) + '\n',
-        { encoding: 'utf-8' },
-      );
+      fs.writeFileSync(this.statePath, JSON.stringify(persisted, null, 2) + '\n', {
+        encoding: 'utf-8',
+      });
     } catch (err: unknown) {
       this.logger.warn(
         `Failed to persist observation state to ${this.statePath}: ${

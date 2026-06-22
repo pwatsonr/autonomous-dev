@@ -16,8 +16,8 @@
  * Audit events: `pause_issued` and `resume_issued`.
  */
 
-import type { AbortManagerPort, AuditTrail } from "./kill-switch";
-import type { PauseResumeResult } from "./types";
+import type { AbortManagerPort, AuditTrail } from './kill-switch';
+import type { PauseResumeResult } from './types';
 
 // ---------------------------------------------------------------------------
 // PauseResumeController
@@ -68,22 +68,22 @@ export class PauseResumeController {
     if (requestId !== undefined) {
       // Per-request pause
       this.pausedRequests.add(requestId);
-      this.abortManager.abortRequest(requestId, "PAUSE");
+      this.abortManager.abortRequest(requestId, 'PAUSE');
 
       const result: PauseResumeResult = {
         requestId,
-        action: "paused",
+        action: 'paused',
         issuedBy,
         issuedAt,
         affectedRequests: [requestId],
       };
 
       this.auditTrail.append({
-        event_type: "pause_issued",
+        event_type: 'pause_issued',
         payload: {
           issuedBy,
           requestId,
-          scope: "request",
+          scope: 'request',
           affectedRequests: [requestId],
         },
       });
@@ -94,20 +94,20 @@ export class PauseResumeController {
     // Global pause
     this.globallyPaused = true;
     const activeIds = this.abortManager.getActiveRequestIds();
-    this.abortManager.abortAll("PAUSE");
+    this.abortManager.abortAll('PAUSE');
 
     const result: PauseResumeResult = {
-      action: "paused",
+      action: 'paused',
       issuedBy,
       issuedAt,
       affectedRequests: activeIds,
     };
 
     this.auditTrail.append({
-      event_type: "pause_issued",
+      event_type: 'pause_issued',
       payload: {
         issuedBy,
-        scope: "global",
+        scope: 'global',
         affectedRequests: activeIds,
       },
     });
@@ -140,18 +140,18 @@ export class PauseResumeController {
 
       const result: PauseResumeResult = {
         requestId,
-        action: "resumed",
+        action: 'resumed',
         issuedBy,
         issuedAt,
         affectedRequests: [requestId],
       };
 
       this.auditTrail.append({
-        event_type: "resume_issued",
+        event_type: 'resume_issued',
         payload: {
           issuedBy,
           requestId,
-          scope: "request",
+          scope: 'request',
           affectedRequests: [requestId],
         },
       });
@@ -165,17 +165,17 @@ export class PauseResumeController {
     this.abortManager.reset();
 
     const result: PauseResumeResult = {
-      action: "resumed",
+      action: 'resumed',
       issuedBy,
       issuedAt,
       affectedRequests: activeIds,
     };
 
     this.auditTrail.append({
-      event_type: "resume_issued",
+      event_type: 'resume_issued',
       payload: {
         issuedBy,
-        scope: "global",
+        scope: 'global',
         affectedRequests: activeIds,
       },
     });

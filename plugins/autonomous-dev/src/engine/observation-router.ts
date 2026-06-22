@@ -13,10 +13,7 @@
  */
 
 import type { ServiceConfig, IntelligenceConfig } from '../config/intelligence-config.schema';
-import type {
-  PrometheusResult,
-  GrafanaAlertResult,
-} from '../adapters/types';
+import type { PrometheusResult, GrafanaAlertResult } from '../adapters/types';
 import type { ScrubbedOpenSearchResult } from '../safety/scrub-pipeline';
 import type { CandidateObservation, BaselineMetrics, MetricBaseline } from './types';
 import type { AdoptionResult } from './adoption-tracker';
@@ -342,12 +339,7 @@ export class ObservationRouter {
 
     // Priority 1: Error detection (always active, even in learning mode)
     const thresholds = this.getServiceThresholds(config, service.name);
-    const errorCandidates = await this.detectErrors(
-      metrics,
-      logs,
-      thresholds,
-      service,
-    );
+    const errorCandidates = await this.detectErrors(metrics, logs, thresholds, service);
     const filteredErrors = errorCandidates.filter(
       (c) => !this.filterFalsePositive(c, config, new Date()).filtered,
     );
@@ -388,13 +380,7 @@ export class ObservationRouter {
         if (!baselineMetric) continue;
 
         for (const window of config.trend_analysis.windows) {
-          const trend = await this.analyzeTrend(
-            metric,
-            window,
-            service,
-            baselineMetric,
-            config,
-          );
+          const trend = await this.analyzeTrend(metric, window, service, baselineMetric, config);
           if (trend.detected) {
             observations.push(trendToCandidate(trend, service));
           }

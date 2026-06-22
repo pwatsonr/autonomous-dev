@@ -13,10 +13,7 @@ import Ajv2020 from 'ajv/dist/2020';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const SCHEMA_PATH = path.resolve(
-  __dirname,
-  '../../schemas/autonomous-dev-config.schema.json',
-);
+const SCHEMA_PATH = path.resolve(__dirname, '../../schemas/autonomous-dev-config.schema.json');
 
 function loadSchema(): object {
   return JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf-8')) as object;
@@ -40,9 +37,10 @@ describe('extensions.privileged_backends schema', () => {
     };
     expect(validate(cfg)).toBe(true);
     // After validation+default-fill, the field is preserved as supplied.
-    expect(
-      (cfg.extensions as { privileged_backends: string[] }).privileged_backends,
-    ).toEqual(['plugin-a', 'autonomous-dev-deploy-aws']);
+    expect((cfg.extensions as { privileged_backends: string[] }).privileged_backends).toEqual([
+      'plugin-a',
+      'autonomous-dev-deploy-aws',
+    ]);
   });
 
   it('rejects uppercase plugin IDs', () => {
@@ -73,10 +71,8 @@ describe('extensions.privileged_backends schema', () => {
     // AJV with useDefaults fills in the default at the field level when
     // the parent object has matching default; here we accept either
     // explicit empty array or absence — both mean "no implicit allowlist".
-    const value = (cfg.extensions as { privileged_backends?: string[] })
-      .privileged_backends;
-    expect(value === undefined || (Array.isArray(value) && value.length === 0))
-      .toBe(true);
+    const value = (cfg.extensions as { privileged_backends?: string[] }).privileged_backends;
+    expect(value === undefined || (Array.isArray(value) && value.length === 0)).toBe(true);
   });
 
   it('rejects non-array values', () => {

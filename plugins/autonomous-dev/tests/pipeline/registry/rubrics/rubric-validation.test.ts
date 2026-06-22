@@ -5,7 +5,13 @@ import { SPEC_RUBRIC } from '../../../../src/pipeline/registry/rubrics/spec-rubr
 import { CODE_RUBRIC } from '../../../../src/pipeline/registry/rubrics/code-rubric';
 import type { QualityRubric } from '../../../../src/pipeline/types/quality-rubric';
 
-const ALL_RUBRICS: QualityRubric[] = [PRD_RUBRIC, TDD_RUBRIC, PLAN_RUBRIC, SPEC_RUBRIC, CODE_RUBRIC];
+const ALL_RUBRICS: QualityRubric[] = [
+  PRD_RUBRIC,
+  TDD_RUBRIC,
+  PLAN_RUBRIC,
+  SPEC_RUBRIC,
+  CODE_RUBRIC,
+];
 
 describe('Per-Type Rubric Definitions', () => {
   // --- Category count checks ---

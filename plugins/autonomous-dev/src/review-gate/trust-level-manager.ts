@@ -65,7 +65,7 @@ export class TrustLevelManager {
    */
   requiresHumanApproval(
     documentType: DocumentType,
-    aiOutcome: 'approved' | 'changes_requested' | 'rejected'
+    aiOutcome: 'approved' | 'changes_requested' | 'rejected',
   ): HumanApprovalDecision {
     if (this.trustLevel === 'full_auto') {
       return {

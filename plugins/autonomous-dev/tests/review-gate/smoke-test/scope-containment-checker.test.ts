@@ -19,7 +19,7 @@ function makeParent(id: string, sectionIds: string[]): ParentDocument {
 function makeChild(
   id: string,
   sectionIds: string[],
-  tracesFrom: { document_id: string; section_ids: string[] }[]
+  tracesFrom: { document_id: string; section_ids: string[] }[],
 ): ChildDocument {
   return {
     id,
@@ -40,7 +40,7 @@ function makeChildWithCreep(
   id: string,
   totalSections: number,
   mappedSections: number,
-  parentId: string
+  parentId: string,
 ): ChildDocument {
   const sectionIds = Array.from({ length: totalSections }, (_, i) => `${id}-s${i}`);
   const mappedIds = sectionIds.slice(0, mappedSections);
@@ -52,9 +52,7 @@ function makeChildWithCreep(
       title: `Section ${sid}`,
       content: `Content for ${sid}`,
     })),
-    traces_from: mappedIds.length > 0
-      ? [{ document_id: parentId, section_ids: mappedIds }]
-      : [],
+    traces_from: mappedIds.length > 0 ? [{ document_id: parentId, section_ids: mappedIds }] : [],
   };
 }
 
@@ -71,9 +69,7 @@ describe('ScopeContainmentChecker', () => {
   test('No scope creep: all child sections trace to parent sections', () => {
     const parent = makeParent('p1', ['s1', 's2']);
     const children = [
-      makeChild('c1', ['cs1', 'cs2'], [
-        { document_id: 'p1', section_ids: ['cs1', 'cs2'] },
-      ]),
+      makeChild('c1', ['cs1', 'cs2'], [{ document_id: 'p1', section_ids: ['cs1', 'cs2'] }]),
     ];
 
     const result = checker.check(parent, children);

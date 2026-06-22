@@ -26,14 +26,8 @@ import {
   writeInferredStandards,
 } from '../../intake/standards/auto-detection';
 import { loadStandardsFile } from '../../intake/standards/loader';
-import {
-  computePrecisionReport,
-  ALL_SIGNALS,
-} from './precision-report';
-import type {
-  DetectedRule,
-  SignalKind,
-} from '../../intake/standards/auto-detection-types';
+import { computePrecisionReport, ALL_SIGNALS } from './precision-report';
+import type { DetectedRule, SignalKind } from '../../intake/standards/auto-detection-types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -53,10 +47,7 @@ async function writeFile(repo: string, rel: string, content: string): Promise<vo
   await fs.writeFile(target, content, 'utf8');
 }
 
-function findBySignal(
-  detected: DetectedRule[],
-  signal: SignalKind,
-): DetectedRule[] {
+function findBySignal(detected: DetectedRule[], signal: SignalKind): DetectedRule[] {
   return detected.filter((d) => d.signal === signal);
 }
 
@@ -82,11 +73,7 @@ describe('AutoDetectionScanner — per-signal correctness', () => {
 
   it('framework-dep (Python): detects fastapi from pyproject.toml', async () => {
     repo = await makeTmpRepo('py-pyproject');
-    await writeFile(
-      repo,
-      'pyproject.toml',
-      '[tool.poetry.dependencies]\nfastapi = "^0.110"\n',
-    );
+    await writeFile(repo, 'pyproject.toml', '[tool.poetry.dependencies]\nfastapi = "^0.110"\n');
     const r = await new AutoDetectionScanner(repo).scan();
     const ids = findBySignal(r.detected, 'framework-dep').map((d) => d.rule.id);
     expect(ids).toContain('auto:python-fastapi');
@@ -152,11 +139,7 @@ describe('AutoDetectionScanner — per-signal correctness', () => {
 
   it('tsconfig-strict: full strict mode → auto:typescript-strict-mode', async () => {
     repo = await makeTmpRepo('tsstrict-full');
-    await writeFile(
-      repo,
-      'tsconfig.json',
-      JSON.stringify({ compilerOptions: { strict: true } }),
-    );
+    await writeFile(repo, 'tsconfig.json', JSON.stringify({ compilerOptions: { strict: true } }));
     const r = await new AutoDetectionScanner(repo).scan();
     const ids = findBySignal(r.detected, 'tsconfig-strict').map((d) => d.rule.id);
     expect(ids).toEqual(['auto:typescript-strict-mode']);
@@ -208,11 +191,7 @@ describe('AutoDetectionScanner — per-signal correctness', () => {
 
   it('readme-mention: Black, isort, mypy, pytest each fire at confidence 0.6', async () => {
     repo = await makeTmpRepo('readme');
-    await writeFile(
-      repo,
-      'README.md',
-      '# project\nUses Black, isort, mypy, and pytest.\n',
-    );
+    await writeFile(repo, 'README.md', '# project\nUses Black, isort, mypy, and pytest.\n');
     const r = await new AutoDetectionScanner(repo).scan();
     const readme = findBySignal(r.detected, 'readme-mention');
     const ids = readme.map((d) => d.rule.id);
@@ -327,9 +306,7 @@ describe('writeInferredStandards — determinism', () => {
     repo = await makeTmpRepo('det-sort');
     const { path: outPath } = await writeInferredStandards(repo, fixedDetected);
     const text = await fs.readFile(outPath, 'utf8');
-    const idLines = text
-      .split('\n')
-      .filter((l) => /-\s+id:\s+/.test(l));
+    const idLines = text.split('\n').filter((l) => /-\s+id:\s+/.test(l));
     const ids = idLines.map((l) => {
       const m = l.match(/-\s+id:\s+(\S+)/);
       return m ? m[1] : '';
@@ -378,8 +355,7 @@ describe('AutoDetectionScanner — precision report', () => {
     await fs.writeFile(outPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 
     for (const signal of ALL_SIGNALS) {
-      const observed =
-        report.counts[signal].tp + report.counts[signal].fp;
+      const observed = report.counts[signal].tp + report.counts[signal].fp;
       // Vacuous precision (no observations) reports as 1.0; either way,
       // the floor must hold.
       expect(

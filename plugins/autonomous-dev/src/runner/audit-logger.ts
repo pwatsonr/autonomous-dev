@@ -90,7 +90,9 @@ export class AuditLogger {
     if (this.closed) {
       throw new Error(`AuditLogger for ${this.runId} is already closed`);
     }
-    this.info(`Run completed. ${metadata.observations_generated} observations generated. ${metadata.total_tokens_consumed} tokens consumed.`);
+    this.info(
+      `Run completed. ${metadata.observations_generated} observations generated. ${metadata.total_tokens_consumed} tokens consumed.`,
+    );
   }
 
   /**

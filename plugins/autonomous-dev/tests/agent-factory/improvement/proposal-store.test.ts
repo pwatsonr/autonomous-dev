@@ -19,10 +19,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { ProposalStore } from '../../../src/agent-factory/improvement/proposal-store';
-import type {
-  AgentProposal,
-  ProposalStatus,
-} from '../../../src/agent-factory/improvement/types';
+import type { AgentProposal, ProposalStatus } from '../../../src/agent-factory/improvement/types';
 
 // ---------------------------------------------------------------------------
 // Assertions
@@ -155,7 +152,10 @@ function test_every_legal_transition_succeeds(): void {
       store.close();
     }
     // Sanity: assert we exercised exactly the matrix we expect.
-    assert(LEGAL_TRANSITIONS.length === 10, `expected 10 legal transitions, got ${LEGAL_TRANSITIONS.length}`);
+    assert(
+      LEGAL_TRANSITIONS.length === 10,
+      `expected 10 legal transitions, got ${LEGAL_TRANSITIONS.length}`,
+    );
     console.log('PASS: test_every_legal_transition_succeeds');
   } finally {
     cleanupDir(tmpDir);
@@ -253,8 +253,14 @@ function test_append_and_get_by_id_roundtrip(): void {
     // Full proposal (incl. definitions) round-trips through JSONL.
     assert(fetched!.proposal_id === proposal.proposal_id, 'proposal_id round-trips');
     assert(fetched!.agent_name === proposal.agent_name, 'agent_name round-trips');
-    assert(fetched!.current_definition === proposal.current_definition, 'current_definition round-trips');
-    assert(fetched!.proposed_definition === proposal.proposed_definition, 'proposed_definition round-trips');
+    assert(
+      fetched!.current_definition === proposal.current_definition,
+      'current_definition round-trips',
+    );
+    assert(
+      fetched!.proposed_definition === proposal.proposed_definition,
+      'proposed_definition round-trips',
+    );
     assert(fetched!.diff === proposal.diff, 'diff round-trips');
     assert(fetched!.rationale === proposal.rationale, 'rationale round-trips');
     assert(fetched!.version_bump === proposal.version_bump, 'version_bump round-trips');
@@ -273,10 +279,30 @@ function test_get_by_status_and_by_agent(): void {
   try {
     const store = makeStore(tmpDir);
 
-    store.append(makeProposal({ proposal_id: 'ce-1', agent_name: 'code-executor', status: 'pending_meta_review' }));
-    store.append(makeProposal({ proposal_id: 'ce-2', agent_name: 'code-executor', status: 'meta_approved' }));
-    store.append(makeProposal({ proposal_id: 'ce-3', agent_name: 'code-executor', status: 'pending_meta_review' }));
-    store.append(makeProposal({ proposal_id: 'pa-1', agent_name: 'prd-author', status: 'pending_meta_review' }));
+    store.append(
+      makeProposal({
+        proposal_id: 'ce-1',
+        agent_name: 'code-executor',
+        status: 'pending_meta_review',
+      }),
+    );
+    store.append(
+      makeProposal({ proposal_id: 'ce-2', agent_name: 'code-executor', status: 'meta_approved' }),
+    );
+    store.append(
+      makeProposal({
+        proposal_id: 'ce-3',
+        agent_name: 'code-executor',
+        status: 'pending_meta_review',
+      }),
+    );
+    store.append(
+      makeProposal({
+        proposal_id: 'pa-1',
+        agent_name: 'prd-author',
+        status: 'pending_meta_review',
+      }),
+    );
 
     // getByStatus
     const pending = store.getByStatus('pending_meta_review');
@@ -295,7 +321,10 @@ function test_get_by_status_and_by_agent(): void {
     const cePending = store.getByAgent('code-executor', 'pending_meta_review');
     assert(cePending.length === 2, `expected 2 code-executor pending, got ${cePending.length}`);
     const ceApproved = store.getByAgent('code-executor', 'meta_approved');
-    assert(ceApproved.length === 1, `expected 1 code-executor meta_approved, got ${ceApproved.length}`);
+    assert(
+      ceApproved.length === 1,
+      `expected 1 code-executor meta_approved, got ${ceApproved.length}`,
+    );
     store.close();
     console.log('PASS: test_get_by_status_and_by_agent');
   } finally {
@@ -322,12 +351,18 @@ function test_jsonl_is_source_of_truth_after_update(): void {
     const lines = raw.split('\n').filter((l) => l.trim() !== '');
     assert(lines.length === 1, `expected exactly 1 JSONL line after rewrite, got ${lines.length}`);
     const onDisk = JSON.parse(lines[0]) as AgentProposal;
-    assert(onDisk.status === 'meta_approved', `on-disk status should be meta_approved, got ${onDisk.status}`);
+    assert(
+      onDisk.status === 'meta_approved',
+      `on-disk status should be meta_approved, got ${onDisk.status}`,
+    );
 
     // A new store reading the same file sees the persisted status.
     const store2 = new ProposalStore(jsonlPath, sqlitePath, silentLogger);
     const reread = store2.getById('persist-1');
-    assert(reread!.status === 'meta_approved', `re-read status should be meta_approved, got ${reread!.status}`);
+    assert(
+      reread!.status === 'meta_approved',
+      `re-read status should be meta_approved, got ${reread!.status}`,
+    );
     store2.close();
     console.log('PASS: test_jsonl_is_source_of_truth_after_update');
   } finally {
@@ -344,12 +379,18 @@ function test_set_meta_review_id_persists(): void {
   try {
     const store = makeStore(tmpDir);
     store.append(makeProposal({ proposal_id: 'meta-id-1' }));
-    assert(store.getById('meta-id-1')!.meta_review_id === undefined, 'meta_review_id should start unset');
+    assert(
+      store.getById('meta-id-1')!.meta_review_id === undefined,
+      'meta_review_id should start unset',
+    );
 
     store.setMetaReviewId('meta-id-1', 'review-abc');
 
     const fetched = store.getById('meta-id-1');
-    assert(fetched!.meta_review_id === 'review-abc', `meta_review_id should persist, got ${fetched!.meta_review_id}`);
+    assert(
+      fetched!.meta_review_id === 'review-abc',
+      `meta_review_id should persist, got ${fetched!.meta_review_id}`,
+    );
 
     assertThrows(
       () => store.setMetaReviewId('missing', 'review-x'),
@@ -367,12 +408,18 @@ function test_set_evaluation_id_persists(): void {
   try {
     const store = makeStore(tmpDir);
     store.append(makeProposal({ proposal_id: 'eval-id-1' }));
-    assert(store.getById('eval-id-1')!.evaluation_id === undefined, 'evaluation_id should start unset');
+    assert(
+      store.getById('eval-id-1')!.evaluation_id === undefined,
+      'evaluation_id should start unset',
+    );
 
     store.setEvaluationId('eval-id-1', 'eval-xyz');
 
     const fetched = store.getById('eval-id-1');
-    assert(fetched!.evaluation_id === 'eval-xyz', `evaluation_id should persist, got ${fetched!.evaluation_id}`);
+    assert(
+      fetched!.evaluation_id === 'eval-xyz',
+      `evaluation_id should persist, got ${fetched!.evaluation_id}`,
+    );
 
     assertThrows(
       () => store.setEvaluationId('missing', 'eval-x'),
@@ -400,7 +447,10 @@ function test_id_setters_do_not_clobber_other_fields(): void {
     assert(fetched!.status === 'meta_approved', 'status preserved through setters');
     assert(fetched!.meta_review_id === 'rev-1', 'meta_review_id retained');
     assert(fetched!.evaluation_id === 'ev-1', 'evaluation_id retained');
-    assert(fetched!.proposed_definition === makeProposal().proposed_definition, 'definition preserved');
+    assert(
+      fetched!.proposed_definition === makeProposal().proposed_definition,
+      'definition preserved',
+    );
     store.close();
     console.log('PASS: test_id_setters_do_not_clobber_other_fields');
   } finally {

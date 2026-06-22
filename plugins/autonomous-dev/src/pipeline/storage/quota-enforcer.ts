@@ -15,9 +15,7 @@ export class QuotaExceededError extends Error {
     public readonly limit: number,
     public readonly actual: number,
   ) {
-    super(
-      `Storage quota exceeded: ${violation} (limit=${limit}, actual=${actual})`,
-    );
+    super(`Storage quota exceeded: ${violation} (limit=${limit}, actual=${actual})`);
     this.name = 'QuotaExceededError';
   }
 }
@@ -48,11 +46,7 @@ export class QuotaEnforcer {
    *
    * @throws QuotaExceededError if limit would be exceeded
    */
-  async checkVersionLimit(
-    pipelineId: string,
-    type: string,
-    documentId: string,
-  ): Promise<void> {
+  async checkVersionLimit(pipelineId: string, type: string, documentId: string): Promise<void> {
     const currentCount = await this.countVersions(pipelineId, type, documentId);
     const limit = this.config.storage.maxVersionsPerDocument;
     if (currentCount >= limit) {
@@ -152,11 +146,7 @@ export class QuotaEnforcer {
     type: string,
     documentId: string,
   ): Promise<number> {
-    const docDir = path.join(
-      this.directoryManager.getDocumentsDir(pipelineId),
-      type,
-      documentId,
-    );
+    const docDir = path.join(this.directoryManager.getDocumentsDir(pipelineId), type, documentId);
 
     let entries: string[];
     try {
@@ -166,7 +156,7 @@ export class QuotaEnforcer {
     }
 
     const versionRegex = /^v\d+\.\d+\.md$/;
-    return entries.filter(e => versionRegex.test(e)).length;
+    return entries.filter((e) => versionRegex.test(e)).length;
   }
 
   /**

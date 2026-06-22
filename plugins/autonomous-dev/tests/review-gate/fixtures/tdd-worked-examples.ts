@@ -14,7 +14,7 @@ import type { Rubric, RubricCategory } from '../../../src/review-gate/types';
 function buildRubric(
   documentType: string,
   threshold: number,
-  categories: Omit<RubricCategory, 'description' | 'calibration'>[]
+  categories: Omit<RubricCategory, 'description' | 'calibration'>[],
 ): Rubric {
   return {
     document_type: documentType as Rubric['document_type'],
@@ -41,8 +41,18 @@ const PRD_RUBRIC_FIXTURE = buildRubric('PRD', 85, [
   { id: 'problem_clarity', name: 'Problem Clarity', weight: 15, min_threshold: 60 },
   { id: 'goals_measurability', name: 'Goals Measurability', weight: 15, min_threshold: 60 },
   { id: 'user_story_coverage', name: 'User Story Coverage', weight: 15, min_threshold: 60 },
-  { id: 'requirements_completeness', name: 'Requirements Completeness', weight: 20, min_threshold: 70 },
-  { id: 'requirements_testability', name: 'Requirements Testability', weight: 15, min_threshold: 60 },
+  {
+    id: 'requirements_completeness',
+    name: 'Requirements Completeness',
+    weight: 20,
+    min_threshold: 70,
+  },
+  {
+    id: 'requirements_testability',
+    name: 'Requirements Testability',
+    weight: 15,
+    min_threshold: 60,
+  },
   { id: 'risk_identification', name: 'Risk Identification', weight: 10, min_threshold: 50 },
   { id: 'internal_consistency', name: 'Internal Consistency', weight: 10, min_threshold: 50 },
 ]);
@@ -55,7 +65,12 @@ const TDD_RUBRIC_FIXTURE = buildRubric('TDD', 85, [
   { id: 'architecture_soundness', name: 'Architecture Soundness', weight: 20, min_threshold: 70 },
   { id: 'tradeoff_rigor', name: 'Tradeoff Rigor', weight: 15, min_threshold: 60 },
   { id: 'data_model_integrity', name: 'Data Model Integrity', weight: 15, min_threshold: 60 },
-  { id: 'api_contract_completeness', name: 'API Contract Completeness', weight: 15, min_threshold: 60 },
+  {
+    id: 'api_contract_completeness',
+    name: 'API Contract Completeness',
+    weight: 15,
+    min_threshold: 60,
+  },
   { id: 'integration_robustness', name: 'Integration Robustness', weight: 10, min_threshold: 50 },
   { id: 'security_depth', name: 'Security Depth', weight: 10, min_threshold: 50 },
   { id: 'prd_alignment', name: 'PRD Alignment', weight: 15, min_threshold: 70 },
@@ -130,7 +145,7 @@ export const TWO_REVIEWER_TDD_MEAN = {
     security_depth: 75,
     prd_alignment: 95,
   },
-  reviewer_a_weighted: 87.50,
+  reviewer_a_weighted: 87.5,
   reviewer_b_scores: {
     architecture_soundness: 82,
     tradeoff_rigor: 88,

@@ -15,10 +15,7 @@ import type { NotificationPayload } from './notification';
  * Format an observation into a Slack Block Kit or Discord embed payload.
  * Matches TDD section 3.10.3 notification format.
  */
-export function formatMessage(
-  obs: NotificationPayload,
-  channel: 'slack' | 'discord'
-): object {
+export function formatMessage(obs: NotificationPayload, channel: 'slack' | 'discord'): object {
   if (channel === 'slack') {
     return formatSlackMessage(obs);
   }
@@ -57,10 +54,7 @@ function formatSlackMessage(obs: NotificationPayload): object {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: [
-            'Reply with:',
-            ...obs.commands.map(cmd => `  \`${cmd}\``),
-          ].join('\n'),
+          text: ['Reply with:', ...obs.commands.map((cmd) => `  \`${cmd}\``)].join('\n'),
         },
       },
     ],
@@ -85,7 +79,7 @@ function formatDiscordMessage(obs: NotificationPayload): object {
           `Recommended: ${obs.recommended_action}`,
           '',
           'Reply with:',
-          ...obs.commands.map(cmd => `  \`${cmd}\``),
+          ...obs.commands.map((cmd) => `  \`${cmd}\``),
         ].join('\n'),
         color: getSeverityColor(obs.severity),
       },
@@ -99,21 +93,31 @@ function formatDiscordMessage(obs: NotificationPayload): object {
 
 export function getSeverityEmoji(severity: string): string {
   switch (severity) {
-    case 'P0': return ':rotating_light:';
-    case 'P1': return ':warning:';
-    case 'P2': return ':large_yellow_circle:';
-    case 'P3': return ':information_source:';
-    default: return ':grey_question:';
+    case 'P0':
+      return ':rotating_light:';
+    case 'P1':
+      return ':warning:';
+    case 'P2':
+      return ':large_yellow_circle:';
+    case 'P3':
+      return ':information_source:';
+    default:
+      return ':grey_question:';
   }
 }
 
 export function getSeverityColor(severity: string): number {
   switch (severity) {
-    case 'P0': return 0xFF0000; // Red
-    case 'P1': return 0xFF8C00; // Orange
-    case 'P2': return 0xFFD700; // Yellow
-    case 'P3': return 0x4169E1; // Blue
-    default: return 0x808080;   // Grey
+    case 'P0':
+      return 0xff0000; // Red
+    case 'P1':
+      return 0xff8c00; // Orange
+    case 'P2':
+      return 0xffd700; // Yellow
+    case 'P3':
+      return 0x4169e1; // Blue
+    default:
+      return 0x808080; // Grey
   }
 }
 

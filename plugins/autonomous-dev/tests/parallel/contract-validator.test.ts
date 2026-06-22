@@ -60,10 +60,7 @@ function cleanupRepo(dir: string): void {
 /**
  * Add files to the integration branch and commit.
  */
-function addFilesToIntegration(
-  repoRoot: string,
-  files: Record<string, string>,
-): void {
+function addFilesToIntegration(repoRoot: string, files: Record<string, string>): void {
   for (const [filePath, content] of Object.entries(files)) {
     const fullPath = path.join(repoRoot, filePath);
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
@@ -602,7 +599,10 @@ describe('validateMigrationSequence', () => {
 
     // Verify the rename happened in git
     const lsOutput = git(repoRoot, 'ls-tree --name-only HEAD migrations/');
-    const filenames = lsOutput.split('\n').map((f) => path.basename(f)).sort();
+    const filenames = lsOutput
+      .split('\n')
+      .map((f) => path.basename(f))
+      .sort();
     // After renumbering: 001_a.sql, 002_b.sql, 003_c.sql
     expect(filenames).toContain('001_a.sql');
     expect(filenames).toContain('002_b.sql');

@@ -72,11 +72,7 @@ describe('GithubPagesBackend.deploy', () => {
       { stdout: '' },
     );
     void lsCount;
-    m.expect(
-      /^git$/,
-      (a) => a[0] === 'subtree' && a[1] === 'push',
-      { stdout: '' },
-    );
+    m.expect(/^git$/, (a) => a[0] === 'subtree' && a[1] === 'push', { stdout: '' });
   }
 
   it('records previous_sha and new_sha; never uses --force in deploy', async () => {
@@ -84,15 +80,8 @@ describe('GithubPagesBackend.deploy', () => {
     m.expect(/^echo$/, () => true, { stdout: '' });
     // First ls-remote → previous_sha (SHA_OLD), second → new_sha (SHA_NEW).
     let lsCalls = 0;
-    const lsResponses = [
-      `${SHA_OLD}\trefs/heads/gh-pages\n`,
-      `${SHA_NEW}\trefs/heads/gh-pages\n`,
-    ];
-    const wrap = async (
-      cmd: string,
-      args: string[],
-      opts: Parameters<typeof m.runTool>[2],
-    ) => {
+    const lsResponses = [`${SHA_OLD}\trefs/heads/gh-pages\n`, `${SHA_NEW}\trefs/heads/gh-pages\n`];
+    const wrap = async (cmd: string, args: string[], opts: Parameters<typeof m.runTool>[2]) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         const resp = lsResponses[lsCalls] ?? '';
         lsCalls++;
@@ -100,23 +89,21 @@ describe('GithubPagesBackend.deploy', () => {
       }
       return m.runTool(cmd, args, opts);
     };
-    m.expect(
-      /^git$/,
-      (a) => a[0] === 'subtree' && a[1] === 'push',
-      { stdout: '' },
-    );
+    m.expect(/^git$/, (a) => a[0] === 'subtree' && a[1] === 'push', { stdout: '' });
     const b = new GithubPagesBackend({ runTool: wrap });
     const a = await b.build(ctx());
     const r = await b.deploy(a, 'env', githubPagesValidParams);
     expect(r.details.previous_sha).toBe(SHA_OLD);
     expect(r.details.new_sha).toBe(SHA_NEW);
     // None of the deploy calls should mention --force (or --force-with-lease).
-    const forced = m.calls().some(
-      (c) =>
-        c.cmd === 'git' &&
-        c.args[0] === 'push' &&
-        c.args.some((arg) => arg.startsWith('--force')),
-    );
+    const forced = m
+      .calls()
+      .some(
+        (c) =>
+          c.cmd === 'git' &&
+          c.args[0] === 'push' &&
+          c.args.some((arg) => arg.startsWith('--force')),
+      );
     expect(forced).toBe(false);
     expect(verifyDeploymentRecord(r).valid).toBe(true);
   });
@@ -125,38 +112,28 @@ describe('GithubPagesBackend.deploy', () => {
     const m = makeRunToolMock();
     m.expect(/^echo$/, () => true, { stdout: '' });
     let lsCalls = 0;
-    const wrap = async (
-      cmd: string,
-      args: string[],
-      opts: Parameters<typeof m.runTool>[2],
-    ) => {
+    const wrap = async (cmd: string, args: string[], opts: Parameters<typeof m.runTool>[2]) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         lsCalls++;
         return {
-          stdout:
-            (lsCalls === 1 ? SHA_OLD : SHA_NEW) + '\trefs/heads/gh-pages\n',
+          stdout: (lsCalls === 1 ? SHA_OLD : SHA_NEW) + '\trefs/heads/gh-pages\n',
           stderr: '',
         };
       }
       return m.runTool(cmd, args, opts);
     };
-    m.expect(
-      /^git$/,
-      (a) => a[0] === 'subtree' && a[1] === 'push',
-      { exitCode: 1, stderr: 'Updates were rejected because the remote contains work that you do not have' },
-    );
-    m.expect(
-      /^git$/,
-      (a) => a[0] === 'push' && a[1] === 'origin',
-      { stdout: '' },
-    );
+    m.expect(/^git$/, (a) => a[0] === 'subtree' && a[1] === 'push', {
+      exitCode: 1,
+      stderr: 'Updates were rejected because the remote contains work that you do not have',
+    });
+    m.expect(/^git$/, (a) => a[0] === 'push' && a[1] === 'origin', { stdout: '' });
     const b = new GithubPagesBackend({ runTool: wrap });
     const a = await b.build(ctx());
     const r = await b.deploy(a, 'env', githubPagesValidParams);
     expect(verifyDeploymentRecord(r).valid).toBe(true);
-    const fallback = m.calls().find(
-      (c) => c.cmd === 'git' && c.args[0] === 'push' && c.args[1] === 'origin',
-    );
+    const fallback = m
+      .calls()
+      .find((c) => c.cmd === 'git' && c.args[0] === 'push' && c.args[1] === 'origin');
     expect(fallback).toBeDefined();
   });
 });
@@ -165,22 +142,12 @@ describe('GithubPagesBackend.rollback', () => {
   function makeWrap(lsResponses: string[]) {
     const m = makeRunToolMock();
     m.expect(/^echo$/, () => true, { stdout: '' });
-    m.expect(
-      /^git$/,
-      (a) => a[0] === 'subtree' && a[1] === 'push',
-      { stdout: '' },
-    );
-    m.expect(
-      /^git$/,
-      (a) => a[0] === 'push' && a[1].startsWith('--force-with-lease'),
-      { stdout: '' },
-    );
+    m.expect(/^git$/, (a) => a[0] === 'subtree' && a[1] === 'push', { stdout: '' });
+    m.expect(/^git$/, (a) => a[0] === 'push' && a[1].startsWith('--force-with-lease'), {
+      stdout: '',
+    });
     let i = 0;
-    const wrap = async (
-      cmd: string,
-      args: string[],
-      opts: Parameters<typeof m.runTool>[2],
-    ) => {
+    const wrap = async (cmd: string, args: string[], opts: Parameters<typeof m.runTool>[2]) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         const resp = lsResponses[i] ?? '';
         i++;
@@ -212,12 +179,14 @@ describe('GithubPagesBackend.rollback', () => {
     });
     const rb = await b.rollback(r);
     expect(rb.success).toBe(true);
-    const forcedCall = mock.calls().find(
-      (c) =>
-        c.cmd === 'git' &&
-        c.args[0] === 'push' &&
-        c.args[1] === `--force-with-lease=gh-pages:${SHA_NEW}`,
-    );
+    const forcedCall = mock
+      .calls()
+      .find(
+        (c) =>
+          c.cmd === 'git' &&
+          c.args[0] === 'push' &&
+          c.args[1] === `--force-with-lease=gh-pages:${SHA_NEW}`,
+      );
     expect(forcedCall).toBeDefined();
     // Refspec: <previous_sha>:<branch>
     expect(forcedCall!.args).toContain(`${SHA_OLD}:gh-pages`);
@@ -229,11 +198,7 @@ describe('GithubPagesBackend.healthCheck', () => {
     const m = makeRunToolMock();
     m.expect(/^echo$/, () => true, { stdout: '' });
     let i = 0;
-    const wrap = async (
-      cmd: string,
-      args: string[],
-      opts: Parameters<typeof m.runTool>[2],
-    ) => {
+    const wrap = async (cmd: string, args: string[], opts: Parameters<typeof m.runTool>[2]) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         const resp = (i === 0 ? SHA_OLD : SHA_NEW) + '\trefs/heads/gh-pages\n';
         i++;
@@ -241,11 +206,7 @@ describe('GithubPagesBackend.healthCheck', () => {
       }
       return m.runTool(cmd, args, opts);
     };
-    m.expect(
-      /^git$/,
-      (a) => a[0] === 'subtree' && a[1] === 'push',
-      { stdout: '' },
-    );
+    m.expect(/^git$/, (a) => a[0] === 'subtree' && a[1] === 'push', { stdout: '' });
 
     const ok = new GithubPagesBackend({
       runTool: wrap,
@@ -260,11 +221,7 @@ describe('GithubPagesBackend.healthCheck', () => {
 
     // Build a fresh instance for the 500 case so ls-remote counters reset.
     let i2 = 0;
-    const wrap2 = async (
-      cmd: string,
-      args: string[],
-      opts: Parameters<typeof m.runTool>[2],
-    ) => {
+    const wrap2 = async (cmd: string, args: string[], opts: Parameters<typeof m.runTool>[2]) => {
       if (cmd === 'git' && args[0] === 'ls-remote') {
         const resp = (i2 === 0 ? SHA_OLD : SHA_NEW) + '\trefs/heads/gh-pages\n';
         i2++;

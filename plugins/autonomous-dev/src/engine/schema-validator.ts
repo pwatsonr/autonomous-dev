@@ -13,12 +13,7 @@ import { z } from 'zod';
 // Data source status enum
 // ---------------------------------------------------------------------------
 
-const DataSourceStatusSchema = z.enum([
-  'available',
-  'degraded',
-  'unreachable',
-  'not_configured',
-]);
+const DataSourceStatusSchema = z.enum(['available', 'degraded', 'unreachable', 'not_configured']);
 
 // ---------------------------------------------------------------------------
 // Observation frontmatter schema
@@ -45,9 +40,7 @@ export const ObservationFrontmatterSchema = z.object({
     'investigating',
     'cooldown',
   ]),
-  triage_decision: z
-    .enum(['promote', 'dismiss', 'defer', 'investigate'])
-    .nullable(),
+  triage_decision: z.enum(['promote', 'dismiss', 'defer', 'investigate']).nullable(),
   triage_by: z.string().nullable(),
   triage_at: z.string().datetime().nullable(),
   triage_reason: z.string().nullable(),
@@ -55,9 +48,7 @@ export const ObservationFrontmatterSchema = z.object({
   cooldown_active: z.boolean(),
   linked_prd: z.string().nullable(),
   linked_deployment: z.string().nullable(),
-  effectiveness: z
-    .enum(['improved', 'unchanged', 'degraded', 'pending'])
-    .nullable(),
+  effectiveness: z.enum(['improved', 'unchanged', 'degraded', 'pending']).nullable(),
   effectiveness_detail: z
     .object({
       pre_fix_avg: z.number().nullable(),
@@ -84,9 +75,7 @@ export const ObservationFrontmatterSchema = z.object({
 /**
  * TypeScript type inferred from the validation schema.
  */
-export type ObservationFrontmatter = z.infer<
-  typeof ObservationFrontmatterSchema
->;
+export type ObservationFrontmatter = z.infer<typeof ObservationFrontmatterSchema>;
 
 // ---------------------------------------------------------------------------
 // Validation result
@@ -122,8 +111,6 @@ export function validateObservation(frontmatter: unknown): ValidationResult {
   }
   return {
     valid: false,
-    errors: result.error.issues.map(
-      (i) => `${i.path.join('.')}: ${i.message}`,
-    ),
+    errors: result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
   };
 }

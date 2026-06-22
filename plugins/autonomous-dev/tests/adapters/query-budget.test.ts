@@ -104,9 +104,9 @@ describe('QueryBudgetEnforcer', () => {
 
     const queryCall = () => delay(200).then(() => 'late data');
 
-    await expect(
-      tracker.executeQuery('prometheus', 'service-A', queryCall),
-    ).rejects.toThrow('timed out');
+    await expect(tracker.executeQuery('prometheus', 'service-A', queryCall)).rejects.toThrow(
+      'timed out',
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -138,17 +138,13 @@ describe('QueryBudgetEnforcer', () => {
 
     const state = tracker.getState();
 
-    const promState = state.find(
-      (s) => s.source === 'prometheus' && s.service === 'service-X',
-    )!;
+    const promState = state.find((s) => s.source === 'prometheus' && s.service === 'service-X')!;
     expect(promState).toBeDefined();
     expect(promState.queries_executed).toBe(15);
     expect(promState.queries_blocked).toBe(0);
     expect(promState.budget_exhausted).toBe(false);
 
-    const grafState = state.find(
-      (s) => s.source === 'grafana' && s.service === 'service-X',
-    )!;
+    const grafState = state.find((s) => s.source === 'grafana' && s.service === 'service-X')!;
     expect(grafState).toBeDefined();
     expect(grafState.queries_executed).toBe(10);
     expect(grafState.queries_blocked).toBe(2);
@@ -168,14 +164,10 @@ describe('QueryBudgetEnforcer', () => {
     const tracker = new QueryBudgetEnforcer(budgets);
 
     // Query that takes 50ms (well under the 200ms test timeout).
-    const result = await tracker.executeQuery(
-      'opensearch',
-      'service-A',
-      async () => {
-        await delay(50);
-        return 'opensearch-data';
-      },
-    );
+    const result = await tracker.executeQuery('opensearch', 'service-A', async () => {
+      await delay(50);
+      return 'opensearch-data';
+    });
 
     expect(result).toBe('opensearch-data');
     expect(tracker.getCount('opensearch', 'service-A')).toBe(1);
@@ -248,11 +240,9 @@ describe('QueryBudgetEnforcer', () => {
 
   test('executeQuery returns result on success', async () => {
     const tracker = new QueryBudgetEnforcer(DEFAULT_BUDGETS);
-    const result = await tracker.executeQuery(
-      'prometheus',
-      'svc-1',
-      async () => ({ metrics: [1, 2, 3] }),
-    );
+    const result = await tracker.executeQuery('prometheus', 'svc-1', async () => ({
+      metrics: [1, 2, 3],
+    }));
 
     expect(result).toEqual({ metrics: [1, 2, 3] });
     expect(tracker.getCount('prometheus', 'svc-1')).toBe(1);

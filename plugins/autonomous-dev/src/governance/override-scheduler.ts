@@ -86,8 +86,10 @@ function parseFrontmatterFromFile(filePath: string): Record<string, any> | null 
         value = true;
       } else if (value === 'false') {
         value = false;
-      } else if ((value.startsWith('"') && value.endsWith('"')) ||
-                 (value.startsWith("'") && value.endsWith("'"))) {
+      } else if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
         value = value.substring(1, value.length - 1);
       }
 
@@ -109,11 +111,7 @@ function findObservationFileById(rootDir: string, observationId: string): string
   return findFileRecursive(fsSync, obsDir, observationId);
 }
 
-function findFileRecursive(
-  fsSync: any,
-  dir: string,
-  observationId: string
-): string | null {
+function findFileRecursive(fsSync: any, dir: string, observationId: string): string | null {
   let entries: any[];
   try {
     entries = fsSync.readdirSync(dir, { withFileTypes: true });
@@ -129,7 +127,10 @@ function findFileRecursive(
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
       try {
         const content = fsSync.readFileSync(fullPath, 'utf-8');
-        if (content.includes(`id: ${observationId}`) || content.includes(`id: "${observationId}"`)) {
+        if (
+          content.includes(`id: ${observationId}`) ||
+          content.includes(`id: "${observationId}"`)
+        ) {
           return fullPath;
         }
       } catch {
@@ -162,14 +163,14 @@ export async function scheduleOverrideCheck(
   prdId: string,
   deadline: Date,
   rootDir: string,
-  logger: AuditLogger
+  logger: AuditLogger,
 ): Promise<void> {
   const checkFile = path.join(
     rootDir,
     '.autonomous-dev',
     'governance',
     'pending-overrides',
-    `${observationId}.json`
+    `${observationId}.json`,
   );
   await fs.mkdir(path.dirname(checkFile), { recursive: true });
 
@@ -184,8 +185,7 @@ export async function scheduleOverrideCheck(
   await fs.writeFile(checkFile, JSON.stringify(check, null, 2), 'utf-8');
 
   logger.info(
-    `Override check scheduled for ${observationId}: ` +
-    `deadline ${deadline.toISOString()}`
+    `Override check scheduled for ${observationId}: ` + `deadline ${deadline.toISOString()}`,
   );
 }
 
@@ -207,14 +207,9 @@ export async function scheduleOverrideCheck(
 export async function processPendingOverrides(
   rootDir: string,
   logger: AuditLogger,
-  now?: Date
+  now?: Date,
 ): Promise<OverrideProcessingResult> {
-  const pendingDir = path.join(
-    rootDir,
-    '.autonomous-dev',
-    'governance',
-    'pending-overrides'
-  );
+  const pendingDir = path.join(rootDir, '.autonomous-dev', 'governance', 'pending-overrides');
   const result: OverrideProcessingResult = {
     confirmed: 0,
     overridden: 0,
@@ -256,10 +251,9 @@ export async function processPendingOverrides(
       continue;
     }
 
-    const wasOverridden = (
+    const wasOverridden =
       frontmatter.triage_decision !== 'promote' ||
-      (frontmatter.triage_by !== 'auto-promote-engine' && frontmatter.triage_by !== null)
-    );
+      (frontmatter.triage_by !== 'auto-promote-engine' && frontmatter.triage_by !== null);
 
     if (wasOverridden) {
       // Cancel the PRD
@@ -267,15 +261,13 @@ export async function processPendingOverrides(
       check.status = 'overridden';
       result.overridden++;
       logger.info(
-        `Auto-promotion overridden: ${check.observation_id}. ` +
-        `PRD ${check.prd_id} cancelled.`
+        `Auto-promotion overridden: ${check.observation_id}. ` + `PRD ${check.prd_id} cancelled.`,
       );
     } else {
       check.status = 'confirmed';
       result.confirmed++;
       logger.info(
-        `Auto-promotion confirmed: ${check.observation_id}. ` +
-        `PRD ${check.prd_id} stands.`
+        `Auto-promotion confirmed: ${check.observation_id}. ` + `PRD ${check.prd_id} stands.`,
       );
     }
 
@@ -294,11 +286,7 @@ export async function processPendingOverrides(
  * Moves the file to a cancelled/ subdirectory and updates
  * the observation's linked_prd to null.
  */
-async function cancelPrd(
-  rootDir: string,
-  prdId: string,
-  logger: AuditLogger
-): Promise<void> {
+async function cancelPrd(rootDir: string, prdId: string, logger: AuditLogger): Promise<void> {
   const prdDir = path.join(rootDir, '.autonomous-dev', 'prd');
   const prdFile = path.join(prdDir, `${prdId}.md`);
   const cancelledDir = path.join(prdDir, 'cancelled');

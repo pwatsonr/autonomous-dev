@@ -68,7 +68,7 @@ describe('GcpCostEstimator', () => {
       gib: 0,
       gib_seconds: 0,
     });
-    expect(r.estimated_cost_usd).toBeCloseTo(0.40, 6);
+    expect(r.estimated_cost_usd).toBeCloseTo(0.4, 6);
     expect(r.confidence).toBe(0.65);
   });
 
@@ -117,17 +117,36 @@ describe('Cross-backend invariants', () => {
     {
       name: 'aws',
       estimator: new AwsCostEstimator() as any,
-      sample: { tasks: 1, vcpu: 1, memory_gb: 2, vcpu_hours: 24, image_size_gb: 0.3, run_hours: 24 },
+      sample: {
+        tasks: 1,
+        vcpu: 1,
+        memory_gb: 2,
+        vcpu_hours: 24,
+        image_size_gb: 0.3,
+        run_hours: 24,
+      },
     },
     {
       name: 'gcp',
       estimator: new GcpCostEstimator() as any,
-      sample: { expected_requests: 5_000_000, vcpu: 1, vcpu_seconds: 3600, gib: 0.5, gib_seconds: 3600 },
+      sample: {
+        expected_requests: 5_000_000,
+        vcpu: 1,
+        vcpu_seconds: 3600,
+        gib: 0.5,
+        gib_seconds: 3600,
+      },
     },
     {
       name: 'azure',
       estimator: new AzureCostEstimator() as any,
-      sample: { expected_requests: 5_000_000, vcpu: 1, vcpu_seconds: 3600, gib: 0.5, gib_seconds: 3600 },
+      sample: {
+        expected_requests: 5_000_000,
+        vcpu: 1,
+        vcpu_seconds: 3600,
+        gib: 0.5,
+        gib_seconds: 3600,
+      },
     },
     {
       name: 'k8s',
@@ -136,10 +155,13 @@ describe('Cross-backend invariants', () => {
     },
   ];
 
-  test.each(estimators)('total of $name equals sum(breakdown.subtotal_usd)', async ({ estimator, sample }) => {
-    const r = await estimator.estimateDeployCost(sample);
-    expect(r.estimated_cost_usd).toBeCloseTo(sumBreakdown(r.breakdown), 9);
-  });
+  test.each(estimators)(
+    'total of $name equals sum(breakdown.subtotal_usd)',
+    async ({ estimator, sample }) => {
+      const r = await estimator.estimateDeployCost(sample);
+      expect(r.estimated_cost_usd).toBeCloseTo(sumBreakdown(r.breakdown), 9);
+    },
+  );
 
   test.each(estimators)('currency of $name is USD', async ({ estimator, sample }) => {
     const r = await estimator.estimateDeployCost(sample);

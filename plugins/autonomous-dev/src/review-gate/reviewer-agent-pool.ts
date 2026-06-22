@@ -124,9 +124,7 @@ export class ReviewerAgentPool {
    * Returns all instances with status "active".
    */
   getActiveInstances(): ReviewerAgentInstance[] {
-    return Array.from(this.instances.values()).filter(
-      (instance) => instance.status === 'active',
-    );
+    return Array.from(this.instances.values()).filter((instance) => instance.status === 'active');
   }
 
   /**

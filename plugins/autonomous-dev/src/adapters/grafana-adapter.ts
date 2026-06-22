@@ -25,13 +25,16 @@ import { AdapterTimeoutError } from './types';
 
 function withTimeout<T>(promise: Promise<T>, ms: number, queryName: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new AdapterTimeoutError('grafana', queryName, ms)),
-      ms,
-    );
+    const timer = setTimeout(() => reject(new AdapterTimeoutError('grafana', queryName, ms)), ms);
     promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
+      (val) => {
+        clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
     );
   });
 }
@@ -54,10 +57,7 @@ function isValidAlertState(state: string): state is GrafanaAlertState {
  * an array of alert objects with name, state, dashboardUID, and
  * newStateDate fields.
  */
-function parseAlertResponse(
-  raw: unknown,
-  dashboardUid: string,
-): GrafanaAlertResult {
+function parseAlertResponse(raw: unknown, dashboardUid: string): GrafanaAlertResult {
   const items = Array.isArray(raw) ? raw : [];
 
   const alerts: GrafanaAlert[] = items
@@ -66,7 +66,9 @@ function parseAlertResponse(
       return isValidAlertState(state);
     })
     .map((item: Record<string, unknown>) => ({
-      name: String(item.name ?? (item.labels as Record<string, unknown> | undefined)?.alertname ?? ''),
+      name: String(
+        item.name ?? (item.labels as Record<string, unknown> | undefined)?.alertname ?? '',
+      ),
       state: String(item.state ?? '').toLowerCase() as GrafanaAlertState,
       dashboard_uid: String(item.dashboardUID ?? item.dashboard_uid ?? dashboardUid),
       since: String(item.newStateDate ?? item.activeAt ?? item.since ?? ''),
@@ -82,23 +84,19 @@ function parseAlertResponse(
  * Grafana annotation responses contain an array of objects with id, time,
  * text, tags, and dashboardUID fields.
  */
-function parseAnnotationResponse(
-  raw: unknown,
-  dashboardUid: string,
-): GrafanaAnnotationResult {
+function parseAnnotationResponse(raw: unknown, dashboardUid: string): GrafanaAnnotationResult {
   const items = Array.isArray(raw) ? raw : [];
 
-  const annotations: GrafanaAnnotation[] = items.map(
-    (item: Record<string, unknown>) => ({
-      id: Number(item.id ?? 0),
-      time: typeof item.time === 'number'
+  const annotations: GrafanaAnnotation[] = items.map((item: Record<string, unknown>) => ({
+    id: Number(item.id ?? 0),
+    time:
+      typeof item.time === 'number'
         ? new Date(item.time).toISOString()
         : String(item.time ?? item.created ?? ''),
-      text: String(item.text ?? ''),
-      tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
-      dashboard_uid: String(item.dashboardUID ?? item.dashboard_uid ?? dashboardUid),
-    }),
-  );
+    text: String(item.text ?? ''),
+    tags: Array.isArray(item.tags) ? item.tags.map(String) : [],
+    dashboard_uid: String(item.dashboardUID ?? item.dashboard_uid ?? dashboardUid),
+  }));
 
   return { annotations };
 }
@@ -158,9 +156,7 @@ export class GrafanaAdapter {
     const result = parseAlertResponse(raw, dashboardUid);
 
     // Filter to only the requested states
-    result.alerts = result.alerts.filter((a) =>
-      states.includes(a.state),
-    );
+    result.alerts = result.alerts.filter((a) => states.includes(a.state));
 
     return result;
   }
@@ -221,9 +217,7 @@ export class GrafanaAdapter {
    */
   private isUnreachable(): boolean {
     if (!this.connectivity) return false;
-    const grafanaResult = this.connectivity.results.find(
-      (r) => r.source === 'grafana',
-    );
+    const grafanaResult = this.connectivity.results.find((r) => r.source === 'grafana');
     return grafanaResult?.status === 'unreachable';
   }
 }

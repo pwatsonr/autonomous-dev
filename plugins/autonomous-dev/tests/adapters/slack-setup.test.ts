@@ -28,16 +28,9 @@ function nowSeconds(): string {
 }
 
 /** Compute a valid Slack signature for the given parameters. */
-function computeSignature(
-  secret: string,
-  timestamp: string,
-  body: string,
-): string {
+function computeSignature(secret: string, timestamp: string, body: string): string {
   const baseString = `v0:${timestamp}:${body}`;
-  const hmac = crypto
-    .createHmac('sha256', secret)
-    .update(baseString)
-    .digest('hex');
+  const hmac = crypto.createHmac('sha256', secret).update(baseString).digest('hex');
   return `v0=${hmac}`;
 }
 
@@ -177,9 +170,7 @@ describe('SlackClient', () => {
   test('TC-4-01-07: constructor throws when SLACK_BOT_TOKEN is missing', () => {
     delete process.env.SLACK_BOT_TOKEN;
 
-    expect(() => new SlackClient()).toThrow(
-      'SLACK_BOT_TOKEN environment variable is not set',
-    );
+    expect(() => new SlackClient()).toThrow('SLACK_BOT_TOKEN environment variable is not set');
   });
 
   test('getClient returns a WebClient instance', () => {
@@ -295,11 +286,7 @@ describe('SlackServer', () => {
 
   beforeEach(() => {
     const verifier = new SlackVerifier();
-    server = new SlackServer(
-      verifier,
-      buildMockCommandHandler(),
-      buildMockInteractionHandler(),
-    );
+    server = new SlackServer(verifier, buildMockCommandHandler(), buildMockInteractionHandler());
   });
 
   // -------------------------------------------------------------------------

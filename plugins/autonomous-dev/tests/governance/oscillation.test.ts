@@ -1,5 +1,12 @@
-import { checkOscillation, buildOscillationWarningMarkdown } from '../../src/governance/oscillation';
-import { GovernanceConfig, ObservationSummary, OscillationResult } from '../../src/governance/types';
+import {
+  checkOscillation,
+  buildOscillationWarningMarkdown,
+} from '../../src/governance/oscillation';
+import {
+  GovernanceConfig,
+  ObservationSummary,
+  OscillationResult,
+} from '../../src/governance/types';
 
 /**
  * Unit tests for checkOscillation and buildOscillationWarningMarkdown
@@ -20,7 +27,12 @@ function defaultConfig(overrides?: Partial<GovernanceConfig>): GovernanceConfig 
   };
 }
 
-function makeSummary(id: string, triageStatus: string, effectiveness?: string | null, isCurrent?: boolean): ObservationSummary {
+function makeSummary(
+  id: string,
+  triageStatus: string,
+  effectiveness?: string | null,
+  isCurrent?: boolean,
+): ObservationSummary {
   return {
     id,
     triage_status: triageStatus,
@@ -45,9 +57,15 @@ function test_oscillation_triggered(): void {
 
   assert(result.oscillating === true, `expected oscillating=true, got ${result.oscillating}`);
   assert(result.count === 3, `expected count=3, got ${result.count}`);
-  assert(result.recommendation === 'systemic_investigation', `expected systemic_investigation, got ${result.recommendation}`);
+  assert(
+    result.recommendation === 'systemic_investigation',
+    `expected systemic_investigation, got ${result.recommendation}`,
+  );
   assert(result.window_days === 30, `expected window_days=30, got ${result.window_days}`);
-  assert(result.observation_ids!.length === 3, `expected 3 IDs, got ${result.observation_ids!.length}`);
+  assert(
+    result.observation_ids!.length === 3,
+    `expected 3 IDs, got ${result.observation_ids!.length}`,
+  );
   assert(result.observation_summaries!.length === 3, `expected 3 summaries`);
   console.log('PASS: TC-5-1-07 oscillation triggered');
 }
@@ -85,7 +103,10 @@ function test_oscillation_exact_threshold(): void {
 
   const result = checkOscillation('api-gateway', 'timeout', defaultConfig(), finder, now);
 
-  assert(result.oscillating === true, `exact threshold: expected oscillating=true, got ${result.oscillating}`);
+  assert(
+    result.oscillating === true,
+    `exact threshold: expected oscillating=true, got ${result.oscillating}`,
+  );
   assert(result.count === 3, `expected count=3, got ${result.count}`);
   console.log('PASS: TC-5-1-09 oscillation exact threshold (>= comparison)');
 }
@@ -108,14 +129,17 @@ function test_oscillation_observations_outside_window(): void {
     expectedWindowStart.setDate(expectedWindowStart.getDate() - 30);
     assert(
       afterDate.getTime() === expectedWindowStart.getTime(),
-      `window start mismatch: expected ${expectedWindowStart.toISOString()}, got ${afterDate.toISOString()}`
+      `window start mismatch: expected ${expectedWindowStart.toISOString()}, got ${afterDate.toISOString()}`,
     );
     return observations;
   };
 
   const result = checkOscillation('api-gateway', 'timeout', defaultConfig(), finder, now);
 
-  assert(result.oscillating === false, `expected oscillating=false when only 2 in window, got ${result.oscillating}`);
+  assert(
+    result.oscillating === false,
+    `expected oscillating=false when only 2 in window, got ${result.oscillating}`,
+  );
   console.log('PASS: TC-5-1-10 observations outside window not counted');
 }
 
@@ -145,10 +169,13 @@ function test_oscillation_markdown_format(): void {
   assert(md.includes('systemic issue'), 'should mention systemic issue');
   assert(md.includes('**Previous observations:**'), 'should contain observations heading');
   // 4 bullet points
-  const bullets = md.split('\n').filter(line => line.startsWith('- '));
+  const bullets = md.split('\n').filter((line) => line.startsWith('- '));
   assert(bullets.length === 4, `expected 4 bullet points, got ${bullets.length}`);
   assert(md.includes('**Recommendation:**'), 'should contain recommendation');
-  assert(md.includes('architectural investigation PRD'), 'should recommend architectural investigation');
+  assert(
+    md.includes('architectural investigation PRD'),
+    'should recommend architectural investigation',
+  );
   console.log('PASS: TC-5-1-11 oscillation Markdown format');
 }
 
@@ -171,8 +198,14 @@ function test_observation_status_promoted_improved(): void {
 
   const md = buildOscillationWarningMarkdown(result);
 
-  assert(md.includes('obs-001 (promoted, fix deployed, effective)'), `should show "promoted, fix deployed, effective" for improved`);
-  assert(md.includes('obs-002 (promoted, fix deployed, not effective)'), `should show "promoted, fix deployed, not effective" for degraded`);
+  assert(
+    md.includes('obs-001 (promoted, fix deployed, effective)'),
+    `should show "promoted, fix deployed, effective" for improved`,
+  );
+  assert(
+    md.includes('obs-002 (promoted, fix deployed, not effective)'),
+    `should show "promoted, fix deployed, not effective" for degraded`,
+  );
   console.log('PASS: TC-5-1-12 observation status rendering (promoted + improved/degraded)');
 }
 
@@ -196,7 +229,10 @@ function test_observation_status_current(): void {
   const md = buildOscillationWarningMarkdown(result);
 
   assert(md.includes('obs-003 (this observation)'), `should show "this observation" for current`);
-  assert(md.includes('obs-001 (promoted, fix deployed, partially effective)'), `should show partially effective for unchanged`);
+  assert(
+    md.includes('obs-001 (promoted, fix deployed, partially effective)'),
+    `should show partially effective for unchanged`,
+  );
   assert(md.includes('obs-002 (dismissed)'), `should show "dismissed" for dismissed`);
   console.log('PASS: TC-5-1-13 observation status rendering (current observation)');
 }
@@ -220,8 +256,14 @@ function test_observation_status_promoted_pending(): void {
 
   const md = buildOscillationWarningMarkdown(result);
 
-  assert(md.includes('obs-001 (promoted, fix in progress)'), `should show "promoted, fix in progress" for pending effectiveness`);
-  assert(md.includes('obs-002 (promoted, fix deployed)'), `should show "promoted, fix deployed" when effectiveness is null`);
+  assert(
+    md.includes('obs-001 (promoted, fix in progress)'),
+    `should show "promoted, fix in progress" for pending effectiveness`,
+  );
+  assert(
+    md.includes('obs-002 (promoted, fix deployed)'),
+    `should show "promoted, fix deployed" when effectiveness is null`,
+  );
   console.log('PASS: observation status rendering (promoted + pending/null effectiveness)');
 }
 
@@ -254,7 +296,7 @@ function test_window_start_calculation(): void {
   const expected = new Date('2026-03-09T00:00:00Z');
   assert(
     capturedAfterDate!.getTime() === expected.getTime(),
-    `window start should be 2026-03-09, got ${capturedAfterDate!.toISOString()}`
+    `window start should be 2026-03-09, got ${capturedAfterDate!.toISOString()}`,
   );
   console.log('PASS: window start calculation is correct');
 }
@@ -273,15 +315,35 @@ function assert(condition: boolean, message: string): void {
 // Runner
 // ---------------------------------------------------------------------------
 
-describe("OscillationGovernance", () => {
-  it("triggers oscillation when threshold met", () => { test_oscillation_triggered(); });
-  it("does not trigger oscillation below threshold", () => { test_oscillation_not_triggered(); });
-  it("triggers oscillation at exact threshold", () => { test_oscillation_exact_threshold(); });
-  it("ignores observations outside window", () => { test_oscillation_observations_outside_window(); });
-  it("formats markdown for oscillation", () => { test_oscillation_markdown_format(); });
-  it("classifies observation status as promoted+improved", () => { test_observation_status_promoted_improved(); });
-  it("classifies observation status as current", () => { test_observation_status_current(); });
-  it("classifies observation status as promoted+pending", () => { test_observation_status_promoted_pending(); });
-  it("returns empty markdown when not oscillating", () => { test_markdown_empty_when_not_oscillating(); });
-  it("calculates window start", () => { test_window_start_calculation(); });
+describe('OscillationGovernance', () => {
+  it('triggers oscillation when threshold met', () => {
+    test_oscillation_triggered();
+  });
+  it('does not trigger oscillation below threshold', () => {
+    test_oscillation_not_triggered();
+  });
+  it('triggers oscillation at exact threshold', () => {
+    test_oscillation_exact_threshold();
+  });
+  it('ignores observations outside window', () => {
+    test_oscillation_observations_outside_window();
+  });
+  it('formats markdown for oscillation', () => {
+    test_oscillation_markdown_format();
+  });
+  it('classifies observation status as promoted+improved', () => {
+    test_observation_status_promoted_improved();
+  });
+  it('classifies observation status as current', () => {
+    test_observation_status_current();
+  });
+  it('classifies observation status as promoted+pending', () => {
+    test_observation_status_promoted_pending();
+  });
+  it('returns empty markdown when not oscillating', () => {
+    test_markdown_empty_when_not_oscillating();
+  });
+  it('calculates window start', () => {
+    test_window_start_calculation();
+  });
 });

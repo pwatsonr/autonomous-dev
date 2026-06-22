@@ -142,9 +142,7 @@ export class InputSelector {
 
     // 4d: Fill remaining slots for domain diversity (up to MAX_INPUTS total)
     if (selected.size < MAX_INPUTS) {
-      const remainingInvocations = invocations.filter(
-        (inv) => !selected.has(inv.invocation_id),
-      );
+      const remainingInvocations = invocations.filter((inv) => !selected.has(inv.invocation_id));
 
       // Group remaining by domain
       const domainGroups = new Map<string, InvocationMetric[]>();
@@ -164,8 +162,8 @@ export class InputSelector {
       const unseenDomains = [...domainGroups.entries()].filter(
         ([domain]) => !selectedDomains.has(domain),
       );
-      const seenDomains = [...domainGroups.entries()].filter(
-        ([domain]) => selectedDomains.has(domain),
+      const seenDomains = [...domainGroups.entries()].filter(([domain]) =>
+        selectedDomains.has(domain),
       );
 
       // Fill from unseen domains first, then seen domains
@@ -174,8 +172,7 @@ export class InputSelector {
         // Pick the invocation closest to median for diversity
         invs.sort(
           (a, b) =>
-            Math.abs(a.output_quality_score - median) -
-            Math.abs(b.output_quality_score - median),
+            Math.abs(a.output_quality_score - median) - Math.abs(b.output_quality_score - median),
         );
         for (const inv of invs) {
           if (selected.size >= MAX_INPUTS) break;

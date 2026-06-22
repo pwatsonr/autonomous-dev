@@ -41,10 +41,7 @@ describe('endpoint-scanner', () => {
   it('Python Flask blueprint matches', async () => {
     const ws = workspace();
     try {
-      writeFileSync(
-        join(ws.root, 'bp.py'),
-        '@blueprint.route("/api/users")\ndef u(): pass\n',
-      );
+      writeFileSync(join(ws.root, 'bp.py'), '@blueprint.route("/api/users")\ndef u(): pass\n');
       const r = await endpointScanner(['bp.py'], { exposes_endpoint: '/api/users' }, ctx(ws.root));
       expect(r.passed).toBe(true);
     } finally {
@@ -69,10 +66,7 @@ describe('endpoint-scanner', () => {
   it('Go: mux.HandleFunc("/health", handler) matches', async () => {
     const ws = workspace();
     try {
-      writeFileSync(
-        join(ws.root, 'srv.go'),
-        'mux.HandleFunc("/health", healthHandler)\n',
-      );
+      writeFileSync(join(ws.root, 'srv.go'), 'mux.HandleFunc("/health", healthHandler)\n');
       const r = await endpointScanner(['srv.go'], { exposes_endpoint: '/health' }, ctx(ws.root));
       expect(r.passed).toBe(true);
     } finally {
@@ -83,11 +77,12 @@ describe('endpoint-scanner', () => {
   it('Go chi/gin: r.GET("/api/v1/items") matches', async () => {
     const ws = workspace();
     try {
-      writeFileSync(
-        join(ws.root, 'srv.go'),
-        'r.GET("/api/v1/items", listItems)\n',
+      writeFileSync(join(ws.root, 'srv.go'), 'r.GET("/api/v1/items", listItems)\n');
+      const r = await endpointScanner(
+        ['srv.go'],
+        { exposes_endpoint: '/api/v1/items' },
+        ctx(ws.root),
       );
-      const r = await endpointScanner(['srv.go'], { exposes_endpoint: '/api/v1/items' }, ctx(ws.root));
       expect(r.passed).toBe(true);
     } finally {
       ws.cleanup();
@@ -117,10 +112,7 @@ describe('endpoint-scanner', () => {
   it('endpoint with regex metacharacters is escaped (matches literal `.well-known`)', async () => {
     const ws = workspace();
     try {
-      writeFileSync(
-        join(ws.root, 'srv.ts'),
-        "app.get('/api/v1/.well-known', handler);\n",
-      );
+      writeFileSync(join(ws.root, 'srv.ts'), "app.get('/api/v1/.well-known', handler);\n");
       // A bogus endpoint that would only match if `.` were treated as regex any-char:
       const bogus = await endpointScanner(
         ['srv.ts'],

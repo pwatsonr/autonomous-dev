@@ -18,9 +18,7 @@ import {
   MaxWorktreesExceededError,
   DiskPressureCriticalError,
 } from '../../src/parallel/worktree-manager';
-import {
-  StatePersister,
-} from '../../src/parallel/state-persister';
+import { StatePersister } from '../../src/parallel/state-persister';
 import { PersistedExecutionState, ExecutionPhase } from '../../src/parallel/types';
 import type {
   WorktreeDiskWarningEvent,
@@ -100,15 +98,13 @@ describe('WorktreeManager', () => {
 
     it('is idempotent', async () => {
       await wm.createIntegrationBranch('req-001', 'main');
-      await expect(
-        wm.createIntegrationBranch('req-001', 'main'),
-      ).resolves.not.toThrow();
+      await expect(wm.createIntegrationBranch('req-001', 'main')).resolves.not.toThrow();
     });
 
     it('throws if base branch does not exist', async () => {
-      await expect(
-        wm.createIntegrationBranch('req-001', 'nonexistent'),
-      ).rejects.toThrow(/does not exist/);
+      await expect(wm.createIntegrationBranch('req-001', 'nonexistent')).rejects.toThrow(
+        /does not exist/,
+      );
     });
 
     it('returns the integration branch name', async () => {
@@ -148,24 +144,24 @@ describe('WorktreeManager', () => {
 
       await limitedWm.createIntegrationBranch('req-001', 'main');
       await limitedWm.createTrackWorktree('req-001', 'track-a');
-      await expect(
-        limitedWm.createTrackWorktree('req-001', 'track-b'),
-      ).rejects.toThrow(MaxWorktreesExceededError);
+      await expect(limitedWm.createTrackWorktree('req-001', 'track-b')).rejects.toThrow(
+        MaxWorktreesExceededError,
+      );
     });
 
     it('rejects when disk pressure is critical', async () => {
       await wm.createIntegrationBranch('req-001', 'main');
       // Force disk pressure to critical
       wm.setDiskPressureLevel('critical');
-      await expect(
-        wm.createTrackWorktree('req-001', 'track-a'),
-      ).rejects.toThrow(DiskPressureCriticalError);
+      await expect(wm.createTrackWorktree('req-001', 'track-a')).rejects.toThrow(
+        DiskPressureCriticalError,
+      );
     });
 
     it('throws if integration branch does not exist', async () => {
-      await expect(
-        wm.createTrackWorktree('req-001', 'track-a'),
-      ).rejects.toThrow(/integration.*does not exist/i);
+      await expect(wm.createTrackWorktree('req-001', 'track-a')).rejects.toThrow(
+        /integration.*does not exist/i,
+      );
     });
 
     it('emits worktree.created event', async () => {
@@ -282,9 +278,7 @@ describe('WorktreeManager', () => {
     });
 
     it('is idempotent on missing worktree', async () => {
-      await expect(
-        wm.removeWorktree('req-001', 'nonexistent'),
-      ).resolves.not.toThrow();
+      await expect(wm.removeWorktree('req-001', 'nonexistent')).resolves.not.toThrow();
     });
 
     it('emits worktree.removed event', async () => {
@@ -336,10 +330,7 @@ describe('WorktreeManager', () => {
       expect((await wm.listWorktrees('req-001')).length).toBe(0);
       // Integration branch should be gone
       expect(() =>
-        gitSync(
-          repoRoot,
-          'rev-parse --verify refs/heads/auto/req-001/integration',
-        ),
+        gitSync(repoRoot, 'rev-parse --verify refs/heads/auto/req-001/integration'),
       ).toThrow();
     });
 
@@ -393,7 +384,7 @@ describe('WorktreeManager', () => {
       const lowConfig = loadConfig({
         worktree_root: worktreeRoot,
         disk_warning_threshold_gb: 0.00000001, // ~10 bytes
-        disk_hard_limit_gb: 0.0000001,        // ~107 bytes
+        disk_hard_limit_gb: 0.0000001, // ~107 bytes
       });
       const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter);
 
@@ -427,7 +418,7 @@ describe('WorktreeManager', () => {
       const lowConfig = loadConfig({
         worktree_root: worktreeRoot,
         disk_warning_threshold_gb: 0.00000001, // ~10 bytes
-        disk_hard_limit_gb: 0.0000001,        // ~107 bytes
+        disk_hard_limit_gb: 0.0000001, // ~107 bytes
       });
       const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter, {
         diskUsageProvider: async () => 200,
@@ -456,7 +447,7 @@ describe('WorktreeManager', () => {
       const lowConfig = loadConfig({
         worktree_root: worktreeRoot,
         disk_warning_threshold_gb: 0.00000001, // ~10 bytes
-        disk_hard_limit_gb: 0.0000001,        // ~107 bytes
+        disk_hard_limit_gb: 0.0000001, // ~107 bytes
       });
       const lowWm = new WorktreeManager(lowConfig, repoRoot, emitter, {
         diskUsageProvider: async () => 200,
@@ -561,9 +552,7 @@ describe('WorktreeManager', () => {
       fs.rmSync(info.worktreePath, { recursive: true });
 
       // removeWorktree should not throw and should prune stale metadata
-      await expect(
-        wm.removeWorktree('req-001', 'track-a'),
-      ).resolves.not.toThrow();
+      await expect(wm.removeWorktree('req-001', 'track-a')).resolves.not.toThrow();
 
       // After removal, the branch should be cleaned up
       expect(() =>
@@ -621,28 +610,20 @@ describe('WorktreeManager', () => {
 
     it('removes stale auto/* branches', async () => {
       // Create a branch manually without a state file
-      execSync(
-        `git -C "${repoRoot}" branch auto/stale/integration main`,
-        { encoding: 'utf-8' },
-      );
+      execSync(`git -C "${repoRoot}" branch auto/stale/integration main`, { encoding: 'utf-8' });
 
       const report = await wm.cleanupOrphanedWorktrees(persister);
       expect(report.removedBranches).toContain('auto/stale/integration');
     });
 
     it('does not touch non-auto branches', async () => {
-      execSync(
-        `git -C "${repoRoot}" branch feature/keep main`,
-        { encoding: 'utf-8' },
-      );
+      execSync(`git -C "${repoRoot}" branch feature/keep main`, { encoding: 'utf-8' });
 
       const report = await wm.cleanupOrphanedWorktrees(persister);
       expect(report.removedBranches).not.toContain('feature/keep');
 
       // Verify the branch still exists
-      expect(() =>
-        gitSync(repoRoot, 'rev-parse --verify refs/heads/feature/keep'),
-      ).not.toThrow();
+      expect(() => gitSync(repoRoot, 'rev-parse --verify refs/heads/feature/keep')).not.toThrow();
     });
 
     it('handles no orphans gracefully', async () => {
@@ -656,9 +637,7 @@ describe('WorktreeManager', () => {
       // Create a worktree WITH a valid in-flight state
       await wm.createIntegrationBranch('req-active', 'main');
       const info = await wm.createTrackWorktree('req-active', 'track-a');
-      await persister.saveState(
-        createTestState('req-active', { phase: 'fan-out' }),
-      );
+      await persister.saveState(createTestState('req-active', { phase: 'fan-out' }));
 
       const report = await wm.cleanupOrphanedWorktrees(persister);
       expect(report.removedWorktrees.length).toBe(0);
@@ -774,16 +753,10 @@ describe('WorktreeManager', () => {
 
     it('is idempotent (calling twice does not change file)', async () => {
       await wm.ensureGitignore();
-      const content1 = fs.readFileSync(
-        path.join(repoRoot, '.gitignore'),
-        'utf-8',
-      );
+      const content1 = fs.readFileSync(path.join(repoRoot, '.gitignore'), 'utf-8');
 
       await wm.ensureGitignore();
-      const content2 = fs.readFileSync(
-        path.join(repoRoot, '.gitignore'),
-        'utf-8',
-      );
+      const content2 = fs.readFileSync(path.join(repoRoot, '.gitignore'), 'utf-8');
 
       expect(content1).toBe(content2);
     });
@@ -807,9 +780,7 @@ describe('WorktreeManager', () => {
 
   describe('orphan cleanup helpers', () => {
     it('parseWorktreePath extracts requestId and trackName', () => {
-      const result = wm.parseWorktreePath(
-        path.join(worktreeRoot, 'req-001', 'track-a'),
-      );
+      const result = wm.parseWorktreePath(path.join(worktreeRoot, 'req-001', 'track-a'));
       expect(result.requestId).toBe('req-001');
       expect(result.trackName).toBe('track-a');
     });
@@ -821,12 +792,8 @@ describe('WorktreeManager', () => {
     });
 
     it('extractRequestIdFromBranch extracts from auto/* branches', () => {
-      expect(wm.extractRequestIdFromBranch('auto/req-001/integration')).toBe(
-        'req-001',
-      );
-      expect(wm.extractRequestIdFromBranch('auto/req-002/track-a')).toBe(
-        'req-002',
-      );
+      expect(wm.extractRequestIdFromBranch('auto/req-001/integration')).toBe('req-001');
+      expect(wm.extractRequestIdFromBranch('auto/req-002/track-a')).toBe('req-002');
     });
 
     it('extractRequestIdFromBranch returns null for non-auto branches', () => {

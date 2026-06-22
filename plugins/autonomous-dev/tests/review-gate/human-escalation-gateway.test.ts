@@ -105,7 +105,7 @@ describe('HumanEscalationGateway', () => {
       'max_iterations_exhausted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.escalation_trigger).toBe('max_iterations_exhausted');
@@ -126,9 +126,7 @@ describe('HumanEscalationGateway', () => {
       description: 'Fundamentally flawed approach',
       resolution_status: 'open',
     });
-    const reviewHistory = [
-      makeGateReviewResult({ iteration: 1, aggregate_score: 60 }),
-    ];
+    const reviewHistory = [makeGateReviewResult({ iteration: 1, aggregate_score: 60 })];
     const state = makeIterationState({ current_iteration: 1 });
     const versions = [makeDocumentVersion('v1', 'content v1')];
 
@@ -139,7 +137,7 @@ describe('HumanEscalationGateway', () => {
       'critical_reject_finding',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.escalation_trigger).toBe('critical_reject_finding');
@@ -173,7 +171,7 @@ describe('HumanEscalationGateway', () => {
       'stagnation_persisted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.escalation_trigger).toBe('stagnation_persisted');
@@ -201,7 +199,7 @@ describe('HumanEscalationGateway', () => {
       'trust_level_requirement',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.escalation_trigger).toBe('trust_level_requirement');
@@ -229,7 +227,7 @@ describe('HumanEscalationGateway', () => {
       'max_iterations_exhausted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.recommended_action).toBe('approve_override');
@@ -258,7 +256,7 @@ describe('HumanEscalationGateway', () => {
       'max_iterations_exhausted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.recommended_action).toBe('reject_and_restart');
@@ -282,7 +280,7 @@ describe('HumanEscalationGateway', () => {
       'stagnation_persisted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.recommended_action).toBe('reject_and_restart');
@@ -310,7 +308,7 @@ describe('HumanEscalationGateway', () => {
       'max_iterations_exhausted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.recommended_action).toBe('reject_and_restart');
@@ -334,7 +332,7 @@ describe('HumanEscalationGateway', () => {
       'max_iterations_exhausted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.recommended_action).toBe('manual_revision');
@@ -345,9 +343,7 @@ describe('HumanEscalationGateway', () => {
   // Test 10: Version diffs present
   // -----------------------------------------------------------------------
   test('Version diffs: 3 versions produce 2 diffs (v1->v2, v2->v3)', async () => {
-    const reviewHistory = [
-      makeGateReviewResult({ aggregate_score: 90, threshold: 85 }),
-    ];
+    const reviewHistory = [makeGateReviewResult({ aggregate_score: 90, threshold: 85 })];
     const state = makeIterationState({ current_iteration: 1 });
     const versions = [
       makeDocumentVersion('v1', 'Line 1\nLine 2'),
@@ -362,7 +358,7 @@ describe('HumanEscalationGateway', () => {
       'trust_level_requirement',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.diffs).toHaveLength(2);
@@ -385,9 +381,7 @@ describe('HumanEscalationGateway', () => {
       makeMergedFinding({ id: 'f4', resolution_status: 'recurred' }),
       makeMergedFinding({ id: 'f5', resolution_status: 'open' }),
     ];
-    const reviewHistory = [
-      makeGateReviewResult({ aggregate_score: 70, threshold: 85 }),
-    ];
+    const reviewHistory = [makeGateReviewResult({ aggregate_score: 70, threshold: 85 })];
     const state = makeIterationState({ current_iteration: 1 });
     const versions = [makeDocumentVersion('v1', 'content')];
 
@@ -398,7 +392,7 @@ describe('HumanEscalationGateway', () => {
       'max_iterations_exhausted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.unresolved_findings).toHaveLength(3);
@@ -415,9 +409,7 @@ describe('HumanEscalationGateway', () => {
       makeMergedFinding({ id: 'f3', resolution_status: 'resolved' }),
       makeMergedFinding({ id: 'f4', resolution_status: 'recurred' }),
     ];
-    const reviewHistory = [
-      makeGateReviewResult({ aggregate_score: 70, threshold: 85 }),
-    ];
+    const reviewHistory = [makeGateReviewResult({ aggregate_score: 70, threshold: 85 })];
     const state = makeIterationState({ current_iteration: 1 });
     const versions = [makeDocumentVersion('v1', 'content')];
 
@@ -428,7 +420,7 @@ describe('HumanEscalationGateway', () => {
       'max_iterations_exhausted',
       versions,
       null,
-      []
+      [],
     );
 
     expect(pkg.recurred_findings).toHaveLength(2);
@@ -446,11 +438,13 @@ describe('HumanEscalationGateway', () => {
       summary: 'This is the parent document summary with executive overview.',
     };
     const traceLinks: TraceLink[] = [
-      { parent_document_id: 'PRD-000', parent_section_id: 'goals', child_section_id: 'architecture' },
+      {
+        parent_document_id: 'PRD-000',
+        parent_section_id: 'goals',
+        child_section_id: 'architecture',
+      },
     ];
-    const reviewHistory = [
-      makeGateReviewResult({ aggregate_score: 90, threshold: 85 }),
-    ];
+    const reviewHistory = [makeGateReviewResult({ aggregate_score: 90, threshold: 85 })];
     const state = makeIterationState({ current_iteration: 1 });
     const versions = [makeDocumentVersion('v1', 'content')];
 
@@ -461,7 +455,7 @@ describe('HumanEscalationGateway', () => {
       'trust_level_requirement',
       versions,
       parentDoc,
-      traceLinks
+      traceLinks,
     );
 
     expect(pkg.parent_document).not.toBeNull();

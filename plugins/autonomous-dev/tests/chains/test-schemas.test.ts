@@ -17,10 +17,7 @@ import * as path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 
-import {
-  loadSecurityFindingsExample,
-  loadCodePatchesExample,
-} from '../helpers/chain-fixtures';
+import { loadSecurityFindingsExample, loadCodePatchesExample } from '../helpers/chain-fixtures';
 
 const SCHEMA_ROOT = path.resolve(__dirname, '..', '..', 'schemas');
 
@@ -81,9 +78,7 @@ describe('plugin-manifest-v2.json', () => {
   it("rejects produces[].format = 'xml'", () => {
     const bad = {
       ...v1Manifest,
-      produces: [
-        { artifact_type: 'security-findings', schema_version: '1.0', format: 'xml' },
-      ],
+      produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'xml' }],
     };
     expect(validate(bad)).toBe(false);
   });
@@ -108,9 +103,7 @@ describe('plugin-manifest-v2.json', () => {
   it("rejects produces[].schema_version of '1' (pattern violation)", () => {
     const bad = {
       ...v1Manifest,
-      produces: [
-        { artifact_type: 'security-findings', schema_version: '1', format: 'json' },
-      ],
+      produces: [{ artifact_type: 'security-findings', schema_version: '1', format: 'json' }],
     };
     expect(validate(bad)).toBe(false);
   });
@@ -121,12 +114,7 @@ describe('plugin-manifest-v2.json', () => {
 // ---------------------------------------------------------------------------
 
 describe('security-findings/1.0.json', () => {
-  const schemaPath = path.join(
-    SCHEMA_ROOT,
-    'artifacts',
-    'security-findings',
-    '1.0.json',
-  );
+  const schemaPath = path.join(SCHEMA_ROOT, 'artifacts', 'security-findings', '1.0.json');
   const schema = readJson(schemaPath) as Record<string, unknown>;
   const validate = makeAjv().compile(schema);
 

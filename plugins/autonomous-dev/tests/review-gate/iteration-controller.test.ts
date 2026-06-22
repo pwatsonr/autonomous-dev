@@ -13,7 +13,7 @@ function makeFinding(
   id: string,
   sectionId: string,
   categoryId: string,
-  overrides?: Partial<MergedFinding>
+  overrides?: Partial<MergedFinding>,
 ): MergedFinding {
   return {
     id,
@@ -52,7 +52,7 @@ describe('IterationController', () => {
       90,
       [],
       computeContentHash('document content v1'),
-      'approved'
+      'approved',
     );
 
     expect(decision.should_continue).toBe(false);
@@ -74,7 +74,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('document content v1'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(decision1.should_continue).toBe(true);
     expect(decision1.outcome).toBe('changes_requested');
@@ -86,7 +86,7 @@ describe('IterationController', () => {
       90,
       [],
       computeContentHash('document content v2 improved'),
-      'approved'
+      'approved',
     );
     expect(decision2.should_continue).toBe(false);
     expect(decision2.outcome).toBe('approved');
@@ -104,13 +104,9 @@ describe('IterationController', () => {
     controller.recordReviewOutcome(
       state,
       60,
-      [
-        makeFinding('f1', 's1', 'c1'),
-        makeFinding('f2', 's2', 'c2'),
-        makeFinding('f3', 's3', 'c3'),
-      ],
+      [makeFinding('f1', 's1', 'c1'), makeFinding('f2', 's2', 'c2'), makeFinding('f3', 's3', 'c3')],
       computeContentHash('v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: 2 findings (decreasing), score 65 (improving)
@@ -120,7 +116,7 @@ describe('IterationController', () => {
       65,
       [makeFinding('f1', 's1', 'c1'), makeFinding('f2', 's2', 'c2')],
       computeContentHash('v2'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 3 (max): 1 finding (decreasing), score 70 (improving)
@@ -130,7 +126,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('v3'),
-      'changes_requested'
+      'changes_requested',
     );
 
     expect(decision.should_continue).toBe(false);
@@ -155,7 +151,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f1', 's1', 'c1')],
       hash,
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: same hash
@@ -165,7 +161,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f1', 's1', 'c1')],
       hash,
-      'changes_requested'
+      'changes_requested',
     );
 
     expect(decision.should_continue).toBe(false);
@@ -193,7 +189,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f1', 's1', 'c1')],
       hash1,
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: same hash after normalization
@@ -203,7 +199,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f1', 's1', 'c1')],
       hash2,
-      'changes_requested'
+      'changes_requested',
     );
 
     expect(decision.identical_revision).toBe(true);
@@ -223,7 +219,7 @@ describe('IterationController', () => {
       75,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: score declines => stagnation warning
@@ -233,7 +229,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f2', 's2', 'c2')],
       computeContentHash('v2'),
-      'changes_requested'
+      'changes_requested',
     );
 
     expect(decision.stagnation_warning).toBe(true);
@@ -254,7 +250,7 @@ describe('IterationController', () => {
       75,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: score declines (stagnation 1)
@@ -264,7 +260,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f2', 's2', 'c2')],
       computeContentHash('v2'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(decision2.stagnation_warning).toBe(true);
     expect(decision2.should_continue).toBe(true);
@@ -276,7 +272,7 @@ describe('IterationController', () => {
       65,
       [makeFinding('f3', 's3', 'c3')],
       computeContentHash('v3'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(decision3.should_continue).toBe(false);
     expect(decision3.outcome).toBe('rejected');
@@ -298,7 +294,7 @@ describe('IterationController', () => {
       75,
       [makeFinding('f1', 's1', 'c1'), makeFinding('f2', 's2', 'c2')],
       computeContentHash('v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: declines (stagnation 1)
@@ -308,7 +304,7 @@ describe('IterationController', () => {
       70,
       [makeFinding('f3', 's3', 'c3')],
       computeContentHash('v2'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(decision2.stagnation_warning).toBe(true);
     expect(state.stagnation_count).toBe(1);
@@ -320,7 +316,7 @@ describe('IterationController', () => {
       80,
       [],
       computeContentHash('v3'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(decision3.stagnation_warning).toBe(false);
     expect(state.stagnation_count).toBe(0);
@@ -339,7 +335,7 @@ describe('IterationController', () => {
       78,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     controller.checkpoint(state, 'review_completed');
@@ -386,7 +382,7 @@ describe('IterationController', () => {
         60 + i * 2, // incrementing scores to avoid stagnation
         findingsThisIter,
         computeContentHash(`v${i}`),
-        'changes_requested'
+        'changes_requested',
       );
       expect(decision.should_continue).toBe(true);
       expect(decision.outcome).toBe('changes_requested');
@@ -400,7 +396,7 @@ describe('IterationController', () => {
       72,
       [makeFinding('f5-1', 's1', 'c1'), makeFinding('f5-2', 's2', 'c2')],
       computeContentHash('v5'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(decision5.should_continue).toBe(false);
     expect(decision5.outcome).toBe('rejected');
@@ -424,7 +420,7 @@ describe('IterationController', () => {
       80,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: score drops to 70 (drop of 10, exceeds margin of 5)
@@ -435,7 +431,7 @@ describe('IterationController', () => {
       70,
       [],
       computeContentHash('v2'),
-      'changes_requested'
+      'changes_requested',
     );
 
     expect(decision.should_continue).toBe(true);
@@ -463,7 +459,7 @@ describe('IterationController', () => {
       80,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: regression with auto-rollback
@@ -473,7 +469,7 @@ describe('IterationController', () => {
       70,
       [],
       computeContentHash('v2'),
-      'changes_requested'
+      'changes_requested',
     );
 
     expect(decision.should_continue).toBe(true);

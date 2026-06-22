@@ -5,7 +5,10 @@ import { DirectoryManager } from '../../../src/pipeline/storage/directory-manage
 import { TemplateEngine } from '../../../src/pipeline/template-engine/template-engine';
 import { InMemoryIdCounter } from '../../../src/pipeline/frontmatter/id-generator';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
-import { createDocument, CreateDocumentRequest } from '../../../src/pipeline/storage/document-creator';
+import {
+  createDocument,
+  CreateDocumentRequest,
+} from '../../../src/pipeline/storage/document-creator';
 import { listDocuments } from '../../../src/pipeline/storage/document-lister';
 
 describe('listDocuments', () => {
@@ -50,11 +53,15 @@ describe('listDocuments', () => {
     await createDocument(makeRequest({ title: 'PRD 1' }), dm, templateEngine, idCounter);
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD 1', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({ type: DocumentType.PLAN, title: 'Plan 1', depth: 2 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     const results = await listDocuments(pipelineId, dm);
@@ -66,20 +73,22 @@ describe('listDocuments', () => {
     // Create documents of different types so IDs will have different prefixes
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD 1', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(makeRequest({ title: 'PRD 1' }), dm, templateEngine, idCounter);
     await createDocument(
       makeRequest({ type: DocumentType.PLAN, title: 'Plan 1', depth: 2 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     const results = await listDocuments(pipelineId, dm);
 
     for (let i = 1; i < results.length; i++) {
-      expect(
-        results[i - 1].documentId.localeCompare(results[i].documentId),
-      ).toBeLessThanOrEqual(0);
+      expect(results[i - 1].documentId.localeCompare(results[i].documentId)).toBeLessThanOrEqual(0);
     }
   });
 
@@ -87,11 +96,15 @@ describe('listDocuments', () => {
     await createDocument(makeRequest({ title: 'PRD 1' }), dm, templateEngine, idCounter);
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD 1', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD 2', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     const results = await listDocuments(pipelineId, dm, { type: DocumentType.TDD });
@@ -107,7 +120,9 @@ describe('listDocuments', () => {
     await createDocument(makeRequest({ title: 'PRD 1' }), dm, templateEngine, idCounter);
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD 1', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     const draftResults = await listDocuments(pipelineId, dm, { status: 'draft' });
@@ -120,7 +135,9 @@ describe('listDocuments', () => {
   it('with parentId filter only returns children of that parent', async () => {
     const prdHandle = await createDocument(
       makeRequest({ title: 'PRD 1' }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     await createDocument(
@@ -130,7 +147,9 @@ describe('listDocuments', () => {
         depth: 1,
         parentId: prdHandle.documentId,
       }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({
@@ -139,7 +158,9 @@ describe('listDocuments', () => {
         depth: 1,
         parentId: prdHandle.documentId,
       }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({
@@ -148,7 +169,9 @@ describe('listDocuments', () => {
         depth: 1,
         parentId: null,
       }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     const results = await listDocuments(pipelineId, dm, {
@@ -162,17 +185,18 @@ describe('listDocuments', () => {
   });
 
   it('with minDepth/maxDepth filter narrows by depth', async () => {
-    await createDocument(
-      makeRequest({ title: 'PRD', depth: 0 }),
-      dm, templateEngine, idCounter,
-    );
+    await createDocument(makeRequest({ title: 'PRD', depth: 0 }), dm, templateEngine, idCounter);
     await createDocument(
       makeRequest({ type: DocumentType.TDD, title: 'TDD', depth: 1 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
     await createDocument(
       makeRequest({ type: DocumentType.PLAN, title: 'Plan', depth: 2 }),
-      dm, templateEngine, idCounter,
+      dm,
+      templateEngine,
+      idCounter,
     );
 
     // minDepth = 1 -> should exclude PRD (depth 0)

@@ -44,8 +44,7 @@ export function checkRegression(
 ): RegressionCheckResult {
   // Get margin: per-type override or default
   const typeOverrides = config.reviewGates.overrides[type];
-  const margin = typeOverrides?.regressionMargin
-    ?? config.reviewGates.defaults.regressionMargin;
+  const margin = typeOverrides?.regressionMargin ?? config.reviewGates.defaults.regressionMargin;
 
   // First review: never a regression
   if (previousScore === null) {

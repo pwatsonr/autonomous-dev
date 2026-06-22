@@ -133,9 +133,7 @@ function makeMockAuditTrail(): AuditTrail {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makePayload(
-  overrides: Partial<NotificationPayload> = {},
-): NotificationPayload {
+function makePayload(overrides: Partial<NotificationPayload> = {}): NotificationPayload {
   return {
     notification_id: `notif-${Math.random().toString(36).slice(2, 8)}`,
     event_type: 'pipeline_completed',
@@ -233,9 +231,7 @@ describe('NotificationFramework - Unit', () => {
     );
 
     // Emit immediate notification
-    framework.emit(
-      makePayload({ urgency: 'immediate', repository: 'test-repo' }),
-    );
+    framework.emit(makePayload({ urgency: 'immediate', repository: 'test-repo' }));
 
     // Should have been delivered (not queued or buffered)
     // immediate bypasses DND (shouldSuppress returns false for immediate)
@@ -357,7 +353,11 @@ describe('NotificationFramework - Unit', () => {
       clock,
     );
     const batcher = new NotificationBatcher(
-      { flushIntervalMinutes: 60, maxBufferSize: 50, exemptTypes: ['escalation', 'pipeline_failed'] },
+      {
+        flushIntervalMinutes: 60,
+        maxBufferSize: 50,
+        exemptTypes: ['escalation', 'pipeline_failed'],
+      },
       dm,
       timer,
     );
@@ -388,9 +388,7 @@ describe('NotificationFramework - Unit', () => {
     // The 3rd triggers systemic detection and delivers the systemic alert directly
     // So we should see:
     // - dm.deliverCalls includes the first 2 (via batcher exempt) + systemic alert
-    const systemicAlert = dm.deliverCalls.find(
-      p => p.event_type === 'systemic_issue',
-    );
+    const systemicAlert = dm.deliverCalls.find((p) => p.event_type === 'systemic_issue');
     expect(systemicAlert).toBeDefined();
     expect(systemicAlert!.urgency).toBe('immediate');
   });
@@ -429,9 +427,7 @@ describe('NotificationFramework - Unit', () => {
       timer,
     );
 
-    framework.emit(
-      makePayload({ urgency: 'informational' }),
-    );
+    framework.emit(makePayload({ urgency: 'informational' }));
 
     // Non-exempt, non-immediate -> buffered in batcher
     expect(batcher.getBufferSize()).toBe(1);
@@ -553,10 +549,7 @@ describe('NotificationFramework - Integration Scenarios', () => {
 
     // All notifications should have been delivered as batches
     expect(dm.deliverBatchCalls.length).toBeGreaterThan(0);
-    const totalDelivered = dm.deliverBatchCalls.reduce(
-      (sum, batch) => sum + batch.length,
-      0,
-    );
+    const totalDelivered = dm.deliverBatchCalls.reduce((sum, batch) => sum + batch.length, 0);
     expect(totalDelivered).toBe(25);
   });
 
@@ -582,7 +575,11 @@ describe('NotificationFramework - Integration Scenarios', () => {
       clock,
     );
     const batcher = new NotificationBatcher(
-      { flushIntervalMinutes: 60, maxBufferSize: 50, exemptTypes: ['escalation', 'pipeline_failed'] },
+      {
+        flushIntervalMinutes: 60,
+        maxBufferSize: 50,
+        exemptTypes: ['escalation', 'pipeline_failed'],
+      },
       dm,
       timer,
     );
@@ -610,9 +607,7 @@ describe('NotificationFramework - Integration Scenarios', () => {
     }
 
     // Find the systemic alert
-    const systemicAlert = dm.deliverCalls.find(
-      p => p.event_type === 'systemic_issue',
-    );
+    const systemicAlert = dm.deliverCalls.find((p) => p.event_type === 'systemic_issue');
     expect(systemicAlert).toBeDefined();
     expect(systemicAlert!.urgency).toBe('immediate');
     expect(systemicAlert!.title).toContain('Systemic issue detected');
@@ -624,7 +619,7 @@ describe('NotificationFramework - Integration Scenarios', () => {
     // The third individual pipeline_failed notification should be suppressed
     // (replaced by the systemic alert)
     const pipelineFailedCount = dm.deliverCalls.filter(
-      p => p.event_type === 'pipeline_failed',
+      (p) => p.event_type === 'pipeline_failed',
     ).length;
     // First 2 are delivered normally, 3rd is suppressed by systemic
     expect(pipelineFailedCount).toBe(2);
@@ -695,10 +690,7 @@ describe('NotificationFramework - Integration Scenarios', () => {
     expect(batcher.getBufferSize()).toBe(0);
 
     // All 5 notifications should have been delivered via batch
-    const totalBatchDelivered = dm.deliverBatchCalls.reduce(
-      (sum, batch) => sum + batch.length,
-      0,
-    );
+    const totalBatchDelivered = dm.deliverBatchCalls.reduce((sum, batch) => sum + batch.length, 0);
     expect(totalBatchDelivered).toBe(5);
   });
 });

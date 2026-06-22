@@ -11,14 +11,14 @@
  *   16. Security escalation halts immediately
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import { EscalationEngine } from "../escalation-engine";
-import { EscalationClassifier } from "../classifier";
-import { EscalationFormatter, EscalationIdGenerator } from "../formatter";
-import { RoutingEngine } from "../routing-engine";
-import { EscalationChainManager } from "../chain-manager";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { EscalationEngine } from '../escalation-engine';
+import { EscalationClassifier } from '../classifier';
+import { EscalationFormatter, EscalationIdGenerator } from '../formatter';
+import { RoutingEngine } from '../routing-engine';
+import { EscalationChainManager } from '../chain-manager';
 import type {
   AuditTrail,
   DeliveryAdapter,
@@ -27,8 +27,8 @@ import type {
   RoutingTarget,
   Timer,
   TimerHandle,
-} from "../types";
-import type { FailureContext } from "../classifier";
+} from '../types';
+import type { FailureContext } from '../classifier';
 
 // ---------------------------------------------------------------------------
 // Test infrastructure
@@ -102,27 +102,27 @@ function createMockDeliveryAdapter(): DeliveryAdapter & {
 // ---------------------------------------------------------------------------
 
 const PRIMARY_TARGET: RoutingTarget = {
-  target_id: "primary-reviewer",
-  display_name: "Primary Reviewer",
-  channel: "slack",
+  target_id: 'primary-reviewer',
+  display_name: 'Primary Reviewer',
+  channel: 'slack',
 };
 
 const SECONDARY_TARGET: RoutingTarget = {
-  target_id: "escalation-manager",
-  display_name: "Escalation Manager",
-  channel: "email",
+  target_id: 'escalation-manager',
+  display_name: 'Escalation Manager',
+  channel: 'email',
 };
 
 const SECURITY_TARGET: RoutingTarget = {
-  target_id: "security-team",
-  display_name: "Security Team",
-  channel: "pagerduty",
+  target_id: 'security-team',
+  display_name: 'Security Team',
+  channel: 'pagerduty',
 };
 
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "esc-int-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'esc-int-'));
 });
 
 afterEach(() => {
@@ -136,83 +136,75 @@ function createEngine(
   audit: AuditTrail,
 ): EscalationEngine {
   const classifier = new EscalationClassifier();
-  const statePath = path.join(tmpDir, "escalation-counter.json");
-  const idGen = new EscalationIdGenerator(statePath, () => "20260408");
+  const statePath = path.join(tmpDir, 'escalation-counter.json');
+  const idGen = new EscalationIdGenerator(statePath, () => '20260408');
   const formatter = new EscalationFormatter(idGen, config.verbosity);
   const routingEngine = new RoutingEngine(config);
   const chainManager = new EscalationChainManager(timer, delivery, audit);
 
-  return new EscalationEngine(
-    classifier,
-    formatter,
-    routingEngine,
-    chainManager,
-    audit,
-  );
+  return new EscalationEngine(classifier, formatter, routingEngine, chainManager, audit);
 }
 
 // ---------------------------------------------------------------------------
 // Integration Scenario 14: Quality escalation after 3 retries
 // ---------------------------------------------------------------------------
 
-describe("Integration: Quality escalation after 3 retries", () => {
-  test("classifies as quality, formats, routes, starts chain, emits audit", () => {
+describe('Integration: Quality escalation after 3 retries', () => {
+  test('classifies as quality, formats, routes, starts chain, emits audit', () => {
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
     const audit = createMockAuditTrail();
 
     const config: EscalationConfig = {
       routing: {
-        mode: "default",
+        mode: 'default',
         default_target: PRIMARY_TARGET,
       },
-      verbosity: "standard",
+      verbosity: 'standard',
       retry_budget: 3,
     };
 
     const engine = createEngine(config, timer, delivery, audit);
 
     const failureContext: FailureContext = {
-      pipelinePhase: "code_review",
-      errorType: "review_gate_failed",
-      errorMessage: "Code review failed: insufficient test coverage",
+      pipelinePhase: 'code_review',
+      errorType: 'review_gate_failed',
+      errorMessage: 'Code review failed: insufficient test coverage',
       retryCount: 3,
       maxRetries: 3,
     };
 
     const result = engine.raise(failureContext, {
-      requestId: "req-100",
-      repository: "my-app",
-      pipelinePhase: "code_review",
+      requestId: 'req-100',
+      repository: 'my-app',
+      pipelinePhase: 'code_review',
       retryCount: 3,
     });
 
     // Verify classification
-    expect(result.message.escalation_type).toBe("quality");
-    expect(result.message.urgency).toBe("soon");
+    expect(result.message.escalation_type).toBe('quality');
+    expect(result.message.urgency).toBe('soon');
 
     // Verify formatting
-    expect(result.message.schema_version).toBe("v1");
+    expect(result.message.schema_version).toBe('v1');
     expect(result.message.escalation_id).toMatch(/^esc-20260408-\d{3,}$/);
-    expect(result.message.request_id).toBe("req-100");
-    expect(result.message.repository).toBe("my-app");
-    expect(result.message.summary).toContain("quality");
+    expect(result.message.request_id).toBe('req-100');
+    expect(result.message.repository).toBe('my-app');
+    expect(result.message.summary).toContain('quality');
     expect(result.message.options.length).toBeGreaterThanOrEqual(2);
 
     // Verify routing: dispatched to configured target
     expect(delivery.deliveries).toHaveLength(1);
-    expect(delivery.deliveries[0].target.target_id).toBe("primary-reviewer");
+    expect(delivery.deliveries[0].target.target_id).toBe('primary-reviewer');
 
     // Verify pipeline behavior
-    expect(result.pipelineBehavior).toBe("pause_at_boundary");
+    expect(result.pipelineBehavior).toBe('pause_at_boundary');
 
     // Verify audit: escalation_raised
-    const raisedEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_raised",
-    );
+    const raisedEvents = audit.events.filter((e) => e.event_type === 'escalation_raised');
     expect(raisedEvents).toHaveLength(1);
-    expect(raisedEvents[0].payload.escalation_type).toBe("quality");
-    expect(raisedEvents[0].payload.target).toBe("primary-reviewer");
+    expect(raisedEvents[0].payload.escalation_type).toBe('quality');
+    expect(raisedEvents[0].payload.target).toBe('primary-reviewer');
   });
 });
 
@@ -220,26 +212,26 @@ describe("Integration: Quality escalation after 3 retries", () => {
 // Integration Scenario 15: Escalation chain timeout to secondary
 // ---------------------------------------------------------------------------
 
-describe("Integration: Escalation chain timeout to secondary", () => {
-  test("primary timeout dispatches to secondary, secondary timeout applies behavior", () => {
+describe('Integration: Escalation chain timeout to secondary', () => {
+  test('primary timeout dispatches to secondary, secondary timeout applies behavior', () => {
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
     const audit = createMockAuditTrail();
 
     const config: EscalationConfig = {
       routing: {
-        mode: "advanced",
+        mode: 'advanced',
         default_target: PRIMARY_TARGET,
         advanced: {
           quality: {
             primary: PRIMARY_TARGET,
             secondary: SECONDARY_TARGET,
             timeout_minutes: 30,
-            timeout_behavior: "pause",
+            timeout_behavior: 'pause',
           },
         } as any,
       },
-      verbosity: "standard",
+      verbosity: 'standard',
       retry_budget: 3,
     };
 
@@ -247,54 +239,50 @@ describe("Integration: Escalation chain timeout to secondary", () => {
 
     const result = engine.raise(
       {
-        pipelinePhase: "code_review",
-        errorType: "review_gate_failed",
-        errorMessage: "Quality gate failed",
+        pipelinePhase: 'code_review',
+        errorType: 'review_gate_failed',
+        errorMessage: 'Quality gate failed',
         retryCount: 3,
         maxRetries: 3,
       },
       {
-        requestId: "req-200",
-        repository: "my-app",
-        pipelinePhase: "code_review",
+        requestId: 'req-200',
+        repository: 'my-app',
+        pipelinePhase: 'code_review',
         retryCount: 3,
       },
     );
 
     // Initial dispatch to primary
     expect(delivery.deliveries).toHaveLength(1);
-    expect(delivery.deliveries[0].target.target_id).toBe("primary-reviewer");
+    expect(delivery.deliveries[0].target.target_id).toBe('primary-reviewer');
 
     // Advance past primary timeout (30 minutes)
     timer.advance(30 * 60 * 1000);
 
     // Secondary should be dispatched
     expect(delivery.deliveries).toHaveLength(2);
-    expect(delivery.deliveries[1].target.target_id).toBe("escalation-manager");
+    expect(delivery.deliveries[1].target.target_id).toBe('escalation-manager');
 
     // Verify primary timeout audit event
-    const timeoutEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_timeout",
-    );
+    const timeoutEvents = audit.events.filter((e) => e.event_type === 'escalation_timeout');
     expect(timeoutEvents.length).toBeGreaterThanOrEqual(1);
-    expect(timeoutEvents[0].payload.target).toBe("primary");
-    expect(timeoutEvents[0].payload.chainedTo).toBe("secondary");
+    expect(timeoutEvents[0].payload.target).toBe('primary');
+    expect(timeoutEvents[0].payload.chainedTo).toBe('secondary');
 
     // Advance past secondary timeout
     timer.advance(30 * 60 * 1000);
 
     // Verify secondary timeout audit event
-    const allTimeouts = audit.events.filter(
-      (e) => e.event_type === "escalation_timeout",
-    );
+    const allTimeouts = audit.events.filter((e) => e.event_type === 'escalation_timeout');
     expect(allTimeouts).toHaveLength(2);
-    expect(allTimeouts[1].payload.target).toBe("secondary");
-    expect(allTimeouts[1].payload.behavior).toBe("pause");
+    expect(allTimeouts[1].payload.target).toBe('secondary');
+    expect(allTimeouts[1].payload.behavior).toBe('pause');
 
     // Verify full audit trail: escalation_raised, timeout (primary), timeout (secondary)
     const allEvents = audit.events.map((e) => e.event_type);
-    expect(allEvents).toContain("escalation_raised");
-    expect(allEvents.filter((e) => e === "escalation_timeout")).toHaveLength(2);
+    expect(allEvents).toContain('escalation_raised');
+    expect(allEvents.filter((e) => e === 'escalation_timeout')).toHaveLength(2);
   });
 });
 
@@ -302,26 +290,26 @@ describe("Integration: Escalation chain timeout to secondary", () => {
 // Integration Scenario 16: Security escalation halts immediately
 // ---------------------------------------------------------------------------
 
-describe("Integration: Security escalation halts immediately", () => {
-  test("security escalation: immediate urgency, halt behavior, forced pause timeout", () => {
+describe('Integration: Security escalation halts immediately', () => {
+  test('security escalation: immediate urgency, halt behavior, forced pause timeout', () => {
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
     const audit = createMockAuditTrail();
 
     const config: EscalationConfig = {
       routing: {
-        mode: "advanced",
+        mode: 'advanced',
         default_target: PRIMARY_TARGET,
         advanced: {
           security: {
             primary: SECURITY_TARGET,
             secondary: SECONDARY_TARGET,
             timeout_minutes: 10,
-            timeout_behavior: "cancel", // Should be overridden to "pause"
+            timeout_behavior: 'cancel', // Should be overridden to "pause"
           },
         } as any,
       },
-      verbosity: "verbose",
+      verbosity: 'verbose',
       retry_budget: 1,
     };
 
@@ -329,31 +317,31 @@ describe("Integration: Security escalation halts immediately", () => {
 
     const result = engine.raise(
       {
-        pipelinePhase: "security_review",
-        errorType: "security_scan_failed",
-        errorMessage: "Critical vulnerability detected in dependency",
+        pipelinePhase: 'security_review',
+        errorType: 'security_scan_failed',
+        errorMessage: 'Critical vulnerability detected in dependency',
         retryCount: 0,
         maxRetries: 1,
-        securityFindings: [{ severity: "critical", count: 3 }],
+        securityFindings: [{ severity: 'critical', count: 3 }],
       },
       {
-        requestId: "req-300",
-        repository: "critical-service",
-        pipelinePhase: "security_review",
+        requestId: 'req-300',
+        repository: 'critical-service',
+        pipelinePhase: 'security_review',
         retryCount: 0,
       },
     );
 
     // Verify classification
-    expect(result.message.escalation_type).toBe("security");
-    expect(result.message.urgency).toBe("immediate");
+    expect(result.message.escalation_type).toBe('security');
+    expect(result.message.urgency).toBe('immediate');
 
     // Verify pipeline behavior: halt_immediately
-    expect(result.pipelineBehavior).toBe("halt_immediately");
+    expect(result.pipelineBehavior).toBe('halt_immediately');
 
     // Verify routing: dispatched to security team
     expect(delivery.deliveries).toHaveLength(1);
-    expect(delivery.deliveries[0].target.target_id).toBe("security-team");
+    expect(delivery.deliveries[0].target.target_id).toBe('security-team');
 
     // Verify chain timeout behavior is "pause" (immutable security invariant)
     // Let primary timeout fire to confirm behavior
@@ -361,30 +349,26 @@ describe("Integration: Security escalation halts immediately", () => {
 
     // Secondary dispatched
     expect(delivery.deliveries).toHaveLength(2);
-    expect(delivery.deliveries[1].target.target_id).toBe("escalation-manager");
+    expect(delivery.deliveries[1].target.target_id).toBe('escalation-manager');
 
     // Let secondary timeout fire
     timer.advance(10 * 60 * 1000);
 
     // The timeout behavior should be "pause" (forced from "cancel")
     const secondaryTimeouts = audit.events.filter(
-      (e) =>
-        e.event_type === "escalation_timeout" &&
-        e.payload.target === "secondary",
+      (e) => e.event_type === 'escalation_timeout' && e.payload.target === 'secondary',
     );
     expect(secondaryTimeouts).toHaveLength(1);
-    expect(secondaryTimeouts[0].payload.behavior).toBe("pause");
+    expect(secondaryTimeouts[0].payload.behavior).toBe('pause');
 
     // Verify audit trail includes escalation_raised
-    const raisedEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_raised",
-    );
+    const raisedEvents = audit.events.filter((e) => e.event_type === 'escalation_raised');
     expect(raisedEvents).toHaveLength(1);
-    expect(raisedEvents[0].payload.urgency).toBe("immediate");
+    expect(raisedEvents[0].payload.urgency).toBe('immediate');
   });
 
-  test("security escalation uses pause timeout regardless of config", () => {
-    const warnSpy = jest.spyOn(console, "warn").mockImplementation();
+  test('security escalation uses pause timeout regardless of config', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
@@ -392,17 +376,17 @@ describe("Integration: Security escalation halts immediately", () => {
 
     const config: EscalationConfig = {
       routing: {
-        mode: "advanced",
+        mode: 'advanced',
         default_target: PRIMARY_TARGET,
         advanced: {
           security: {
             primary: SECURITY_TARGET,
             timeout_minutes: 5,
-            timeout_behavior: "skip", // Should be forced to "pause"
+            timeout_behavior: 'skip', // Should be forced to "pause"
           },
         } as any,
       },
-      verbosity: "standard",
+      verbosity: 'standard',
       retry_budget: 1,
     };
 
@@ -410,17 +394,17 @@ describe("Integration: Security escalation halts immediately", () => {
 
     engine.raise(
       {
-        pipelinePhase: "build",
-        errorType: "security_scan",
-        errorMessage: "High severity finding",
+        pipelinePhase: 'build',
+        errorType: 'security_scan',
+        errorMessage: 'High severity finding',
         retryCount: 0,
         maxRetries: 1,
-        securityFindings: [{ severity: "high", count: 1 }],
+        securityFindings: [{ severity: 'high', count: 1 }],
       },
       {
-        requestId: "req-301",
-        repository: "my-service",
-        pipelinePhase: "build",
+        requestId: 'req-301',
+        repository: 'my-service',
+        pipelinePhase: 'build',
         retryCount: 0,
       },
     );
@@ -429,14 +413,12 @@ describe("Integration: Security escalation halts immediately", () => {
     timer.advance(5 * 60 * 1000);
 
     // Verify behavior is "pause", not "skip"
-    const timeoutEvents = audit.events.filter(
-      (e) => e.event_type === "escalation_timeout",
-    );
+    const timeoutEvents = audit.events.filter((e) => e.event_type === 'escalation_timeout');
     expect(timeoutEvents).toHaveLength(1);
-    expect(timeoutEvents[0].payload.behavior).toBe("pause");
+    expect(timeoutEvents[0].payload.behavior).toBe('pause');
 
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Security escalation timeout behavior forced"),
+      expect.stringContaining('Security escalation timeout behavior forced'),
     );
 
     warnSpy.mockRestore();
@@ -447,18 +429,18 @@ describe("Integration: Security escalation halts immediately", () => {
 // Integration: Re-escalation linking
 // ---------------------------------------------------------------------------
 
-describe("Integration: Re-escalation linking", () => {
-  test("previousEscalationId is preserved through the full pipeline", () => {
+describe('Integration: Re-escalation linking', () => {
+  test('previousEscalationId is preserved through the full pipeline', () => {
     const timer = createMockTimer();
     const delivery = createMockDeliveryAdapter();
     const audit = createMockAuditTrail();
 
     const config: EscalationConfig = {
       routing: {
-        mode: "default",
+        mode: 'default',
         default_target: PRIMARY_TARGET,
       },
-      verbosity: "standard",
+      verbosity: 'standard',
       retry_budget: 3,
     };
 
@@ -467,16 +449,16 @@ describe("Integration: Re-escalation linking", () => {
     // First escalation
     const first = engine.raise(
       {
-        pipelinePhase: "implementation",
-        errorType: "build_failed",
-        errorMessage: "Compilation error",
+        pipelinePhase: 'implementation',
+        errorType: 'build_failed',
+        errorMessage: 'Compilation error',
         retryCount: 3,
         maxRetries: 3,
       },
       {
-        requestId: "req-400",
-        repository: "my-app",
-        pipelinePhase: "implementation",
+        requestId: 'req-400',
+        repository: 'my-app',
+        pipelinePhase: 'implementation',
         retryCount: 3,
       },
     );
@@ -484,16 +466,16 @@ describe("Integration: Re-escalation linking", () => {
     // Second escalation linking to first
     const second = engine.raise(
       {
-        pipelinePhase: "implementation",
-        errorType: "build_failed",
-        errorMessage: "Still failing after guidance",
+        pipelinePhase: 'implementation',
+        errorType: 'build_failed',
+        errorMessage: 'Still failing after guidance',
         retryCount: 3,
         maxRetries: 3,
       },
       {
-        requestId: "req-400",
-        repository: "my-app",
-        pipelinePhase: "implementation",
+        requestId: 'req-400',
+        repository: 'my-app',
+        pipelinePhase: 'implementation',
         retryCount: 3,
         previousEscalationId: first.message.escalation_id,
       },

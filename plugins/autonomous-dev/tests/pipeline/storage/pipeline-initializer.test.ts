@@ -3,7 +3,10 @@ import * as path from 'path';
 import * as os from 'os';
 import yaml from 'js-yaml';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
-import { generatePipelineId, initializePipeline } from '../../../src/pipeline/storage/pipeline-initializer';
+import {
+  generatePipelineId,
+  initializePipeline,
+} from '../../../src/pipeline/storage/pipeline-initializer';
 
 describe('generatePipelineId', () => {
   it('formats correctly for 2026-04-08 seq 1', () => {

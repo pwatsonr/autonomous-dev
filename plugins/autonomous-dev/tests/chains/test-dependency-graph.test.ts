@@ -24,9 +24,7 @@ describe('DependencyGraph', () => {
     g.addPlugin(
       buildManifest({
         id: 'producer',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
       }),
     );
     expect(g.getNodes()).toEqual(['producer']);
@@ -38,9 +36,7 @@ describe('DependencyGraph', () => {
     g.addPlugin(
       buildManifest({
         id: 'p',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
       }),
     );
     g.addPlugin(
@@ -64,17 +60,13 @@ describe('DependencyGraph', () => {
     g.addPlugin(
       buildManifest({
         id: 'p1',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
       }),
     );
     g.addPlugin(
       buildManifest({
         id: 'p2',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.1', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.1', format: 'json' }],
       }),
     );
     g.addPlugin(
@@ -91,9 +83,7 @@ describe('DependencyGraph', () => {
     g.addPlugin(
       buildManifest({
         id: 'p',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
       }),
     );
     g.addPlugin(
@@ -116,9 +106,7 @@ describe('DependencyGraph', () => {
     g.addPlugin(
       buildManifest({
         id: 'p',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
         consumes: [{ artifact_type: 'foo', schema_version: '^1.0' }],
       }),
     );
@@ -131,9 +119,7 @@ describe('DependencyGraph', () => {
     g.addPlugin(
       buildManifest({
         id: 'p',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
       }),
     );
     g.addPlugin(
@@ -150,17 +136,13 @@ describe('DependencyGraph', () => {
     g.addPlugin(
       buildManifest({
         id: 'zeta',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
       }),
     );
     g.addPlugin(
       buildManifest({
         id: 'alpha',
-        produces: [
-          { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
       }),
     );
     const ids = g.getProducers('foo').map((p) => p.pluginId);
@@ -220,9 +202,7 @@ describe('DependencyGraph', () => {
     const g = new DependencyGraph();
     const m = buildManifest({
       id: 'p',
-      produces: [
-        { artifact_type: 'foo', schema_version: '1.0', format: 'json' },
-      ],
+      produces: [{ artifact_type: 'foo', schema_version: '1.0', format: 'json' }],
     });
     g.addPlugin(m);
     g.addPlugin(m);

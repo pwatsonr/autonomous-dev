@@ -48,9 +48,7 @@ function baseAgent(overrides?: Partial<ParsedAgent>): ParsedAgent {
       { name: 'quality', weight: 0.3, description: 'Clean code' },
       { name: 'coverage', weight: 0.3, description: 'Adequate test coverage' },
     ],
-    version_history: [
-      { version: '1.0.0', date: '2026-01-01', change: 'Initial release' },
-    ],
+    version_history: [{ version: '1.0.0', date: '2026-01-01', change: 'Initial release' }],
     risk_tier: 'medium',
     frozen: false,
     description: 'Executes code changes based on specs',
@@ -87,8 +85,10 @@ function sampleProposal(overrides?: Partial<AgentProposal>): AgentProposal {
     proposed_version: '1.0.1',
     version_bump: 'patch',
     weakness_report_id: 'report-001',
-    current_definition: '---\nname: code-executor\nversion: 1.0.0\nrole: executor\ntools: [Read, Bash]\n---\nOriginal prompt.',
-    proposed_definition: '---\nname: code-executor\nversion: 1.0.1\nrole: executor\ntools: [Read, Bash]\n---\nImproved prompt.',
+    current_definition:
+      '---\nname: code-executor\nversion: 1.0.0\nrole: executor\ntools: [Read, Bash]\n---\nOriginal prompt.',
+    proposed_definition:
+      '---\nname: code-executor\nversion: 1.0.1\nrole: executor\ntools: [Read, Bash]\n---\nImproved prompt.',
     diff: '--- a/code-executor.md\n+++ b/code-executor.md\n@@ -1,3 +1,3 @@\n-Original prompt.\n+Improved prompt.',
     rationale: 'Improve test coverage guidance',
     status: 'pending_meta_review',
@@ -307,9 +307,7 @@ function createTestSetup(
   const tmpDir = createTempDir();
   const auditLogPath = path.join(tmpDir, 'data', 'agent-audit.log');
 
-  const records: AgentRecord[] = [
-    makeAgentRecord(baseAgent()),
-  ];
+  const records: AgentRecord[] = [makeAgentRecord(baseAgent())];
 
   if (includeMetaReviewer) {
     records.push(makeAgentRecord(metaReviewerAgent(), 'FROZEN'));
@@ -365,8 +363,14 @@ async function test_meta_review_all_pass(): Promise<void> {
   const result = await orchestrator.review(proposal);
 
   assert(result.verdict === 'approved', `expected approved, got ${result.verdict}`);
-  assert(result.checklist_results.length === 6, `expected 6 checklist results, got ${result.checklist_results.length}`);
-  assert(result.checklist_results.every(cr => cr.passed), 'all checklist items should pass');
+  assert(
+    result.checklist_results.length === 6,
+    `expected 6 checklist results, got ${result.checklist_results.length}`,
+  );
+  assert(
+    result.checklist_results.every((cr) => cr.passed),
+    'all checklist items should pass',
+  );
   assert(result.findings.length === 0, `expected 0 findings, got ${result.findings.length}`);
   assert(result.bypassed === false, 'should not be bypassed');
 
@@ -383,9 +387,12 @@ async function test_meta_review_blocker_finding_rejects(): Promise<void> {
 
   assert(result.verdict === 'rejected', `expected rejected, got ${result.verdict}`);
   assert(result.findings.length >= 1, 'should have at least 1 finding');
-  const blockerFinding = result.findings.find(f => f.severity === 'blocker');
+  const blockerFinding = result.findings.find((f) => f.severity === 'blocker');
   assert(blockerFinding !== undefined, 'should have a blocker finding');
-  assert(blockerFinding!.checklist_item === 1, `expected checklist_item 1, got ${blockerFinding!.checklist_item}`);
+  assert(
+    blockerFinding!.checklist_item === 1,
+    `expected checklist_item 1, got ${blockerFinding!.checklist_item}`,
+  );
 
   auditLogger.close();
   cleanupTmpDir(tmpDir);
@@ -400,7 +407,10 @@ async function test_meta_review_warning_does_not_reject(): Promise<void> {
 
   assert(result.verdict === 'approved', `expected approved, got ${result.verdict}`);
   assert(result.findings.length === 1, `expected 1 finding, got ${result.findings.length}`);
-  assert(result.findings[0].severity === 'warning', `expected warning severity, got ${result.findings[0].severity}`);
+  assert(
+    result.findings[0].severity === 'warning',
+    `expected warning severity, got ${result.findings[0].severity}`,
+  );
 
   auditLogger.close();
   cleanupTmpDir(tmpDir);
@@ -415,7 +425,7 @@ async function test_hard_override_blocker_always_rejects(): Promise<void> {
 
   // Agent said "approved" but has a blocker finding -- must be overridden to "rejected"
   assert(result.verdict === 'rejected', `expected rejected (overridden), got ${result.verdict}`);
-  const blockerFinding = result.findings.find(f => f.severity === 'blocker');
+  const blockerFinding = result.findings.find((f) => f.severity === 'blocker');
   assert(blockerFinding !== undefined, 'should have a blocker finding');
 
   auditLogger.close();
@@ -450,14 +460,19 @@ async function test_meta_review_updates_proposal_status_rejected(): Promise<void
 }
 
 async function test_meta_review_audit_log(): Promise<void> {
-  const { orchestrator, auditLogger, auditLogPath, tmpDir } = createTestSetup(approvedMetaReviewResponse());
+  const { orchestrator, auditLogger, auditLogPath, tmpDir } = createTestSetup(
+    approvedMetaReviewResponse(),
+  );
   const proposal = sampleProposal();
 
   await orchestrator.review(proposal);
   auditLogger.close();
 
   const logContent = readAuditLog(auditLogPath);
-  assert(logContent.includes('meta_review_completed'), 'audit log should contain meta_review_completed');
+  assert(
+    logContent.includes('meta_review_completed'),
+    'audit log should contain meta_review_completed',
+  );
   assert(logContent.includes(proposal.proposal_id), 'audit log should contain proposal_id');
 
   cleanupTmpDir(tmpDir);
@@ -465,7 +480,9 @@ async function test_meta_review_audit_log(): Promise<void> {
 }
 
 async function test_meta_review_parse_failure(): Promise<void> {
-  const { orchestrator, auditLogger, auditLogPath, tmpDir } = createTestSetup('this is not valid JSON at all');
+  const { orchestrator, auditLogger, auditLogPath, tmpDir } = createTestSetup(
+    'this is not valid JSON at all',
+  );
   const proposal = sampleProposal();
 
   let threw = false;
@@ -480,11 +497,17 @@ async function test_meta_review_parse_failure(): Promise<void> {
   }
 
   assert(threw, 'should have thrown an error on parse failure');
-  assert(proposal.status === 'pending_meta_review', `proposal status should remain pending_meta_review, got ${proposal.status}`);
+  assert(
+    proposal.status === 'pending_meta_review',
+    `proposal status should remain pending_meta_review, got ${proposal.status}`,
+  );
 
   auditLogger.close();
   const logContent = readAuditLog(auditLogPath);
-  assert(logContent.includes('meta_review_parse_failed'), 'audit log should contain parse failure event');
+  assert(
+    logContent.includes('meta_review_parse_failed'),
+    'audit log should contain parse failure event',
+  );
 
   cleanupTmpDir(tmpDir);
   console.log('PASS: test_meta_review_parse_failure');
@@ -497,12 +520,15 @@ async function test_schema_compliance_check(): Promise<void> {
   const result = await orchestrator.review(proposal);
 
   assert(result.verdict === 'rejected', `expected rejected, got ${result.verdict}`);
-  const item5 = result.checklist_results.find(cr => cr.item === 5);
+  const item5 = result.checklist_results.find((cr) => cr.item === 5);
   assert(item5 !== undefined, 'should have checklist item 5');
   assert(item5!.passed === false, 'checklist item 5 should fail');
-  const schemaFinding = result.findings.find(f => f.checklist_item === 5);
+  const schemaFinding = result.findings.find((f) => f.checklist_item === 5);
   assert(schemaFinding !== undefined, 'should have a finding for checklist item 5');
-  assert(schemaFinding!.severity === 'blocker', `expected blocker severity, got ${schemaFinding!.severity}`);
+  assert(
+    schemaFinding!.severity === 'blocker',
+    `expected blocker severity, got ${schemaFinding!.severity}`,
+  );
 
   auditLogger.close();
   cleanupTmpDir(tmpDir);
@@ -547,14 +573,19 @@ async function test_meta_reviewer_not_found_throws(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function test_self_review_bypass_detected(): Promise<void> {
-  const { orchestrator, auditLogger, tmpDir, mockRuntime } = createTestSetup(approvedMetaReviewResponse());
+  const { orchestrator, auditLogger, tmpDir, mockRuntime } = createTestSetup(
+    approvedMetaReviewResponse(),
+  );
   const proposal = sampleProposal({ agent_name: 'agent-meta-reviewer' });
 
   const result = await orchestrator.review(proposal);
 
   assert(result.bypassed === true, 'should be bypassed');
   assert(result.bypass_reason !== undefined, 'bypass_reason should be set');
-  assert(result.bypass_reason!.includes('Self-referential'), 'bypass_reason should mention self-referential');
+  assert(
+    result.bypass_reason!.includes('Self-referential'),
+    'bypass_reason should mention self-referential',
+  );
   // The mock runtime should NOT have been invoked
   assert(mockRuntime.lastInput === '', 'meta-reviewer should NOT have been invoked');
 
@@ -580,7 +611,9 @@ async function test_self_review_status_pending_human(): Promise<void> {
 }
 
 async function test_self_review_bypass_logged(): Promise<void> {
-  const { orchestrator, auditLogger, auditLogPath, tmpDir } = createTestSetup(approvedMetaReviewResponse());
+  const { orchestrator, auditLogger, auditLogPath, tmpDir } = createTestSetup(
+    approvedMetaReviewResponse(),
+  );
   const proposal = sampleProposal({ agent_name: 'agent-meta-reviewer' });
 
   await orchestrator.review(proposal);
@@ -640,9 +673,15 @@ function test_review_prompt_includes_both_definitions(): void {
   const prompt = buildReviewPrompt(proposal);
 
   assert(prompt.includes('Current Definition'), 'prompt should include current definition section');
-  assert(prompt.includes('Proposed Definition'), 'prompt should include proposed definition section');
+  assert(
+    prompt.includes('Proposed Definition'),
+    'prompt should include proposed definition section',
+  );
   assert(prompt.includes(proposal.current_definition), 'prompt should include current definition');
-  assert(prompt.includes(proposal.proposed_definition), 'prompt should include proposed definition');
+  assert(
+    prompt.includes(proposal.proposed_definition),
+    'prompt should include proposed definition',
+  );
   console.log('PASS: test_review_prompt_includes_both_definitions');
 }
 
@@ -670,7 +709,10 @@ function test_parse_approved_output(): void {
   assert(parsed !== null, 'should parse successfully');
   assert(parsed!.verdict === 'approved', `expected approved, got ${parsed!.verdict}`);
   assert(parsed!.findings.length === 0, 'should have no findings');
-  assert(parsed!.checklist_results.length === 6, `expected 6 checklist results, got ${parsed!.checklist_results.length}`);
+  assert(
+    parsed!.checklist_results.length === 6,
+    `expected 6 checklist results, got ${parsed!.checklist_results.length}`,
+  );
   console.log('PASS: test_parse_approved_output');
 }
 
@@ -727,7 +769,10 @@ describe('meta reviewer', () => {
   it('test_review_prompt_includes_proposal_details', test_review_prompt_includes_proposal_details);
   it('test_review_prompt_includes_diff', test_review_prompt_includes_diff);
   it('test_review_prompt_includes_both_definitions', test_review_prompt_includes_both_definitions);
-  it('test_review_prompt_includes_6_point_checklist', test_review_prompt_includes_6_point_checklist);
+  it(
+    'test_review_prompt_includes_6_point_checklist',
+    test_review_prompt_includes_6_point_checklist,
+  );
   it('test_parse_approved_output', test_parse_approved_output);
   it('test_parse_rejected_output', test_parse_rejected_output);
   it('test_parse_json_in_code_block', test_parse_json_in_code_block);
@@ -735,17 +780,25 @@ describe('meta reviewer', () => {
   it('test_parse_missing_verdict_returns_null', test_parse_missing_verdict_returns_null);
   it('test_parse_invalid_verdict_returns_null', test_parse_invalid_verdict_returns_null);
   it('test_meta_review_all_pass', async () => await test_meta_review_all_pass());
-  it('test_meta_review_blocker_finding_rejects', async () => await test_meta_review_blocker_finding_rejects());
-  it('test_meta_review_warning_does_not_reject', async () => await test_meta_review_warning_does_not_reject());
-  it('test_hard_override_blocker_always_rejects', async () => await test_hard_override_blocker_always_rejects());
-  it('test_meta_review_updates_proposal_status_approved', async () => await test_meta_review_updates_proposal_status_approved());
-  it('test_meta_review_updates_proposal_status_rejected', async () => await test_meta_review_updates_proposal_status_rejected());
+  it('test_meta_review_blocker_finding_rejects', async () =>
+    await test_meta_review_blocker_finding_rejects());
+  it('test_meta_review_warning_does_not_reject', async () =>
+    await test_meta_review_warning_does_not_reject());
+  it('test_hard_override_blocker_always_rejects', async () =>
+    await test_hard_override_blocker_always_rejects());
+  it('test_meta_review_updates_proposal_status_approved', async () =>
+    await test_meta_review_updates_proposal_status_approved());
+  it('test_meta_review_updates_proposal_status_rejected', async () =>
+    await test_meta_review_updates_proposal_status_rejected());
   it('test_meta_review_audit_log', async () => await test_meta_review_audit_log());
   it('test_meta_review_parse_failure', async () => await test_meta_review_parse_failure());
   it('test_schema_compliance_check', async () => await test_schema_compliance_check());
-  it('test_meta_reviewer_not_found_throws', async () => await test_meta_reviewer_not_found_throws());
+  it('test_meta_reviewer_not_found_throws', async () =>
+    await test_meta_reviewer_not_found_throws());
   it('test_self_review_bypass_detected', async () => await test_self_review_bypass_detected());
-  it('test_self_review_status_pending_human', async () => await test_self_review_status_pending_human());
+  it('test_self_review_status_pending_human', async () =>
+    await test_self_review_status_pending_human());
   it('test_self_review_bypass_logged', async () => await test_self_review_bypass_logged());
-  it('test_non_self_proposal_not_bypassed', async () => await test_non_self_proposal_not_bypassed());
+  it('test_non_self_proposal_not_bypassed', async () =>
+    await test_non_self_proposal_not_bypassed());
 });

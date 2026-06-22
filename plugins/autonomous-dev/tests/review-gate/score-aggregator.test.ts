@@ -15,7 +15,7 @@ import {
  */
 function makeRubric(
   categories: { id: string; weight: number; minimumScore?: number }[],
-  documentType = 'PRD'
+  documentType = 'PRD',
 ): QualityRubric {
   return {
     documentType,
@@ -40,7 +40,7 @@ function makeRubric(
  */
 function makeReviewOutput(
   reviewerId: string,
-  scores: { category_id: string; score: number }[]
+  scores: { category_id: string; score: number }[],
 ): ReviewOutput {
   return {
     reviewer_id: reviewerId,
@@ -67,23 +67,21 @@ const WORKED_EXAMPLE_CATEGORIES = [
   { id: 'cat_a', weight: 0.15 },
   { id: 'cat_b', weight: 0.15 },
   { id: 'cat_c', weight: 0.15 },
-  { id: 'cat_d', weight: 0.20 },
+  { id: 'cat_d', weight: 0.2 },
   { id: 'cat_e', weight: 0.15 },
-  { id: 'cat_f', weight: 0.10 },
-  { id: 'cat_g', weight: 0.10 },
+  { id: 'cat_f', weight: 0.1 },
+  { id: 'cat_g', weight: 0.1 },
 ];
 
 const WORKED_EXAMPLE_SCORES = [92, 78, 85, 70, 88, 65, 90];
 
 const WORKED_EXAMPLE_RUBRIC = makeRubric(WORKED_EXAMPLE_CATEGORIES);
 
-const WORKED_EXAMPLE_CATEGORY_SCORES: CategoryScore[] = WORKED_EXAMPLE_CATEGORIES.map(
-  (cat, i) => ({
-    category_id: cat.id,
-    score: WORKED_EXAMPLE_SCORES[i],
-    section_scores: null,
-  })
-);
+const WORKED_EXAMPLE_CATEGORY_SCORES: CategoryScore[] = WORKED_EXAMPLE_CATEGORIES.map((cat, i) => ({
+  category_id: cat.id,
+  score: WORKED_EXAMPLE_SCORES[i],
+  section_scores: null,
+}));
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -98,7 +96,7 @@ describe('ScoreAggregator', () => {
   test('TDD worked example: single reviewer PRD scores produce 80.95', () => {
     const result = aggregator.computeWeightedScore(
       WORKED_EXAMPLE_CATEGORY_SCORES,
-      WORKED_EXAMPLE_RUBRIC
+      WORKED_EXAMPLE_RUBRIC,
     );
     expect(result).toBe(80.95);
   });
@@ -113,7 +111,7 @@ describe('ScoreAggregator', () => {
 
     const reviewerA: ReviewOutput = {
       reviewer_id: 'reviewer_a',
-      category_scores: [{ category_id: 'overall', score: 87.50, section_scores: null }],
+      category_scores: [{ category_id: 'overall', score: 87.5, section_scores: null }],
       findings: [],
     };
 
@@ -123,15 +121,11 @@ describe('ScoreAggregator', () => {
       findings: [],
     };
 
-    const result = aggregator.aggregateScores(
-      [reviewerA, reviewerB],
-      singleCatRubric,
-      'mean'
-    );
+    const result = aggregator.aggregateScores([reviewerA, reviewerB], singleCatRubric, 'mean');
 
     expect(result.aggregate_score).toBe(84.58);
     expect(result.per_reviewer_scores).toHaveLength(2);
-    expect(result.per_reviewer_scores[0].weighted_score).toBe(87.50);
+    expect(result.per_reviewer_scores[0].weighted_score).toBe(87.5);
     expect(result.per_reviewer_scores[1].weighted_score).toBe(81.65);
   });
 
@@ -141,7 +135,7 @@ describe('ScoreAggregator', () => {
   test('Median with 3 reviewers [80, 85, 90] returns 85', () => {
     const rubric = makeRubric([{ id: 'overall', weight: 1.0 }]);
     const reviewers: ReviewOutput[] = [80, 85, 90].map((score, i) =>
-      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score }])
+      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score }]),
     );
 
     const result = aggregator.aggregateScores(reviewers, rubric, 'median');
@@ -154,7 +148,7 @@ describe('ScoreAggregator', () => {
   test('Median with 2 reviewers [80, 90] returns 85 (mean of two middle values)', () => {
     const rubric = makeRubric([{ id: 'overall', weight: 1.0 }]);
     const reviewers: ReviewOutput[] = [80, 90].map((score, i) =>
-      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score }])
+      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score }]),
     );
 
     const result = aggregator.aggregateScores(reviewers, rubric, 'median');
@@ -167,7 +161,7 @@ describe('ScoreAggregator', () => {
   test('Min aggregation [80, 85, 90] returns 80', () => {
     const rubric = makeRubric([{ id: 'overall', weight: 1.0 }]);
     const reviewers: ReviewOutput[] = [80, 85, 90].map((score, i) =>
-      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score }])
+      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score }]),
     );
 
     const result = aggregator.aggregateScores(reviewers, rubric, 'min');
@@ -193,7 +187,7 @@ describe('ScoreAggregator', () => {
   test('Three reviewers all scoring 82: all methods return 82', () => {
     const rubric = makeRubric([{ id: 'overall', weight: 1.0 }]);
     const reviewers = [0, 1, 2].map((i) =>
-      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score: 82 }])
+      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score: 82 }]),
     );
 
     for (const method of ['mean', 'median', 'min'] as const) {
@@ -262,9 +256,7 @@ describe('ScoreAggregator', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const result = aggregator.computeWeightedScore(scores, rubric);
     expect(result).toBe(76);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Category 'cat_a' has weight 0")
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Category 'cat_a' has weight 0"));
     warnSpy.mockRestore();
   });
 
@@ -292,7 +284,7 @@ describe('ScoreAggregator', () => {
   test('Median with 5 reviewers [70, 75, 80, 85, 90] returns 80', () => {
     const rubric = makeRubric([{ id: 'overall', weight: 1.0 }]);
     const reviewers = [70, 75, 80, 85, 90].map((score, i) =>
-      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score }])
+      makeReviewOutput(`r${i}`, [{ category_id: 'overall', score }]),
     );
 
     const result = aggregator.aggregateScores(reviewers, rubric, 'median');
@@ -357,10 +349,7 @@ describe('ScoreAggregator', () => {
 // TDD Worked Example Regression Tests (using fixtures)
 // ===========================================================================
 
-import {
-  SINGLE_REVIEWER_PRD,
-  TWO_REVIEWER_TDD_MEAN,
-} from './fixtures/tdd-worked-examples';
+import { SINGLE_REVIEWER_PRD, TWO_REVIEWER_TDD_MEAN } from './fixtures/tdd-worked-examples';
 
 describe('ScoreAggregator - TDD Worked Example Regression', () => {
   const aggregator = new ScoreAggregator();
@@ -370,13 +359,13 @@ describe('ScoreAggregator - TDD Worked Example Regression', () => {
   // -----------------------------------------------------------------------
   test('Single-reviewer PRD fixture produces weighted score 80.95', () => {
     const rubric = SINGLE_REVIEWER_PRD.rubric;
-    const categoryScores: CategoryScore[] = Object.entries(
-      SINGLE_REVIEWER_PRD.scores
-    ).map(([categoryId, score]) => ({
-      category_id: categoryId,
-      score,
-      section_scores: null,
-    }));
+    const categoryScores: CategoryScore[] = Object.entries(SINGLE_REVIEWER_PRD.scores).map(
+      ([categoryId, score]) => ({
+        category_id: categoryId,
+        score,
+        section_scores: null,
+      }),
+    );
 
     // Build a QualityRubric from the fixture rubric for computeWeightedScore
     const qualityRubric: QualityRubric = {
@@ -430,7 +419,7 @@ describe('ScoreAggregator - TDD Worked Example Regression', () => {
           category_id: categoryId,
           score,
           section_scores: null,
-        })
+        }),
       ),
       findings: [],
     };
@@ -442,7 +431,7 @@ describe('ScoreAggregator - TDD Worked Example Regression', () => {
           category_id: categoryId,
           score,
           section_scores: null,
-        })
+        }),
       ),
       findings: [],
     };
@@ -450,22 +439,18 @@ describe('ScoreAggregator - TDD Worked Example Regression', () => {
     // Verify individual weighted scores
     const reviewerAWeighted = aggregator.computeWeightedScore(
       reviewerA.category_scores,
-      qualityRubric
+      qualityRubric,
     );
     expect(reviewerAWeighted).toBe(TWO_REVIEWER_TDD_MEAN.reviewer_a_weighted);
 
     const reviewerBWeighted = aggregator.computeWeightedScore(
       reviewerB.category_scores,
-      qualityRubric
+      qualityRubric,
     );
     expect(reviewerBWeighted).toBe(TWO_REVIEWER_TDD_MEAN.reviewer_b_weighted);
 
     // Verify aggregate
-    const result = aggregator.aggregateScores(
-      [reviewerA, reviewerB],
-      qualityRubric,
-      'mean'
-    );
+    const result = aggregator.aggregateScores([reviewerA, reviewerB], qualityRubric, 'mean');
     expect(result.aggregate_score).toBe(TWO_REVIEWER_TDD_MEAN.expected_aggregate_mean);
   });
 
@@ -473,17 +458,12 @@ describe('ScoreAggregator - TDD Worked Example Regression', () => {
   // Test 16: Two-reviewer TDD disagreement at security_depth
   // -----------------------------------------------------------------------
   test('Two-reviewer TDD: security_depth has variance of 15', () => {
-    const { expected_disagreement, reviewer_a_scores, reviewer_b_scores } =
-      TWO_REVIEWER_TDD_MEAN;
+    const { expected_disagreement, reviewer_a_scores, reviewer_b_scores } = TWO_REVIEWER_TDD_MEAN;
 
     const scoreA =
-      reviewer_a_scores[
-        expected_disagreement.category_id as keyof typeof reviewer_a_scores
-      ];
+      reviewer_a_scores[expected_disagreement.category_id as keyof typeof reviewer_a_scores];
     const scoreB =
-      reviewer_b_scores[
-        expected_disagreement.category_id as keyof typeof reviewer_b_scores
-      ];
+      reviewer_b_scores[expected_disagreement.category_id as keyof typeof reviewer_b_scores];
 
     const variance = Math.abs(scoreA - scoreB);
 
@@ -535,7 +515,7 @@ describe('ScoreAggregator - Property-Based and Edge-Case Tests', () => {
         weights.map((w, i) => ({
           id: `cat_${i}`,
           weight: w / 100, // QualityRubric uses 0-1 weights
-        }))
+        })),
       );
 
       const categoryScores: CategoryScore[] = scores.map((s, i) => ({
@@ -651,9 +631,7 @@ describe('ScoreAggregator - Property-Based and Edge-Case Tests', () => {
       per_reviewer_scores: [{ reviewer_id: 'r1', weighted_score: 80 }],
       category_aggregates: [],
     };
-    const reviewerOutputs = [
-      makeReviewOutput('r1', [{ category_id: 'overall', score: 80 }]),
-    ];
+    const reviewerOutputs = [makeReviewOutput('r1', [{ category_id: 'overall', score: 80 }])];
 
     const result1 = evalr.evaluate(aggResult, reviewerOutputs, rubric, 1, 3);
     const result2 = evalr.evaluate(aggResult, reviewerOutputs, rubric, 1, 3);

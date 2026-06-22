@@ -12,7 +12,7 @@
  * Based on SPEC-009-2-1 (TDD Section 3.2).
  */
 
-import type { EscalationType, EscalationUrgency } from "./types";
+import type { EscalationType, EscalationUrgency } from './types';
 
 // ---------------------------------------------------------------------------
 // Failure context
@@ -66,28 +66,25 @@ export interface ClassificationResult {
 // ---------------------------------------------------------------------------
 
 /** Security severity levels considered "high" or above for escalation. */
-const HIGH_SEVERITY_LEVELS: ReadonlySet<string> = new Set([
-  "high",
-  "critical",
-]);
+const HIGH_SEVERITY_LEVELS: ReadonlySet<string> = new Set(['high', 'critical']);
 
 /** Pipeline phases that correspond to review gates. */
 const REVIEW_GATE_PHASES: ReadonlySet<string> = new Set([
-  "code_review",
-  "test_review",
-  "quality_gate",
-  "security_review",
-  "prd_approval",
+  'code_review',
+  'test_review',
+  'quality_gate',
+  'security_review',
+  'prd_approval',
 ]);
 
 /** Pipeline phases that correspond to implementation work. */
 const IMPLEMENTATION_PHASES: ReadonlySet<string> = new Set([
-  "implementation",
-  "coding",
-  "build",
-  "compilation",
-  "testing",
-  "deployment",
+  'implementation',
+  'coding',
+  'build',
+  'compilation',
+  'testing',
+  'deployment',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -121,37 +118,31 @@ export class EscalationClassifier {
   classify(context: FailureContext): ClassificationResult {
     // Priority 1: Security findings with severity >= "high"
     if (this.hasHighSeveritySecurityFindings(context)) {
-      return { type: "security", urgency: "immediate" };
+      return { type: 'security', urgency: 'immediate' };
     }
 
     // Priority 2: CI/CD or environment infrastructure failure
     if (context.cicdFailure === true || context.environmentFailure === true) {
-      return { type: "infrastructure", urgency: "soon" };
+      return { type: 'infrastructure', urgency: 'soon' };
     }
 
     // Priority 3: Cost threshold exceeded
-    if (
-      context.costData != null &&
-      context.costData.estimated > context.costData.threshold
-    ) {
-      return { type: "cost", urgency: "soon" };
+    if (context.costData != null && context.costData.estimated > context.costData.threshold) {
+      return { type: 'cost', urgency: 'soon' };
     }
 
     // Priority 4: Review gate failure after exhausting retries
     if (this.isReviewGatePhase(context) && this.retriesExhausted(context)) {
-      return { type: "quality", urgency: "soon" };
+      return { type: 'quality', urgency: 'soon' };
     }
 
     // Priority 5: Implementation failure after exhausting retries
-    if (
-      this.isImplementationPhase(context) &&
-      this.retriesExhausted(context)
-    ) {
-      return { type: "technical", urgency: "soon" };
+    if (this.isImplementationPhase(context) && this.retriesExhausted(context)) {
+      return { type: 'technical', urgency: 'soon' };
     }
 
     // Priority 6: Catch-all -- ambiguous requirements, unclear specs, etc.
-    return { type: "product", urgency: "informational" };
+    return { type: 'product', urgency: 'informational' };
   }
 
   // -------------------------------------------------------------------------
@@ -165,10 +156,7 @@ export class EscalationClassifier {
    * An empty findings array does NOT qualify.
    */
   private hasHighSeveritySecurityFindings(context: FailureContext): boolean {
-    if (
-      context.securityFindings == null ||
-      context.securityFindings.length === 0
-    ) {
+    if (context.securityFindings == null || context.securityFindings.length === 0) {
       return false;
     }
 

@@ -75,9 +75,8 @@ async function sendNotification(
   format: 'slack' | 'discord' = 'slack',
   maxRetries: number = 1,
 ): Promise<NotificationResult> {
-  const message = format === 'slack'
-    ? formatSlackMessage(notification)
-    : formatDiscordMessage(notification);
+  const message =
+    format === 'slack' ? formatSlackMessage(notification) : formatDiscordMessage(notification);
 
   let lastResult: { status: number; retryAfter?: number } | null = null;
   let attempts = 0;

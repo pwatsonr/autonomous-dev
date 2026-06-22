@@ -74,8 +74,12 @@ describe('PfctlBackend.applyRulesForPid', () => {
     await backend.applyRulesForPid(502, [{ fqdn: 'a', port: 443, protocol: 'tcp' }]);
     const replaceCall = calls[1];
     expect(replaceCall.args).toEqual(['-a', `${ANCHOR_ROOT}/uid-502`, '-f', '-']);
-    expect(replaceCall.stdin).toContain('pass out quick proto tcp from any to 1.1.1.1 port 443 user 502');
-    expect(replaceCall.stdin).toContain('pass out quick proto tcp from any to 2.2.2.2 port 443 user 502');
+    expect(replaceCall.stdin).toContain(
+      'pass out quick proto tcp from any to 1.1.1.1 port 443 user 502',
+    );
+    expect(replaceCall.stdin).toContain(
+      'pass out quick proto tcp from any to 2.2.2.2 port 443 user 502',
+    );
     expect(replaceCall.stdin).toContain('block return out quick from any to any user 502');
   });
 });

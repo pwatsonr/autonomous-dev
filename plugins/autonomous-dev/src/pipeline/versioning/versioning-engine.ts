@@ -44,12 +44,17 @@ export class VersioningEngine {
 
     if (request.reason !== 'INITIAL') {
       const history = await this.storage.listVersions(
-        request.pipelineId, request.type, request.documentId,
+        request.pipelineId,
+        request.type,
+        request.documentId,
       );
       if (history.length > 0) {
         previousVersion = history[history.length - 1].version;
         const prevDoc = await this.storage.readVersion(
-          request.pipelineId, request.type, request.documentId, previousVersion,
+          request.pipelineId,
+          request.type,
+          request.documentId,
+          previousVersion,
         );
         previousContent = prevDoc.rawContent;
       }
@@ -60,12 +65,7 @@ export class VersioningEngine {
 
     // Auto-generate diff for non-initial versions
     if (previousContent !== null && previousVersion !== null) {
-      const diff = computeDiff(
-        previousContent,
-        request.content,
-        previousVersion,
-        record.version,
-      );
+      const diff = computeDiff(previousContent, request.content, previousVersion, record.version);
       await writeDiff(
         diff,
         request.pipelineId,
@@ -103,7 +103,9 @@ export class VersioningEngine {
     newScore: number,
   ): Promise<RegressionCheckResult> {
     const previousScore = await getLatestScore(
-      pipelineId, type, documentId,
+      pipelineId,
+      type,
+      documentId,
       this.storage.getDirectoryManager(),
     );
     return checkRegression(newScore, previousScore, this.config, type);

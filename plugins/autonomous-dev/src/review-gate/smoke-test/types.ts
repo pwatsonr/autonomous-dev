@@ -31,7 +31,7 @@ export interface ChildDocument {
 /** Coverage status for a single parent section. */
 export interface ParentSectionCoverage {
   section_id: string;
-  covered_by: string[];              // child document IDs
+  covered_by: string[]; // child document IDs
   coverage_type: 'full' | 'partial' | 'none';
 }
 
@@ -40,7 +40,7 @@ export interface CoverageMatrix {
   parent_id: string;
   parent_sections: ParentSectionCoverage[];
   coverage_percentage: number;
-  gaps: string[];                     // parent section IDs with no child coverage
+  gaps: string[]; // parent section IDs with no child coverage
   pass: boolean;
 }
 
@@ -50,7 +50,7 @@ export interface CoverageMatrix {
 
 /** Configuration for the scope containment check. */
 export interface ScopeContainmentConfig {
-  creep_threshold_percentage: number;  // default: 20
+  creep_threshold_percentage: number; // default: 20
 }
 
 /** Scope containment result across all children. */
@@ -74,7 +74,7 @@ export interface Contradiction {
   entity: string;
   statement_a: string;
   statement_b: string;
-  confidence: number;                 // 0-1
+  confidence: number; // 0-1
 }
 
 /** Result of contradiction detection across all sibling children. */
@@ -98,8 +98,8 @@ export interface ContradictionDetectionStrategy {
 
 /** Configuration for the smoke test executor. */
 export interface SmokeTestConfig {
-  max_iterations: number;             // default: 2
-  scope_creep_threshold: number;      // default: 20
+  max_iterations: number; // default: 2
+  scope_creep_threshold: number; // default: 20
 }
 
 /** Complete result of a smoke test execution. */

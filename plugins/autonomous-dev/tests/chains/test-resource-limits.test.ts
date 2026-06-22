@@ -72,9 +72,7 @@ describe('SPEC-022-2-02: chain-length limit', () => {
                 ]
               : undefined,
           consumes:
-            i === 0
-              ? undefined
-              : [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+            i === 0 ? undefined : [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
         }),
       );
     }
@@ -153,9 +151,7 @@ describe('SPEC-022-2-02: artifact-size limit', () => {
     const reg = new ArtifactRegistry({ maxArtifactSizeMb: 1 });
     // 'a' repeated 2.5M times ≈ 2.5MB serialized (single quoted string).
     const huge = { findings: 'a'.repeat(2_500_000) };
-    await expect(
-      reg.persist(tempRoot, 'security-findings', 'big', huge),
-    ).rejects.toMatchObject({
+    await expect(reg.persist(tempRoot, 'security-findings', 'big', huge)).rejects.toMatchObject({
       name: 'ArtifactTooLargeError',
       max_bytes: 1 * 1024 * 1024,
     });
@@ -203,7 +199,10 @@ describe('SPEC-022-2-02: artifact-size limit', () => {
     ).rejects.toBeInstanceOf(ArtifactTooLargeError);
     // No tmp files should have been written.
     const fs = await import('node:fs/promises');
-    const exists = await fs.stat(target).then(() => true).catch(() => false);
+    const exists = await fs
+      .stat(target)
+      .then(() => true)
+      .catch(() => false);
     // The directory may or may not exist (we throw before mkdir); but no .tmp.* file should exist.
     if (exists) {
       const ents = await fs.readdir(target);
@@ -233,15 +232,11 @@ describe('SPEC-022-2-02: concurrent-chain cap', () => {
     const manifests = [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
-        consumes: [
-          { artifact_type: 'security-findings', schema_version: '^1.0' },
-        ],
+        consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
       }),
     ];
     return { manifests, graph: buildGraphFrom(manifests) };
@@ -419,9 +414,7 @@ describe('SPEC-022-2-05: resource-limits cross-feature scenarios', () => {
                 ]
               : undefined,
           consumes:
-            i === 0
-              ? undefined
-              : [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+            i === 0 ? undefined : [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
         }),
       );
     }
@@ -452,9 +445,7 @@ describe('SPEC-022-2-05: resource-limits cross-feature scenarios', () => {
     const manifests = [
       buildManifest({
         id: 'producer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'fixer',
@@ -476,15 +467,11 @@ describe('SPEC-022-2-05: resource-limits cross-feature scenarios', () => {
       maxArtifactSizeMb: 1 / 1024, // 1 KB
     });
     // Re-load schemas so `validate` works.
-    await tinyRegistry.loadSchemas(
-      `${__dirname}/../../schemas/artifacts`,
-    );
+    await tinyRegistry.loadSchemas(`${__dirname}/../../schemas/artifacts`);
     const oversize = { patches: 'a'.repeat(5000) };
     const invoker: ChainHookInvoker = async (pid) => {
       if (pid === 'fixer') {
-        return [
-          { artifactType: 'code-patches', scanId: 'big', payload: oversize },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 'big', payload: oversize }];
       }
       return [];
     };
@@ -514,16 +501,12 @@ describe('SPEC-022-2-05: resource-limits cross-feature scenarios', () => {
     const trio: HookManifest[] = [
       buildManifest({
         id: 't0',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'middle',
         consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
-        produces: [
-          { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'code-patches', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'tail',
@@ -565,9 +548,7 @@ describe('SPEC-022-2-05: resource-limits cross-feature scenarios', () => {
     const manifests = [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
@@ -666,9 +647,7 @@ describe('SPEC-022-2-05: resource-limits cross-feature scenarios', () => {
               ? [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }]
               : undefined,
           consumes:
-            i === 0
-              ? undefined
-              : [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
+            i === 0 ? undefined : [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
         }),
       );
     }

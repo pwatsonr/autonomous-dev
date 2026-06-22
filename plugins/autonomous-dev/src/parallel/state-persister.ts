@@ -65,7 +65,7 @@ const logger = {
 
 export class StatePersister {
   constructor(
-    private stateDir: string,   // e.g. "{repoRoot}/.autonomous-dev/state"
+    private stateDir: string, // e.g. "{repoRoot}/.autonomous-dev/state"
     private archiveDir: string, // e.g. "{repoRoot}/.autonomous-dev/archive"
   ) {}
 

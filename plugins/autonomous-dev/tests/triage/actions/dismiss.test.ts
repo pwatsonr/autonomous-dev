@@ -9,7 +9,11 @@ import * as path from 'path';
 import * as os from 'os';
 import { executeDismiss, createFingerprintStoreUpdater } from '../../../src/triage/actions/dismiss';
 import type { UpdateFingerprintStoreFn } from '../../../src/triage/actions/dismiss';
-import type { TriageDecision, TriageAuditEntry, TriageAuditLogger } from '../../../src/triage/types';
+import type {
+  TriageDecision,
+  TriageAuditEntry,
+  TriageAuditLogger,
+} from '../../../src/triage/types';
 import type { FingerprintStore } from '../../../src/engine/types';
 
 // ---------------------------------------------------------------------------
@@ -56,9 +60,13 @@ function createMockAuditLog(): TriageAuditLogger & { entries: TriageAuditEntry[]
   const entries: TriageAuditEntry[] = [];
   return {
     entries,
-    log(entry: TriageAuditEntry) { entries.push(entry); },
+    log(entry: TriageAuditEntry) {
+      entries.push(entry);
+    },
     logError() {},
-    getEntries() { return entries; },
+    getEntries() {
+      return entries;
+    },
     async flush() {},
   };
 }
@@ -145,10 +153,7 @@ describe('executeDismiss', () => {
     await executeDismiss(decision, filePath, auditLog, updateFp);
 
     // Read updated fingerprint store
-    const storeContent = await fsp.readFile(
-      path.join(fpDir, 'api-gateway.json'),
-      'utf-8',
-    );
+    const storeContent = await fsp.readFile(path.join(fpDir, 'api-gateway.json'), 'utf-8');
     const store = JSON.parse(storeContent) as FingerprintStore;
 
     expect(store.fingerprints[0].triage_status).toBe('dismissed');
@@ -181,10 +186,7 @@ describe('executeDismiss', () => {
 
     await executeDismiss(decision, filePath, auditLog, updateFp);
 
-    const storeContent = await fsp.readFile(
-      path.join(fpDir, 'api-gateway.json'),
-      'utf-8',
-    );
+    const storeContent = await fsp.readFile(path.join(fpDir, 'api-gateway.json'), 'utf-8');
     const store = JSON.parse(storeContent) as FingerprintStore;
 
     expect(store.fingerprints).toHaveLength(1);

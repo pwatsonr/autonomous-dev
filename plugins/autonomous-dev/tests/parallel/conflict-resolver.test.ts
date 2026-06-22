@@ -126,35 +126,34 @@ describe('ConflictResolver', () => {
 
   describe('classifyConflict', () => {
     it('returns NonOverlapping when ours is null', () => {
-      expect(resolver.classifyConflict('base', null, 'theirs'))
-        .toBe(ConflictType.NonOverlapping);
+      expect(resolver.classifyConflict('base', null, 'theirs')).toBe(ConflictType.NonOverlapping);
     });
 
     it('returns NonOverlapping when theirs is null', () => {
-      expect(resolver.classifyConflict('base', 'ours', null))
-        .toBe(ConflictType.NonOverlapping);
+      expect(resolver.classifyConflict('base', 'ours', null)).toBe(ConflictType.NonOverlapping);
     });
 
     it('returns OverlappingConflicting when base is null', () => {
       // Both tracks added the file independently
-      expect(resolver.classifyConflict(null, 'ours', 'theirs'))
-        .toBe(ConflictType.OverlappingConflicting);
+      expect(resolver.classifyConflict(null, 'ours', 'theirs')).toBe(
+        ConflictType.OverlappingConflicting,
+      );
     });
 
     it('returns NonOverlapping when changes are on different lines', () => {
       const base = 'line1\nline2\nline3\nline4\n';
-      const ours = 'CHANGED1\nline2\nline3\nline4\n';     // changed line 1
-      const theirs = 'line1\nline2\nline3\nCHANGED4\n';   // changed line 4
-      expect(resolver.classifyConflict(base, ours, theirs))
-        .toBe(ConflictType.NonOverlapping);
+      const ours = 'CHANGED1\nline2\nline3\nline4\n'; // changed line 1
+      const theirs = 'line1\nline2\nline3\nCHANGED4\n'; // changed line 4
+      expect(resolver.classifyConflict(base, ours, theirs)).toBe(ConflictType.NonOverlapping);
     });
 
     it('returns OverlappingConflicting when changes are on the same lines', () => {
       const base = 'line1\nline2\nline3\n';
       const ours = 'line1\nOURS\nline3\n';
       const theirs = 'line1\nTHEIRS\nline3\n';
-      expect(resolver.classifyConflict(base, ours, theirs))
-        .toBe(ConflictType.OverlappingConflicting);
+      expect(resolver.classifyConflict(base, ours, theirs)).toBe(
+        ConflictType.OverlappingConflicting,
+      );
     });
   });
 
@@ -165,7 +164,10 @@ describe('ConflictResolver', () => {
   describe('escalateConflict', () => {
     it('writes escalation report to correct path', async () => {
       const report = await resolver.escalateConflict(
-        'src/service.ts', 'req-001', 'track-a', 'track-b',
+        'src/service.ts',
+        'req-001',
+        'track-a',
+        'track-b',
       );
 
       const reportDir = path.join(repoRoot, '.autonomous-dev', 'conflicts', 'req-req-001');
@@ -178,7 +180,10 @@ describe('ConflictResolver', () => {
 
     it('report contains all required fields', async () => {
       const report = await resolver.escalateConflict(
-        'src/service.ts', 'req-001', 'track-a', 'track-b',
+        'src/service.ts',
+        'req-001',
+        'track-a',
+        'track-b',
       );
 
       expect(report.id).toMatch(/^conflict-req-001-\d+$/);
@@ -204,7 +209,11 @@ describe('ConflictResolver', () => {
       };
 
       const report = await resolver.escalateConflict(
-        'src/service.ts', 'req-001', 'track-a', 'track-b', aiResult,
+        'src/service.ts',
+        'req-001',
+        'track-a',
+        'track-b',
+        aiResult,
       );
 
       expect(report.aiSuggestion).toBe('merged content');
@@ -214,7 +223,10 @@ describe('ConflictResolver', () => {
 
     it('sets AI fields to null when no AI result provided', async () => {
       const report = await resolver.escalateConflict(
-        'src/service.ts', 'req-001', 'track-a', 'track-b',
+        'src/service.ts',
+        'req-001',
+        'track-a',
+        'track-b',
       );
 
       expect(report.aiSuggestion).toBeNull();
@@ -226,9 +238,7 @@ describe('ConflictResolver', () => {
       // Set up a merge conflict first
       setupMergeConflict(repoRoot);
 
-      await resolver.escalateConflict(
-        'src/service.ts', 'req-001', 'track-a', 'track-b',
-      );
+      await resolver.escalateConflict('src/service.ts', 'req-001', 'track-a', 'track-b');
 
       // Verify no merge in progress
       const status = execSync(`git -C "${repoRoot}" status`, { encoding: 'utf-8' });
@@ -239,9 +249,7 @@ describe('ConflictResolver', () => {
       const events: any[] = [];
       emitter.on('merge.escalated', (e) => events.push(e));
 
-      await resolver.escalateConflict(
-        'src/service.ts', 'req-001', 'track-a', 'track-b',
-      );
+      await resolver.escalateConflict('src/service.ts', 'req-001', 'track-a', 'track-b');
 
       expect(events.length).toBe(1);
       expect(events[0].type).toBe('merge.escalated');
@@ -255,7 +263,10 @@ describe('ConflictResolver', () => {
 
     it('report JSON on disk matches returned report', async () => {
       const report = await resolver.escalateConflict(
-        'src/service.ts', 'req-001', 'track-a', 'track-b',
+        'src/service.ts',
+        'req-001',
+        'track-a',
+        'track-b',
       );
 
       const reportDir = path.join(repoRoot, '.autonomous-dev', 'conflicts', 'req-req-001');

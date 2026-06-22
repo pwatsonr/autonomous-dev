@@ -39,9 +39,7 @@ export async function rollback(
   storage: DocumentStorage,
 ): Promise<VersionRecord> {
   // 1. Read target version content
-  const targetContent = await storage.readVersion(
-    pipelineId, type, documentId, targetVersion,
-  );
+  const targetContent = await storage.readVersion(pipelineId, type, documentId, targetVersion);
 
   // 2. Create new version with ROLLBACK reason
   const request: VersionCreateRequest = {

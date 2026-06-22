@@ -55,9 +55,7 @@ describe('sql-injection-detector — unsafe patterns flagged', () => {
   });
 
   it('PY-FSTRING-2: f-string with WHERE only', async () => {
-    const r = await runOn([
-      { name: 'a.py', contents: 'q = f"... WHERE name = {name}"\n' },
-    ]);
+    const r = await runOn([{ name: 'a.py', contents: 'q = f"... WHERE name = {name}"\n' }]);
     expect(r.passed).toBe(false);
   });
 
@@ -105,7 +103,10 @@ describe('sql-injection-detector — unsafe patterns flagged', () => {
 
   it('JAVA-FORMAT: String.format with SELECT', async () => {
     const r = await runOn([
-      { name: 'a.java', contents: 'String sql = String.format("SELECT * FROM t WHERE id = %s", id);\n' },
+      {
+        name: 'a.java',
+        contents: 'String sql = String.format("SELECT * FROM t WHERE id = %s", id);\n',
+      },
     ]);
     expect(r.passed).toBe(false);
   });
@@ -119,7 +120,10 @@ describe('sql-injection-detector — unsafe patterns flagged', () => {
 
   it('JAVA-MSGFMT: MessageFormat.format with SELECT', async () => {
     const r = await runOn([
-      { name: 'a.java', contents: 'String sql = MessageFormat.format("SELECT * FROM t WHERE id = {0}", id);\n' },
+      {
+        name: 'a.java',
+        contents: 'String sql = MessageFormat.format("SELECT * FROM t WHERE id = {0}", id);\n',
+      },
     ]);
     expect(r.passed).toBe(false);
   });
@@ -128,7 +132,10 @@ describe('sql-injection-detector — unsafe patterns flagged', () => {
 describe('sql-injection-detector — safe patterns NOT flagged', () => {
   it('Python parameterized cursor.execute', async () => {
     const r = await runOn([
-      { name: 'a.py', contents: 'cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))\n' },
+      {
+        name: 'a.py',
+        contents: 'cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))\n',
+      },
     ]);
     expect(r.passed).toBe(true);
   });
@@ -149,7 +156,11 @@ describe('sql-injection-detector — safe patterns NOT flagged', () => {
 
   it('Java PreparedStatement', async () => {
     const r = await runOn([
-      { name: 'a.java', contents: 'PreparedStatement ps = c.prepareStatement("SELECT * FROM t WHERE id = ?");\nps.setString(1, userId);\n' },
+      {
+        name: 'a.java',
+        contents:
+          'PreparedStatement ps = c.prepareStatement("SELECT * FROM t WHERE id = ?");\nps.setString(1, userId);\n',
+      },
     ]);
     expect(r.passed).toBe(true);
   });

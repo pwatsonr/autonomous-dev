@@ -33,13 +33,13 @@ import * as path from 'path';
 
 export interface AutoPromoteConfig {
   enabled: boolean;
-  override_hours: number;          // Default: 2
+  override_hours: number; // Default: 2
 }
 
 export interface AutoPromoteResult {
   promoted: boolean;
   reason: string;
-  safeguard_failed?: string;       // Which safeguard blocked promotion
+  safeguard_failed?: string; // Which safeguard blocked promotion
 }
 
 export interface AutoPromoteCandidate {
@@ -82,7 +82,7 @@ export async function evaluateAutoPromote(
   governanceConfig: GovernanceConfig,
   notificationConfig: NotificationConfig,
   findObservations: (service: string, errorClass: string, after: Date) => ObservationSummary[],
-  logger: AuditLogger
+  logger: AuditLogger,
 ): Promise<AutoPromoteResult> {
   // Safeguard 1: Auto-promote must be enabled
   if (!autoPromoteConfig.enabled) {
@@ -125,7 +125,7 @@ export async function evaluateAutoPromote(
     observation.service,
     observation.error_class,
     governanceConfig,
-    findObservations
+    findObservations,
   );
   if (oscillation.oscillating) {
     return {
@@ -166,7 +166,7 @@ export async function executeAutoPromotion(
   rootDir: string,
   notificationConfig: NotificationConfig,
   logger: AuditLogger,
-  generatePrdFromObservation?: (filePath: string, rootDir: string) => Promise<{ prdId: string }>
+  generatePrdFromObservation?: (filePath: string, rootDir: string) => Promise<{ prdId: string }>,
 ): Promise<AutoPromotionExecution> {
   // 1. Generate PRD (delegates to promotion pipeline from SPEC-007-4-3)
   const prdResult = generatePrdFromObservation
@@ -203,17 +203,11 @@ export async function executeAutoPromotion(
     prdResult.prdId,
     overrideDeadline,
     autoPromoteConfig,
-    notificationConfig
+    notificationConfig,
   );
 
   // 5. Schedule override check
-  await scheduleOverrideCheck(
-    observation.id,
-    prdResult.prdId,
-    overrideDeadline,
-    rootDir,
-    logger
-  );
+  await scheduleOverrideCheck(observation.id, prdResult.prdId, overrideDeadline, rootDir, logger);
 
   return {
     prd_id: prdResult.prdId,
@@ -234,7 +228,7 @@ async function postAutoPromoteNotification(
   prdId: string,
   overrideDeadline: Date,
   autoPromoteConfig: AutoPromoteConfig,
-  notificationConfig: NotificationConfig
+  notificationConfig: NotificationConfig,
 ): Promise<void> {
   const message = {
     text: [
@@ -273,17 +267,8 @@ interface TriageAuditLogEntry {
 /**
  * Append an entry to the triage audit log (JSONL format).
  */
-async function appendToTriageAuditLog(
-  rootDir: string,
-  entry: TriageAuditLogEntry
-): Promise<void> {
-  const logPath = path.join(
-    rootDir,
-    '.autonomous-dev',
-    'logs',
-    'intelligence',
-    'triage-audit.log'
-  );
+async function appendToTriageAuditLog(rootDir: string, entry: TriageAuditLogEntry): Promise<void> {
+  const logPath = path.join(rootDir, '.autonomous-dev', 'logs', 'intelligence', 'triage-audit.log');
   const logDir = path.dirname(logPath);
   await fs.mkdir(logDir, { recursive: true });
   const json = JSON.stringify(entry);

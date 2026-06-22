@@ -10,14 +10,14 @@
  * and the structured message delivered to humans.
  */
 
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 import type {
   EscalationMessage,
   EscalationOption,
   EscalationArtifact,
   FormatterInput,
-} from "./types";
+} from './types';
 
 // ---------------------------------------------------------------------------
 // Secret detection
@@ -35,7 +35,7 @@ const SECRET_PATTERN =
  * Replace secret-like patterns in text with [REDACTED].
  */
 export function redactSecrets(text: string): string {
-  return text.replace(SECRET_PATTERN, "[REDACTED]");
+  return text.replace(SECRET_PATTERN, '[REDACTED]');
 }
 
 // ---------------------------------------------------------------------------
@@ -48,12 +48,9 @@ export function redactSecrets(text: string): string {
  * If the path starts with the workspace root, strip the prefix.
  * Otherwise, return the path unchanged.
  */
-export function sanitizePath(
-  absolutePath: string,
-  workspaceRoot: string,
-): string {
+export function sanitizePath(absolutePath: string, workspaceRoot: string): string {
   if (absolutePath.startsWith(workspaceRoot)) {
-    return absolutePath.slice(workspaceRoot.length).replace(/^\//, "");
+    return absolutePath.slice(workspaceRoot.length).replace(/^\//, '');
   }
   return absolutePath;
 }
@@ -81,7 +78,7 @@ export function generateSummary(
     return full;
   }
 
-  return full.slice(0, MAX_SUMMARY_LENGTH - 3) + "...";
+  return full.slice(0, MAX_SUMMARY_LENGTH - 3) + '...';
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +142,7 @@ export class EscalationIdGenerator {
     this.counter += 1;
     this.persistState();
 
-    const paddedCounter = String(this.counter).padStart(3, "0");
+    const paddedCounter = String(this.counter).padStart(3, '0');
     return `esc-${this.currentDate}-${paddedCounter}`;
   }
 
@@ -156,12 +153,9 @@ export class EscalationIdGenerator {
   /** Load counter state from the persisted file, or null if unavailable. */
   private loadState(): CounterState | null {
     try {
-      const raw = fs.readFileSync(this.statePath, "utf-8");
+      const raw = fs.readFileSync(this.statePath, 'utf-8');
       const parsed = JSON.parse(raw) as CounterState;
-      if (
-        typeof parsed.date === "string" &&
-        typeof parsed.counter === "number"
-      ) {
+      if (typeof parsed.date === 'string' && typeof parsed.counter === 'number') {
         return parsed;
       }
       return null;
@@ -179,7 +173,7 @@ export class EscalationIdGenerator {
     const dir = path.dirname(this.statePath);
     try {
       fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(this.statePath, JSON.stringify(state), "utf-8");
+      fs.writeFileSync(this.statePath, JSON.stringify(state), 'utf-8');
     } catch {
       // Best-effort persistence; in-memory state remains correct
     }
@@ -192,8 +186,8 @@ export class EscalationIdGenerator {
 function getUtcDateString(): string {
   const now = new Date();
   const y = now.getUTCFullYear();
-  const m = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(now.getUTCDate()).padStart(2, "0");
+  const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(now.getUTCDate()).padStart(2, '0');
   return `${y}${m}${d}`;
 }
 
@@ -218,7 +212,7 @@ export class EscalationFormatter {
    */
   constructor(
     private readonly idGenerator: EscalationIdGenerator,
-    private readonly verbosity: "terse" | "standard" | "verbose",
+    private readonly verbosity: 'terse' | 'standard' | 'verbose',
     private readonly workspaceRoot: string = process.cwd(),
   ) {}
 
@@ -232,28 +226,22 @@ export class EscalationFormatter {
   format(input: FormatterInput): EscalationMessage {
     // Enforce minimum 2 options
     if (input.options.length < 2) {
-      throw new Error(
-        `Escalation requires at least 2 options, got ${input.options.length}`,
-      );
+      throw new Error(`Escalation requires at least 2 options, got ${input.options.length}`);
     }
 
     const escalationId = this.idGenerator.next();
     const timestamp = new Date().toISOString();
     const summary = redactSecrets(
-      generateSummary(
-        input.escalationType,
-        input.pipelinePhase,
-        input.failureReason,
-      ),
+      generateSummary(input.escalationType, input.pipelinePhase, input.failureReason),
     );
 
     // Build message per verbosity mode
     switch (this.verbosity) {
-      case "terse":
+      case 'terse':
         return this.buildTerse(input, escalationId, timestamp, summary);
-      case "standard":
+      case 'standard':
         return this.buildStandard(input, escalationId, timestamp, summary);
-      case "verbose":
+      case 'verbose':
         return this.buildVerbose(input, escalationId, timestamp, summary);
     }
   }
@@ -274,7 +262,7 @@ export class EscalationFormatter {
     summary: string,
   ): EscalationMessage {
     const msg: Record<string, unknown> = {
-      schema_version: "v1",
+      schema_version: 'v1',
       escalation_id: escalationId,
       timestamp,
       request_id: input.requestId,
@@ -308,7 +296,7 @@ export class EscalationFormatter {
     summary: string,
   ): EscalationMessage {
     const msg: Record<string, unknown> = {
-      schema_version: "v1",
+      schema_version: 'v1',
       escalation_id: escalationId,
       timestamp,
       request_id: input.requestId,
@@ -357,7 +345,7 @@ export class EscalationFormatter {
     summary: string,
   ): EscalationMessage {
     const msg: Record<string, unknown> = {
-      schema_version: "v1",
+      schema_version: 'v1',
       escalation_id: escalationId,
       timestamp,
       request_id: input.requestId,

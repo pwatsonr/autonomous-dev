@@ -1,4 +1,7 @@
-import { BackwardCascadeController, CascadeInitiateRequest } from '../../../src/pipeline/cascade/cascade-controller';
+import {
+  BackwardCascadeController,
+  CascadeInitiateRequest,
+} from '../../../src/pipeline/cascade/cascade-controller';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
 import { DEFAULT_PIPELINE_CONFIG, PipelineConfig } from '../../../src/pipeline/types/config';
 import { PipelineState } from '../../../src/pipeline/flow/pipeline-state';
@@ -21,11 +24,16 @@ jest.mock('../../../src/pipeline/flow/pipeline-state-io', () => ({
 }));
 
 import { scopeCascade } from '../../../src/pipeline/cascade/cascade-scoper';
-import { readPipelineState, writePipelineState } from '../../../src/pipeline/flow/pipeline-state-io';
+import {
+  readPipelineState,
+  writePipelineState,
+} from '../../../src/pipeline/flow/pipeline-state-io';
 
 const mockedScopeCascade = scopeCascade as jest.MockedFunction<typeof scopeCascade>;
 const mockedReadPipelineState = readPipelineState as jest.MockedFunction<typeof readPipelineState>;
-const mockedWritePipelineState = writePipelineState as jest.MockedFunction<typeof writePipelineState>;
+const mockedWritePipelineState = writePipelineState as jest.MockedFunction<
+  typeof writePipelineState
+>;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,7 +49,8 @@ function createMockStorage() {
         traces_from: [],
       },
       body: '## Scope\n\nScope content\n\n## Requirements\n\nReqs content\n',
-      rawContent: '---\nid: PRD-001\n---\n## Scope\n\nScope content\n\n## Requirements\n\nReqs content\n',
+      rawContent:
+        '---\nid: PRD-001\n---\n## Scope\n\nScope content\n\n## Requirements\n\nReqs content\n',
       version: '1.0',
       filePath: '/fake/PRD-001',
     }),
@@ -426,9 +435,9 @@ describe('BackwardCascadeController.resolve', () => {
     mockedReadPipelineState.mockResolvedValue(null);
 
     const controller = createController();
-    await expect(
-      controller.resolve('PIPE-MISSING', 'CASCADE-001-001', 'system'),
-    ).rejects.toThrow('Pipeline PIPE-MISSING not found');
+    await expect(controller.resolve('PIPE-MISSING', 'CASCADE-001-001', 'system')).rejects.toThrow(
+      'Pipeline PIPE-MISSING not found',
+    );
   });
 });
 

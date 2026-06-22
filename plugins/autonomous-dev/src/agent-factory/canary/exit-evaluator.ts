@@ -87,8 +87,8 @@ export interface CanaryExitCriteria {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_EXIT_CRITERIA: CanaryExitCriteria = {
-  winThreshold: 0.60,
-  lossThreshold: 0.40,
+  winThreshold: 0.6,
+  lossThreshold: 0.4,
   catastrophicRegressionDelta: 1.5,
   minComparisons: 3,
 };
@@ -196,12 +196,8 @@ export class CanaryExitEvaluator {
     }
 
     // Step 3: Compute win/loss rates
-    const proposedWins = comparisons.filter(
-      (c) => c.outcome === 'proposed_wins',
-    ).length;
-    const currentWins = comparisons.filter(
-      (c) => c.outcome === 'current_wins',
-    ).length;
+    const proposedWins = comparisons.filter((c) => c.outcome === 'proposed_wins').length;
+    const currentWins = comparisons.filter((c) => c.outcome === 'current_wins').length;
     const total = comparisons.length;
     const winRate = proposedWins / total;
     const lossRate = currentWins / total;
@@ -257,10 +253,7 @@ export class CanaryExitEvaluator {
    * @param latestComparison  The most recent comparison result.
    * @returns                 `terminate` if catastrophic, `wait` otherwise.
    */
-  evaluateImmediate(
-    agentName: string,
-    latestComparison: CanaryComparison,
-  ): ExitDecision {
+  evaluateImmediate(agentName: string, latestComparison: CanaryComparison): ExitDecision {
     if (latestComparison.delta < -this.criteria.catastrophicRegressionDelta) {
       const reason = `Catastrophic regression: proposed scored ${Math.abs(latestComparison.delta).toFixed(1)} points below current on input ${latestComparison.input_hash.substring(0, 8)}`;
 
@@ -307,15 +300,11 @@ export class CanaryExitEvaluator {
   private resolveConfigCriteria(): Partial<CanaryExitCriteria> {
     const partial: Partial<CanaryExitCriteria> = {};
     const configAny = this.config as unknown as Record<string, unknown>;
-    const canaryConfig = configAny['canary'] as
-      | Record<string, unknown>
-      | undefined;
+    const canaryConfig = configAny['canary'] as Record<string, unknown> | undefined;
 
     if (!canaryConfig) return partial;
 
-    const exitCriteria = canaryConfig['exitCriteria'] as
-      | Record<string, unknown>
-      | undefined;
+    const exitCriteria = canaryConfig['exitCriteria'] as Record<string, unknown> | undefined;
 
     if (!exitCriteria) return partial;
 
@@ -326,8 +315,7 @@ export class CanaryExitEvaluator {
       partial.lossThreshold = exitCriteria['lossThreshold'];
     }
     if (typeof exitCriteria['catastrophicRegressionDelta'] === 'number') {
-      partial.catastrophicRegressionDelta =
-        exitCriteria['catastrophicRegressionDelta'];
+      partial.catastrophicRegressionDelta = exitCriteria['catastrophicRegressionDelta'];
     }
     if (typeof exitCriteria['minComparisons'] === 'number') {
       partial.minComparisons = exitCriteria['minComparisons'];

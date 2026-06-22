@@ -2,8 +2,14 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { pausePipeline, resumePipeline } from '../../../src/pipeline/flow/pause-resume-handler';
-import { createInitialPipelineState, DocumentState } from '../../../src/pipeline/flow/pipeline-state';
-import { writePipelineState, readPipelineState } from '../../../src/pipeline/flow/pipeline-state-io';
+import {
+  createInitialPipelineState,
+  DocumentState,
+} from '../../../src/pipeline/flow/pipeline-state';
+import {
+  writePipelineState,
+  readPipelineState,
+} from '../../../src/pipeline/flow/pipeline-state-io';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
 
@@ -82,9 +88,9 @@ describe('pause-resume-handler', () => {
     });
 
     it('throws for non-existent pipeline', async () => {
-      await expect(
-        pausePipeline('NON-EXISTENT', directoryManager, 'user-1'),
-      ).rejects.toThrow('Pipeline NON-EXISTENT not found');
+      await expect(pausePipeline('NON-EXISTENT', directoryManager, 'user-1')).rejects.toThrow(
+        'Pipeline NON-EXISTENT not found',
+      );
     });
   });
 
@@ -126,7 +132,11 @@ describe('pause-resume-handler', () => {
       state.documentStates['TDD-001'] = tdd;
 
       // PLAN-001 is revision-requested, no blockers -> ready
-      state.documentStates['PLAN-001'] = makeDocState('PLAN-001', DocumentType.PLAN, 'revision-requested');
+      state.documentStates['PLAN-001'] = makeDocState(
+        'PLAN-001',
+        DocumentType.PLAN,
+        'revision-requested',
+      );
 
       state.status = 'PAUSED';
       state.pausedAt = new Date().toISOString();
@@ -163,18 +173,14 @@ describe('pause-resume-handler', () => {
     });
 
     it('throws for non-existent pipeline', async () => {
-      await expect(
-        resumePipeline('NON-EXISTENT', directoryManager, 'user-1'),
-      ).rejects.toThrow('Pipeline NON-EXISTENT not found');
+      await expect(resumePipeline('NON-EXISTENT', directoryManager, 'user-1')).rejects.toThrow(
+        'Pipeline NON-EXISTENT not found',
+      );
     });
   });
 });
 
-function makeDocState(
-  documentId: string,
-  type: DocumentType,
-  status: string,
-): DocumentState {
+function makeDocState(documentId: string, type: DocumentType, status: string): DocumentState {
   return {
     documentId,
     type,

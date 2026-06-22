@@ -74,9 +74,9 @@ describe('Version + Quota Integration', () => {
     }
 
     // 21st should be blocked by quota
-    await expect(
-      enforcer.checkVersionLimit(pipelineId, 'PRD', documentId),
-    ).rejects.toThrow(QuotaExceededError);
+    await expect(enforcer.checkVersionLimit(pipelineId, 'PRD', documentId)).rejects.toThrow(
+      QuotaExceededError,
+    );
 
     try {
       await enforcer.checkVersionLimit(pipelineId, 'PRD', documentId);
@@ -98,9 +98,7 @@ describe('Version + Quota Integration', () => {
     }
 
     // 101st should be blocked
-    await expect(
-      enforcer.checkDocumentLimit(pipelineId),
-    ).rejects.toThrow(QuotaExceededError);
+    await expect(enforcer.checkDocumentLimit(pipelineId)).rejects.toThrow(QuotaExceededError);
 
     try {
       await enforcer.checkDocumentLimit(pipelineId);
@@ -129,6 +127,6 @@ describe('Version + Quota Integration', () => {
 
     const versions = await listVersions(pipelineId, DocumentType.PRD, documentId, dm);
     expect(versions).toHaveLength(3);
-    expect(versions.map(v => v.version)).toEqual(['1.0', '1.1', '1.2']);
+    expect(versions.map((v) => v.version)).toEqual(['1.0', '1.1', '1.2']);
   });
 });

@@ -76,22 +76,19 @@ const CATALOG: CatalogEntry[] = [
   },
   {
     name: 'email-naive-evil',
-    pattern:
-      '^([a-zA-Z0-9])(([\\-.]|[_]+)?([a-zA-Z0-9]+))*(@){1}([a-z0-9]+)([\\.][a-z]{2,3}){2}$',
+    pattern: '^([a-zA-Z0-9])(([\\-.]|[_]+)?([a-zA-Z0-9]+))*(@){1}([a-z0-9]+)([\\.][a-z]{2,3}){2}$',
     input: 'a'.repeat(35) + '@',
     source: 'RegExLib-evil-email',
   },
   {
     name: 'url-naive',
-    pattern:
-      '^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?$',
+    pattern: '^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\\?([^#]*))?(#(.*))?$',
     input: 'http://' + 'a'.repeat(25),
     source: 'RFC3986-evil',
   },
   {
     name: 'phone-naive',
-    pattern:
-      '^[+]?[(]?[0-9]{1,4}[)]?[-\\s\\.]?([0-9]{1,4}[-\\s\\.]?){1,5}[0-9]{1,9}$',
+    pattern: '^[+]?[(]?[0-9]{1,4}[)]?[-\\s\\.]?([0-9]{1,4}[-\\s\\.]?){1,5}[0-9]{1,9}$',
     input: '+12345678901234567890123456789012345!',
     source: 'RegExLib',
   },
@@ -170,17 +167,15 @@ describe('ReDoS sandbox — adversarial catalog (SPEC-021-2-05)', () => {
   }
 
   it('input >10KB rejected synchronously (no worker spawn)', async () => {
-    await expect(
-      evaluateRegex('foo', 'a'.repeat(10241)),
-    ).rejects.toThrow(/SecurityError: input exceeds 10240/);
+    await expect(evaluateRegex('foo', 'a'.repeat(10241))).rejects.toThrow(
+      /SecurityError: input exceeds 10240/,
+    );
   });
 
   it('30 concurrent evil patterns all resolve without leaking workers', async () => {
     const start = Date.now();
     const results = await Promise.all(
-      Array.from({ length: 30 }, () =>
-        evaluateRegex('^(a+)+$', 'a'.repeat(30) + 'X'),
-      ),
+      Array.from({ length: 30 }, () => evaluateRegex('^(a+)+$', 'a'.repeat(30) + 'X')),
     );
     const elapsed = Date.now() - start;
     // Every call resolved — none hung.

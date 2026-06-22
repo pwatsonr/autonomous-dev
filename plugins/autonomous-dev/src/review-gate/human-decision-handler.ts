@@ -76,7 +76,7 @@ export class HumanDecisionHandler {
     decision: HumanDecision,
     gateId: string,
     documentId: string,
-    originalAiOutcome: string
+    originalAiOutcome: string,
   ): HumanDecisionResult {
     // Validation
     this.validateDecision(decision);
@@ -115,7 +115,7 @@ export class HumanDecisionHandler {
     if (decision.action === 'approve_with_notes') {
       if (!decision.notes || decision.notes.trim() === '') {
         throw new HumanDecisionValidationError(
-          'notes is required for approve_with_notes action and must be non-empty.'
+          'notes is required for approve_with_notes action and must be non-empty.',
         );
       }
     }
@@ -123,7 +123,7 @@ export class HumanDecisionHandler {
     if (decision.action === 'revise') {
       if (!decision.guidance || decision.guidance.trim() === '') {
         throw new HumanDecisionValidationError(
-          'guidance is required for revise action and must be non-empty.'
+          'guidance is required for revise action and must be non-empty.',
         );
       }
     }
@@ -139,14 +139,14 @@ export class HumanDecisionHandler {
   private handleApprove(
     decision: HumanDecision,
     auditRecord: AuditRecord,
-    originalAiOutcome: string
+    originalAiOutcome: string,
   ): HumanDecisionResult {
     const overrideFinding = this.createSystemFinding(
       `Approved by human override. Original AI outcome: ${originalAiOutcome}.`,
       'suggestion',
       null,
       'human_override',
-      'human_override'
+      'human_override',
     );
 
     return {
@@ -162,14 +162,14 @@ export class HumanDecisionHandler {
    */
   private handleApproveWithNotes(
     decision: HumanDecision,
-    auditRecord: AuditRecord
+    auditRecord: AuditRecord,
   ): HumanDecisionResult {
     const notesFinding = this.createSystemFinding(
       decision.notes!,
       'suggestion',
       null,
       'human_notes',
-      'human_override'
+      'human_override',
     );
 
     return {
@@ -183,16 +183,13 @@ export class HumanDecisionHandler {
   /**
    * Revise: iteration resets. Human guidance added as a major finding.
    */
-  private handleRevise(
-    decision: HumanDecision,
-    auditRecord: AuditRecord
-  ): HumanDecisionResult {
+  private handleRevise(decision: HumanDecision, auditRecord: AuditRecord): HumanDecisionResult {
     const guidanceFinding = this.createSystemFinding(
       decision.guidance!,
       'major',
       null,
       'human_guidance',
-      'human_guidance'
+      'human_guidance',
     );
 
     return {
@@ -206,16 +203,13 @@ export class HumanDecisionHandler {
   /**
    * Reject: pipeline subtree halts. Critical:reject finding generated.
    */
-  private handleReject(
-    decision: HumanDecision,
-    auditRecord: AuditRecord
-  ): HumanDecisionResult {
+  private handleReject(decision: HumanDecision, auditRecord: AuditRecord): HumanDecisionResult {
     const rejectFinding = this.createSystemFinding(
       `Rejected by human operator. Rationale: ${decision.rationale}.`,
       'critical',
       'reject',
       'human_decision',
-      'human_override'
+      'human_override',
     );
 
     return {
@@ -230,16 +224,13 @@ export class HumanDecisionHandler {
    * Cascade up: triggers backward cascade to parent document.
    * Critical:reject finding mentioning backward cascade.
    */
-  private handleCascadeUp(
-    decision: HumanDecision,
-    auditRecord: AuditRecord
-  ): HumanDecisionResult {
+  private handleCascadeUp(decision: HumanDecision, auditRecord: AuditRecord): HumanDecisionResult {
     const cascadeFinding = this.createSystemFinding(
       'Human confirmed issue is in parent document. Initiating backward cascade.',
       'critical',
       'reject',
       'human_decision',
-      'human_override'
+      'human_override',
     );
 
     return {
@@ -262,7 +253,7 @@ export class HumanDecisionHandler {
     severity: 'critical' | 'major' | 'minor' | 'suggestion',
     criticalSub: 'blocking' | 'reject' | null,
     sectionId: string,
-    categoryId: string
+    categoryId: string,
   ): MergedFinding {
     return {
       id: `human-${crypto.randomUUID()}`,
@@ -287,7 +278,7 @@ export class HumanDecisionHandler {
     decision: HumanDecision,
     gateId: string,
     documentId: string,
-    originalAiOutcome: string
+    originalAiOutcome: string,
   ): AuditRecord {
     return {
       decision_id: `audit-${crypto.randomUUID()}`,

@@ -18,14 +18,8 @@
 import * as path from 'node:path';
 
 import { ArtifactRegistry } from '../../intake/chains/artifact-registry';
-import {
-  CapabilityError,
-  type ConsumerPluginRef,
-} from '../../intake/chains/types';
-import {
-  clearSchemaCache,
-  getCompileCount,
-} from '../../intake/chains/schema-cache';
+import { CapabilityError, type ConsumerPluginRef } from '../../intake/chains/types';
+import { clearSchemaCache, getCompileCount } from '../../intake/chains/schema-cache';
 import { createTempRequestDir, cleanupTempDir } from '../helpers/chain-fixtures';
 
 const FIXTURE_SCHEMA_ROOT = path.resolve(__dirname, 'fixtures', 'schemas');
@@ -41,18 +35,12 @@ describe('ArtifactRegistry.read — capability scope (SPEC-022-3-01)', () => {
     await registry.loadSchemas(FIXTURE_SCHEMA_ROOT);
     // Persist artifacts of BOTH types so the test isolates the capability
     // check (artifact existence is not the gating factor).
-    await registry.persist(
-      tempRoot,
-      'security-findings',
-      'cap-1',
-      { findings: [{ file: 'a', line: 1, rule_id: 'R' }] },
-    );
-    await registry.persist(
-      tempRoot,
-      'code-patches',
-      'cap-2',
-      { patches: [{ file: 'a', hunks: ['@@'] }] },
-    );
+    await registry.persist(tempRoot, 'security-findings', 'cap-1', {
+      findings: [{ file: 'a', line: 1, rule_id: 'R' }],
+    });
+    await registry.persist(tempRoot, 'code-patches', 'cap-2', {
+      patches: [{ file: 'a', hunks: ['@@'] }],
+    });
   });
 
   afterEach(async () => {
@@ -74,9 +62,9 @@ describe('ArtifactRegistry.read — capability scope (SPEC-022-3-01)', () => {
       pluginId: 'P',
       consumes: [{ artifact_type: 'security-findings', schema_version: '1.0' }],
     };
-    await expect(
-      registry.read('code-patches', 'cap-2', consumer, tempRoot),
-    ).rejects.toBeInstanceOf(CapabilityError);
+    await expect(registry.read('code-patches', 'cap-2', consumer, tempRoot)).rejects.toBeInstanceOf(
+      CapabilityError,
+    );
   });
 
   it('CapabilityError carries CAPABILITY_DENIED code and identifies plugin + type', async () => {
@@ -119,8 +107,8 @@ describe('ArtifactRegistry.read — capability scope (SPEC-022-3-01)', () => {
     await expect(
       registry.read('security-findings', 'cap-1', consumer, tempRoot),
     ).rejects.toBeInstanceOf(CapabilityError);
-    await expect(
-      registry.read('code-patches', 'cap-2', consumer, tempRoot),
-    ).rejects.toBeInstanceOf(CapabilityError);
+    await expect(registry.read('code-patches', 'cap-2', consumer, tempRoot)).rejects.toBeInstanceOf(
+      CapabilityError,
+    );
   });
 });

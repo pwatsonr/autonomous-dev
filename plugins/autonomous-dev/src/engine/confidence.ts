@@ -83,7 +83,7 @@ export interface TriageHistorySummary {
  * Weights for the three confidence factors per TDD section 3.8.
  */
 export const CONFIDENCE_WEIGHTS = {
-  evidence: 0.50,
+  evidence: 0.5,
   dedup: 0.25,
   history: 0.25,
 } as const;
@@ -163,11 +163,11 @@ export function computeHistoryScore(history: TriageHistorySummary): number {
 
   const promoteRate = history.promoted_count / history.total_similar;
 
-  if (promoteRate > 0.80) return 1.0;  // Historically promoted at >80%
-  if (promoteRate >= 0.50) return 0.7; // Mixed history
+  if (promoteRate > 0.8) return 1.0; // Historically promoted at >80%
+  if (promoteRate >= 0.5) return 0.7; // Mixed history
 
   const dismissRate = history.dismissed_count / history.total_similar;
-  if (dismissRate > 0.50) return 0.2;  // Mostly dismissed
+  if (dismissRate > 0.5) return 0.2; // Mostly dismissed
 
   return 0.5;
 }

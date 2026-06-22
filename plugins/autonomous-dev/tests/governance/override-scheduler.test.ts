@@ -9,11 +9,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import {
-  setupTestDir,
-  createMockObservation,
-  fileExists,
-} from '../helpers/mock-observations';
+import { setupTestDir, createMockObservation, fileExists } from '../helpers/mock-observations';
 import {
   scheduleMockOverride,
   listPendingOverrides,
@@ -96,7 +92,9 @@ async function processPendingOverrides(
         await fs.mkdir(path.dirname(cancelledPath), { recursive: true });
         await fs.writeFile(cancelledPath, prdContent, 'utf-8');
         await fs.unlink(prdPath);
-        logger.info(`Override: PRD ${prdId} cancelled (triage changed by ${observation.triage_by})`);
+        logger.info(
+          `Override: PRD ${prdId} cancelled (triage changed by ${observation.triage_by})`,
+        );
       } catch (err) {
         logger.warn(`Override: failed to cancel PRD ${prdId}: ${err}`);
       }
@@ -166,8 +164,10 @@ function parseFrontmatter(content: string): Record<string, any> | null {
     if (value === 'null' || value === '~' || value === '') value = null;
     else if (value === 'true') value = true;
     else if (value === 'false') value = false;
-    else if ((value.startsWith('"') && value.endsWith('"')) ||
-             (value.startsWith("'") && value.endsWith("'"))) {
+    else if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
       value = value.substring(1, value.length - 1);
     }
     result[key] = value;
@@ -211,12 +211,7 @@ describe('processPendingOverrides', () => {
     );
 
     // Schedule override with a deadline that has already passed
-    await scheduleMockOverride(
-      rootDir,
-      obs.id,
-      prdId,
-      new Date('2026-04-08T14:30:00Z'),
-    );
+    await scheduleMockOverride(rootDir, obs.id, prdId, new Date('2026-04-08T14:30:00Z'));
 
     const result = await processPendingOverrides(rootDir, mockLogger());
 
@@ -225,9 +220,9 @@ describe('processPendingOverrides', () => {
     expect(
       await fileExists(path.join(rootDir, '.autonomous-dev', 'prd', 'cancelled', `${prdId}.md`)),
     ).toBe(true);
-    expect(
-      await fileExists(path.join(rootDir, '.autonomous-dev', 'prd', `${prdId}.md`)),
-    ).toBe(false);
+    expect(await fileExists(path.join(rootDir, '.autonomous-dev', 'prd', `${prdId}.md`))).toBe(
+      false,
+    );
   });
 
   // TC-5-6-14: No override within window confirms PRD
@@ -249,20 +244,15 @@ describe('processPendingOverrides', () => {
       'utf-8',
     );
 
-    await scheduleMockOverride(
-      rootDir,
-      obs.id,
-      prdId,
-      new Date('2026-04-08T14:30:00Z'),
-    );
+    await scheduleMockOverride(rootDir, obs.id, prdId, new Date('2026-04-08T14:30:00Z'));
 
     const result = await processPendingOverrides(rootDir, mockLogger());
 
     expect(result.confirmed).toBe(1);
     // PRD should still be in place
-    expect(
-      await fileExists(path.join(rootDir, '.autonomous-dev', 'prd', `${prdId}.md`)),
-    ).toBe(true);
+    expect(await fileExists(path.join(rootDir, '.autonomous-dev', 'prd', `${prdId}.md`))).toBe(
+      true,
+    );
   });
 
   // Override check still pending if deadline not reached
@@ -305,7 +295,12 @@ describe('processPendingOverrides', () => {
     await scheduleMockOverride(rootDir, obs2.id, 'PRD-OBS-005', new Date('2026-04-08T10:00:00Z'));
 
     // Override 3: pending (future deadline)
-    await scheduleMockOverride(rootDir, 'OBS-future', 'PRD-OBS-006', new Date('2026-04-10T00:00:00Z'));
+    await scheduleMockOverride(
+      rootDir,
+      'OBS-future',
+      'PRD-OBS-006',
+      new Date('2026-04-10T00:00:00Z'),
+    );
 
     const result = await processPendingOverrides(
       rootDir,

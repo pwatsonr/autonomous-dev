@@ -19,11 +19,7 @@ import * as path from 'path';
 
 import { ParallelConfig } from './config';
 import type { ClassificationResult } from './conflict-classifier';
-import {
-  ConflictType,
-  ConflictResolutionResult,
-  ConflictResolutionRequest,
-} from './types';
+import { ConflictType, ConflictResolutionResult, ConflictResolutionRequest } from './types';
 
 // Re-export for convenience
 export { ConflictType } from './types';
@@ -177,12 +173,8 @@ export function threeWayMerge(
 
     // Handle the base line itself
     if (baseIdx < baseLines.length) {
-      const oursEntry = oursAlignment.find(
-        (a) => a.baseIdx === baseIdx && a.baseIdx !== -1,
-      );
-      const theirsEntry = theirsAlignment.find(
-        (a) => a.baseIdx === baseIdx && a.baseIdx !== -1,
-      );
+      const oursEntry = oursAlignment.find((a) => a.baseIdx === baseIdx && a.baseIdx !== -1);
+      const theirsEntry = theirsAlignment.find((a) => a.baseIdx === baseIdx && a.baseIdx !== -1);
 
       const oursChanged = oursEntry
         ? oursEntry.deleted || oursEntry.modLine !== baseLines[baseIdx]
@@ -208,9 +200,7 @@ export function threeWayMerge(
       } else {
         // Both changed
         const oursContent = oursEntry?.deleted ? null : oursEntry?.modLine;
-        const theirsContent = theirsEntry?.deleted
-          ? null
-          : theirsEntry?.modLine;
+        const theirsContent = theirsEntry?.deleted ? null : theirsEntry?.modLine;
 
         if (oursContent === theirsContent) {
           // Compatible: same change (including both deleted)
@@ -265,17 +255,12 @@ interface AlignmentEntry {
  * Build a line-by-line alignment between base and modified arrays
  * using LCS to determine which lines match.
  */
-function buildAlignment(
-  baseLines: string[],
-  modLines: string[],
-): AlignmentEntry[] {
+function buildAlignment(baseLines: string[], modLines: string[]): AlignmentEntry[] {
   const m = baseLines.length;
   const n = modLines.length;
 
   // Build LCS table
-  const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array(n + 1).fill(0),
-  );
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
@@ -391,8 +376,7 @@ export class ConflictResolver {
     private readonly eventEmitter: EventEmitter,
     spawnAgent?: SpawnConflictAgentFn,
   ) {
-    this.spawnConflictAgent =
-      spawnAgent ?? ConflictResolver.defaultSpawnConflictAgent;
+    this.spawnConflictAgent = spawnAgent ?? ConflictResolver.defaultSpawnConflictAgent;
   }
 
   /**
@@ -426,10 +410,9 @@ export class ConflictResolver {
    */
   async getStageContent(file: string, stage: 1 | 2 | 3): Promise<string | null> {
     try {
-      const output = execSync(
-        `git -C "${this.repoRoot}" show :${stage}:${file}`,
-        { encoding: 'utf-8' },
-      );
+      const output = execSync(`git -C "${this.repoRoot}" show :${stage}:${file}`, {
+        encoding: 'utf-8',
+      });
       return output;
     } catch {
       return null;
@@ -543,8 +526,7 @@ export class ConflictResolver {
     return {
       resolvedContent,
       confidence: 0.95,
-      reasoning:
-        'Non-overlapping hunks: both change sets applied independently to base',
+      reasoning: 'Non-overlapping hunks: both change sets applied independently to base',
       strategy: 'auto',
     };
   }
@@ -563,9 +545,7 @@ export class ConflictResolver {
    * If below threshold, throws ConflictResolutionBelowThresholdError for
    * human escalation.
    */
-  async aiResolve(
-    request: ConflictResolutionRequest,
-  ): Promise<ConflictResolutionResult> {
+  async aiResolve(request: ConflictResolutionRequest): Promise<ConflictResolutionResult> {
     this.eventEmitter.emit('merge.conflict_detected', {
       type: 'merge.conflict_detected',
       requestId: request.requestId,
@@ -695,9 +675,9 @@ REASONING: <explanation of merge decisions>`;
     aiResult?: ConflictResolutionResult,
   ): Promise<EscalationReport> {
     // 1. Read stage content
-    const baseContent = await this.getStageContent(file, 1) ?? '';
-    const oursContent = await this.getStageContent(file, 2) ?? '';
-    const theirsContent = await this.getStageContent(file, 3) ?? '';
+    const baseContent = (await this.getStageContent(file, 1)) ?? '';
+    const oursContent = (await this.getStageContent(file, 2)) ?? '';
+    const theirsContent = (await this.getStageContent(file, 3)) ?? '';
 
     // 2. Classify
     const conflictType = this.classifyConflict(
@@ -726,12 +706,7 @@ REASONING: <explanation of merge decisions>`;
     };
 
     // 4. Write report to structured location
-    const reportDir = path.join(
-      this.repoRoot,
-      '.autonomous-dev',
-      'conflicts',
-      `req-${requestId}`,
-    );
+    const reportDir = path.join(this.repoRoot, '.autonomous-dev', 'conflicts', `req-${requestId}`);
     await fs.mkdir(reportDir, { recursive: true });
     const reportPath = path.join(reportDir, `${report.id}.json`);
     await fs.writeFile(reportPath, JSON.stringify(report, null, 2), 'utf-8');

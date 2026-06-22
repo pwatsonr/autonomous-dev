@@ -77,10 +77,7 @@ export function buildSafetyConfig(
  */
 function rejectAfter(ms: number): Promise<never> {
   return new Promise<never>((_, reject) => {
-    setTimeout(
-      () => reject(new ScrubTimeoutError(`Scrubbing exceeded ${ms}ms`)),
-      ms,
-    );
+    setTimeout(() => reject(new ScrubTimeoutError(`Scrubbing exceeded ${ms}ms`)), ms);
   });
 }
 
@@ -150,10 +147,7 @@ export function performScrub(
       let match: RegExpExecArray | null;
       while ((match = regex.exec(result)) !== null) {
         // False-positive check
-        if (
-          pattern.falsePositiveCheck &&
-          pattern.falsePositiveCheck(match[0], result)
-        ) {
+        if (pattern.falsePositiveCheck && pattern.falsePositiveCheck(match[0], result)) {
           continue;
         }
 
@@ -169,9 +163,7 @@ export function performScrub(
         });
 
         result =
-          result.slice(0, match.index) +
-          replacement +
-          result.slice(match.index + match[0].length);
+          result.slice(0, match.index) + replacement + result.slice(match.index + match[0].length);
         regex.lastIndex = match.index + replacement.length;
       }
     } catch (e) {
@@ -188,10 +180,7 @@ export function performScrub(
       let match: RegExpExecArray | null;
       while ((match = regex.exec(result)) !== null) {
         // False-positive check
-        if (
-          pattern.falsePositiveCheck &&
-          pattern.falsePositiveCheck(match[0], result)
-        ) {
+        if (pattern.falsePositiveCheck && pattern.falsePositiveCheck(match[0], result)) {
           continue;
         }
 
@@ -207,9 +196,7 @@ export function performScrub(
         });
 
         result =
-          result.slice(0, match.index) +
-          replacement +
-          result.slice(match.index + match[0].length);
+          result.slice(0, match.index) + replacement + result.slice(match.index + match[0].length);
         regex.lastIndex = match.index + replacement.length;
       }
     } catch (e) {
@@ -222,15 +209,11 @@ export function performScrub(
   const entropyRedactions = detectHighEntropySecrets(result);
   if (entropyRedactions.length > 0) {
     // Process in reverse order to preserve position indices
-    const sortedRedactions = [...entropyRedactions].sort(
-      (a, b) => b.position - a.position,
-    );
+    const sortedRedactions = [...entropyRedactions].sort((a, b) => b.position - a.position);
 
     for (const redaction of sortedRedactions) {
       const before = result.substring(0, redaction.position);
-      const after = result.substring(
-        redaction.position + redaction.original_length,
-      );
+      const after = result.substring(redaction.position + redaction.original_length);
 
       // Preserve the key= prefix and only replace the value
       const matchedText = result.substring(
@@ -270,10 +253,7 @@ export function performScrub(
  * Matches that are already replacement tokens ([REDACTED:...],
  * [SECRET_REDACTED], [SCRUB_FAILED:...]) are skipped.
  */
-export function detectResiduals(
-  text: string,
-  config: DataSafetyConfig,
-): PatternMatch[] {
+export function detectResiduals(text: string, config: DataSafetyConfig): PatternMatch[] {
   const matches: PatternMatch[] = [];
 
   for (const pattern of [...config.pii_patterns, ...config.secret_patterns]) {
@@ -291,10 +271,7 @@ export function detectResiduals(
         }
 
         // Skip false positives
-        if (
-          pattern.falsePositiveCheck &&
-          pattern.falsePositiveCheck(match[0], text)
-        ) {
+        if (pattern.falsePositiveCheck && pattern.falsePositiveCheck(match[0], text)) {
           continue;
         }
 
@@ -347,10 +324,7 @@ export function postScrubValidation(
   if (residualsAfterReScrub.length === 0) {
     reScrubbed.validation_passed = true;
     reScrubbed.redaction_count += scrubResult.redaction_count;
-    reScrubbed.redactions = [
-      ...scrubResult.redactions,
-      ...reScrubbed.redactions,
-    ];
+    reScrubbed.redactions = [...scrubResult.redactions, ...reScrubbed.redactions];
     return reScrubbed;
   }
 

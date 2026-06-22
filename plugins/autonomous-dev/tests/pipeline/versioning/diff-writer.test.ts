@@ -2,7 +2,11 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { writeDiff, readDiff } from '../../../src/pipeline/versioning/diff-writer';
-import { VersionDiff, SectionDiff, DiffSummary } from '../../../src/pipeline/versioning/diff-engine';
+import {
+  VersionDiff,
+  SectionDiff,
+  DiffSummary,
+} from '../../../src/pipeline/versioning/diff-engine';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
 
@@ -44,9 +48,7 @@ function makeDiff(overrides: Partial<VersionDiff> = {}): VersionDiff {
     fromVersion: '1.0',
     toVersion: '1.1',
     sectionDiffs,
-    frontmatterChanges: [
-      { field: 'version', oldValue: '1.0', newValue: '1.1' },
-    ],
+    frontmatterChanges: [{ field: 'version', oldValue: '1.0', newValue: '1.1' }],
     summary,
     computedAt: '2026-04-08T12:00:00.000Z',
     ...overrides,
@@ -159,7 +161,7 @@ describe('diff-writer', () => {
     // Verify no temp files remain
     const diffsDir = dm.getDiffsDir(pipelineId, type, documentId);
     const files = await fs.readdir(diffsDir);
-    const tmpFiles = files.filter(f => f.endsWith('.tmp'));
+    const tmpFiles = files.filter((f) => f.endsWith('.tmp'));
     expect(tmpFiles).toHaveLength(0);
 
     // Verify the diff file exists and is valid YAML

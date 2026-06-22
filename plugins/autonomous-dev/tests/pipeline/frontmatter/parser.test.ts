@@ -116,7 +116,8 @@ function test_handles_frontmatter_no_body(): void {
 }
 
 function test_handles_multiline_yaml_strings(): void {
-  const content = '---\nid: PRD-001\ntitle: A document with many words in the title\nversion: 1.0\n---\n';
+  const content =
+    '---\nid: PRD-001\ntitle: A document with many words in the title\nversion: 1.0\n---\n';
   const result = parseFrontmatter(content);
 
   assert(result.frontmatter.title === 'A document with many words in the title', `title mismatch`);
@@ -145,7 +146,10 @@ function test_handles_special_characters(): void {
   const content = '---\nid: PRD-001\ntitle: "Special: chars [in] title, yes"\nversion: 1.0\n---\n';
   const result = parseFrontmatter(content);
 
-  assert(result.frontmatter.title === 'Special: chars [in] title, yes', `title mismatch: ${result.frontmatter.title}`);
+  assert(
+    result.frontmatter.title === 'Special: chars [in] title, yes',
+    `title mismatch: ${result.frontmatter.title}`,
+  );
   console.log('PASS: handles frontmatter with special characters');
 }
 
@@ -158,7 +162,8 @@ function test_preserves_raw_content(): void {
 }
 
 function test_parses_arrays_with_values(): void {
-  const content = '---\nid: TDD-001-01\ntitle: Test\ntraces_from: [section-1, section-2]\ndepends_on: [TDD-001-02]\n---\n';
+  const content =
+    '---\nid: TDD-001-01\ntitle: Test\ntraces_from: [section-1, section-2]\ndepends_on: [TDD-001-02]\n---\n';
   const result = parseFrontmatter(content);
 
   const tracesFrom = result.frontmatter.traces_from as string[];
@@ -193,17 +198,17 @@ function assert(condition: boolean, message: string): void {
 function assertParseError(err: unknown, expectedCode: string): void {
   assert(err instanceof FrontmatterParseError, `Expected FrontmatterParseError, got ${err}`);
   const parseErr = err as FrontmatterParseError;
-  assert(
-    parseErr.code === expectedCode,
-    `Expected code '${expectedCode}', got '${parseErr.code}'`,
-  );
+  assert(parseErr.code === expectedCode, `Expected code '${expectedCode}', got '${parseErr.code}'`);
 }
 
 // ---------------------------------------------------------------------------
 // Runner
 // ---------------------------------------------------------------------------
 describe('parser', () => {
-  it('test_parses_valid_frontmatter_with_all_fields', test_parses_valid_frontmatter_with_all_fields);
+  it(
+    'test_parses_valid_frontmatter_with_all_fields',
+    test_parses_valid_frontmatter_with_all_fields,
+  );
   it('test_returns_body_after_frontmatter', test_returns_body_after_frontmatter);
   it('test_throws_no_frontmatter_when_no_delimiter', test_throws_no_frontmatter_when_no_delimiter);
   it('test_throws_empty_frontmatter', test_throws_empty_frontmatter);

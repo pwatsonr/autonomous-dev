@@ -100,10 +100,7 @@ export class DomainGapDetector {
   private readonly gapsFilePath: string;
   private readonly auditLogger: AuditLogger | null;
 
-  constructor(opts: {
-    gapsFilePath: string;
-    auditLogger?: AuditLogger;
-  }) {
+  constructor(opts: { gapsFilePath: string; auditLogger?: AuditLogger }) {
     this.gapsFilePath = path.resolve(opts.gapsFilePath);
     this.auditLogger = opts.auditLogger ?? null;
   }
@@ -120,11 +117,7 @@ export class DomainGapDetector {
    * @param closestAgent      The closest-matching agent from discovery, or null.
    * @returns                 GapRecord that was logged (or would have been, if rate-limited).
    */
-  detect(
-    taskDomain: string,
-    taskDescription: string,
-    closestAgent: RankedAgent | null,
-  ): GapRecord {
+  detect(taskDomain: string, taskDescription: string, closestAgent: RankedAgent | null): GapRecord {
     const record = this.buildGapRecord(
       taskDomain,
       taskDescription,
@@ -245,9 +238,7 @@ export class DomainGapDetector {
     const weekStart = getCalendarWeekStart(new Date());
 
     return existing.some(
-      (g) =>
-        g.task_domain === taskDomain &&
-        new Date(g.detected_at) >= weekStart,
+      (g) => g.task_domain === taskDomain && new Date(g.detected_at) >= weekStart,
     );
   }
 

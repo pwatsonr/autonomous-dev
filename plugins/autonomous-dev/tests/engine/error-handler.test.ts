@@ -25,9 +25,7 @@ import type { ServiceConfig } from '../../src/config/intelligence-config.schema'
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildCandidate(
-  overrides: Partial<CandidateObservation> = {},
-): CandidateObservation {
+function buildCandidate(overrides: Partial<CandidateObservation> = {}): CandidateObservation {
   return {
     type: 'error',
     error_type: 'error_rate',
@@ -55,16 +53,14 @@ function buildService(overrides: Partial<ServiceConfig> = {}): ServiceConfig {
   };
 }
 
-function buildSeverityResult(
-  overrides: Partial<SeverityResult> = {},
-): SeverityResult {
+function buildSeverityResult(overrides: Partial<SeverityResult> = {}): SeverityResult {
   return {
     severity: 'P1',
     score: 0.65,
     breakdown: {
-      error_rate: { value: 12.3, sub_score: 0.50, weighted: 0.15 },
+      error_rate: { value: 12.3, sub_score: 0.5, weighted: 0.15 },
       affected_users: { value: 2400, sub_score: 0.75, weighted: 0.1875 },
-      service_criticality: { value: 'critical', sub_score: 1.0, weighted: 0.20 },
+      service_criticality: { value: 'critical', sub_score: 1.0, weighted: 0.2 },
       duration: { value: 45, sub_score: 0.75, weighted: 0.1125 },
       data_integrity: { value: 'no_data_risk', sub_score: 0.0, weighted: 0.0 },
     },
@@ -72,7 +68,11 @@ function buildSeverityResult(
   };
 }
 
-function buildMockAuditLogger(): AuditLogger & { warnings: string[]; errors: string[]; infos: string[] } {
+function buildMockAuditLogger(): AuditLogger & {
+  warnings: string[];
+  errors: string[];
+  infos: string[];
+} {
   const warnings: string[] = [];
   const errors: string[] = [];
   const infos: string[] = [];

@@ -12,13 +12,18 @@ import {
   DecompositionRequest,
   DecompositionError,
 } from '../../../src/pipeline/decomposition/decomposition-engine';
-import { ProposedChild, SmokeTestResult } from '../../../src/pipeline/decomposition/decomposition-record-io';
+import {
+  ProposedChild,
+  SmokeTestResult,
+} from '../../../src/pipeline/decomposition/decomposition-record-io';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeNode(overrides: Partial<DecompositionNode> & { documentId: string }): DecompositionNode {
+function makeNode(
+  overrides: Partial<DecompositionNode> & { documentId: string },
+): DecompositionNode {
   return {
     type: DocumentType.PRD,
     status: 'draft',
@@ -37,10 +42,12 @@ function makeNode(overrides: Partial<DecompositionNode> & { documentId: string }
 function makeTreeWithNodeCount(count: number): DecompositionTree {
   const tree = new DecompositionTree();
   for (let i = 0; i < count; i++) {
-    tree.addNode(makeNode({
-      documentId: `NODE-${String(i).padStart(3, '0')}`,
-      depth: i === 0 ? 0 : 1,
-    }));
+    tree.addNode(
+      makeNode({
+        documentId: `NODE-${String(i).padStart(3, '0')}`,
+        depth: i === 0 ? 0 : 1,
+      }),
+    );
   }
   return tree;
 }
@@ -99,7 +106,10 @@ function makeParentContent(overrides?: {
       priority: priority as any,
     },
     body: '## Overview\nSome content\n\n## Requirements\nSome requirements',
-    rawContent: '---\nid: PRD-001\nstatus: ' + status + '\n---\n## Overview\nSome content\n\n## Requirements\nSome requirements',
+    rawContent:
+      '---\nid: PRD-001\nstatus: ' +
+      status +
+      '\n---\n## Overview\nSome content\n\n## Requirements\nSome requirements',
     version: '1.0',
     filePath: '/mock/PRD-001/v1.0.md',
   };
@@ -148,17 +158,20 @@ function mockStorage(opts?: {
 }): DocumentStorage {
   createDocumentCallCount = 0;
 
-  const readDocumentFn = opts?.readDocumentFn ?? jest.fn().mockImplementation(
-    async (_pipelineId: string, _type: DocumentType, _docId: string) => {
-      if (opts?.parentContent === null) {
-        throw new Error('Document not found');
-      }
-      return opts?.parentContent ?? makeParentContent();
-    },
-  );
+  const readDocumentFn =
+    opts?.readDocumentFn ??
+    jest
+      .fn()
+      .mockImplementation(async (_pipelineId: string, _type: DocumentType, _docId: string) => {
+        if (opts?.parentContent === null) {
+          throw new Error('Document not found');
+        }
+        return opts?.parentContent ?? makeParentContent();
+      });
 
-  const createDocumentFn = opts?.createDocumentFn ?? jest.fn().mockImplementation(
-    async (req: any): Promise<DocumentHandle> => {
+  const createDocumentFn =
+    opts?.createDocumentFn ??
+    jest.fn().mockImplementation(async (req: any): Promise<DocumentHandle> => {
       createDocumentCallCount++;
       const docId = `${req.type}-001-${String(createDocumentCallCount).padStart(2, '0')}`;
       return {
@@ -170,8 +183,7 @@ function mockStorage(opts?: {
         symlinkPath: `/mock/${docId}/current.md`,
         documentDir: `/mock/${docId}`,
       };
-    },
-  );
+    });
 
   return {
     readDocument: readDocumentFn,
@@ -188,7 +200,9 @@ jest.mock('../../../src/pipeline/decomposition/decomposition-record-io', () => {
   const actual = jest.requireActual('../../../src/pipeline/decomposition/decomposition-record-io');
   return {
     ...actual,
-    writeDecompositionRecord: jest.fn().mockResolvedValue('/mock/decomposition/PRD-001-decomposition.yaml'),
+    writeDecompositionRecord: jest
+      .fn()
+      .mockResolvedValue('/mock/decomposition/PRD-001-decomposition.yaml'),
   };
 });
 
@@ -201,7 +215,9 @@ import { smokeTest } from '../../../src/pipeline/decomposition/smoke-test';
 import { writeDecompositionRecord } from '../../../src/pipeline/decomposition/decomposition-record-io';
 
 const mockedSmokeTest = smokeTest as jest.MockedFunction<typeof smokeTest>;
-const mockedWriteRecord = writeDecompositionRecord as jest.MockedFunction<typeof writeDecompositionRecord>;
+const mockedWriteRecord = writeDecompositionRecord as jest.MockedFunction<
+  typeof writeDecompositionRecord
+>;
 
 function makeRequest(overrides?: Partial<DecompositionRequest>): DecompositionRequest {
   return {
@@ -237,9 +253,9 @@ describe('Decomposition Engine', () => {
     const config = makeConfig();
     const tree = makeTreeWithNodeCount(1);
 
-    await expect(
-      decompose(makeRequest(), storage, config, tree),
-    ).rejects.toThrow(DecompositionError);
+    await expect(decompose(makeRequest(), storage, config, tree)).rejects.toThrow(
+      DecompositionError,
+    );
 
     try {
       await decompose(makeRequest(), storage, config, tree);
@@ -256,9 +272,9 @@ describe('Decomposition Engine', () => {
     const config = makeConfig();
     const tree = makeTreeWithNodeCount(1);
 
-    await expect(
-      decompose(makeRequest(), storage, config, tree),
-    ).rejects.toThrow(DecompositionError);
+    await expect(decompose(makeRequest(), storage, config, tree)).rejects.toThrow(
+      DecompositionError,
+    );
 
     try {
       await decompose(makeRequest(), storage, config, tree);
@@ -310,12 +326,7 @@ describe('Decomposition Engine', () => {
     ];
 
     await expect(
-      decompose(
-        makeRequest({ proposedChildren: children }),
-        storage,
-        config,
-        tree,
-      ),
+      decompose(makeRequest({ proposedChildren: children }), storage, config, tree),
     ).rejects.toThrow(DecompositionError);
 
     try {
@@ -334,12 +345,7 @@ describe('Decomposition Engine', () => {
 
     // CODE is at depth 4; trying to decompose further would go to depth 5
     await expect(
-      decompose(
-        makeRequest({ parentType: DocumentType.CODE }),
-        storage,
-        config,
-        tree,
-      ),
+      decompose(makeRequest({ parentType: DocumentType.CODE }), storage, config, tree),
     ).rejects.toThrow(DecompositionError);
   });
 
@@ -349,9 +355,9 @@ describe('Decomposition Engine', () => {
     const tree = makeTreeWithNodeCount(4);
 
     // 4 existing + 2 proposed = 6 > limit 5
-    await expect(
-      decompose(makeRequest(), storage, config, tree),
-    ).rejects.toThrow(DecompositionError);
+    await expect(decompose(makeRequest(), storage, config, tree)).rejects.toThrow(
+      DecompositionError,
+    );
 
     try {
       await decompose(makeRequest(), storage, config, tree);
@@ -367,9 +373,9 @@ describe('Decomposition Engine', () => {
 
     mockedSmokeTest.mockResolvedValue(failingSmokeTestResult());
 
-    await expect(
-      decompose(makeRequest(), storage, config, tree),
-    ).rejects.toThrow(DecompositionError);
+    await expect(decompose(makeRequest(), storage, config, tree)).rejects.toThrow(
+      DecompositionError,
+    );
 
     try {
       await decompose(makeRequest(), storage, config, tree);
@@ -454,7 +460,12 @@ describe('Decomposition Engine', () => {
 
     const children = [
       makeChild({ id: 'TDD-001-01', title: 'A', tracesFrom: ['overview'], dependsOn: [] }),
-      makeChild({ id: 'TDD-001-02', title: 'B', tracesFrom: ['requirements'], dependsOn: ['TDD-001-01'] }),
+      makeChild({
+        id: 'TDD-001-02',
+        title: 'B',
+        tracesFrom: ['requirements'],
+        dependsOn: ['TDD-001-01'],
+      }),
     ];
 
     await decompose(makeRequest({ proposedChildren: children }), storage, config, tree);
@@ -496,14 +507,12 @@ describe('Decomposition Engine', () => {
       tree,
     );
 
-    const overviewEntry = result.record.coverageMatrix.find(
-      e => e.parentSection === 'overview',
-    );
+    const overviewEntry = result.record.coverageMatrix.find((e) => e.parentSection === 'overview');
     expect(overviewEntry).toBeDefined();
     expect(overviewEntry!.coveredBy).toHaveLength(1);
 
     const requirementsEntry = result.record.coverageMatrix.find(
-      e => e.parentSection === 'requirements',
+      (e) => e.parentSection === 'requirements',
     );
     expect(requirementsEntry).toBeDefined();
     expect(requirementsEntry!.coveredBy).toHaveLength(2);
@@ -547,12 +556,7 @@ describe('Decomposition Engine', () => {
     const config = makeConfig({ smokeTestRequired: false });
     const tree = makeTreeWithNodeCount(1);
 
-    const result = await decompose(
-      makeRequest({ skipSmokeTest: true }),
-      storage,
-      config,
-      tree,
-    );
+    const result = await decompose(makeRequest({ skipSmokeTest: true }), storage, config, tree);
 
     expect(result.success).toBe(true);
     expect(result.smokeTestResult).toBeNull();
@@ -560,11 +564,7 @@ describe('Decomposition Engine', () => {
   });
 
   test('DecompositionError has correct name and properties', () => {
-    const error = new DecompositionError(
-      'PARENT_NOT_APPROVED',
-      'test message',
-      { extra: true },
-    );
+    const error = new DecompositionError('PARENT_NOT_APPROVED', 'test message', { extra: true });
     expect(error.name).toBe('DecompositionError');
     expect(error.type).toBe('PARENT_NOT_APPROVED');
     expect(error.message).toBe('test message');

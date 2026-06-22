@@ -40,10 +40,7 @@ export function checkNoSkipping(
 
   const parentState = pipelineState.documentStates[parentId];
   if (!parentState) {
-    throw new ProgressionError(
-      'SKIP_VIOLATION',
-      `Parent ${parentId} not found in pipeline state`,
-    );
+    throw new ProgressionError('SKIP_VIOLATION', `Parent ${parentId} not found in pipeline state`);
   }
 
   if (parentState.status !== 'approved') {
@@ -61,10 +58,7 @@ export function checkNoSkipping(
  *
  * @throws ProgressionError with GATE_VIOLATION
  */
-export function checkGateRequired(
-  documentId: string,
-  pipelineState: PipelineState,
-): void {
+export function checkGateRequired(documentId: string, pipelineState: PipelineState): void {
   const docState = pipelineState.documentStates[documentId];
   if (!docState) {
     throw new ProgressionError('GATE_VIOLATION', `Document ${documentId} not found`);
@@ -87,13 +81,13 @@ export function getReadyParallelSiblings(
   siblingIds: string[],
   pipelineState: PipelineState,
 ): string[] {
-  return siblingIds.filter(id => {
+  return siblingIds.filter((id) => {
     const state = pipelineState.documentStates[id];
     if (!state) return false;
     if (state.status !== 'draft') return false; // Only draft docs can be started
 
     // Check all blocking dependencies are approved
-    return state.blockedBy.every(blockerId => {
+    return state.blockedBy.every((blockerId) => {
       const blockerState = pipelineState.documentStates[blockerId];
       return blockerState && blockerState.status === 'approved';
     });
@@ -106,14 +100,11 @@ export function getReadyParallelSiblings(
  *
  * @returns true if all dependencies are met
  */
-export function areDependenciesMet(
-  documentId: string,
-  pipelineState: PipelineState,
-): boolean {
+export function areDependenciesMet(documentId: string, pipelineState: PipelineState): boolean {
   const docState = pipelineState.documentStates[documentId];
   if (!docState) return false;
 
-  return docState.blockedBy.every(blockerId => {
+  return docState.blockedBy.every((blockerId) => {
     const blockerState = pipelineState.documentStates[blockerId];
     return blockerState && blockerState.status === 'approved';
   });
@@ -128,16 +119,13 @@ export function areDependenciesMet(
  * @param pipelineState Current pipeline state
  * @returns true if all children of parentId are approved
  */
-export function isPhaseComplete(
-  parentId: string,
-  pipelineState: PipelineState,
-): boolean {
+export function isPhaseComplete(parentId: string, pipelineState: PipelineState): boolean {
   const parentState = pipelineState.documentStates[parentId];
   if (!parentState) return false;
 
   if (parentState.children.length === 0) return false; // No children yet
 
-  return parentState.children.every(childId => {
+  return parentState.children.every((childId) => {
     const childState = pipelineState.documentStates[childId];
     return childState && childState.status === 'approved';
   });

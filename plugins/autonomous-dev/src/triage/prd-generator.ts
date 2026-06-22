@@ -53,17 +53,13 @@ export interface PrdGenerationResult {
  *
  * Receives the interpolated prompt and returns the structured LLM response.
  */
-export type GeneratePrdViaLlmFn = (
-  prompt: string,
-) => Promise<LlmPrdContent>;
+export type GeneratePrdViaLlmFn = (prompt: string) => Promise<LlmPrdContent>;
 
 /**
  * Function signature for retrieving previous observation summaries.
  * Injected as a dependency for testability.
  */
-export type GetPreviousObservationsFn = (
-  service: string,
-) => Promise<string>;
+export type GetPreviousObservationsFn = (service: string) => Promise<string>;
 
 // ---------------------------------------------------------------------------
 // Body extraction helpers
@@ -82,8 +78,10 @@ export function extractSection(body: string, heading: string): string {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed.toLowerCase() === `## ${heading.toLowerCase()}` ||
-        trimmed.toLowerCase().startsWith(`## ${heading.toLowerCase()}`)) {
+    if (
+      trimmed.toLowerCase() === `## ${heading.toLowerCase()}` ||
+      trimmed.toLowerCase().startsWith(`## ${heading.toLowerCase()}`)
+    ) {
       capturing = true;
       continue;
     }
@@ -122,9 +120,11 @@ export function extractEvidenceFromBody(body: string): string {
  * Looks for patterns like "error_rate: 12.3% (baseline: 0.4%)" or
  * a Metrics/Success Criteria section with a Markdown table.
  */
-export function extractMetricsFromBody(
-  body: string,
-): { targetMetric: string; currentValue: string; baselineValue: string } {
+export function extractMetricsFromBody(body: string): {
+  targetMetric: string;
+  currentValue: string;
+  baselineValue: string;
+} {
   const defaults = { targetMetric: 'unknown', currentValue: 'unknown', baselineValue: 'unknown' };
 
   // Try to find metric patterns in the body
@@ -140,12 +140,18 @@ export function extractMetricsFromBody(
   }
 
   // Try: look for a Metrics or Success Criteria section with a table
-  const metricsSection = extractSection(body, 'Metrics') || extractSection(body, 'Success Criteria');
+  const metricsSection =
+    extractSection(body, 'Metrics') || extractSection(body, 'Success Criteria');
   if (metricsSection) {
     // Parse table rows: | metric | current | target | ...
-    const tableRows = metricsSection.split('\n').filter((l) => l.includes('|') && !l.includes('---'));
+    const tableRows = metricsSection
+      .split('\n')
+      .filter((l) => l.includes('|') && !l.includes('---'));
     for (const row of tableRows) {
-      const cells = row.split('|').map((c) => c.trim()).filter(Boolean);
+      const cells = row
+        .split('|')
+        .map((c) => c.trim())
+        .filter(Boolean);
       if (cells.length >= 3 && cells[0] !== 'Metric') {
         return {
           targetMetric: cells[0],
@@ -226,17 +232,9 @@ export async function generatePrdFromObservation(
   };
 
   // Step 3: Build LLM prompt
-  const previousSummary = getPreviousObs
-    ? await getPreviousObs(service)
-    : 'None';
+  const previousSummary = getPreviousObs ? await getPreviousObs(service) : 'None';
 
-  const prompt = buildPrdPrompt(
-    obsContent,
-    service,
-    repo,
-    severity,
-    previousSummary,
-  );
+  const prompt = buildPrdPrompt(obsContent, service, repo, severity, previousSummary);
 
   // Step 4: Generate PRD content via LLM
   const llmContent = await generateViaLlm(prompt);

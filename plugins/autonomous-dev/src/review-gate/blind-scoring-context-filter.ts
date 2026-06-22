@@ -219,9 +219,10 @@ export class BlindScoringContextFilter {
    * Filters document sections: removes revision-titled sections and
    * strips feedback references from remaining sections' content.
    */
-  private filterSections(
-    sections: { id: string; title: string; content: string }[],
-  ): { sections: { id: string; title: string; content: string }[]; revisionSectionsRemoved: boolean } {
+  private filterSections(sections: { id: string; title: string; content: string }[]): {
+    sections: { id: string; title: string; content: string }[];
+    revisionSectionsRemoved: boolean;
+  } {
     let revisionSectionsRemoved = false;
     const isRevisionSection = (title: string): boolean => {
       const normalized = title.trim().toLowerCase();

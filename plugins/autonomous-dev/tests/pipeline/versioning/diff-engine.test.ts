@@ -111,16 +111,12 @@ describe('computeDiff', () => {
   test('single section modified: detects modification with word count delta', () => {
     const oldContent = makeDoc({
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Section', content: 'One two three.' },
-      ],
+      sections: [{ level: 2, heading: 'Section', content: 'One two three.' }],
     });
 
     const newContent = makeDoc({
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Section', content: 'One two three four five six.' },
-      ],
+      sections: [{ level: 2, heading: 'Section', content: 'One two three four five six.' }],
     });
 
     const diff = computeDiff(oldContent, newContent, '1.0', '1.1');
@@ -139,9 +135,7 @@ describe('computeDiff', () => {
   test('section added: changeType is added, old content is null', () => {
     const oldContent = makeDoc({
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Existing', content: 'Content.' },
-      ],
+      sections: [{ level: 2, heading: 'Existing', content: 'Content.' }],
     });
 
     const newContent = makeDoc({
@@ -175,9 +169,7 @@ describe('computeDiff', () => {
 
     const newContent = makeDoc({
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Keep', content: 'Staying.' },
-      ],
+      sections: [{ level: 2, heading: 'Keep', content: 'Staying.' }],
     });
 
     const diff = computeDiff(oldContent, newContent, '1.0', '1.1');
@@ -196,17 +188,13 @@ describe('computeDiff', () => {
     const oldContent = makeDoc({
       frontmatter: { title: 'Doc', version: '1.0', status: 'draft' },
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Section', content: 'Content.' },
-      ],
+      sections: [{ level: 2, heading: 'Section', content: 'Content.' }],
     });
 
     const newContent = makeDoc({
       frontmatter: { title: 'Doc', version: '1.1', status: 'review' },
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Section', content: 'Content.' },
-      ],
+      sections: [{ level: 2, heading: 'Section', content: 'Content.' }],
     });
 
     const diff = computeDiff(oldContent, newContent, '1.0', '1.1');
@@ -228,17 +216,13 @@ describe('computeDiff', () => {
     const oldContent = makeDoc({
       frontmatter: { title: 'Doc' },
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Section', content: 'Content.' },
-      ],
+      sections: [{ level: 2, heading: 'Section', content: 'Content.' }],
     });
 
     const newContent = makeDoc({
       frontmatter: { title: 'Doc', author: 'agent-v1' },
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Section', content: 'Content.' },
-      ],
+      sections: [{ level: 2, heading: 'Section', content: 'Content.' }],
     });
 
     const diff = computeDiff(oldContent, newContent, '1.0', '1.1');
@@ -253,17 +237,13 @@ describe('computeDiff', () => {
     const oldContent = makeDoc({
       frontmatter: { title: 'Doc', deprecated: 'true' },
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Section', content: 'Content.' },
-      ],
+      sections: [{ level: 2, heading: 'Section', content: 'Content.' }],
     });
 
     const newContent = makeDoc({
       frontmatter: { title: 'Doc' },
       title: 'Doc',
-      sections: [
-        { level: 2, heading: 'Section', content: 'Content.' },
-      ],
+      sections: [{ level: 2, heading: 'Section', content: 'Content.' }],
     });
 
     const diff = computeDiff(oldContent, newContent, '1.0', '1.1');
@@ -290,7 +270,11 @@ describe('computeDiff', () => {
       sections: [
         { level: 2, heading: 'Stay Same A', content: 'Unchanged content A.' },
         { level: 2, heading: 'Stay Same B', content: 'Unchanged content B.' },
-        { level: 2, heading: 'Will Change', content: 'New completely different content replacing the old.' },
+        {
+          level: 2,
+          heading: 'Will Change',
+          content: 'New completely different content replacing the old.',
+        },
         { level: 2, heading: 'Brand New', content: 'This is new.' },
       ],
     });
@@ -307,8 +291,8 @@ describe('computeDiff', () => {
     const oldContent = makeDoc({
       title: 'Doc',
       sections: [
-        { level: 2, heading: 'A', content: 'one two three' },       // 3 words
-        { level: 2, heading: 'B', content: 'one two three four' },   // 4 words, will be removed
+        { level: 2, heading: 'A', content: 'one two three' }, // 3 words
+        { level: 2, heading: 'B', content: 'one two three four' }, // 4 words, will be removed
       ],
     });
 
@@ -316,7 +300,7 @@ describe('computeDiff', () => {
       title: 'Doc',
       sections: [
         { level: 2, heading: 'A', content: 'one two three four five' }, // 5 words (+2)
-        { level: 2, heading: 'C', content: 'alpha beta' },              // 2 words (new)
+        { level: 2, heading: 'C', content: 'alpha beta' }, // 2 words (new)
       ],
     });
 

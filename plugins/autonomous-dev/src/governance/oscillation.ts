@@ -15,7 +15,7 @@ export function checkOscillation(
   errorClass: string,
   config: GovernanceConfig,
   findObservations: (service: string, errorClass: string, afterDate: Date) => ObservationSummary[],
-  now?: Date
+  now?: Date,
 ): OscillationResult {
   const currentTime = now ?? new Date();
   const windowStart = new Date(currentTime);
@@ -28,7 +28,7 @@ export function checkOscillation(
       oscillating: true,
       count: recentObservations.length,
       window_days: config.oscillation_window_days,
-      observation_ids: recentObservations.map(obs => obs.id),
+      observation_ids: recentObservations.map((obs) => obs.id),
       observation_summaries: recentObservations,
       recommendation: 'systemic_investigation',
     };
@@ -51,8 +51,8 @@ export function buildOscillationWarningMarkdown(result: OscillationResult): stri
   lines.push('');
   lines.push(
     `This service + error class combination has generated ${result.count} observations in the ` +
-    `last ${result.window_days} days. This suggests a systemic issue that incremental fixes are not ` +
-    `resolving.`
+      `last ${result.window_days} days. This suggests a systemic issue that incremental fixes are not ` +
+      `resolving.`,
   );
   lines.push('');
   lines.push('**Previous observations:**');
@@ -65,7 +65,7 @@ export function buildOscillationWarningMarkdown(result: OscillationResult): stri
   lines.push('');
   lines.push(
     '**Recommendation:** Promote as an architectural investigation PRD rather than ' +
-    'an incremental fix PRD.'
+      'an incremental fix PRD.',
   );
 
   return lines.join('\n');

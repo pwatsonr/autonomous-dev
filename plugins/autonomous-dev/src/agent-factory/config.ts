@@ -68,27 +68,24 @@ const DEFAULT_CONFIG: AgentFactoryConfig = {
     agentCreationsPerWeek: 1,
   },
   anomalyThresholds: {
-    approvalRateDrop: 0.70,
+    approvalRateDrop: 0.7,
     qualityDeclinePoints: 0.5,
     qualityDeclineWindow: 10,
-    escalationRate: 0.30,
+    escalationRate: 0.3,
     tokenBudgetMultiplier: 2.0,
   },
-  modelRegistry: [
-    'claude-sonnet-4-20250514',
-    'claude-opus-4-20250514',
-  ],
+  modelRegistry: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514'],
   paths: {
     'audit-log': 'data/agent-audit.log',
     'metrics-jsonl': 'data/metrics/agent-invocations.jsonl',
     'metrics-db': 'data/agent-metrics.db',
     'weakness-reports': 'data/weakness-reports.jsonl',
-    'proposals': 'data/proposals.jsonl',
+    proposals: 'data/proposals.jsonl',
     'domain-gaps': 'data/domain-gaps.jsonl',
     'evaluations-dir': 'data/evaluations/',
     'proposed-agents-dir': 'data/proposed-agents/',
     'canary-state': 'data/canary-state.json',
-    'compatibility': 'data/agent-compatibility.json',
+    compatibility: 'data/agent-compatibility.json',
   },
 };
 
@@ -228,8 +225,7 @@ function parseConfigScalar(raw: string): unknown {
   if (raw === 'false') return false;
 
   // Quoted string
-  if ((raw.startsWith('"') && raw.endsWith('"')) ||
-      (raw.startsWith("'") && raw.endsWith("'"))) {
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
     return raw.slice(1, -1);
   }
 
@@ -325,7 +321,10 @@ export function loadConfig(configPath?: string): AgentFactoryConfig {
       config.observation.defaultThreshold = Number(rawObs['default-threshold']);
     }
     if (rawObs['per-agent-overrides'] !== undefined && rawObs['per-agent-overrides'] !== null) {
-      if (typeof rawObs['per-agent-overrides'] === 'object' && rawObs['per-agent-overrides'] !== null) {
+      if (
+        typeof rawObs['per-agent-overrides'] === 'object' &&
+        rawObs['per-agent-overrides'] !== null
+      ) {
         const overrides = rawObs['per-agent-overrides'] as Record<string, unknown>;
         config.observation.perAgentOverrides = {};
         for (const [k, v] of Object.entries(overrides)) {
@@ -349,10 +348,18 @@ export function loadConfig(configPath?: string): AgentFactoryConfig {
   // Rate limits section
   const rawRL = raw['rate-limits'] as Record<string, unknown> | undefined;
   if (rawRL) {
-    if (rawRL['modifications-per-agent-per-week'] !== undefined && rawRL['modifications-per-agent-per-week'] !== null) {
-      config.rateLimits.modificationsPerAgentPerWeek = Number(rawRL['modifications-per-agent-per-week']);
+    if (
+      rawRL['modifications-per-agent-per-week'] !== undefined &&
+      rawRL['modifications-per-agent-per-week'] !== null
+    ) {
+      config.rateLimits.modificationsPerAgentPerWeek = Number(
+        rawRL['modifications-per-agent-per-week'],
+      );
     }
-    if (rawRL['agent-creations-per-week'] !== undefined && rawRL['agent-creations-per-week'] !== null) {
+    if (
+      rawRL['agent-creations-per-week'] !== undefined &&
+      rawRL['agent-creations-per-week'] !== null
+    ) {
       config.rateLimits.agentCreationsPerWeek = Number(rawRL['agent-creations-per-week']);
     }
   }
@@ -372,7 +379,10 @@ export function loadConfig(configPath?: string): AgentFactoryConfig {
     if (rawAT['escalation-rate'] !== undefined && rawAT['escalation-rate'] !== null) {
       config.anomalyThresholds.escalationRate = Number(rawAT['escalation-rate']);
     }
-    if (rawAT['token-budget-multiplier'] !== undefined && rawAT['token-budget-multiplier'] !== null) {
+    if (
+      rawAT['token-budget-multiplier'] !== undefined &&
+      rawAT['token-budget-multiplier'] !== null
+    ) {
       config.anomalyThresholds.tokenBudgetMultiplier = Number(rawAT['token-budget-multiplier']);
     }
   }

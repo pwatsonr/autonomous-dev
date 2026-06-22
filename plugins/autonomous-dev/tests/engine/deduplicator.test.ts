@@ -11,18 +11,13 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { Deduplicator } from '../../src/engine/deduplicator';
-import type {
-  CandidateObservation,
-  FingerprintStore,
-} from '../../src/engine/types';
+import type { CandidateObservation, FingerprintStore } from '../../src/engine/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildCandidate(
-  overrides: Partial<CandidateObservation> = {},
-): CandidateObservation {
+function buildCandidate(overrides: Partial<CandidateObservation> = {}): CandidateObservation {
   return {
     type: 'error',
     error_type: 'error_rate',

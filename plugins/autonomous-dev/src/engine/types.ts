@@ -228,8 +228,8 @@ export interface FingerprintEntry {
   service: string;
   error_class: string;
   endpoint: string;
-  first_seen: string;       // ISO 8601
-  last_seen: string;        // ISO 8601
+  first_seen: string; // ISO 8601
+  last_seen: string; // ISO 8601
   occurrence_count: number;
   linked_observation_id: string;
   triage_status: string;

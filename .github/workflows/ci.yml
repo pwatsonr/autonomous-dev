@@ -224,7 +224,7 @@ jobs:
         run: npm ci
 
       - name: ESLint
-        run: npx eslint src/ tests/ --ext .ts --format github
+        run: npx eslint src/ tests/ --ext .ts --format stylish
 
       - name: Prettier
         run: npx prettier --check 'src/**/*.ts' 'tests/**/*.ts' 'package.json' 'tsconfig*.json' --log-level warn

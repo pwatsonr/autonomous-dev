@@ -22,12 +22,14 @@ const mockedAnalyzeImpact = analyzeImpact as jest.MockedFunction<typeof analyzeI
 /**
  * Helper: creates a mock DocumentStorage with configurable children.
  */
-function createMockStorage(childDocs: Array<{
-  documentId: string;
-  type: DocumentType;
-  tracesFrom: string[];
-}>) {
-  const docHandles = childDocs.map(d => ({
+function createMockStorage(
+  childDocs: Array<{
+    documentId: string;
+    type: DocumentType;
+    tracesFrom: string[];
+  }>,
+) {
+  const docHandles = childDocs.map((d) => ({
     documentId: d.documentId,
     pipelineId: 'PIPE-001',
     type: d.type,
@@ -38,9 +40,10 @@ function createMockStorage(childDocs: Array<{
 
   return {
     listDocuments: jest.fn().mockResolvedValue(docHandles),
-    readDocument: jest.fn().mockImplementation(
-      (_pipelineId: string, _type: DocumentType, docId: string) => {
-        const child = childDocs.find(c => c.documentId === docId);
+    readDocument: jest
+      .fn()
+      .mockImplementation((_pipelineId: string, _type: DocumentType, docId: string) => {
+        const child = childDocs.find((c) => c.documentId === docId);
         return Promise.resolve({
           frontmatter: {
             traces_from: child?.tracesFrom ?? [],
@@ -50,8 +53,7 @@ function createMockStorage(childDocs: Array<{
           version: '1.0',
           filePath: `/fake/${docId}`,
         });
-      },
-    ),
+      }),
   } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
@@ -90,13 +92,7 @@ describe('scopeCascade', () => {
     ]);
     mockedAnalyzeImpact.mockResolvedValue([]);
 
-    const result = await scopeCascade(
-      'PIPE-001',
-      'PRD-001',
-      ['scope'],
-      ['TDD-001-01'],
-      storage,
-    );
+    const result = await scopeCascade('PIPE-001', 'PRD-001', ['scope'], ['TDD-001-01'], storage);
 
     expect(result.affectedChildren).toEqual([]);
     expect(result.unaffectedChildren).toEqual(['TDD-001-01']);
@@ -148,20 +144,10 @@ describe('scopeCascade', () => {
     // analyzeImpact returns the child plus its descendants
     mockedAnalyzeImpact.mockResolvedValue(['TDD-001-01', 'PLAN-001-01-01', 'PLAN-001-01-02']);
 
-    const result = await scopeCascade(
-      'PIPE-001',
-      'PRD-001',
-      ['scope'],
-      ['TDD-001-01'],
-      storage,
-    );
+    const result = await scopeCascade('PIPE-001', 'PRD-001', ['scope'], ['TDD-001-01'], storage);
 
     expect(result.affectedChildren).toEqual(['TDD-001-01']);
-    expect(result.allAffectedDocuments).toEqual([
-      'TDD-001-01',
-      'PLAN-001-01-01',
-      'PLAN-001-01-02',
-    ]);
+    expect(result.allAffectedDocuments).toEqual(['TDD-001-01', 'PLAN-001-01-01', 'PLAN-001-01-02']);
   });
 
   it('child with empty traces_from: unaffected', async () => {
@@ -170,13 +156,7 @@ describe('scopeCascade', () => {
     ]);
     mockedAnalyzeImpact.mockResolvedValue([]);
 
-    const result = await scopeCascade(
-      'PIPE-001',
-      'PRD-001',
-      ['scope'],
-      ['TDD-001-01'],
-      storage,
-    );
+    const result = await scopeCascade('PIPE-001', 'PRD-001', ['scope'], ['TDD-001-01'], storage);
 
     expect(result.affectedChildren).toEqual([]);
     expect(result.unaffectedChildren).toEqual(['TDD-001-01']);

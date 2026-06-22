@@ -25,7 +25,7 @@ export async function getTraceChain(
     const content = await fs.readFile(traceabilityPath, 'utf-8');
     const matrix = yaml.load(content) as TraceabilityMatrix;
 
-    const chain = matrix.chains.find(c => c.requirementId === requirementId);
+    const chain = matrix.chains.find((c) => c.requirementId === requirementId);
     return chain ?? null;
   } catch {
     return null;

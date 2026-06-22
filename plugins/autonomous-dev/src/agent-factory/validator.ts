@@ -46,10 +46,10 @@ export type { ValidationResult };
 // is a trusted-execution role despite being read-only w.r.t. the repo;
 // adding further scoped-bash reviewers should be a deliberate decision.
 export const TOOL_ALLOWLIST: Record<AgentRole, string[]> = {
-  author:   ['Read', 'Glob', 'Grep', 'Write', 'WebSearch', 'WebFetch'],
+  author: ['Read', 'Glob', 'Grep', 'Write', 'WebSearch', 'WebFetch'],
   executor: ['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write', 'WebSearch', 'WebFetch'],
   reviewer: ['Read', 'Glob', 'Grep', 'Write', 'Bash(node *)'],
-  meta:     ['Read', 'Glob', 'Grep', 'Write'],
+  meta: ['Read', 'Glob', 'Grep', 'Write'],
 };
 
 // ---------------------------------------------------------------------------
@@ -214,11 +214,7 @@ const rule008TurnLimit: ValidationRule = {
   field: 'turn_limit',
   validate(agent: ParsedAgent): ValidationError | null {
     const val = agent.turn_limit;
-    if (
-      !Number.isInteger(val) ||
-      val < 1 ||
-      val > 100
-    ) {
+    if (!Number.isInteger(val) || val < 1 || val > 100) {
       return {
         rule: 'RULE_008_TURN_LIMIT',
         field: 'turn_limit',
@@ -293,10 +289,7 @@ export const VALIDATION_RULES: ValidationRule[] = [
  *                       (for RULE_001 uniqueness check).
  * @returns A `ValidationResult` containing all errors and warnings.
  */
-export function validateAgent(
-  parsed: ParsedAgent,
-  existingNames?: Set<string>,
-): ValidationResult {
+export function validateAgent(parsed: ParsedAgent, existingNames?: Set<string>): ValidationResult {
   const ctx: ValidationContext = {
     existingNames: existingNames ?? new Set(),
   };

@@ -17,9 +17,7 @@ import type { CandidateObservation, FalsePositiveFilterConfig } from '../../src/
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildCandidate(
-  overrides: Partial<CandidateObservation> = {},
-): CandidateObservation {
+function buildCandidate(overrides: Partial<CandidateObservation> = {}): CandidateObservation {
   return {
     type: 'error',
     error_type: 'error_rate',
@@ -355,11 +353,7 @@ describe('filterCandidates', () => {
       load_test_markers: [{ header: 'X-Load-Test', value: 'true' }],
     });
 
-    const result = filterCandidates(
-      candidates,
-      config,
-      new Date('2026-04-08T12:00:00Z'),
-    );
+    const result = filterCandidates(candidates, config, new Date('2026-04-08T12:00:00Z'));
 
     expect(result.passed).toHaveLength(1);
     expect(result.passed[0].service).toBe('svc-b');
@@ -368,10 +362,7 @@ describe('filterCandidates', () => {
   });
 
   it('returns all candidates as passed when no filters match', () => {
-    const candidates = [
-      buildCandidate({ service: 'svc-a' }),
-      buildCandidate({ service: 'svc-b' }),
-    ];
+    const candidates = [buildCandidate({ service: 'svc-a' }), buildCandidate({ service: 'svc-b' })];
 
     const config = buildFilterConfig();
     const result = filterCandidates(candidates, config);
@@ -393,11 +384,7 @@ describe('filterCandidates', () => {
       excluded_error_patterns: ['HealthCheck'],
     });
 
-    const result = filterCandidates(
-      candidates,
-      config,
-      new Date('2026-04-08T12:00:00Z'),
-    );
+    const result = filterCandidates(candidates, config, new Date('2026-04-08T12:00:00Z'));
 
     expect(result.passed).toHaveLength(0);
     expect(result.filtered).toHaveLength(1);
@@ -424,11 +411,7 @@ describe('filterCandidates', () => {
       load_test_markers: [{ header: 'X-Load-Test', value: 'true' }],
     });
 
-    const result = filterCandidates(
-      candidates,
-      config,
-      new Date('2026-04-08T12:00:00Z'),
-    );
+    const result = filterCandidates(candidates, config, new Date('2026-04-08T12:00:00Z'));
 
     expect(result.filtered[0].reason).toBe('load_test_traffic');
   });

@@ -10,14 +10,8 @@ import {
   buildErrorAggregationQuery,
   buildErrorSampleQuery,
 } from '../../src/adapters/opensearch-adapter';
-import type {
-  McpToolCaller,
-  ConnectivityReport,
-} from '../../src/adapters/types';
-import {
-  DefaultQueryBudgetTracker,
-  AdapterTimeoutError,
-} from '../../src/adapters/types';
+import type { McpToolCaller, ConnectivityReport } from '../../src/adapters/types';
+import { DefaultQueryBudgetTracker, AdapterTimeoutError } from '../../src/adapters/types';
 import type { ServiceConfig } from '../../src/config/intelligence-config.schema';
 
 // ---------------------------------------------------------------------------
@@ -63,7 +57,8 @@ function buildMockAggregationResponse(): Record<string, unknown> {
             '@timestamp': '2026-04-08T10:00:00.000Z',
             message: 'NullPointerException in UserService.getUser',
             level: 'ERROR',
-            stack_trace: 'java.lang.NullPointerException\n\tat UserService.getUser(UserService.java:42)',
+            stack_trace:
+              'java.lang.NullPointerException\n\tat UserService.getUser(UserService.java:42)',
             trace_id: 'abc-123-def',
           },
         },
@@ -113,7 +108,9 @@ function buildMockSampleResponse(count: number = 10): Record<string, unknown> {
 
 /** Builds a default query budget tracker. */
 function buildBudget(
-  overrides: Partial<Record<string, { max_queries_per_service: number; timeout_seconds: number }>> = {},
+  overrides: Partial<
+    Record<string, { max_queries_per_service: number; timeout_seconds: number }>
+  > = {},
 ): DefaultQueryBudgetTracker {
   return new DefaultQueryBudgetTracker({
     prometheus: { max_queries_per_service: 20, timeout_seconds: 30 },
@@ -152,13 +149,8 @@ describe('OpenSearchAdapter', () => {
       // Verify query structure
       expect(query.query).toEqual({
         bool: {
-          must: [
-            { match: { level: 'ERROR' } },
-            { range: { '@timestamp': { gte: 'now-4h' } } },
-          ],
-          filter: [
-            { term: { 'service.name': 'api-gateway' } },
-          ],
+          must: [{ match: { level: 'ERROR' } }, { range: { '@timestamp': { gte: 'now-4h' } } }],
+          filter: [{ term: { 'service.name': 'api-gateway' } }],
         },
       });
 
@@ -171,9 +163,7 @@ describe('OpenSearchAdapter', () => {
 
       // Verify size and source fields
       expect(query.size).toBe(50);
-      expect(query._source).toEqual([
-        '@timestamp', 'message', 'level', 'stack_trace', 'trace_id',
-      ]);
+      expect(query._source).toEqual(['@timestamp', 'message', 'level', 'stack_trace', 'trace_id']);
     });
 
     test('aggregation query uses configurable window', () => {
@@ -195,7 +185,12 @@ describe('OpenSearchAdapter', () => {
       const query = buildErrorSampleQuery('api-gateway', 4);
 
       expect(query._source).toEqual([
-        '@timestamp', 'message', 'stack_trace', 'trace_id', 'user_id', 'request_path',
+        '@timestamp',
+        'message',
+        'stack_trace',
+        'trace_id',
+        'user_id',
+        'request_path',
       ]);
     });
   });
@@ -212,9 +207,7 @@ describe('OpenSearchAdapter', () => {
         callTool: async () => {
           callCount++;
           // First call returns aggregation, second returns collapsed samples
-          return callCount === 1
-            ? buildMockAggregationResponse()
-            : sampleResponse;
+          return callCount === 1 ? buildMockAggregationResponse() : sampleResponse;
         },
       };
       const budget = buildBudget();
@@ -404,9 +397,10 @@ describe('OpenSearchAdapter', () => {
   describe('TC-1-3-11: timeout handling', () => {
     test('throws AdapterTimeoutError when query exceeds budget timeout', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       const budget = buildBudget({
         opensearch: { max_queries_per_service: 15, timeout_seconds: 0.05 },
@@ -414,9 +408,7 @@ describe('OpenSearchAdapter', () => {
       const adapter = new OpenSearchAdapter(slowMcp, budget);
       const service = buildService();
 
-      await expect(adapter.collectServiceLogs(service)).rejects.toThrow(
-        AdapterTimeoutError,
-      );
+      await expect(adapter.collectServiceLogs(service)).rejects.toThrow(AdapterTimeoutError);
     });
   });
 

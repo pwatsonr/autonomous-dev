@@ -114,24 +114,15 @@ function validateConfig(config: PipelineConfig): void {
   }
 
   if (config.storage.maxVersionsPerDocument < 1 || config.storage.maxVersionsPerDocument > 100) {
-    throw new ConfigValidationError(
-      'storage.maxVersionsPerDocument',
-      'must be between 1 and 100',
-    );
+    throw new ConfigValidationError('storage.maxVersionsPerDocument', 'must be between 1 and 100');
   }
 
   if (config.storage.maxTotalSizeBytes <= 0) {
-    throw new ConfigValidationError(
-      'storage.maxTotalSizeBytes',
-      'must be greater than 0',
-    );
+    throw new ConfigValidationError('storage.maxTotalSizeBytes', 'must be greater than 0');
   }
 
   if (config.storage.maxDocumentSizeBytes <= 0) {
-    throw new ConfigValidationError(
-      'storage.maxDocumentSizeBytes',
-      'must be greater than 0',
-    );
+    throw new ConfigValidationError('storage.maxDocumentSizeBytes', 'must be greater than 0');
   }
 
   if (
@@ -155,17 +146,11 @@ function validateConfig(config: PipelineConfig): void {
   }
 
   if (config.reviewGates.defaults.panelSize < 1) {
-    throw new ConfigValidationError(
-      'reviewGates.defaults.panelSize',
-      'must be at least 1',
-    );
+    throw new ConfigValidationError('reviewGates.defaults.panelSize', 'must be at least 1');
   }
 
   if (config.reviewGates.defaults.maxIterations < 1) {
-    throw new ConfigValidationError(
-      'reviewGates.defaults.maxIterations',
-      'must be at least 1',
-    );
+    throw new ConfigValidationError('reviewGates.defaults.maxIterations', 'must be at least 1');
   }
 
   if (
@@ -178,14 +163,8 @@ function validateConfig(config: PipelineConfig): void {
     );
   }
 
-  if (
-    config.decomposition.maxTotalNodes < 1 ||
-    config.decomposition.maxTotalNodes > 500
-  ) {
-    throw new ConfigValidationError(
-      'decomposition.maxTotalNodes',
-      'must be between 1 and 500',
-    );
+  if (config.decomposition.maxTotalNodes < 1 || config.decomposition.maxTotalNodes > 500) {
+    throw new ConfigValidationError('decomposition.maxTotalNodes', 'must be between 1 and 500');
   }
 
   if (
@@ -199,10 +178,7 @@ function validateConfig(config: PipelineConfig): void {
   }
 
   if (config.backwardCascade.maxDepth < 1 || config.backwardCascade.maxDepth > 10) {
-    throw new ConfigValidationError(
-      'backwardCascade.maxDepth',
-      'must be between 1 and 10',
-    );
+    throw new ConfigValidationError('backwardCascade.maxDepth', 'must be between 1 and 10');
   }
 }
 

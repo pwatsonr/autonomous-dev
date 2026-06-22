@@ -12,8 +12,8 @@
  * mid-pipeline trust changes take effect at the next gate boundary.
  */
 
-import type { TrustLevel, TrustConfig } from "./types";
-import { isTrustLevel } from "./types";
+import type { TrustLevel, TrustConfig } from './types';
+import { isTrustLevel } from './types';
 
 // ---------------------------------------------------------------------------
 // Context
@@ -58,10 +58,7 @@ export class TrustResolver {
    */
   resolve(context: TrustResolutionContext, config: TrustConfig): TrustLevel {
     // Tier 1: per-request override
-    if (
-      context.requestOverride !== undefined &&
-      isTrustLevel(context.requestOverride)
-    ) {
+    if (context.requestOverride !== undefined && isTrustLevel(context.requestOverride)) {
       return context.requestOverride;
     }
 

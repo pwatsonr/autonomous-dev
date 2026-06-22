@@ -18,9 +18,7 @@ import type { MetricBaseline } from '../../src/engine/types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function buildMetricBaseline(
-  overrides: Partial<MetricBaseline> = {},
-): MetricBaseline {
+function buildMetricBaseline(overrides: Partial<MetricBaseline> = {}): MetricBaseline {
   return {
     mean_7d: 0,
     stddev_7d: 0,
@@ -314,12 +312,9 @@ describe('detectAnomalies', () => {
       error_rate: buildMetricBaseline({ mean_7d: 50, stddev_7d: 10, p50: 50 }),
     };
 
-    const { results } = detectAnomalies(
-      { error_rate: 100 },
-      baselines,
-      iqrConfig,
-      { error_rate: true },
-    );
+    const { results } = detectAnomalies({ error_rate: 100 }, baselines, iqrConfig, {
+      error_rate: true,
+    });
 
     expect(results).toHaveLength(1);
     expect(results[0].method).toBe('iqr');
@@ -350,12 +345,7 @@ describe('detectAnomalies', () => {
       error_rate: buildMetricBaseline({ mean_7d: 5.0, stddev_7d: 1.0 }),
     };
 
-    const { results } = detectAnomalies(
-      { error_rate: 8.5 },
-      baselines,
-      singleRunConfig,
-      {},
-    );
+    const { results } = detectAnomalies({ error_rate: 8.5 }, baselines, singleRunConfig, {});
 
     expect(results).toHaveLength(1);
   });

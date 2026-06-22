@@ -24,7 +24,8 @@ export const SPEC_TEMPLATE: DocumentTemplate = {
       heading: 'Description',
       level: 2,
       required: true,
-      description: 'Detailed description of what this specification covers and its relationship to the parent plan task',
+      description:
+        'Detailed description of what this specification covers and its relationship to the parent plan task',
       minWordCount: 100,
       subsections: [],
       rubricCategoryId: 'completeness',
@@ -34,7 +35,8 @@ export const SPEC_TEMPLATE: DocumentTemplate = {
       heading: 'Files to Create/Modify',
       level: 2,
       required: true,
-      description: 'Table of files that will be created or modified, with action type (create/modify) and purpose',
+      description:
+        'Table of files that will be created or modified, with action type (create/modify) and purpose',
       minWordCount: 50,
       subsections: [],
       rubricCategoryId: 'precision',
@@ -44,7 +46,8 @@ export const SPEC_TEMPLATE: DocumentTemplate = {
       heading: 'Implementation Details',
       level: 2,
       required: true,
-      description: 'Step-by-step implementation instructions with code signatures, algorithms, and data flow',
+      description:
+        'Step-by-step implementation instructions with code signatures, algorithms, and data flow',
       minWordCount: 300,
       subsections: [],
       rubricCategoryId: 'precision',
@@ -54,7 +57,8 @@ export const SPEC_TEMPLATE: DocumentTemplate = {
       heading: 'Acceptance Criteria',
       level: 2,
       required: true,
-      description: 'Verifiable criteria that must be met for this spec to be considered implemented',
+      description:
+        'Verifiable criteria that must be met for this spec to be considered implemented',
       minWordCount: 100,
       subsections: [],
       rubricCategoryId: 'testability',

@@ -2,8 +2,14 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import { cancelPipeline } from '../../../src/pipeline/flow/cancellation-handler';
-import { createInitialPipelineState, DocumentState } from '../../../src/pipeline/flow/pipeline-state';
-import { writePipelineState, readPipelineState } from '../../../src/pipeline/flow/pipeline-state-io';
+import {
+  createInitialPipelineState,
+  DocumentState,
+} from '../../../src/pipeline/flow/pipeline-state';
+import {
+  writePipelineState,
+  readPipelineState,
+} from '../../../src/pipeline/flow/pipeline-state-io';
 import { DirectoryManager } from '../../../src/pipeline/storage/directory-manager';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
 
@@ -92,7 +98,11 @@ describe('cancellation-handler', () => {
     it('stale and revision-requested documents become cancelled', async () => {
       const state = createInitialPipelineState(pipelineId, 'Feature X');
       state.documentStates['DOC-001'] = makeDocState('DOC-001', DocumentType.PRD, 'stale');
-      state.documentStates['DOC-002'] = makeDocState('DOC-002', DocumentType.TDD, 'revision-requested');
+      state.documentStates['DOC-002'] = makeDocState(
+        'DOC-002',
+        DocumentType.TDD,
+        'revision-requested',
+      );
       await writePipelineState(state, directoryManager);
 
       const result = await cancelPipeline(pipelineId, directoryManager, 'full');
@@ -122,7 +132,13 @@ describe('cancellation-handler', () => {
 
       await writePipelineState(state, directoryManager);
 
-      const result = await cancelPipeline(pipelineId, directoryManager, 'subtree', 'TDD-001', 'user-1');
+      const result = await cancelPipeline(
+        pipelineId,
+        directoryManager,
+        'subtree',
+        'TDD-001',
+        'user-1',
+      );
 
       expect(result.cancelledDocuments).toContain('TDD-001');
       expect(result.cancelledDocuments).toContain('PLAN-001');
@@ -147,7 +163,13 @@ describe('cancellation-handler', () => {
 
       await writePipelineState(state, directoryManager);
 
-      const result = await cancelPipeline(pipelineId, directoryManager, 'subtree', 'TDD-001', 'user-1');
+      const result = await cancelPipeline(
+        pipelineId,
+        directoryManager,
+        'subtree',
+        'TDD-001',
+        'user-1',
+      );
 
       expect(result.cancelledDocuments).toContain('TDD-001');
       expect(result.cancelledDocuments).not.toContain('TDD-002');
@@ -171,9 +193,9 @@ describe('cancellation-handler', () => {
       const state = createInitialPipelineState(pipelineId, 'Feature X');
       await writePipelineState(state, directoryManager);
 
-      await expect(
-        cancelPipeline(pipelineId, directoryManager, 'subtree'),
-      ).rejects.toThrow('rootDocumentId required for subtree cancellation');
+      await expect(cancelPipeline(pipelineId, directoryManager, 'subtree')).rejects.toThrow(
+        'rootDocumentId required for subtree cancellation',
+      );
     });
 
     it('preserves terminal documents in subtree', async () => {
@@ -189,7 +211,13 @@ describe('cancellation-handler', () => {
 
       await writePipelineState(state, directoryManager);
 
-      const result = await cancelPipeline(pipelineId, directoryManager, 'subtree', 'PRD-001', 'user-1');
+      const result = await cancelPipeline(
+        pipelineId,
+        directoryManager,
+        'subtree',
+        'PRD-001',
+        'user-1',
+      );
 
       expect(result.cancelledDocuments).toContain('PRD-001');
       expect(result.preservedDocuments).toContain('TDD-001');
@@ -200,17 +228,13 @@ describe('cancellation-handler', () => {
   });
 
   it('throws for non-existent pipeline', async () => {
-    await expect(
-      cancelPipeline('NON-EXISTENT', directoryManager, 'full'),
-    ).rejects.toThrow('Pipeline NON-EXISTENT not found');
+    await expect(cancelPipeline('NON-EXISTENT', directoryManager, 'full')).rejects.toThrow(
+      'Pipeline NON-EXISTENT not found',
+    );
   });
 });
 
-function makeDocState(
-  documentId: string,
-  type: DocumentType,
-  status: string,
-): DocumentState {
+function makeDocState(documentId: string, type: DocumentType, status: string): DocumentState {
   return {
     documentId,
     type,

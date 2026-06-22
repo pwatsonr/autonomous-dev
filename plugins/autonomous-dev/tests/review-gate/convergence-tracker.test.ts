@@ -9,7 +9,7 @@ function makeFinding(
   id: string,
   sectionId: string,
   categoryId: string,
-  overrides?: Partial<MergedFinding>
+  overrides?: Partial<MergedFinding>,
 ): MergedFinding {
   return {
     id,
@@ -31,7 +31,7 @@ function makeFinding(
 function makeState(
   currentIteration: number,
   scores: { iteration: number; aggregate_score: number }[],
-  findings: { iteration: number; findings: MergedFinding[] }[]
+  findings: { iteration: number; findings: MergedFinding[] }[],
 ): ConvergenceState {
   return {
     current_iteration: currentIteration,
@@ -54,7 +54,7 @@ describe('ConvergenceTracker', () => {
     const state = makeState(
       1,
       [{ iteration: 1, aggregate_score: 75 }],
-      [{ iteration: 1, findings: [makeFinding('f1', 'goals', 'goals_measurability')] }]
+      [{ iteration: 1, findings: [makeFinding('f1', 'goals', 'goals_measurability')] }],
     );
 
     const result = tracker.analyze(state);
@@ -80,7 +80,7 @@ describe('ConvergenceTracker', () => {
       [
         { iteration: 1, findings: [makeFinding('f1', 'goals', 'completeness')] },
         { iteration: 2, findings: [] },
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -102,7 +102,7 @@ describe('ConvergenceTracker', () => {
       [
         { iteration: 1, findings: [makeFinding('f1', 'a', 'b')] },
         { iteration: 2, findings: [] },
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -111,7 +111,7 @@ describe('ConvergenceTracker', () => {
     expect(result.score_delta).toBe(-8);
     expect(result.stagnation_detected).toBe(true);
     expect(result.stagnation_reasons).toEqual(
-      expect.arrayContaining([expect.stringContaining('declined')])
+      expect.arrayContaining([expect.stringContaining('declined')]),
     );
   });
 
@@ -128,7 +128,7 @@ describe('ConvergenceTracker', () => {
       [
         { iteration: 1, findings: [makeFinding('f1', 'a', 'b')] },
         { iteration: 2, findings: [] },
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -151,7 +151,7 @@ describe('ConvergenceTracker', () => {
       [
         { iteration: 1, findings: [f1] },
         { iteration: 2, findings: [] },
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -177,7 +177,7 @@ describe('ConvergenceTracker', () => {
         { iteration: 1, findings: [f1] },
         { iteration: 2, findings: [] }, // f1 resolved here
         { iteration: 3, findings: [f1Recurred] }, // f1 recurred
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -185,7 +185,7 @@ describe('ConvergenceTracker', () => {
     expect(result.recurred_findings).toContain('f1-r');
     expect(result.stagnation_detected).toBe(true);
     expect(result.stagnation_reasons).toEqual(
-      expect.arrayContaining([expect.stringContaining('recurred')])
+      expect.arrayContaining([expect.stringContaining('recurred')]),
     );
   });
 
@@ -193,11 +193,9 @@ describe('ConvergenceTracker', () => {
   // Test 18: Finding count decreasing
   // -----------------------------------------------------------------------
   test('Finding count decreasing: 5 -> 3, not a stagnation trigger by itself', () => {
-    const findings1 = Array.from({ length: 5 }, (_, i) =>
-      makeFinding(`f${i}`, `s${i}`, `c${i}`)
-    );
+    const findings1 = Array.from({ length: 5 }, (_, i) => makeFinding(`f${i}`, `s${i}`, `c${i}`));
     const findings2 = Array.from({ length: 3 }, (_, i) =>
-      makeFinding(`f2-${i}`, `s2-${i}`, `c2-${i}`)
+      makeFinding(`f2-${i}`, `s2-${i}`, `c2-${i}`),
     );
 
     const state = makeState(
@@ -209,7 +207,7 @@ describe('ConvergenceTracker', () => {
       [
         { iteration: 1, findings: findings1 },
         { iteration: 2, findings: findings2 },
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -224,12 +222,8 @@ describe('ConvergenceTracker', () => {
   // -----------------------------------------------------------------------
   test('Finding count flat: 5 -> 5 triggers stagnation', () => {
     // Use different section/category keys so there are no "resolved" findings
-    const findings1 = Array.from({ length: 5 }, (_, i) =>
-      makeFinding(`f1-${i}`, `s${i}`, `c${i}`)
-    );
-    const findings2 = Array.from({ length: 5 }, (_, i) =>
-      makeFinding(`f2-${i}`, `s${i}`, `c${i}`)
-    );
+    const findings1 = Array.from({ length: 5 }, (_, i) => makeFinding(`f1-${i}`, `s${i}`, `c${i}`));
+    const findings2 = Array.from({ length: 5 }, (_, i) => makeFinding(`f2-${i}`, `s${i}`, `c${i}`));
 
     const state = makeState(
       2,
@@ -240,7 +234,7 @@ describe('ConvergenceTracker', () => {
       [
         { iteration: 1, findings: findings1 },
         { iteration: 2, findings: findings2 },
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -248,9 +242,7 @@ describe('ConvergenceTracker', () => {
     expect(result.finding_count_trend).toBe('flat');
     expect(result.stagnation_detected).toBe(true);
     expect(result.stagnation_reasons).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('did not decrease'),
-      ])
+      expect.arrayContaining([expect.stringContaining('did not decrease')]),
     );
   });
 
@@ -258,12 +250,8 @@ describe('ConvergenceTracker', () => {
   // Test 20: Finding count increasing -- stagnation
   // -----------------------------------------------------------------------
   test('Finding count increasing: 3 -> 5 triggers stagnation', () => {
-    const findings1 = Array.from({ length: 3 }, (_, i) =>
-      makeFinding(`f1-${i}`, `s${i}`, `c${i}`)
-    );
-    const findings2 = Array.from({ length: 5 }, (_, i) =>
-      makeFinding(`f2-${i}`, `s${i}`, `c${i}`)
-    );
+    const findings1 = Array.from({ length: 3 }, (_, i) => makeFinding(`f1-${i}`, `s${i}`, `c${i}`));
+    const findings2 = Array.from({ length: 5 }, (_, i) => makeFinding(`f2-${i}`, `s${i}`, `c${i}`));
 
     const state = makeState(
       2,
@@ -274,7 +262,7 @@ describe('ConvergenceTracker', () => {
       [
         { iteration: 1, findings: findings1 },
         { iteration: 2, findings: findings2 },
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -302,7 +290,7 @@ describe('ConvergenceTracker', () => {
         { iteration: 1, findings: [f1, f2] },
         { iteration: 2, findings: [f2] }, // f1 resolved
         { iteration: 3, findings: [f1Recurred, f2] }, // f1 recurred, count increased
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);
@@ -314,7 +302,7 @@ describe('ConvergenceTracker', () => {
       expect.arrayContaining([
         expect.stringContaining('declined'),
         expect.stringContaining('recurred'),
-      ])
+      ]),
     );
   });
 
@@ -341,7 +329,7 @@ describe('ConvergenceTracker', () => {
           iteration: 2,
           findings: [makeFinding('f4', 's4', 'c4')],
         },
-      ]
+      ],
     );
 
     const result = tracker.analyze(state);

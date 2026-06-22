@@ -10,10 +10,7 @@ import { resolve as resolvePath, join } from 'node:path';
 
 import { EvaluatorRegistry } from '../../intake/standards/evaluator-registry';
 import { runEvaluator } from '../../intake/standards/runner';
-import {
-  EvaluatorRunError,
-  SecurityError,
-} from '../../intake/standards/errors';
+import { EvaluatorRunError, SecurityError } from '../../intake/standards/errors';
 import type { Rule } from '../../intake/standards/types';
 
 const FIXTURE_ALLOWED = resolvePath(__dirname, 'fixtures', 'eval-allowed.sh');

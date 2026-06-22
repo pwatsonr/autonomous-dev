@@ -4,10 +4,7 @@
  * Covers all test cases TC-5-2-01 through TC-5-2-12, TC-5-2-18, TC-5-2-19.
  */
 
-import {
-  evaluateEffectiveness,
-  computeImprovement,
-} from '../../src/governance/effectiveness';
+import { evaluateEffectiveness, computeImprovement } from '../../src/governance/effectiveness';
 import type {
   EffectivenessCandidate,
   GovernanceConfig,
@@ -31,9 +28,7 @@ function makeConfig(overrides: Partial<GovernanceConfig> = {}): GovernanceConfig
   };
 }
 
-function makeObservation(
-  overrides: Partial<EffectivenessCandidate> = {},
-): EffectivenessCandidate {
+function makeObservation(overrides: Partial<EffectivenessCandidate> = {}): EffectivenessCandidate {
   return {
     id: 'OBS-001',
     file_path: '/tmp/observations/OBS-001.md',
@@ -46,9 +41,7 @@ function makeObservation(
   };
 }
 
-function makeDeployment(
-  overrides: Partial<DeploymentInfo> = {},
-): DeploymentInfo {
+function makeDeployment(overrides: Partial<DeploymentInfo> = {}): DeploymentInfo {
   return {
     id: 'deploy-001',
     deployed_at: '2026-03-01T00:00:00Z',
@@ -56,10 +49,7 @@ function makeDeployment(
   };
 }
 
-function makePrometheus(
-  preAvg: number | null,
-  postAvg: number | null,
-): PrometheusClient {
+function makePrometheus(preAvg: number | null, postAvg: number | null): PrometheusClient {
   let callCount = 0;
   return {
     async queryRangeAverage(): Promise<number | null> {
@@ -69,17 +59,12 @@ function makePrometheus(
   };
 }
 
-function makeFailingPrometheus(
-  failWindow: 'pre' | 'post',
-): PrometheusClient {
+function makeFailingPrometheus(failWindow: 'pre' | 'post'): PrometheusClient {
   let callCount = 0;
   return {
     async queryRangeAverage(): Promise<number | null> {
       callCount++;
-      if (
-        (failWindow === 'pre' && callCount === 1) ||
-        (failWindow === 'post' && callCount === 2)
-      ) {
+      if ((failWindow === 'pre' && callCount === 1) || (failWindow === 'post' && callCount === 2)) {
         throw new Error('Connection refused');
       }
       return 5.0;
@@ -263,7 +248,13 @@ describe('evaluateEffectiveness', () => {
     const getRecentDeploy = (id: string) => (id === 'deploy-recent' ? recentDeploy : null);
     const observation = makeObservation({ linked_deployment: 'deploy-recent' });
     const prometheus = makePrometheus(1, 1);
-    const result = await evaluateEffectiveness(observation, config, getRecentDeploy, prometheus, NOW);
+    const result = await evaluateEffectiveness(
+      observation,
+      config,
+      getRecentDeploy,
+      prometheus,
+      NOW,
+    );
     expect(result.status).toBe('pending');
     expect(result.reason).toContain('not yet elapsed');
   });
@@ -396,7 +387,12 @@ describe('evaluateEffectiveness', () => {
   it('uses 300-second step resolution for Prometheus queries', async () => {
     let capturedStep = 0;
     const prometheus: PrometheusClient = {
-      async queryRangeAverage(_q: string, _s: Date, _e: Date, step: number): Promise<number | null> {
+      async queryRangeAverage(
+        _q: string,
+        _s: Date,
+        _e: Date,
+        step: number,
+      ): Promise<number | null> {
         capturedStep = step;
         return 5.0;
       },
@@ -412,7 +408,7 @@ describe('evaluateEffectiveness', () => {
     const prometheus = makePrometheus(12.345, 0.678);
     const result = await evaluateEffectiveness(observation, config, getDeployment, prometheus, NOW);
     expect(result.detail!.pre_fix_avg).toBe(12.35); // rounded to 2 decimal places
-    expect(result.detail!.post_fix_avg).toBe(0.68);  // rounded to 2 decimal places
+    expect(result.detail!.post_fix_avg).toBe(0.68); // rounded to 2 decimal places
     // improvement_pct rounded to 1 decimal place
     expect(typeof result.detail!.improvement_pct).toBe('number');
   });

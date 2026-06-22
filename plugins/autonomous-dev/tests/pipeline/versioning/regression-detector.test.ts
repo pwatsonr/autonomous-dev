@@ -1,4 +1,7 @@
-import { checkRegression, RegressionCheckResult } from '../../../src/pipeline/versioning/regression-detector';
+import {
+  checkRegression,
+  RegressionCheckResult,
+} from '../../../src/pipeline/versioning/regression-detector';
 import { PipelineConfig, DEFAULT_PIPELINE_CONFIG } from '../../../src/pipeline/types/config';
 import { DocumentType } from '../../../src/pipeline/types/document-type';
 
@@ -7,10 +10,12 @@ import { DocumentType } from '../../../src/pipeline/types/document-type';
  */
 
 /** Creates a config with a given default margin and optional per-type override. */
-function makeConfig(overrides: {
-  defaultMargin?: number;
-  typeMargins?: Partial<Record<DocumentType, number>>;
-} = {}): PipelineConfig {
+function makeConfig(
+  overrides: {
+    defaultMargin?: number;
+    typeMargins?: Partial<Record<DocumentType, number>>;
+  } = {},
+): PipelineConfig {
   const config: PipelineConfig = {
     ...DEFAULT_PIPELINE_CONFIG,
     reviewGates: {

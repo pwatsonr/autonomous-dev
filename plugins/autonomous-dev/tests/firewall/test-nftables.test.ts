@@ -71,7 +71,10 @@ describe('NftablesBackend.init', () => {
 
   test('Operation not permitted → throws FirewallUnavailableError mentioning CAP_NET_ADMIN', async () => {
     const { backend } = mkBackend({
-      runResults: [{ exitCode: 1, stderr: 'Operation not permitted' }, { exitCode: 4, stderr: 'Operation not permitted' }],
+      runResults: [
+        { exitCode: 1, stderr: 'Operation not permitted' },
+        { exitCode: 4, stderr: 'Operation not permitted' },
+      ],
     });
     await expect(backend.init()).rejects.toBeInstanceOf(FirewallUnavailableError);
     try {
@@ -165,7 +168,11 @@ describe('NftablesBackend.removeRulesForPid', () => {
     const rms: string[] = [];
     const { backend, calls, refresh } = mkBackend({
       runResults: [{ exitCode: 0 }, { exitCode: 0 }],
-      fs: { rm: async (p: string) => { rms.push(p); } },
+      fs: {
+        rm: async (p: string) => {
+          rms.push(p);
+        },
+      },
     });
     await backend.init();
     await backend.removeRulesForPid(42);

@@ -11,11 +11,7 @@
 // ---------------------------------------------------------------------------
 
 /** Outcome of a review pass on an invocation output. */
-export type ReviewOutcome =
-  | 'approved'
-  | 'rejected'
-  | 'revision_requested'
-  | 'not_reviewed';
+export type ReviewOutcome = 'approved' | 'rejected' | 'revision_requested' | 'not_reviewed';
 
 /** Runtime environment in which the invocation occurred. */
 export type Environment = 'production' | 'validation' | 'canary';

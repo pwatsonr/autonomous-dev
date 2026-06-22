@@ -37,7 +37,11 @@ export class TraceabilityMatrixAPI {
     return getTraceChain(requirementId, pipelineId, this.storage.getDirectoryManager());
   }
 
-  async analyzeImpact(pipelineId: string, documentId: string, sectionIds: string[]): Promise<string[]> {
+  async analyzeImpact(
+    pipelineId: string,
+    documentId: string,
+    sectionIds: string[],
+  ): Promise<string[]> {
     return analyzeImpact(pipelineId, documentId, sectionIds, this.storage);
   }
 }

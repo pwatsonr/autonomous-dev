@@ -86,13 +86,10 @@ export class Comparator {
    * @param mapping        The randomization mapping that reveals which output is which.
    * @returns              ComparisonResult with version-level scores and outcome.
    */
-  compare(
-    scoringResult: ScoringResult,
-    mapping: RandomizationMapping,
-  ): ComparisonResult {
+  compare(scoringResult: ScoringResult, mapping: RandomizationMapping): ComparisonResult {
     this.logger.info(
       `De-randomizing scores for input ${scoringResult.input_id} ` +
-      `(output_1 is ${mapping.output_1_is})`,
+        `(output_1 is ${mapping.output_1_is})`,
     );
 
     // Step 1: De-randomize -- map output_1/output_2 to version_a/version_b
@@ -102,10 +99,7 @@ export class Comparator {
     );
 
     // Step 2: Compute per-dimension deltas (proposed - current)
-    const perDimensionDelta = computePerDimensionDelta(
-      versionAScores,
-      versionBScores,
-    );
+    const perDimensionDelta = computePerDimensionDelta(versionAScores, versionBScores);
 
     // Step 3: Compute overall delta (mean of dimension deltas)
     const overallDelta = computeOverallDelta(perDimensionDelta);
@@ -115,7 +109,7 @@ export class Comparator {
 
     this.logger.info(
       `Comparison for input ${scoringResult.input_id}: ` +
-      `overall_delta=${overallDelta.toFixed(4)}, outcome=${outcome}`,
+        `overall_delta=${overallDelta.toFixed(4)}, outcome=${outcome}`,
     );
 
     return {
@@ -200,9 +194,7 @@ export function computePerDimensionDelta(
  *
  * Returns 0 if there are no dimensions.
  */
-export function computeOverallDelta(
-  perDimensionDelta: Record<string, number>,
-): number {
+export function computeOverallDelta(perDimensionDelta: Record<string, number>): number {
   const values = Object.values(perDimensionDelta);
   if (values.length === 0) return 0;
   return values.reduce((sum, v) => sum + v, 0) / values.length;
@@ -219,9 +211,7 @@ export function computeOverallDelta(
  * - current_wins:  overall_delta < -0.2 (strictly less)
  * - tie:           -0.2 <= overall_delta <= 0.2
  */
-export function classifyOutcome(
-  overallDelta: number,
-): 'proposed_wins' | 'current_wins' | 'tie' {
+export function classifyOutcome(overallDelta: number): 'proposed_wins' | 'current_wins' | 'tie' {
   if (overallDelta > TIE_THRESHOLD) {
     return 'proposed_wins';
   }

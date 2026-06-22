@@ -113,7 +113,7 @@ export class FileSystemMetricsStore implements MetricsStore {
     }
     if (filter.reviewer_id) {
       const hasReviewer = record.reviewer_metrics.some(
-        (rm) => rm.reviewer_id === filter.reviewer_id
+        (rm) => rm.reviewer_id === filter.reviewer_id,
       );
       if (!hasReviewer) {
         return false;
@@ -146,7 +146,7 @@ export function sleep(ms: number): Promise<void> {
 export async function writeWithRetry(
   store: MetricsStore,
   record: ReviewMetricsRecord,
-  maxRetries: number = 3
+  maxRetries: number = 3,
 ): Promise<void> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -156,7 +156,7 @@ export async function writeWithRetry(
       if (attempt === maxRetries) {
         console.error(
           `Metrics write failed after ${maxRetries} attempts for gate ${record.gate_id}`,
-          error
+          error,
         );
         return;
       }

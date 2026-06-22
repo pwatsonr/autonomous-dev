@@ -10,8 +10,4 @@ export {
   type FrontmatterValidationResult,
   type ValidationError,
 } from './validator';
-export {
-  generateDocumentId,
-  InMemoryIdCounter,
-  type IdCounter,
-} from './id-generator';
+export { generateDocumentId, InMemoryIdCounter, type IdCounter } from './id-generator';

@@ -6,9 +6,9 @@ import type {
 } from '../types';
 
 // Discord embed color values
-const COLOR_RED = 16711680;       // immediate
-const COLOR_YELLOW = 16776960;    // soon
-const COLOR_BLUE = 3447003;       // informational
+const COLOR_RED = 16711680; // immediate
+const COLOR_YELLOW = 16776960; // soon
+const COLOR_BLUE = 3447003; // informational
 
 interface DiscordEmbedField {
   name: string;
@@ -40,7 +40,7 @@ interface DiscordPayload {
  * Batch delivery: single embed with multiple field groups.
  */
 export class DiscordDeliveryAdapter implements DeliveryAdapter {
-  readonly method = "discord" as const;
+  readonly method = 'discord' as const;
 
   deliver(payload: NotificationPayload): DeliveryResult {
     try {

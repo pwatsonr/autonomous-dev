@@ -111,14 +111,12 @@ export class SystemicFailureDetector {
 
     // Check each pattern
     for (const { type, key } of patternKeys) {
-      const entries = (this.indices.get(key) ?? []).filter(
-        e => e.timestamp >= cutoff,
-      );
+      const entries = (this.indices.get(key) ?? []).filter((e) => e.timestamp >= cutoff);
 
       if (entries.length >= this.config.threshold) {
         if (!this.isSystemicIssueActive(key)) {
           // New systemic issue detected
-          const affectedRequests = [...new Set(entries.map(e => e.requestId))];
+          const affectedRequests = [...new Set(entries.map((e) => e.requestId))];
           const alert = this.createSystemicAlert(
             { type, key, count: entries.length, windowStart: cutoff },
             affectedRequests,
@@ -177,7 +175,7 @@ export class SystemicFailureDetector {
 
   private pruneOlderThan(cutoff: Date): void {
     for (const [key, records] of this.indices) {
-      const pruned = records.filter(r => r.timestamp >= cutoff);
+      const pruned = records.filter((r) => r.timestamp >= cutoff);
       if (pruned.length === 0) {
         this.indices.delete(key);
         // Also deactivate the pattern if all records expired
@@ -202,9 +200,7 @@ export class SystemicFailureDetector {
       urgency: 'immediate',
       timestamp: this.clock.now().toISOString(),
       request_id: 'system',
-      repository: pattern.key.startsWith('repo:')
-        ? pattern.key.slice(5)
-        : '',
+      repository: pattern.key.startsWith('repo:') ? pattern.key.slice(5) : '',
       title: `Systemic issue detected: ${pattern.type} - ${pattern.key}`,
       body: `${pattern.count} failures in ${this.config.windowMinutes} minutes. Affected requests: ${affectedRequests.join(', ')}. This may indicate an infrastructure or configuration issue.`,
       metadata: {

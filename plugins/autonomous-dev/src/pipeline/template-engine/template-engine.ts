@@ -141,9 +141,7 @@ export class TemplateEngine {
     // 2. Parse sections from body
     const body = frontmatterResult.body;
     const documentSections = parseSections(body);
-    const templateSectionIds = new Set(
-      collectAllSectionIds(template.sections),
-    );
+    const templateSectionIds = new Set(collectAllSectionIds(template.sections));
     const documentSectionMap = new Map<string, ParsedSection>();
     for (const ds of documentSections) {
       documentSectionMap.set(ds.id, ds);
@@ -374,11 +372,21 @@ function extractFrontmatter(content: string): {
   }
 
   if (closingIndex === -1) {
-    return { valid: false, yaml: '', body: content, error: 'No closing frontmatter delimiter found' };
+    return {
+      valid: false,
+      yaml: '',
+      body: content,
+      error: 'No closing frontmatter delimiter found',
+    };
   }
 
   if (closingIndex === 1) {
-    return { valid: false, yaml: '', body: lines.slice(2).join('\n'), error: 'Frontmatter is empty' };
+    return {
+      valid: false,
+      yaml: '',
+      body: lines.slice(2).join('\n'),
+      error: 'Frontmatter is empty',
+    };
   }
 
   const yaml = lines.slice(1, closingIndex).join('\n');

@@ -1,7 +1,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { atomicWrite, atomicSymlink, AtomicWriteError } from '../../../src/pipeline/storage/atomic-io';
+import {
+  atomicWrite,
+  atomicSymlink,
+  AtomicWriteError,
+} from '../../../src/pipeline/storage/atomic-io';
 
 describe('atomicWrite', () => {
   let tmpDir: string;
@@ -36,7 +40,7 @@ describe('atomicWrite', () => {
 
     // Verify no leftover .tmp files in tmpDir
     const files = await fs.readdir(tmpDir);
-    const tmpFiles = files.filter(f => f.endsWith('.tmp'));
+    const tmpFiles = files.filter((f) => f.endsWith('.tmp'));
     expect(tmpFiles).toHaveLength(0);
   });
 
@@ -63,10 +67,7 @@ describe('atomicWrite', () => {
     const contentB = 'B'.repeat(10000);
 
     // Run two writes concurrently
-    await Promise.all([
-      atomicWrite(filePath, contentA),
-      atomicWrite(filePath, contentB),
-    ]);
+    await Promise.all([atomicWrite(filePath, contentA), atomicWrite(filePath, contentB)]);
 
     const finalContent = await fs.readFile(filePath, 'utf-8');
     // Final content must be one of the two complete writes, never partial
@@ -130,7 +131,7 @@ describe('atomicSymlink', () => {
 
     // Verify no leftover .tmp symlinks in tmpDir
     const files = await fs.readdir(tmpDir);
-    const tmpFiles = files.filter(f => f.endsWith('.tmp'));
+    const tmpFiles = files.filter((f) => f.endsWith('.tmp'));
     expect(tmpFiles).toHaveLength(0);
   });
 });

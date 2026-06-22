@@ -21,7 +21,7 @@ function makeFinding(
   id: string,
   sectionId: string,
   categoryId: string,
-  overrides?: Partial<MergedFinding>
+  overrides?: Partial<MergedFinding>,
 ): MergedFinding {
   return {
     id,
@@ -118,7 +118,7 @@ describe('IterationController - Extended tests', () => {
       80,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: decline (stagnation count 1)
@@ -128,7 +128,7 @@ describe('IterationController - Extended tests', () => {
       75,
       [makeFinding('f2', 's2', 'c2')],
       computeContentHash('v2'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(d2.stagnation_warning).toBe(true);
     expect(state.stagnation_count).toBe(1);
@@ -140,7 +140,7 @@ describe('IterationController - Extended tests', () => {
       82,
       [],
       computeContentHash('v3'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(d3.stagnation_warning).toBe(false);
     expect(state.stagnation_count).toBe(0);
@@ -152,7 +152,7 @@ describe('IterationController - Extended tests', () => {
       78,
       [makeFinding('f4', 's4', 'c4')],
       computeContentHash('v4'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(d4.stagnation_warning).toBe(true);
     expect(state.stagnation_count).toBe(1);
@@ -164,7 +164,7 @@ describe('IterationController - Extended tests', () => {
       73,
       [makeFinding('f5', 's5', 'c5')],
       computeContentHash('v5'),
-      'changes_requested'
+      'changes_requested',
     );
     expect(d5.should_continue).toBe(false);
     expect(d5.outcome).toBe('rejected');
@@ -184,7 +184,7 @@ describe('IterationController - Extended tests', () => {
       85,
       [makeFinding('f1', 's1', 'c1')],
       computeContentHash('interplay-v1'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Iteration 2: large score drop (regression + stagnation)
@@ -194,7 +194,7 @@ describe('IterationController - Extended tests', () => {
       70,
       [makeFinding('f2', 's2', 'c2')],
       computeContentHash('interplay-v2'),
-      'changes_requested'
+      'changes_requested',
     );
 
     // Both should be flagged
@@ -222,9 +222,7 @@ describe('IterationController - Extended tests', () => {
     // Iteration 1
     state = controller.startIteration(state);
     controller.checkpoint(state, 'review_started');
-    controller.recordReviewOutcome(
-      state, 70, [], computeContentHash('cp-v1'), 'changes_requested'
-    );
+    controller.recordReviewOutcome(state, 70, [], computeContentHash('cp-v1'), 'changes_requested');
     controller.checkpoint(state, 'review_completed');
     controller.checkpoint(state, 'decision');
 
@@ -252,7 +250,7 @@ describe('IterationController - Extended tests', () => {
       95,
       [],
       computeContentHash('excellent-doc'),
-      'approved'
+      'approved',
     );
 
     expect(decision.should_continue).toBe(false);

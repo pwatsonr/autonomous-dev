@@ -32,8 +32,8 @@ export interface OverrideWindow {
   agent_name: string;
   version: string;
   commit_hash: string;
-  opened_at: string;                // ISO 8601
-  expires_at: string;               // ISO 8601 (opened_at + override_hours)
+  opened_at: string; // ISO 8601
+  expires_at: string; // ISO 8601 (opened_at + override_hours)
   status: 'open' | 'expired' | 'used';
 }
 
@@ -83,11 +83,7 @@ export class OverrideWindowManager {
   /** In-memory window state keyed by agent name. */
   private readonly windows: Map<string, OverrideWindow> = new Map();
 
-  constructor(
-    config: AgentFactoryConfig,
-    auditLogger: AuditLogger,
-    statePath?: string,
-  ) {
+  constructor(config: AgentFactoryConfig, auditLogger: AuditLogger, statePath?: string) {
     this.overrideHours = config.autonomousPromotion?.overrideHours ?? 24;
     this.auditLogger = auditLogger;
     this.statePath = statePath
@@ -189,9 +185,7 @@ export class OverrideWindowManager {
     window.status = reason;
     this.persistState();
 
-    const eventType = reason === 'expired'
-      ? 'override_window_expired'
-      : 'override_window_used';
+    const eventType = reason === 'expired' ? 'override_window_expired' : 'override_window_used';
 
     this.auditLogger.log({
       timestamp: new Date().toISOString(),
@@ -280,11 +274,9 @@ export class OverrideWindowManager {
     }
 
     try {
-      fs.writeFileSync(
-        this.statePath,
-        JSON.stringify(persisted, null, 2) + '\n',
-        { encoding: 'utf-8' },
-      );
+      fs.writeFileSync(this.statePath, JSON.stringify(persisted, null, 2) + '\n', {
+        encoding: 'utf-8',
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logOverrideEvent('state_persist_failed', { error: message });

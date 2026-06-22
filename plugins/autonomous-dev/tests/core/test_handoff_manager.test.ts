@@ -34,38 +34,27 @@ import { pollNewRequests, readState } from '../../intake/daemon/state_reader';
 import { initializeDatabase } from '../../intake/db/migrator';
 import { Repository } from '../../intake/db/repository';
 
-import {
-  setHandoffDatabase,
-  submitRequest,
-} from '../../intake/core/handoff_manager';
+import { setHandoffDatabase, submitRequest } from '../../intake/core/handoff_manager';
 import { setAllowedRepositoriesForTest } from '../../intake/core/path_security';
 import type { SubmitRequest } from '../../intake/core/types';
 import { submitFromRouter } from '../../intake/router/request_submitter';
 
 import { cleanupOrphanedTemps } from '../../intake/recovery/temp_cleanup';
 import { promoteNeedsPromotion } from '../../intake/recovery/promotion';
-import {
-  runStartupRecovery,
-} from '../../intake/recovery/recovery_runner';
+import { runStartupRecovery } from '../../intake/recovery/recovery_runner';
 
 import {
   readStateJson,
   writeStateJson,
   type StateJsonV11,
 } from '../../intake/state/state_validator';
-import {
-  REQUEST_SOURCES,
-  type RequestSource,
-} from '../../intake/types/request_source';
+import { REQUEST_SOURCES, type RequestSource } from '../../intake/types/request_source';
 
 // ---------------------------------------------------------------------------
 // Test harness
 // ---------------------------------------------------------------------------
 
-const MIGRATIONS_DIR = path.resolve(
-  __dirname,
-  '../../intake/db/migrations',
-);
+const MIGRATIONS_DIR = path.resolve(__dirname, '../../intake/db/migrations');
 
 interface Ctx {
   repo: string;
@@ -76,9 +65,7 @@ interface Ctx {
 }
 
 function setup(): Ctx {
-  const repoDir = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'autonomous-dev-handoff-int-'),
-  );
+  const repoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autonomous-dev-handoff-int-'));
   const realRepo = fs.realpathSync(repoDir);
   setAllowedRepositoriesForTest([realRepo]);
 
@@ -127,9 +114,8 @@ function tempLeftovers(reqDir: string): string[] {
   return fs
     .readdirSync(reqDir)
     .filter(
-      (f) => f.startsWith('state.json.tmp')
-        || f.includes('.corrupt')
-        || f.endsWith('.needs_promotion'),
+      (f) =>
+        f.startsWith('state.json.tmp') || f.includes('.corrupt') || f.endsWith('.needs_promotion'),
     );
 }
 
@@ -168,18 +154,12 @@ describe('Handoff integration — happy path', () => {
     expect(readResult.state.request_id).toBe('REQ-000001');
     expect(readResult.state.source).toBe('cli');
 
-    const ackResult = await acknowledgeRequest(
-      ctx.db,
-      'REQ-000001',
-      'daemon-test-1',
-    );
+    const ackResult = await acknowledgeRequest(ctx.db, 'REQ-000001', 'daemon-test-1');
     expect(ackResult.ok).toBe(true);
 
     // Repository sees acknowledged_at + acknowledged_by.
     const row = ctx.db
-      .prepare(
-        'SELECT acknowledged_at, acknowledged_by FROM requests WHERE request_id = ?',
-      )
+      .prepare('SELECT acknowledged_at, acknowledged_by FROM requests WHERE request_id = ?')
       .get('REQ-000001') as { acknowledged_at: string | null; acknowledged_by: string | null };
     expect(row.acknowledged_at).not.toBeNull();
     expect(row.acknowledged_by).toBe('daemon-test-1');
@@ -219,12 +199,7 @@ describe('Handoff integration — F1', () => {
     expect(row).toBeUndefined();
 
     // No request directory created (validation rejects before mkdir).
-    const reqDir = path.join(
-      ctx.repo,
-      '.autonomous-dev',
-      'requests',
-      'NOT-A-REQ',
-    );
+    const reqDir = path.join(ctx.repo, '.autonomous-dev', 'requests', 'NOT-A-REQ');
     expect(fs.existsSync(reqDir)).toBe(false);
   });
 });
@@ -248,12 +223,7 @@ describe('Handoff integration — F2', () => {
     // Force F2 by pre-creating the request dir read-only (chmod 0500): the
     // mkdirSync inside submitRequest succeeds (idempotent on existing
     // dir), but the openSync of state.json.tmp.* fails with EACCES.
-    const reqDir = path.join(
-      ctx.repo,
-      '.autonomous-dev',
-      'requests',
-      'REQ-000002',
-    );
+    const reqDir = path.join(ctx.repo, '.autonomous-dev', 'requests', 'REQ-000002');
     fs.mkdirSync(reqDir, { recursive: true, mode: 0o700 });
     fs.chmodSync(reqDir, 0o500); // read+execute only — no writes
 
@@ -286,12 +256,7 @@ describe('Handoff integration — F2', () => {
   test('manually-staged orphan temp from a dead PID → recovery cleans it', async () => {
     // The most reliable way to assert F2-survivor cleanup is to construct
     // the post-F2 state directly: a dead-PID temp file with no SQLite row.
-    const reqDir = path.join(
-      ctx.repo,
-      '.autonomous-dev',
-      'requests',
-      'REQ-000050',
-    );
+    const reqDir = path.join(ctx.repo, '.autonomous-dev', 'requests', 'REQ-000050');
     fs.mkdirSync(reqDir, { recursive: true, mode: 0o700 });
     const tmp = path.join(reqDir, 'state.json.tmp.999999.deadbeef00000000');
     fs.writeFileSync(tmp, '{"orphan":"from-F2-simulation"}');
@@ -339,9 +304,7 @@ describe('Handoff integration — F3', () => {
     // Only one DB row.
     const cnt = (
       ctx.db
-        .prepare(
-          'SELECT COUNT(*) AS c FROM requests WHERE request_id = ?',
-        )
+        .prepare('SELECT COUNT(*) AS c FROM requests WHERE request_id = ?')
         .get('REQ-000003') as { c: number }
     ).c;
     expect(cnt).toBe(1);
@@ -566,9 +529,7 @@ describe('Handoff integration — concurrency', () => {
   });
 
   test('20 producers race distinct ids — all succeed, no leftover artifacts', async () => {
-    const reqs = Array.from({ length: 20 }, (_, i) =>
-      makeReq(ctx.repo, 200 + i),
-    );
+    const reqs = Array.from({ length: 20 }, (_, i) => makeReq(ctx.repo, 200 + i));
     const results = await Promise.all(reqs.map((r) => submitRequest(r)));
     expect(results.every((r) => r.ok)).toBe(true);
 
@@ -758,9 +719,7 @@ describe('Handoff property tests (hand-rolled)', () => {
     expect(r1.ok).toBe(false);
     if (!r1.ok) expect(r1.failureMode).toBe('F1');
 
-    const r1Row = ctx.db
-      .prepare("SELECT request_id FROM requests WHERE request_id = 'BAD'")
-      .get();
+    const r1Row = ctx.db.prepare("SELECT request_id FROM requests WHERE request_id = 'BAD'").get();
     expect(r1Row).toBeUndefined();
 
     // F3: duplicate.
@@ -773,9 +732,7 @@ describe('Handoff property tests (hand-rolled)', () => {
     // Only one row.
     const cnt = (
       ctx.db
-        .prepare(
-          "SELECT COUNT(*) AS c FROM requests WHERE request_id = 'REQ-008001'",
-        )
+        .prepare("SELECT COUNT(*) AS c FROM requests WHERE request_id = 'REQ-008001'")
         .get() as { c: number }
     ).c;
     expect(cnt).toBe(1);
@@ -900,10 +857,7 @@ describe('Handoff chaos — random failure injection across protocol steps', () 
         // .needs_promotion markers (cleanup + promotion swept them).
         const leftover = fs
           .readdirSync(reqDir)
-          .filter(
-            (f) => f.startsWith('state.json.tmp.')
-              && !f.includes('.corrupt'),
-          );
+          .filter((f) => f.startsWith('state.json.tmp.') && !f.includes('.corrupt'));
         expect(leftover).toEqual([]);
 
         // If a state.json exists, it MUST parse.

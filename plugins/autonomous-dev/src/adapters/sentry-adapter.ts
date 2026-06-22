@@ -57,13 +57,16 @@ export const NOOP_SCRUBBER: DataScrubber = {
 
 function withTimeout<T>(promise: Promise<T>, ms: number, queryName: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new AdapterTimeoutError('sentry', queryName, ms)),
-      ms,
-    );
+    const timer = setTimeout(() => reject(new AdapterTimeoutError('sentry', queryName, ms)), ms);
     promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
+      (val) => {
+        clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
     );
   });
 }
@@ -137,7 +140,9 @@ function parseReleaseHealthResponse(raw: unknown): SentryReleaseHealth {
     adoption: Number(r.adoption ?? 0),
     stats: {
       sessions_24h: Number(stats.sessions_24h ?? stats['24h_sessions'] ?? 0),
-      sessions_crashed_24h: Number(stats.sessions_crashed_24h ?? stats['24h_sessions_crashed'] ?? 0),
+      sessions_crashed_24h: Number(
+        stats.sessions_crashed_24h ?? stats['24h_sessions_crashed'] ?? 0,
+      ),
     },
   };
 }
@@ -314,9 +319,7 @@ export class SentryAdapter {
    */
   private isUnreachable(): boolean {
     if (!this.connectivity) return false;
-    const sentryResult = this.connectivity.results.find(
-      (r) => r.source === 'sentry',
-    );
+    const sentryResult = this.connectivity.results.find((r) => r.source === 'sentry');
     return sentryResult?.status === 'unreachable';
   }
 
@@ -360,23 +363,25 @@ export class SentryAdapter {
         return {
           ...e,
           value: this.scrubber.scrubText(String(e.value ?? '')),
-          stacktrace: e.stacktrace ? {
-            ...(e.stacktrace as Record<string, unknown>),
-            frames: ((e.stacktrace as Record<string, unknown>).frames as unknown[] ?? []).map(
-              (frame: unknown) => {
-                const f = frame as Record<string, unknown>;
-                return {
-                  ...f,
-                  context_line: f.context_line
-                    ? this.scrubber.scrubText(String(f.context_line))
-                    : null,
-                  vars: f.vars
-                    ? this.scrubber.scrubObject(f.vars as Record<string, unknown>)
-                    : null,
-                };
-              },
-            ),
-          } : null,
+          stacktrace: e.stacktrace
+            ? {
+                ...(e.stacktrace as Record<string, unknown>),
+                frames: (((e.stacktrace as Record<string, unknown>).frames as unknown[]) ?? []).map(
+                  (frame: unknown) => {
+                    const f = frame as Record<string, unknown>;
+                    return {
+                      ...f,
+                      context_line: f.context_line
+                        ? this.scrubber.scrubText(String(f.context_line))
+                        : null,
+                      vars: f.vars
+                        ? this.scrubber.scrubObject(f.vars as Record<string, unknown>)
+                        : null,
+                    };
+                  },
+                ),
+              }
+            : null,
         };
       }),
     };
@@ -390,16 +395,10 @@ export class SentryAdapter {
     if (!d) return data;
     return {
       ...d,
-      headers: d.headers
-        ? this.scrubber.scrubObject(d.headers as Record<string, unknown>)
-        : null,
-      query_string: d.query_string
-        ? this.scrubber.scrubText(String(d.query_string))
-        : null,
+      headers: d.headers ? this.scrubber.scrubObject(d.headers as Record<string, unknown>) : null,
+      query_string: d.query_string ? this.scrubber.scrubText(String(d.query_string)) : null,
       data: d.data
-        ? this.scrubber.scrubText(
-            typeof d.data === 'string' ? d.data : JSON.stringify(d.data),
-          )
+        ? this.scrubber.scrubText(typeof d.data === 'string' ? d.data : JSON.stringify(d.data))
         : null,
     };
   }

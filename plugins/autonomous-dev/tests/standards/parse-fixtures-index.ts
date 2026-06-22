@@ -52,13 +52,7 @@ export interface ParsedFixtureIndex {
  * Resolved at module load so a single `import` gives tests both the parsed
  * descriptors and the directory they live under.
  */
-export const FIXTURE_ROOT = path.resolve(
-  __dirname,
-  '..',
-  'fixtures',
-  'standards',
-  'v1',
-);
+export const FIXTURE_ROOT = path.resolve(__dirname, '..', 'fixtures', 'standards', 'v1');
 
 /**
  * Read INDEX.md and return parsed fixture descriptors.
@@ -109,9 +103,7 @@ export function parseFixturesIndex(rootDir: string = FIXTURE_ROOT): ParsedFixtur
       const relPath = cells[0];
       const expected = cells[1];
       if (!isLoaderErrorType(expected)) {
-        throw new Error(
-          `INDEX.md: row "${relPath}" has unknown expectedErrorType "${expected}".`,
-        );
+        throw new Error(`INDEX.md: row "${relPath}" has unknown expectedErrorType "${expected}".`);
       }
       invalid.push({
         relPath,
@@ -126,10 +118,5 @@ export function parseFixturesIndex(rootDir: string = FIXTURE_ROOT): ParsedFixtur
 }
 
 function isLoaderErrorType(s: string): s is LoaderErrorRecord['type'] {
-  return (
-    s === 'io_error' ||
-    s === 'size_exceeded' ||
-    s === 'parse_error' ||
-    s === 'schema_error'
-  );
+  return s === 'io_error' || s === 'size_exceeded' || s === 'parse_error' || s === 'schema_error';
 }

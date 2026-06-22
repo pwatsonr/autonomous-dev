@@ -88,9 +88,7 @@ describe('EvaluatorRegistry', () => {
       throw new Error('config read failure');
     });
     expect(reg.list()).toHaveLength(5);
-    expect(spy.mock.calls.some((c) => String(c[0]).includes('config read failure'))).toBe(
-      true,
-    );
+    expect(spy.mock.calls.some((c) => String(c[0]).includes('config read failure'))).toBe(true);
     spy.mockRestore();
   });
 });

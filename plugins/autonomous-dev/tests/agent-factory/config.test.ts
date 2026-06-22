@@ -81,18 +81,36 @@ paths:
   try {
     const config = loadConfig(tmpFile);
 
-    assert(config.registry.agentsDir === 'custom-agents/', `agentsDir mismatch: ${config.registry.agentsDir}`);
+    assert(
+      config.registry.agentsDir === 'custom-agents/',
+      `agentsDir mismatch: ${config.registry.agentsDir}`,
+    );
     assert(config.registry.maxAgents === 25, `maxAgents mismatch: ${config.registry.maxAgents}`);
-    assert(config.observation.defaultThreshold === 15, `defaultThreshold mismatch: ${config.observation.defaultThreshold}`);
-    assert(config.domainMatching.similarityThreshold === 0.8, `similarityThreshold mismatch: ${config.domainMatching.similarityThreshold}`);
-    assert(config.domainMatching.maxResults === 10, `maxResults mismatch: ${config.domainMatching.maxResults}`);
-    assert(config.rateLimits.modificationsPerAgentPerWeek === 2, `modificationsPerAgentPerWeek mismatch`);
+    assert(
+      config.observation.defaultThreshold === 15,
+      `defaultThreshold mismatch: ${config.observation.defaultThreshold}`,
+    );
+    assert(
+      config.domainMatching.similarityThreshold === 0.8,
+      `similarityThreshold mismatch: ${config.domainMatching.similarityThreshold}`,
+    );
+    assert(
+      config.domainMatching.maxResults === 10,
+      `maxResults mismatch: ${config.domainMatching.maxResults}`,
+    );
+    assert(
+      config.rateLimits.modificationsPerAgentPerWeek === 2,
+      `modificationsPerAgentPerWeek mismatch`,
+    );
     assert(config.rateLimits.agentCreationsPerWeek === 3, `agentCreationsPerWeek mismatch`);
-    assert(config.anomalyThresholds.approvalRateDrop === 0.60, `approvalRateDrop mismatch`);
+    assert(config.anomalyThresholds.approvalRateDrop === 0.6, `approvalRateDrop mismatch`);
     assert(config.anomalyThresholds.qualityDeclinePoints === 0.3, `qualityDeclinePoints mismatch`);
     assert(config.anomalyThresholds.qualityDeclineWindow === 20, `qualityDeclineWindow mismatch`);
     assert(config.anomalyThresholds.escalationRate === 0.25, `escalationRate mismatch`);
-    assert(config.anomalyThresholds.tokenBudgetMultiplier === 3.0, `tokenBudgetMultiplier mismatch`);
+    assert(
+      config.anomalyThresholds.tokenBudgetMultiplier === 3.0,
+      `tokenBudgetMultiplier mismatch`,
+    );
     assert(config.modelRegistry.length === 2, `modelRegistry length mismatch`);
     assert(config.modelRegistry[0] === 'claude-sonnet-4-20250514', `modelRegistry[0] mismatch`);
     assert(config.paths['audit-log'] === 'custom/audit.log', `audit-log path mismatch`);
@@ -116,14 +134,26 @@ function test_load_config_with_defaults(): void {
     const config = loadConfig(tmpFile);
 
     // Provided values
-    assert(config.registry.agentsDir === 'my-agents/', `agentsDir mismatch: ${config.registry.agentsDir}`);
+    assert(
+      config.registry.agentsDir === 'my-agents/',
+      `agentsDir mismatch: ${config.registry.agentsDir}`,
+    );
     assert(config.registry.maxAgents === 10, `maxAgents mismatch: ${config.registry.maxAgents}`);
 
     // Default values for other sections
     assert(config.observation.defaultThreshold === 10, `defaultThreshold should default to 10`);
-    assert(config.domainMatching.similarityThreshold === 0.6, `similarityThreshold should default to 0.6`);
-    assert(config.rateLimits.modificationsPerAgentPerWeek === 1, `modificationsPerAgentPerWeek should default to 1`);
-    assert(config.anomalyThresholds.approvalRateDrop === 0.70, `approvalRateDrop should default to 0.70`);
+    assert(
+      config.domainMatching.similarityThreshold === 0.6,
+      `similarityThreshold should default to 0.6`,
+    );
+    assert(
+      config.rateLimits.modificationsPerAgentPerWeek === 1,
+      `modificationsPerAgentPerWeek should default to 1`,
+    );
+    assert(
+      config.anomalyThresholds.approvalRateDrop === 0.7,
+      `approvalRateDrop should default to 0.70`,
+    );
     assert(config.modelRegistry.length >= 1, `modelRegistry should have defaults`);
     assert(config.paths['audit-log'] === 'data/agent-audit.log', `audit-log path should default`);
 
@@ -138,18 +168,36 @@ function test_load_missing_config_file(): void {
 
   // Should return all defaults, no error thrown
   const defaults = getDefaultConfig();
-  assert(config.registry.agentsDir === defaults.registry.agentsDir, 'agentsDir should match default');
-  assert(config.registry.maxAgents === defaults.registry.maxAgents, 'maxAgents should match default');
-  assert(config.observation.defaultThreshold === defaults.observation.defaultThreshold, 'defaultThreshold should match default');
-  assert(config.domainMatching.similarityThreshold === defaults.domainMatching.similarityThreshold, 'similarityThreshold should match default');
-  assert(config.modelRegistry.length === defaults.modelRegistry.length, 'modelRegistry should match default');
+  assert(
+    config.registry.agentsDir === defaults.registry.agentsDir,
+    'agentsDir should match default',
+  );
+  assert(
+    config.registry.maxAgents === defaults.registry.maxAgents,
+    'maxAgents should match default',
+  );
+  assert(
+    config.observation.defaultThreshold === defaults.observation.defaultThreshold,
+    'defaultThreshold should match default',
+  );
+  assert(
+    config.domainMatching.similarityThreshold === defaults.domainMatching.similarityThreshold,
+    'similarityThreshold should match default',
+  );
+  assert(
+    config.modelRegistry.length === defaults.modelRegistry.length,
+    'modelRegistry should match default',
+  );
 
   console.log('PASS: test_load_missing_config_file');
 }
 
 function test_model_registry_populated(): void {
   const config = getDefaultConfig();
-  assert(config.modelRegistry.length >= 1, `modelRegistry should have at least 1 entry, got ${config.modelRegistry.length}`);
+  assert(
+    config.modelRegistry.length >= 1,
+    `modelRegistry should have at least 1 entry, got ${config.modelRegistry.length}`,
+  );
   assert(
     config.modelRegistry.some((m) => m.includes('claude')),
     'modelRegistry should contain a Claude model',
@@ -214,17 +262,29 @@ function test_default_config_values_match_spec(): void {
   assert(config.observation.defaultThreshold === 10, 'defaultThreshold default');
   assert(config.domainMatching.similarityThreshold === 0.6, 'similarityThreshold default');
   assert(config.domainMatching.maxResults === 5, 'maxResults default');
-  assert(config.rateLimits.modificationsPerAgentPerWeek === 1, 'modificationsPerAgentPerWeek default');
+  assert(
+    config.rateLimits.modificationsPerAgentPerWeek === 1,
+    'modificationsPerAgentPerWeek default',
+  );
   assert(config.rateLimits.agentCreationsPerWeek === 1, 'agentCreationsPerWeek default');
-  assert(config.anomalyThresholds.approvalRateDrop === 0.70, 'approvalRateDrop default');
+  assert(config.anomalyThresholds.approvalRateDrop === 0.7, 'approvalRateDrop default');
   assert(config.anomalyThresholds.qualityDeclinePoints === 0.5, 'qualityDeclinePoints default');
   assert(config.anomalyThresholds.qualityDeclineWindow === 10, 'qualityDeclineWindow default');
-  assert(config.anomalyThresholds.escalationRate === 0.30, 'escalationRate default');
+  assert(config.anomalyThresholds.escalationRate === 0.3, 'escalationRate default');
   assert(config.anomalyThresholds.tokenBudgetMultiplier === 2.0, 'tokenBudgetMultiplier default');
-  assert(config.modelRegistry.includes('claude-sonnet-4-20250514'), 'modelRegistry should include sonnet');
-  assert(config.modelRegistry.includes('claude-opus-4-20250514'), 'modelRegistry should include opus');
+  assert(
+    config.modelRegistry.includes('claude-sonnet-4-20250514'),
+    'modelRegistry should include sonnet',
+  );
+  assert(
+    config.modelRegistry.includes('claude-opus-4-20250514'),
+    'modelRegistry should include opus',
+  );
   assert(config.paths['audit-log'] === 'data/agent-audit.log', 'audit-log path default');
-  assert(config.paths['metrics-jsonl'] === 'data/metrics/agent-invocations.jsonl', 'metrics-jsonl path default');
+  assert(
+    config.paths['metrics-jsonl'] === 'data/metrics/agent-invocations.jsonl',
+    'metrics-jsonl path default',
+  );
   assert(config.paths['metrics-db'] === 'data/agent-metrics.db', 'metrics-db path default');
 
   console.log('PASS: test_default_config_values_match_spec');

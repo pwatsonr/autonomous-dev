@@ -7,7 +7,10 @@
 
 import { Writable } from 'node:stream';
 
-import { runDeployEstimate, type DeployEstimateLookup } from '../../intake/cli/deploy_estimate_command';
+import {
+  runDeployEstimate,
+  type DeployEstimateLookup,
+} from '../../intake/cli/deploy_estimate_command';
 import type { CostEstimator, EstimateResult } from '../../intake/deploy/cost-estimation';
 
 class BufferStream extends Writable {
@@ -26,18 +29,27 @@ function mkEstimate(): EstimateResult {
     estimated_cost_usd: 1.2345,
     currency: 'USD',
     breakdown: [
-      { label: 'Fargate vCPU-hours', quantity: 1, unit: 'vCPU-hour', unit_price_usd: 0.04048, subtotal_usd: 0.04048 },
-      { label: 'ECR storage (prorated)', quantity: 0.001, unit: 'GB-month', unit_price_usd: 0.10, subtotal_usd: 0.0001 },
+      {
+        label: 'Fargate vCPU-hours',
+        quantity: 1,
+        unit: 'vCPU-hour',
+        unit_price_usd: 0.04048,
+        subtotal_usd: 0.04048,
+      },
+      {
+        label: 'ECR storage (prorated)',
+        quantity: 0.001,
+        unit: 'GB-month',
+        unit_price_usd: 0.1,
+        subtotal_usd: 0.0001,
+      },
     ],
     confidence: 0.85,
     notes: 'Excludes data transfer.',
   };
 }
 
-function mkLookup(opts: {
-  resolved: 'ok' | 'missing' | 'estimator-throws';
-  err?: Error;
-}): {
+function mkLookup(opts: { resolved: 'ok' | 'missing' | 'estimator-throws'; err?: Error }): {
   lookup: DeployEstimateLookup;
   estimator: CostEstimator<any>;
   estimateCalls: number;

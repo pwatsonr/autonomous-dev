@@ -162,8 +162,7 @@ export class MetricsEngine implements IMetricsEngine {
       enteredDegradedAt: null,
     };
 
-    this.healthCheckIntervalMs =
-      opts.healthCheckIntervalMs ?? DEFAULT_HEALTH_CHECK_INTERVAL_MS;
+    this.healthCheckIntervalMs = opts.healthCheckIntervalMs ?? DEFAULT_HEALTH_CHECK_INTERVAL_MS;
     this.healthCheckRecordInterval =
       opts.healthCheckRecordInterval ?? DEFAULT_HEALTH_CHECK_RECORD_INTERVAL;
 
@@ -218,19 +217,14 @@ export class MetricsEngine implements IMetricsEngine {
     if (this.sqliteAvailable) {
       this.runPostRecordHooks(metric.agent_name);
     } else {
-      this.logger.warn(
-        'Anomaly detection and aggregation paused — SQLite unavailable',
-      );
+      this.logger.warn('Anomaly detection and aggregation paused — SQLite unavailable');
     }
 
     // Step 4: Observation trigger (SPEC-005-3-1)
     // Runs regardless of degraded mode — observation counting is independent
     if (this.observationTrigger) {
       try {
-        const decision = this.observationTrigger.check(
-          metric.agent_name,
-          metric.agent_version,
-        );
+        const decision = this.observationTrigger.check(metric.agent_name, metric.agent_version);
         if (decision.triggered) {
           this.emit('analysis_triggered', {
             agentName: metric.agent_name,
@@ -257,10 +251,7 @@ export class MetricsEngine implements IMetricsEngine {
    * Normal mode: queries SQLite.
    * Degraded mode: falls back to JSONL reader (slower, filters in-memory).
    */
-  getInvocations(
-    agentName: string,
-    opts?: QueryOptions,
-  ): InvocationMetric[] {
+  getInvocations(agentName: string, opts?: QueryOptions): InvocationMetric[] {
     if (this.sqliteAvailable) {
       try {
         return this.sqliteStore.getInvocations(agentName, {
@@ -270,9 +261,7 @@ export class MetricsEngine implements IMetricsEngine {
           limit: opts?.limit,
         });
       } catch {
-        this.logger.warn(
-          'SQLite query failed for getInvocations, falling back to JSONL',
-        );
+        this.logger.warn('SQLite query failed for getInvocations, falling back to JSONL');
       }
     }
 
@@ -349,9 +338,7 @@ export class MetricsEngine implements IMetricsEngine {
    */
   evaluateAnomalies(agentName: string): AlertRecord[] {
     if (!this.sqliteAvailable) {
-      this.logger.warn(
-        `Anomaly evaluation skipped for '${agentName}' — SQLite unavailable`,
-      );
+      this.logger.warn(`Anomaly evaluation skipped for '${agentName}' — SQLite unavailable`);
       return [];
     }
     if (!this.anomalyDetector) {
@@ -466,9 +453,7 @@ export class MetricsEngine implements IMetricsEngine {
     this.buffer.enteredDegradedAt = new Date().toISOString();
     this.recordsSinceLastHealthCheck = 0;
     this.lastHealthCheckTime = Date.now();
-    this.logger.warn(
-      `Entered degraded mode at ${this.buffer.enteredDegradedAt}`,
-    );
+    this.logger.warn(`Entered degraded mode at ${this.buffer.enteredDegradedAt}`);
   }
 
   private recoverFromDegraded(): void {
@@ -507,9 +492,7 @@ export class MetricsEngine implements IMetricsEngine {
     if (this.buffer.records.length === 0) return;
 
     // Sort by timestamp to guarantee insertion order
-    const sorted = [...this.buffer.records].sort((a, b) =>
-      a.timestamp.localeCompare(b.timestamp),
-    );
+    const sorted = [...this.buffer.records].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
     let replayed = 0;
     const failures: InvocationMetric[] = [];
@@ -528,16 +511,12 @@ export class MetricsEngine implements IMetricsEngine {
       }
     }
 
-    this.logger.info(
-      `Replayed ${replayed}/${sorted.length} buffered records to SQLite`,
-    );
+    this.logger.info(`Replayed ${replayed}/${sorted.length} buffered records to SQLite`);
 
     if (failures.length > 0) {
       this.buffer.records = failures;
       this.sqliteAvailable = false;
-      this.logger.warn(
-        `${failures.length} records failed replay — remaining in buffer`,
-      );
+      this.logger.warn(`${failures.length} records failed replay — remaining in buffer`);
     } else {
       this.buffer.records = [];
       this.buffer.droppedCount = 0;
@@ -606,9 +585,7 @@ export class MetricsEngine implements IMetricsEngine {
         this.anomalyDetector.autoResolve(agentName);
       } catch (err: unknown) {
         this.logger.error(
-          `Post-record auto-resolution failed: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
+          `Post-record auto-resolution failed: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
 
@@ -659,9 +636,7 @@ export class MetricsEngine implements IMetricsEngine {
       this.snapshotCache.set(agentName, aggregate);
     } catch (err: unknown) {
       this.logger.warn(
-        `Failed to store aggregate snapshot: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
+        `Failed to store aggregate snapshot: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
@@ -674,10 +649,7 @@ export class MetricsEngine implements IMetricsEngine {
    * Read invocations from the JSONL file and filter in memory.
    * Used as a fallback when SQLite is unavailable.
    */
-  private getInvocationsFromJsonl(
-    agentName: string,
-    opts?: QueryOptions,
-  ): InvocationMetric[] {
+  private getInvocationsFromJsonl(agentName: string, opts?: QueryOptions): InvocationMetric[] {
     const allMetrics = this.jsonlWriter.readAll();
 
     let filtered = allMetrics.filter((m) => m.agent_name === agentName);

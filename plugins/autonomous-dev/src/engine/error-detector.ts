@@ -13,15 +13,8 @@
  */
 
 import type { ServiceConfig, ThresholdConfig } from '../config/intelligence-config.schema';
-import type {
-  PrometheusResult,
-  PrometheusRangeResult,
-  OpenSearchResult,
-} from '../adapters/types';
-import type {
-  CandidateObservation,
-  BaselineMetrics,
-} from './types';
+import type { PrometheusResult, PrometheusRangeResult, OpenSearchResult } from '../adapters/types';
+import type { CandidateObservation, BaselineMetrics } from './types';
 
 // ---------------------------------------------------------------------------
 // Configuration defaults
@@ -52,10 +45,7 @@ export function countMinutesAboveThreshold(
  * Extracts the top N log sample messages from OpenSearch results.
  * Deduplicates by message content and returns up to `limit` unique samples.
  */
-export function extractTopLogSamples(
-  logs: OpenSearchResult[],
-  limit: number = 5,
-): string[] {
+export function extractTopLogSamples(logs: OpenSearchResult[], limit: number = 5): string[] {
   const seen = new Set<string>();
   const samples: string[] = [];
 
@@ -143,12 +133,7 @@ export class ErrorDetector {
     const candidates: CandidateObservation[] = [];
 
     // 1. Error rate threshold check (with sustained duration)
-    const errorRateCandidate = await this.detectErrorRate(
-      metrics,
-      logs,
-      thresholds,
-      service,
-    );
+    const errorRateCandidate = await this.detectErrorRate(metrics, logs, thresholds, service);
     if (errorRateCandidate) {
       candidates.push(errorRateCandidate);
     }
@@ -171,21 +156,13 @@ export class ErrorDetector {
 
     // 5. Degraded performance detection
     if (baseline) {
-      const degradedCandidate = this.detectDegradedPerformance(
-        metrics,
-        baseline,
-        service,
-      );
+      const degradedCandidate = this.detectDegradedPerformance(metrics, baseline, service);
       if (degradedCandidate) {
         candidates.push(degradedCandidate);
       }
 
       // 6. Data inconsistency detection
-      const dataCandidate = this.detectDataInconsistency(
-        metrics,
-        baseline,
-        service,
-      );
+      const dataCandidate = this.detectDataInconsistency(metrics, baseline, service);
       if (dataCandidate) {
         candidates.push(dataCandidate);
       }
@@ -256,10 +233,7 @@ export class ErrorDetector {
    * Crash detection: checks for service down (up == 0) or restarts
    * (changes(up) > 0).
    */
-  detectCrash(
-    metrics: PrometheusResult[],
-    service: ServiceConfig,
-  ): CandidateObservation | null {
+  detectCrash(metrics: PrometheusResult[], service: ServiceConfig): CandidateObservation | null {
     // Check 1: up == 0 (currently down)
     const upResult = metrics.find((m) => m.query_name === 'crash_down');
     if (upResult && upResult.value === 0) {
@@ -301,10 +275,7 @@ export class ErrorDetector {
    * Exception detection: finds unhandled exceptions in OpenSearch logs
    * grouped by exception class with a configurable count threshold.
    */
-  detectExceptions(
-    logs: OpenSearchResult[],
-    service: ServiceConfig,
-  ): CandidateObservation[] {
+  detectExceptions(logs: OpenSearchResult[], service: ServiceConfig): CandidateObservation[] {
     const candidates: CandidateObservation[] = [];
 
     for (const logResult of logs) {
@@ -320,11 +291,7 @@ export class ErrorDetector {
               threshold_value: this.exceptionCountThreshold,
               sustained_minutes: 0,
               log_samples: logResult.hits
-                .filter(
-                  (h) =>
-                    h.message.includes(bucket.key) ||
-                    h.message === bucket.key,
-                )
+                .filter((h) => h.message.includes(bucket.key) || h.message === bucket.key)
                 .slice(0, 3)
                 .map((h) => h.message),
               data_sources_used: ['opensearch'],
@@ -406,26 +373,15 @@ export class ErrorDetector {
     baseline: BaselineMetrics,
     service: ServiceConfig,
   ): CandidateObservation | null {
-    const clientErrorRate = metrics.find(
-      (m) => m.query_name === 'client_error_rate_4xx',
-    );
-    if (
-      clientErrorRate &&
-      clientErrorRate.value !== null &&
-      baseline.metrics.client_error_rate
-    ) {
+    const clientErrorRate = metrics.find((m) => m.query_name === 'client_error_rate_4xx');
+    if (clientErrorRate && clientErrorRate.value !== null && baseline.metrics.client_error_rate) {
       const baselineRate = baseline.metrics.client_error_rate.mean_7d;
       const threshold = this.dataInconsistencyMultiplier * baselineRate;
 
       if (clientErrorRate.value > threshold) {
         // Check for 422-specific metric to flag data corruption
-        const http422 = metrics.find(
-          (m) => m.query_name === 'client_error_rate_422',
-        );
-        const hasCorruption =
-          http422 !== undefined &&
-          http422.value !== null &&
-          http422.value > 0;
+        const http422 = metrics.find((m) => m.query_name === 'client_error_rate_422');
+        const hasCorruption = http422 !== undefined && http422.value !== null && http422.value > 0;
 
         return {
           type: 'error',

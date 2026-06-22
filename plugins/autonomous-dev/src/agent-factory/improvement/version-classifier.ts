@@ -38,10 +38,7 @@ export function classifyVersionBump(
   proposed: ParsedAgent,
   _diff: string,
 ): VersionClassification {
-  const bodyChangePercent = computeBodyChangePercent(
-    current.system_prompt,
-    proposed.system_prompt,
-  );
+  const bodyChangePercent = computeBodyChangePercent(current.system_prompt, proposed.system_prompt);
 
   const frontmatterChanges = detectFrontmatterChanges(current, proposed);
 
@@ -54,7 +51,8 @@ export function classifyVersionBump(
     const reasons: string[] = [];
     if (frontmatterChanges.includes('role')) reasons.push('role changed');
     if (frontmatterChanges.includes('expertise_new_tags')) reasons.push('new expertise tags added');
-    if (bodyChangePercent > 50) reasons.push(`>50% body changed (${bodyChangePercent.toFixed(1)}%)`);
+    if (bodyChangePercent > 50)
+      reasons.push(`>50% body changed (${bodyChangePercent.toFixed(1)}%)`);
     return {
       bump: 'major',
       reason: reasons.join('; '),
@@ -64,13 +62,11 @@ export function classifyVersionBump(
   }
 
   // MINOR: rubric dimensions changed, or 10-50% body
-  if (
-    frontmatterChanges.includes('evaluation_rubric') ||
-    bodyChangePercent >= 10
-  ) {
+  if (frontmatterChanges.includes('evaluation_rubric') || bodyChangePercent >= 10) {
     const reasons: string[] = [];
     if (frontmatterChanges.includes('evaluation_rubric')) reasons.push('evaluation rubric changed');
-    if (bodyChangePercent >= 10) reasons.push(`10-50% body changed (${bodyChangePercent.toFixed(1)}%)`);
+    if (bodyChangePercent >= 10)
+      reasons.push(`10-50% body changed (${bodyChangePercent.toFixed(1)}%)`);
     return {
       bump: 'minor',
       reason: reasons.join('; '),
@@ -102,10 +98,7 @@ export function classifyVersionBump(
  *   4. removedLines = currentLines.length - lcsLength
  *   5. changePercent = (addedLines + removedLines) / max(currentLines.length, 1) * 100
  */
-export function computeBodyChangePercent(
-  currentBody: string,
-  proposedBody: string,
-): number {
+export function computeBodyChangePercent(currentBody: string, proposedBody: string): number {
   const currentLines = splitLines(currentBody);
   const proposedLines = splitLines(proposedBody);
 
@@ -133,10 +126,7 @@ export function computeBodyChangePercent(
  *   - 'turn_limit'         : turn_limit field changed
  *   - 'model'              : model field changed
  */
-export function detectFrontmatterChanges(
-  current: ParsedAgent,
-  proposed: ParsedAgent,
-): string[] {
+export function detectFrontmatterChanges(current: ParsedAgent, proposed: ParsedAgent): string[] {
   const changes: string[] = [];
 
   // Role
@@ -145,10 +135,8 @@ export function detectFrontmatterChanges(
   }
 
   // Expertise: check for new tags (case-insensitive)
-  const currentExpertiseLower = new Set(current.expertise.map(t => t.toLowerCase()));
-  const newTags = proposed.expertise.filter(
-    t => !currentExpertiseLower.has(t.toLowerCase()),
-  );
+  const currentExpertiseLower = new Set(current.expertise.map((t) => t.toLowerCase()));
+  const newTags = proposed.expertise.filter((t) => !currentExpertiseLower.has(t.toLowerCase()));
   if (newTags.length > 0) {
     changes.push('expertise_new_tags');
   }
@@ -216,8 +204,8 @@ function hasRubricChanges(
   current: Array<{ name: string; weight: number; description: string }>,
   proposed: Array<{ name: string; weight: number; description: string }>,
 ): boolean {
-  const currentMap = new Map(current.map(d => [d.name, d]));
-  const proposedMap = new Map(proposed.map(d => [d.name, d]));
+  const currentMap = new Map(current.map((d) => [d.name, d]));
+  const proposedMap = new Map(proposed.map((d) => [d.name, d]));
 
   // Check for removed dimensions
   for (const name of currentMap.keys()) {

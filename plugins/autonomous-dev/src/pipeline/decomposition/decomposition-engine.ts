@@ -3,7 +3,13 @@ import { PipelineConfig } from '../types/config';
 import { DocumentStorage } from '../storage/document-storage';
 import { CreateDocumentRequest } from '../storage/document-creator';
 import { VersioningEngine } from '../versioning/versioning-engine';
-import { ProposedChild, SmokeTestResult, DecompositionRecord, writeDecompositionRecord, CoverageMatrixEntry } from './decomposition-record-io';
+import {
+  ProposedChild,
+  SmokeTestResult,
+  DecompositionRecord,
+  writeDecompositionRecord,
+  CoverageMatrixEntry,
+} from './decomposition-record-io';
 import { checkDecompositionLimits } from './limits-checker';
 import { smokeTest } from './smoke-test';
 import { getStrategy } from './strategy-registry';
@@ -81,7 +87,9 @@ export async function decompose(
   let parentDoc;
   try {
     parentDoc = await storage.readDocument(
-      request.pipelineId, request.parentType, request.parentId,
+      request.pipelineId,
+      request.parentType,
+      request.parentId,
     );
   } catch {
     throw new DecompositionError('INVALID_PARENT', `Parent ${request.parentId} not found`);
@@ -118,7 +126,7 @@ export async function decompose(
   if (!limitsResult.passed) {
     throw new DecompositionError(
       'LIMIT_EXCEEDED',
-      limitsResult.errors.map(e => e.message).join('; '),
+      limitsResult.errors.map((e) => e.message).join('; '),
       limitsResult.errors,
     );
   }

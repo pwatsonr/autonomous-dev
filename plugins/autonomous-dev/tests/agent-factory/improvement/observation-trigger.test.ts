@@ -21,7 +21,13 @@ import { ObservationTrigger } from '../../../src/agent-factory/improvement/obser
 import { ObservationTracker } from '../../../src/agent-factory/metrics/observation';
 import { AuditLogger } from '../../../src/agent-factory/audit';
 import type { AgentFactoryConfig } from '../../../src/agent-factory/config';
-import type { IAgentRegistry, AgentState, AgentRecord, RankedAgent, RegistryLoadResult } from '../../../src/agent-factory/types';
+import type {
+  IAgentRegistry,
+  AgentState,
+  AgentRecord,
+  RankedAgent,
+  RegistryLoadResult,
+} from '../../../src/agent-factory/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,10 +47,10 @@ function makeConfig(overrides?: Partial<AgentFactoryConfig>): AgentFactoryConfig
     domainMatching: { similarityThreshold: 0.6, maxResults: 5 },
     rateLimits: { modificationsPerAgentPerWeek: 1, agentCreationsPerWeek: 1 },
     anomalyThresholds: {
-      approvalRateDrop: 0.70,
+      approvalRateDrop: 0.7,
       qualityDeclinePoints: 0.5,
       qualityDeclineWindow: 10,
-      escalationRate: 0.30,
+      escalationRate: 0.3,
       tokenBudgetMultiplier: 2.0,
     },
     modelRegistry: [],
@@ -66,8 +72,12 @@ function makeMockRegistry(states: Record<string, AgentState>): IAgentRegistry {
     shadow: () => {},
     unshadow: () => {},
     getState: (name: string) => states[name],
-    setState: (name: string, state: AgentState) => { states[name] = state; },
-    transition: (name: string, state: AgentState) => { states[name] = state; },
+    setState: (name: string, state: AgentState) => {
+      states[name] = state;
+    },
+    transition: (name: string, state: AgentState) => {
+      states[name] = state;
+    },
   };
 }
 
@@ -118,9 +128,15 @@ function test_trigger_fires_at_threshold(): void {
     // 10th invocation should trigger
     decision = trigger.check('test-agent', '1.0.0');
     assert(decision.triggered === true, 'should trigger at threshold');
-    assert(decision.reason === 'threshold reached', `reason should be "threshold reached", got "${decision.reason}"`);
+    assert(
+      decision.reason === 'threshold reached',
+      `reason should be "threshold reached", got "${decision.reason}"`,
+    );
     assert(decision.agentName === 'test-agent', 'agentName should match');
-    assert(decision.invocationCount === 10, `invocationCount should be 10, got ${decision.invocationCount}`);
+    assert(
+      decision.invocationCount === 10,
+      `invocationCount should be 10, got ${decision.invocationCount}`,
+    );
     assert(decision.threshold === 10, `threshold should be 10, got ${decision.threshold}`);
 
     auditLogger.close();
@@ -150,7 +166,10 @@ function test_trigger_does_not_fire_below_threshold(): void {
     }
 
     assert(decision!.triggered === false, 'should not trigger below threshold');
-    assert(decision!.reason === 'threshold not reached', `reason should be "threshold not reached", got "${decision!.reason}"`);
+    assert(
+      decision!.reason === 'threshold not reached',
+      `reason should be "threshold not reached", got "${decision!.reason}"`,
+    );
 
     auditLogger.close();
     console.log('PASS: test_trigger_does_not_fire_below_threshold');
@@ -179,7 +198,10 @@ function test_trigger_skips_frozen_agent(): void {
     }
 
     assert(decision!.triggered === false, 'should not trigger for FROZEN agent');
-    assert(decision!.reason === 'agent is FROZEN', `reason should be "agent is FROZEN", got "${decision!.reason}"`);
+    assert(
+      decision!.reason === 'agent is FROZEN',
+      `reason should be "agent is FROZEN", got "${decision!.reason}"`,
+    );
 
     auditLogger.close();
     console.log('PASS: test_trigger_skips_frozen_agent');
@@ -208,7 +230,10 @@ function test_trigger_skips_under_review_agent(): void {
     }
 
     assert(decision!.triggered === false, 'should not trigger for UNDER_REVIEW agent');
-    assert(decision!.reason === 'analysis already in progress', `reason should be "analysis already in progress", got "${decision!.reason}"`);
+    assert(
+      decision!.reason === 'analysis already in progress',
+      `reason should be "analysis already in progress", got "${decision!.reason}"`,
+    );
 
     auditLogger.close();
     console.log('PASS: test_trigger_skips_under_review_agent');
@@ -237,7 +262,10 @@ function test_trigger_skips_validating_agent(): void {
     }
 
     assert(decision!.triggered === false, 'should not trigger for VALIDATING agent');
-    assert(decision!.reason === 'analysis already in progress', `reason should be "analysis already in progress", got "${decision!.reason}"`);
+    assert(
+      decision!.reason === 'analysis already in progress',
+      `reason should be "analysis already in progress", got "${decision!.reason}"`,
+    );
 
     auditLogger.close();
     console.log('PASS: test_trigger_skips_validating_agent');
@@ -301,7 +329,10 @@ function test_force_trigger_bypasses_threshold(): void {
     // Force trigger should bypass threshold
     const decision = trigger.forceCheck('force-agent');
     assert(decision.triggered === true, 'force trigger should fire regardless of threshold');
-    assert(decision.reason === 'forced by operator', `reason should be "forced by operator", got "${decision.reason}"`);
+    assert(
+      decision.reason === 'forced by operator',
+      `reason should be "forced by operator", got "${decision.reason}"`,
+    );
 
     auditLogger.close();
     console.log('PASS: test_force_trigger_bypasses_threshold');
@@ -357,7 +388,10 @@ function test_trigger_skips_canary_agent(): void {
     }
 
     assert(decision!.triggered === false, 'should not trigger for CANARY agent');
-    assert(decision!.reason === 'analysis already in progress', `reason should be "analysis already in progress", got "${decision!.reason}"`);
+    assert(
+      decision!.reason === 'analysis already in progress',
+      `reason should be "analysis already in progress", got "${decision!.reason}"`,
+    );
 
     auditLogger.close();
     console.log('PASS: test_trigger_skips_canary_agent');
@@ -389,8 +423,14 @@ function test_trigger_writes_audit_log_on_fire(): void {
 
     // Verify audit log entry was written
     const logContent = fs.readFileSync(auditLogPath, 'utf-8');
-    assert(logContent.includes('"event_type":"domain_gap_detected"'), 'audit log should contain domain_gap_detected event');
-    assert(logContent.includes('"trigger":"observation_threshold_reached"'), 'audit log should reference observation_threshold_reached');
+    assert(
+      logContent.includes('"event_type":"domain_gap_detected"'),
+      'audit log should contain domain_gap_detected event',
+    );
+    assert(
+      logContent.includes('"trigger":"observation_threshold_reached"'),
+      'audit log should reference observation_threshold_reached',
+    );
     assert(logContent.includes('"audit-agent"'), 'audit log should reference agent name');
 
     console.log('PASS: test_trigger_writes_audit_log_on_fire');

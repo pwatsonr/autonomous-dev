@@ -16,10 +16,7 @@ import type {
   DataSourceName,
   ConnectivityReport,
 } from '../../src/adapters/types';
-import {
-  DefaultQueryBudgetTracker,
-  AdapterTimeoutError,
-} from '../../src/adapters/types';
+import { DefaultQueryBudgetTracker, AdapterTimeoutError } from '../../src/adapters/types';
 import type { ServiceConfig } from '../../src/config/intelligence-config.schema';
 
 // ---------------------------------------------------------------------------
@@ -74,9 +71,7 @@ function buildMockPrometheusResponse(
 }
 
 /** Builds a Prometheus range query response with multiple data points. */
-function buildMockRangeResponse(
-  values: Array<[number, string]>,
-): Record<string, unknown> {
+function buildMockRangeResponse(values: Array<[number, string]>): Record<string, unknown> {
   return {
     status: 'success',
     data: {
@@ -93,7 +88,9 @@ function buildMockRangeResponse(
 
 /** Builds a default query budget tracker with standard limits. */
 function buildBudget(
-  overrides: Partial<Record<string, { max_queries_per_service: number; timeout_seconds: number }>> = {},
+  overrides: Partial<
+    Record<string, { max_queries_per_service: number; timeout_seconds: number }>
+  > = {},
 ): DefaultQueryBudgetTracker {
   return new DefaultQueryBudgetTracker({
     prometheus: { max_queries_per_service: 20, timeout_seconds: 30 },
@@ -156,16 +153,12 @@ describe('PrometheusAdapter', () => {
 
     test('throughput query generates correct PromQL', () => {
       const query = PROMETHEUS_QUERIES.throughput('api-gateway', '5m');
-      expect(query).toBe(
-        'sum(rate(http_requests_total{job="api-gateway"}[5m]))',
-      );
+      expect(query).toBe('sum(rate(http_requests_total{job="api-gateway"}[5m]))');
     });
 
     test('availability query generates correct PromQL', () => {
       const query = PROMETHEUS_QUERIES.availability('api-gateway', '5m');
-      expect(query).toBe(
-        'avg_over_time(up{job="api-gateway"}[5m]) * 100',
-      );
+      expect(query).toBe('avg_over_time(up{job="api-gateway"}[5m]) * 100');
     });
 
     test('error_rate_by_endpoint query generates correct PromQL', () => {
@@ -435,9 +428,10 @@ describe('PrometheusAdapter', () => {
   describe('TC-1-3-11: timeout handling', () => {
     test('throws AdapterTimeoutError when query exceeds budget timeout', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       // Very short timeout
       const budget = buildBudget({
@@ -446,16 +440,15 @@ describe('PrometheusAdapter', () => {
       const adapter = new PrometheusAdapter(slowMcp, budget);
       const service = buildService();
 
-      await expect(adapter.collectServiceMetrics(service)).rejects.toThrow(
-        AdapterTimeoutError,
-      );
+      await expect(adapter.collectServiceMetrics(service)).rejects.toThrow(AdapterTimeoutError);
     });
 
     test('timeout error includes source, query name, and duration', async () => {
       const slowMcp: McpToolCaller = {
-        callTool: () => new Promise((resolve) => {
-          setTimeout(() => resolve({}), 5000);
-        }),
+        callTool: () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({}), 5000);
+          }),
       };
       const budget = buildBudget({
         prometheus: { max_queries_per_service: 20, timeout_seconds: 0.05 },
@@ -550,9 +543,9 @@ describe('PrometheusAdapter', () => {
       const adapter = new PrometheusAdapter(mcp, budget);
       const service = buildService();
 
-      await expect(
-        adapter.executeDetectionQuery(service, 'nonexistent'),
-      ).rejects.toThrow('Unknown detection query key');
+      await expect(adapter.executeDetectionQuery(service, 'nonexistent')).rejects.toThrow(
+        'Unknown detection query key',
+      );
     });
   });
 

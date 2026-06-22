@@ -86,7 +86,11 @@ describe('CliDeliveryAdapter', () => {
       makePayload({ request_id: 'req-1', event_type: 'escalation', notification_id: 'n1' }),
       makePayload({ request_id: 'req-1', event_type: 'pipeline_failed', notification_id: 'n2' }),
       makePayload({ request_id: 'req-1', event_type: 'escalation', notification_id: 'n3' }),
-      makePayload({ request_id: 'req-2', event_type: 'gate_approval_needed', notification_id: 'n4' }),
+      makePayload({
+        request_id: 'req-2',
+        event_type: 'gate_approval_needed',
+        notification_id: 'n4',
+      }),
       makePayload({ request_id: 'req-2', event_type: 'pipeline_completed', notification_id: 'n5' }),
     ];
 

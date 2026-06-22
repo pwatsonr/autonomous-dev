@@ -22,19 +22,13 @@ describe('SPEC-023-1-01 validateParameters: number/range', () => {
   });
 
   it('rejects values below the lower bound', () => {
-    const r = validateParameters(
-      { port: { type: 'number', range: [1024, 65535] } },
-      { port: 80 },
-    );
+    const r = validateParameters({ port: { type: 'number', range: [1024, 65535] } }, { port: 80 });
     expect(r.valid).toBe(false);
     expect(r.errors.find((e) => e.key === 'port')?.message).toMatch(/range/);
   });
 
   it('rejects non-finite numbers', () => {
-    const r = validateParameters(
-      { x: { type: 'number' } },
-      { x: Number.POSITIVE_INFINITY },
-    );
+    const r = validateParameters({ x: { type: 'number' } }, { x: Number.POSITIVE_INFINITY });
     expect(r.valid).toBe(false);
     expect(r.errors[0].message).toMatch(/finite/);
   });
@@ -100,10 +94,7 @@ describe('SPEC-023-1-01 validateParameters: format=path', () => {
   });
 
   it('rejects empty paths', () => {
-    const r = validateParameters(
-      { target: { type: 'string', format: 'path' } },
-      { target: '' },
-    );
+    const r = validateParameters({ target: { type: 'string', format: 'path' } }, { target: '' });
     expect(r.valid).toBe(false);
   });
 
@@ -168,10 +159,7 @@ describe('SPEC-023-1-01 validateParameters: format=identifier', () => {
   });
 
   it('rejects identifiers starting with a digit', () => {
-    const r = validateParameters(
-      { v: { type: 'string', format: 'identifier' } },
-      { v: '1foo' },
-    );
+    const r = validateParameters({ v: { type: 'string', format: 'identifier' } }, { v: '1foo' });
     expect(r.valid).toBe(false);
   });
 });
@@ -202,20 +190,14 @@ describe('SPEC-023-1-01 validateParameters: format=url', () => {
   });
 
   it('rejects malformed URLs', () => {
-    const r = validateParameters(
-      { u: { type: 'string', format: 'url' } },
-      { u: 'not a url' },
-    );
+    const r = validateParameters({ u: { type: 'string', format: 'url' } }, { u: 'not a url' });
     expect(r.valid).toBe(false);
   });
 });
 
 describe('SPEC-023-1-01 validateParameters: required + defaults', () => {
   it('reports an error when a required key is missing', () => {
-    const r = validateParameters(
-      { x: { type: 'string', required: true } },
-      {},
-    );
+    const r = validateParameters({ x: { type: 'string', required: true } }, {});
     expect(r.valid).toBe(false);
     expect(r.errors[0].key).toBe('x');
     expect(r.errors[0].message).toMatch(/required/);
@@ -231,10 +213,7 @@ describe('SPEC-023-1-01 validateParameters: required + defaults', () => {
   });
 
   it('rejects unknown extra parameters', () => {
-    const r = validateParameters(
-      { x: { type: 'string' } },
-      { x: 'ok', extra: 'nope' },
-    );
+    const r = validateParameters({ x: { type: 'string' } }, { x: 'ok', extra: 'nope' });
     expect(r.valid).toBe(false);
     expect(r.errors.find((e) => e.key === 'extra')).toBeDefined();
   });

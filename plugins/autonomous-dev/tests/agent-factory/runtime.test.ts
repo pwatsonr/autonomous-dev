@@ -27,12 +27,8 @@ function makeAgent(overrides?: Partial<ParsedAgent>): AgentRecord {
     turn_limit: 25,
     tools: overrides?.tools ?? ['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write'],
     expertise: overrides?.expertise ?? ['TypeScript'],
-    evaluation_rubric: [
-      { name: 'correctness', weight: 1.0, description: 'Correct' },
-    ],
-    version_history: [
-      { version: '1.0.0', date: '2026-01-01', change: 'Initial' },
-    ],
+    evaluation_rubric: [{ name: 'correctness', weight: 1.0, description: 'Correct' }],
+    version_history: [{ version: '1.0.0', date: '2026-01-01', change: 'Initial' }],
     risk_tier: 'medium',
     frozen: false,
     description: overrides?.description ?? 'Test executor agent',
@@ -395,7 +391,11 @@ function test_runtime_check_tool_call_path_blocked(): void {
     new PathFilter(auditLogger),
   ]);
 
-  const result = runtime.checkToolCall('Write', { file_path: '/project/agents/foo.md' }, '/project');
+  const result = runtime.checkToolCall(
+    'Write',
+    { file_path: '/project/agents/foo.md' },
+    '/project',
+  );
   assert(result.allowed === false, 'Write to agents/ should be blocked by runtime');
 
   auditLogger.close();
@@ -409,9 +409,7 @@ function test_runtime_intercept_log(): void {
   const auditLogger = new AuditLogger(logPath);
 
   const agent = makeAgent({ tools: ['Read'] });
-  const runtime = new AgentRuntime(agent, auditLogger, [
-    new ToolAccessEnforcer(auditLogger),
-  ]);
+  const runtime = new AgentRuntime(agent, auditLogger, [new ToolAccessEnforcer(auditLogger)]);
 
   runtime.checkToolCall('Read', {}, '/project');
   runtime.checkToolCall('Bash', {}, '/project');

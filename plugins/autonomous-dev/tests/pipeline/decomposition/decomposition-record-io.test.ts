@@ -161,7 +161,7 @@ describe('Decomposition Record I/O', () => {
     const records = await readAllDecompositionRecords(pipelineId, directoryManager);
     expect(records).toHaveLength(2);
 
-    const ids = records.map(r => r.parentId).sort();
+    const ids = records.map((r) => r.parentId).sort();
     expect(ids).toEqual(['PRD-001', 'TDD-001-01']);
   });
 

@@ -235,9 +235,7 @@ export function detectSecrets(
   if (entropyRedactions.length > 0) {
     // Apply entropy-based redactions by replacing matched regions
     // Process in reverse order to preserve position indices
-    const sortedRedactions = [...entropyRedactions].sort(
-      (a, b) => b.position - a.position,
-    );
+    const sortedRedactions = [...entropyRedactions].sort((a, b) => b.position - a.position);
 
     for (const redaction of sortedRedactions) {
       const before = text.substring(0, redaction.position);

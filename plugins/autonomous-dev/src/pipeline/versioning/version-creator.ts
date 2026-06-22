@@ -40,7 +40,9 @@ export async function createVersion(
   let currentVersion: string | null = null;
   if (request.reason !== 'INITIAL') {
     const versions = await storage.listVersions(
-      request.pipelineId, request.type, request.documentId,
+      request.pipelineId,
+      request.type,
+      request.documentId,
     );
     if (versions.length > 0) {
       currentVersion = versions[versions.length - 1].version;
@@ -85,18 +87,8 @@ export async function createVersion(
  * Uses regex replacement on the raw YAML between --- delimiters.
  * Does NOT re-serialize the entire frontmatter (preserves formatting).
  */
-function updateFrontmatterVersion(
-  content: string,
-  newVersion: string,
-  updatedAt: string,
-): string {
-  let updated = content.replace(
-    /^(version:\s*).+$/m,
-    `$1"${newVersion}"`,
-  );
-  updated = updated.replace(
-    /^(updated_at:\s*).+$/m,
-    `$1"${updatedAt}"`,
-  );
+function updateFrontmatterVersion(content: string, newVersion: string, updatedAt: string): string {
+  let updated = content.replace(/^(version:\s*).+$/m, `$1"${newVersion}"`);
+  updated = updated.replace(/^(updated_at:\s*).+$/m, `$1"${updatedAt}"`);
   return updated;
 }

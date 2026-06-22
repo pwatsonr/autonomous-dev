@@ -13,13 +13,13 @@
 // ---------------------------------------------------------------------------
 
 /** Kill mode: graceful waits for phase boundaries, hard aborts immediately. */
-export type KillMode = "graceful" | "hard";
+export type KillMode = 'graceful' | 'hard';
 
 /** Top-level system state managed by the kill switch. */
-export type SystemState = "running" | "halted" | "paused";
+export type SystemState = 'running' | 'halted' | 'paused';
 
 /** Reason attached to an abort signal so listeners can distinguish cause. */
-export type AbortReason = "KILL_GRACEFUL" | "KILL_HARD" | "CANCEL" | "PAUSE";
+export type AbortReason = 'KILL_GRACEFUL' | 'KILL_HARD' | 'CANCEL' | 'PAUSE';
 
 // ---------------------------------------------------------------------------
 // Kill result
@@ -48,7 +48,7 @@ export interface KillResult {
 export interface StateSnapshot {
   requestId: string;
   pipelinePhase: string;
-  phaseStatus: "running" | "completed" | "pending" | "unknown";
+  phaseStatus: 'running' | 'completed' | 'pending' | 'unknown';
   /** Workspace-relative paths to generated artifacts. */
   artifacts: string[];
   pendingEscalationIds: string[];
@@ -75,7 +75,7 @@ export interface CancelResult {
 export interface PauseResumeResult {
   /** Undefined when the action applies to all requests. */
   requestId?: string;
-  action: "paused" | "resumed";
+  action: 'paused' | 'resumed';
   issuedBy: string;
   issuedAt: Date;
   affectedRequests: string[];

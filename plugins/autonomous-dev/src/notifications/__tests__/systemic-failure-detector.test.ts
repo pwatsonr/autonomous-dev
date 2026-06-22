@@ -15,10 +15,7 @@
  */
 
 import { SystemicFailureDetector } from '../systemic-failure-detector';
-import type {
-  AuditTrail,
-  FailureRecord,
-} from '../systemic-failure-detector';
+import type { AuditTrail, FailureRecord } from '../systemic-failure-detector';
 import type { Clock } from '../dnd-filter';
 import type { CrossRequestConfig } from '../types';
 
@@ -38,9 +35,7 @@ function makeMutableClock(initialMs: number = Date.now()): Clock & {
   };
 }
 
-function makeConfig(
-  overrides: Partial<CrossRequestConfig> = {},
-): CrossRequestConfig {
+function makeConfig(overrides: Partial<CrossRequestConfig> = {}): CrossRequestConfig {
   return {
     enabled: true,
     windowMinutes: 60,
@@ -63,9 +58,7 @@ function makeMockAuditTrail(): AuditTrail & {
   };
 }
 
-function makeFailure(
-  overrides: Partial<FailureRecord> = {},
-): FailureRecord {
+function makeFailure(overrides: Partial<FailureRecord> = {}): FailureRecord {
   return {
     requestId: 'req-001',
     repository: 'test-repo',
@@ -93,11 +86,7 @@ describe('SystemicFailureDetector', () => {
 
   // Test Case 19: 3 failures same repo -> systemic
   test('3 failures in same repo triggers systemic detection', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     detector.recordFailure(
       makeFailure({
@@ -131,11 +120,7 @@ describe('SystemicFailureDetector', () => {
 
   // Test Case 20: 2 failures same repo -> not systemic
   test('2 failures below threshold does not trigger systemic', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     detector.recordFailure(
       makeFailure({
@@ -157,11 +142,7 @@ describe('SystemicFailureDetector', () => {
 
   // Test Case 21: 3 failures same phase -> systemic
   test('3 failures in same pipeline phase triggers systemic', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     detector.recordFailure(
       makeFailure({
@@ -200,11 +181,7 @@ describe('SystemicFailureDetector', () => {
 
   // Test Case 22: 3 failures same type -> systemic
   test('3 failures of same type triggers systemic', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     detector.recordFailure(
       makeFailure({
@@ -287,11 +264,7 @@ describe('SystemicFailureDetector', () => {
 
   // Test Case 24: Affected requests listed in alert
   test('affected requests listed in systemic alert', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     detector.recordFailure(
       makeFailure({
@@ -333,11 +306,7 @@ describe('SystemicFailureDetector', () => {
   // overlapping pattern keys for an active incident, which is out of
   // scope for the test-only triage batch.
   test.skip('second systemic for same pattern does NOT emit another alert', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     // First 3 failures trigger systemic
     for (let i = 1; i <= 3; i++) {
@@ -364,11 +333,7 @@ describe('SystemicFailureDetector', () => {
 
   // Test Case 26: Different patterns independent
   test('different patterns are tracked independently', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     // Trigger same_repo for repo-x
     for (let i = 1; i <= 3; i++) {
@@ -419,11 +384,7 @@ describe('SystemicFailureDetector', () => {
 
   // Test Case 27: Audit event logged
   test('systemic_issue_detected audit event logged', async () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     for (let i = 1; i <= 3; i++) {
       detector.recordFailure(
@@ -436,7 +397,7 @@ describe('SystemicFailureDetector', () => {
     }
 
     // Allow async audit logging to complete
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(auditTrail.appendCalls.length).toBeGreaterThan(0);
     const auditEvent = auditTrail.appendCalls[0];
@@ -448,11 +409,7 @@ describe('SystemicFailureDetector', () => {
 
   // Test Case 28: Systemic alert urgency is immediate
   test('systemic alert has immediate urgency', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig(),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig(), auditTrail, clock);
 
     for (let i = 1; i <= 3; i++) {
       detector.recordFailure(
@@ -467,11 +424,7 @@ describe('SystemicFailureDetector', () => {
     // Get the result from the 3rd call (which triggers systemic)
     // We need to re-run to capture the result
     // Actually, let's just create a new detector and test directly
-    const detector2 = new SystemicFailureDetector(
-      makeConfig(),
-      makeMockAuditTrail(),
-      clock,
-    );
+    const detector2 = new SystemicFailureDetector(makeConfig(), makeMockAuditTrail(), clock);
 
     let result;
     for (let i = 1; i <= 3; i++) {
@@ -492,11 +445,7 @@ describe('SystemicFailureDetector', () => {
 
   // Disabled detector never reports systemic
   test('disabled detector always returns systemic: false', () => {
-    const detector = new SystemicFailureDetector(
-      makeConfig({ enabled: false }),
-      auditTrail,
-      clock,
-    );
+    const detector = new SystemicFailureDetector(makeConfig({ enabled: false }), auditTrail, clock);
 
     for (let i = 1; i <= 5; i++) {
       const result = detector.recordFailure(

@@ -30,11 +30,7 @@ import { AuditLogger } from './audit';
  * Path patterns that are protected from agent write operations.
  * These are relative to the working directory.
  */
-const PROTECTED_PATTERNS: string[] = [
-  'agents',
-  'data/agent-',
-  'data/metrics',
-];
+const PROTECTED_PATTERNS: string[] = ['agents', 'data/agent-', 'data/metrics'];
 
 // ---------------------------------------------------------------------------
 // ToolAccessEnforcer
@@ -178,11 +174,7 @@ export class AgentRuntime {
   private toolCallsBlocked = 0;
   private toolCallsAllowed = 0;
 
-  constructor(
-    agent: AgentRecord,
-    auditLogger: AuditLogger,
-    hooks: RuntimeHook[],
-  ) {
+  constructor(agent: AgentRecord, auditLogger: AuditLogger, hooks: RuntimeHook[]) {
     this.agent = agent;
     this.auditLogger = auditLogger;
     this.hooks = hooks;

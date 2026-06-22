@@ -9,12 +9,7 @@
  *   - `linearRegression(points: number[]): TrendResult` (pure function)
  */
 
-import type {
-  InvocationMetric,
-  AggregateMetrics,
-  TrendResult,
-  DomainStats,
-} from './types';
+import type { InvocationMetric, AggregateMetrics, TrendResult, DomainStats } from './types';
 
 // ---------------------------------------------------------------------------
 // Linear regression (exported, pure)
@@ -153,14 +148,10 @@ export class MetricsAggregator {
    * @returns  The aggregate metrics, or `null` if no invocations fall
    *           within the window.
    */
-  compute(
-    agentName: string,
-    allInvocations: InvocationMetric[],
-  ): AggregateMetrics | null {
+  compute(agentName: string, allInvocations: InvocationMetric[]): AggregateMetrics | null {
     const windowStart = this.getWindowStart();
     const invocations = allInvocations.filter(
-      (m) =>
-        m.agent_name === agentName && m.timestamp >= windowStart,
+      (m) => m.agent_name === agentName && m.timestamp >= windowStart,
     );
 
     if (invocations.length === 0) {
@@ -173,9 +164,7 @@ export class MetricsAggregator {
     const count = invocations.length;
 
     // Basic aggregate statistics
-    const approvedCount = invocations.filter(
-      (m) => m.review_outcome === 'approved',
-    ).length;
+    const approvedCount = invocations.filter((m) => m.review_outcome === 'approved').length;
     const approvalRate = approvedCount / count;
 
     const qualityScores = invocations.map((m) => m.output_quality_score);
@@ -183,15 +172,10 @@ export class MetricsAggregator {
     const medianQualityScore = median(qualityScores);
     const stddevQualityScore = stddev(qualityScores);
 
-    const avgReviewIterations = mean(
-      invocations.map((m) => m.review_iteration_count),
-    );
+    const avgReviewIterations = mean(invocations.map((m) => m.review_iteration_count));
     const avgWallClockMs = mean(invocations.map((m) => m.wall_clock_ms));
     const avgTurns = mean(invocations.map((m) => m.turn_count));
-    const totalTokens = invocations.reduce(
-      (sum, m) => sum + m.input_tokens + m.output_tokens,
-      0,
-    );
+    const totalTokens = invocations.reduce((sum, m) => sum + m.input_tokens + m.output_tokens, 0);
 
     // Trend analysis (last 20 invocations)
     const trendInvocations = invocations.slice(-TREND_SAMPLE_SIZE);
@@ -235,9 +219,7 @@ export class MetricsAggregator {
   /**
    * Group invocations by `input_domain` and compute per-domain stats.
    */
-  private computeDomainBreakdown(
-    invocations: InvocationMetric[],
-  ): Record<string, DomainStats> {
+  private computeDomainBreakdown(invocations: InvocationMetric[]): Record<string, DomainStats> {
     const groups = new Map<string, InvocationMetric[]>();
 
     for (const m of invocations) {
@@ -253,9 +235,7 @@ export class MetricsAggregator {
 
     for (const [domain, metrics] of groups) {
       const count = metrics.length;
-      const approved = metrics.filter(
-        (m) => m.review_outcome === 'approved',
-      ).length;
+      const approved = metrics.filter((m) => m.review_outcome === 'approved').length;
 
       breakdown[domain] = {
         invocation_count: count,

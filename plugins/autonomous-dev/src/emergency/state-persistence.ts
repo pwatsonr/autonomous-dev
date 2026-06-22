@@ -19,8 +19,8 @@
  *     events.jsonl             -- Audit event log (managed by PLAN-009-5)
  */
 
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from 'fs';
+import * as path from 'path';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,7 +33,7 @@ import * as path from "path";
 export interface PipelineState {
   requestId: string;
   currentPhase: string;
-  phaseStatus: "running" | "completed" | "pending" | "failed";
+  phaseStatus: 'running' | 'completed' | 'pending' | 'failed';
   completedPhases: string[];
   trustLevel: number;
   lastUpdated: string; // ISO 8601
@@ -54,14 +54,14 @@ export interface StatePersistenceFs {
   openSync?(filePath: string, flags: string): number;
   closeSync?(fd: number): void;
   mkdirSync(dirPath: string, options: { recursive: boolean }): void;
-  readFileSync(filePath: string, encoding: "utf-8"): string;
+  readFileSync(filePath: string, encoding: 'utf-8'): string;
   existsSync(filePath: string): boolean;
   rmSync?(filePath: string, options?: { recursive?: boolean; force?: boolean }): void;
 }
 
 /** Default filesystem backed by Node's fs. */
 export const defaultStatePersistenceFs: StatePersistenceFs = {
-  writeFileSync: (p, c) => fs.writeFileSync(p, c, "utf-8"),
+  writeFileSync: (p, c) => fs.writeFileSync(p, c, 'utf-8'),
   renameSync: (o, n) => fs.renameSync(o, n),
   fdatasyncSync: (fd) => fs.fdatasyncSync(fd),
   openSync: (p, f) => fs.openSync(p, f),
@@ -111,17 +111,14 @@ export class StatePersistence {
    */
   writePipelineState(requestId: string, state: PipelineState): void {
     const dir = path.join(this.baseDir, requestId);
-    const targetPath = path.join(dir, "pipeline.json");
+    const targetPath = path.join(dir, 'pipeline.json');
 
     try {
       this.fs.mkdirSync(dir, { recursive: true });
       this.atomicWrite(targetPath, JSON.stringify(state, null, 2));
     } catch (err) {
       // State loss is acceptable for a single phase -- log but don't halt
-      console.error(
-        `[StatePersistence] Failed to write pipeline state for ${requestId}:`,
-        err,
-      );
+      console.error(`[StatePersistence] Failed to write pipeline state for ${requestId}:`, err);
     }
   }
 
@@ -133,16 +130,13 @@ export class StatePersistence {
    */
   writeArtifactManifest(requestId: string, artifacts: string[]): void {
     const dir = path.join(this.baseDir, requestId);
-    const targetPath = path.join(dir, "artifacts.json");
+    const targetPath = path.join(dir, 'artifacts.json');
 
     try {
       this.fs.mkdirSync(dir, { recursive: true });
       this.atomicWrite(targetPath, JSON.stringify({ artifacts }, null, 2));
     } catch (err) {
-      console.error(
-        `[StatePersistence] Failed to write artifact manifest for ${requestId}:`,
-        err,
-      );
+      console.error(`[StatePersistence] Failed to write artifact manifest for ${requestId}:`, err);
     }
   }
 
@@ -153,10 +147,10 @@ export class StatePersistence {
    * @returns The pipeline state, or null if no state exists.
    */
   readPipelineState(requestId: string): PipelineState | null {
-    const filePath = path.join(this.baseDir, requestId, "pipeline.json");
+    const filePath = path.join(this.baseDir, requestId, 'pipeline.json');
 
     try {
-      const content = this.fs.readFileSync(filePath, "utf-8");
+      const content = this.fs.readFileSync(filePath, 'utf-8');
       return JSON.parse(content) as PipelineState;
     } catch {
       return null;
@@ -170,10 +164,10 @@ export class StatePersistence {
    * @returns List of artifact paths, or empty array if none.
    */
   readArtifactManifest(requestId: string): string[] {
-    const filePath = path.join(this.baseDir, requestId, "artifacts.json");
+    const filePath = path.join(this.baseDir, requestId, 'artifacts.json');
 
     try {
-      const content = this.fs.readFileSync(filePath, "utf-8");
+      const content = this.fs.readFileSync(filePath, 'utf-8');
       const data = JSON.parse(content) as { artifacts: string[] };
       return data.artifacts ?? [];
     } catch {
@@ -220,7 +214,7 @@ export class StatePersistence {
     // Fsync the temp file to ensure content is on disk
     if (this.fs.openSync && this.fs.fdatasyncSync && this.fs.closeSync) {
       try {
-        const fd = this.fs.openSync(tmpPath, "r");
+        const fd = this.fs.openSync(tmpPath, 'r');
         this.fs.fdatasyncSync(fd);
         this.fs.closeSync(fd);
       } catch {

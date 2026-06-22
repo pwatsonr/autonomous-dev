@@ -21,13 +21,13 @@ import type {
   GateCheckResult,
   TrustLevel,
   TrustLevelChangeRequest,
-} from "./types";
-import type { TrustResolutionContext } from "./trust-resolver";
-import type { TrustResolver } from "./trust-resolver";
-import type { TrustChangeManager } from "./trust-change-manager";
-import type { TrustConfigLoader } from "./trust-config";
-import type { AuditTrail } from "./trust-change-manager";
-import * as gateMatrix from "./gate-matrix";
+} from './types';
+import type { TrustResolutionContext } from './trust-resolver';
+import type { TrustResolver } from './trust-resolver';
+import type { TrustChangeManager } from './trust-change-manager';
+import type { TrustConfigLoader } from './trust-config';
+import type { AuditTrail } from './trust-change-manager';
+import * as gateMatrix from './gate-matrix';
 
 // ---------------------------------------------------------------------------
 // TrustEngine
@@ -60,10 +60,7 @@ export class TrustEngine {
    *   6. Emit gate_decision audit event.
    *   7. Return the GateCheckResult.
    */
-  checkGate(
-    gate: PipelineGate,
-    context: TrustResolutionContext,
-  ): GateCheckResult {
+  checkGate(gate: PipelineGate, context: TrustResolutionContext): GateCheckResult {
     // Step 1: Load config
     const config = this.configLoader.load();
 
@@ -71,10 +68,7 @@ export class TrustEngine {
     const baseLevel = this.resolver.resolve(context, config);
 
     // Step 3: Apply pending change at gate boundary
-    const effectiveLevel = this.changeManager.resolveAtGateBoundary(
-      context.requestId,
-      baseLevel,
-    );
+    const effectiveLevel = this.changeManager.resolveAtGateBoundary(context.requestId, baseLevel);
 
     // Track whether a pending change was applied
     const pendingChangeApplied = effectiveLevel !== baseLevel;
@@ -84,9 +78,9 @@ export class TrustEngine {
 
     // Step 5: Defense-in-depth -- security_review is always human
     let securityOverrideRejected = false;
-    if (gate === "security_review" && authority !== "human") {
+    if (gate === 'security_review' && authority !== 'human') {
       this.auditTrail.append({
-        event_type: "security_override_rejected",
+        event_type: 'security_override_rejected',
         payload: {
           gate,
           attemptedAuthority: authority,
@@ -94,13 +88,13 @@ export class TrustEngine {
           requestId: context.requestId,
         },
       });
-      authority = "human";
+      authority = 'human';
       securityOverrideRejected = true;
     }
 
     // Step 6: Emit gate_decision audit event
     this.auditTrail.append({
-      event_type: "gate_decision",
+      event_type: 'gate_decision',
       payload: {
         gate,
         authority,
@@ -141,9 +135,6 @@ export class TrustEngine {
   getEffectiveLevel(context: TrustResolutionContext): TrustLevel {
     const config = this.configLoader.load();
     const baseLevel = this.resolver.resolve(context, config);
-    return this.changeManager.resolveAtGateBoundary(
-      context.requestId,
-      baseLevel,
-    );
+    return this.changeManager.resolveAtGateBoundary(context.requestId, baseLevel);
   }
 }

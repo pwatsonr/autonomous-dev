@@ -77,16 +77,12 @@ describe('ChainExecutor audit emission', () => {
     return [
       buildManifest({
         id: 'security-reviewer',
-        produces: [
-          { artifact_type: 'security-findings', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'security-findings', schema_version: '1.0', format: 'json' }],
       }),
       buildManifest({
         id: 'code-fixer',
         consumes: [{ artifact_type: 'security-findings', schema_version: '^1.0' }],
-        produces: [
-          { artifact_type: 'code-patches', schema_version: '1.0', format: 'json' },
-        ],
+        produces: [{ artifact_type: 'code-patches', schema_version: '1.0', format: 'json' }],
       }),
     ];
   }
@@ -96,9 +92,7 @@ describe('ChainExecutor audit emission', () => {
     const graph = buildGraphFrom(manifests);
     const invoker: ChainHookInvoker = async (pid) => {
       if (pid === 'code-fixer') {
-        return [
-          { artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample }];
       }
       return [];
     };
@@ -218,9 +212,7 @@ describe('ChainExecutor audit emission', () => {
     const graph = buildGraphFrom(manifests);
     const invoker: ChainHookInvoker = async (pid) => {
       if (pid === 'code-fixer') {
-        return [
-          { artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample }];
       }
       return [];
     };
@@ -258,9 +250,7 @@ describe('ChainExecutor audit emission', () => {
       if (pid === 'code-fixer') {
         // Tiny sleep so duration is reliably nonzero.
         await new Promise((r) => setTimeout(r, 5));
-        return [
-          { artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample },
-        ];
+        return [{ artifactType: 'code-patches', scanId: 'patches-1', payload: patchesExample }];
       }
       return [];
     };

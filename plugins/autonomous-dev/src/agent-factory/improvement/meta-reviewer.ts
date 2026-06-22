@@ -147,9 +147,7 @@ export class MetaReviewOrchestrator {
     // Step 4: Invoke the meta-reviewer agent
     const agentOutput = await this.invokeMetaReviewer(metaReviewerRecord, prompt);
     if (agentOutput === null) {
-      this.logger.error(
-        `Meta-reviewer invocation failed for proposal ${proposal.proposal_id}`,
-      );
+      this.logger.error(`Meta-reviewer invocation failed for proposal ${proposal.proposal_id}`);
       // Proposal stays at pending_meta_review; return an error result
       this.auditLogger.log({
         timestamp: new Date().toISOString(),
@@ -194,7 +192,7 @@ export class MetaReviewOrchestrator {
     };
 
     // Step 7: Hard override — any blocker finding forces rejection
-    const hasBlocker = result.findings.some(f => f.severity === 'blocker');
+    const hasBlocker = result.findings.some((f) => f.severity === 'blocker');
     if (hasBlocker && result.verdict === 'approved') {
       result.verdict = 'rejected';
       this.logger.warn(
@@ -222,8 +220,8 @@ export class MetaReviewOrchestrator {
         verdict: result.verdict,
         findings_count: result.findings.length,
         blocker_findings: result.findings
-          .filter(f => f.severity === 'blocker')
-          .map(f => ({
+          .filter((f) => f.severity === 'blocker')
+          .map((f) => ({
             checklist_item: f.checklist_item,
             description: f.description,
           })),
@@ -232,7 +230,7 @@ export class MetaReviewOrchestrator {
 
     this.logger.info(
       `Meta-review ${result.review_id} completed: verdict=${result.verdict}, ` +
-      `findings=${result.findings.length} for proposal ${proposal.proposal_id}`,
+        `findings=${result.findings.length} for proposal ${proposal.proposal_id}`,
     );
 
     return result;
@@ -281,8 +279,8 @@ export class MetaReviewOrchestrator {
 
     this.logger.info(
       `Self-review bypass for proposal ${proposal.proposal_id}: ` +
-      `meta-reviewer cannot review its own modifications, ` +
-      `status set to pending_human_review`,
+        `meta-reviewer cannot review its own modifications, ` +
+        `status set to pending_human_review`,
     );
 
     return result;
@@ -309,9 +307,7 @@ export class MetaReviewOrchestrator {
         });
 
         if (!result.success) {
-          this.logger.error(
-            `Meta-reviewer invocation failed: ${result.output ?? 'unknown error'}`,
-          );
+          this.logger.error(`Meta-reviewer invocation failed: ${result.output ?? 'unknown error'}`);
           return null;
         }
 
@@ -319,9 +315,7 @@ export class MetaReviewOrchestrator {
       }
 
       // Fallback: no runtime factory provided
-      this.logger.warn(
-        'No runtime factory provided; returning null from meta-reviewer invocation',
-      );
+      this.logger.warn('No runtime factory provided; returning null from meta-reviewer invocation');
       return null;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -515,14 +509,11 @@ function parseFindings(raw: unknown): MetaReviewFinding[] {
     }));
 }
 
-function parseChecklistResults(
-  raw: unknown,
-  findings: MetaReviewFinding[],
-): ChecklistResult[] {
+function parseChecklistResults(raw: unknown, findings: MetaReviewFinding[]): ChecklistResult[] {
   if (!Array.isArray(raw)) {
     // Build default checklist results from CHECKLIST_ITEMS with any findings
     return CHECKLIST_ITEMS.map((ci) => {
-      const finding = findings.find(f => f.checklist_item === ci.item);
+      const finding = findings.find((f) => f.checklist_item === ci.item);
       return {
         item: ci.item,
         name: ci.name,
@@ -536,11 +527,12 @@ function parseChecklistResults(
     .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
     .map((item) => {
       const itemNum = typeof item.item === 'number' ? item.item : 0;
-      const name = typeof item.name === 'string'
-        ? item.name
-        : (CHECKLIST_ITEMS.find(ci => ci.item === itemNum)?.name ?? `Item ${itemNum}`);
+      const name =
+        typeof item.name === 'string'
+          ? item.name
+          : (CHECKLIST_ITEMS.find((ci) => ci.item === itemNum)?.name ?? `Item ${itemNum}`);
       const passed = typeof item.passed === 'boolean' ? item.passed : true;
-      const finding = findings.find(f => f.checklist_item === itemNum);
+      const finding = findings.find((f) => f.checklist_item === itemNum);
 
       return {
         item: itemNum,

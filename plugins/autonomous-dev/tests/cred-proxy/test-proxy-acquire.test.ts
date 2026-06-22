@@ -6,22 +6,15 @@
  * behaviour, and TTL-timer wiring without real cloud SDK calls.
  */
 
-import {
-  ActiveTokenRegistry,
-} from '../../intake/cred-proxy/active-tokens';
+import { ActiveTokenRegistry } from '../../intake/cred-proxy/active-tokens';
 import {
   CredentialAuditEmitter,
   type AuditSink,
   type CredentialEventType,
 } from '../../intake/cred-proxy/audit-emitter';
-import {
-  __resetLiveBackendsForTests,
-} from '../../intake/cred-proxy/caller-identity';
+import { __resetLiveBackendsForTests } from '../../intake/cred-proxy/caller-identity';
 import { CredentialProxy } from '../../intake/cred-proxy/proxy';
-import {
-  type CredentialScoper,
-  type Provider,
-} from '../../intake/cred-proxy/types';
+import { type CredentialScoper, type Provider } from '../../intake/cred-proxy/types';
 
 interface RecordedEntry {
   type: CredentialEventType;
@@ -59,10 +52,12 @@ function makeAuditSink(): {
   return { sink, entries, setThrow: (e) => (nextThrow = e) };
 }
 
-function makeScoper(opts: {
-  payload?: string;
-  failRevokeNTimes?: number;
-} = {}): {
+function makeScoper(
+  opts: {
+    payload?: string;
+    failRevokeNTimes?: number;
+  } = {},
+): {
   scoper: CredentialScoper;
   scopeCalls: number;
   revokeCalls: number;
@@ -98,10 +93,12 @@ interface TestSetup {
   fireTimer: (idx?: number) => void;
 }
 
-function setup(opts: {
-  privileged?: string[];
-  scoperOpts?: Parameters<typeof makeScoper>[0];
-} = {}): TestSetup {
+function setup(
+  opts: {
+    privileged?: string[];
+    scoperOpts?: Parameters<typeof makeScoper>[0];
+  } = {},
+): TestSetup {
   const audit = makeAuditSink();
   const scoperCtx = makeScoper(opts.scoperOpts);
   const registry = new ActiveTokenRegistry();

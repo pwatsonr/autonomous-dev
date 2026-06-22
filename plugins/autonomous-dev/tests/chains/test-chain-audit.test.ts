@@ -13,10 +13,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { createHmac } from 'node:crypto';
 
-import {
-  ChainAuditWriter,
-  verifyChain,
-} from '../../intake/chains/audit-writer';
+import { ChainAuditWriter, verifyChain } from '../../intake/chains/audit-writer';
 import {
   getChainsAuditHmacKey,
   resetChainsAuditKeyCacheForTest,
@@ -298,13 +295,7 @@ describe('ChainAuditWriter', () => {
           chain_id: `CH-A-${i}`,
           plugin_id: `padding-plugin-${i}`,
           step: 1,
-          consumes: [
-            'padding-1',
-            'padding-2',
-            'padding-3',
-            'padding-4',
-            'padding-5',
-          ],
+          consumes: ['padding-1', 'padding-2', 'padding-3', 'padding-4', 'padding-5'],
         });
       }
     } finally {
@@ -355,7 +346,7 @@ describe('ChainAuditWriter', () => {
     expect(verifyChain(currentEntries, KEY)).toEqual({ ok: true });
   });
 
-  it('SPEC-022-3-04: open() on a single-line file resumes correctly (chain head = that line\'s hmac)', async () => {
+  it("SPEC-022-3-04: open() on a single-line file resumes correctly (chain head = that line's hmac)", async () => {
     const w1 = await ChainAuditWriter.open({ logPath, key: KEY });
     await w1.append('chain_started', 'CH-X', {
       chain_id: 'CH-X',
@@ -458,13 +449,7 @@ describe('ChainAuditWriter', () => {
           chain_id: `CH-PRE-${i}`,
           chain_name: 'pre-rotation-padding',
           trigger: `padding-plugin-${i}`,
-          plugins: [
-            'padding-1',
-            'padding-2',
-            'padding-3',
-            'padding-4',
-            'padding-5',
-          ],
+          plugins: ['padding-1', 'padding-2', 'padding-3', 'padding-4', 'padding-5'],
         });
       }
       // 10 concurrent appends — the mutex serializes them so each picks
@@ -511,9 +496,7 @@ describe('ChainAuditWriter', () => {
       allEntries.push(...entries);
     }
 
-    const concurrentIds = allEntries
-      .map((e) => e.chain_id)
-      .filter((id) => id.startsWith('CH-CC-'));
+    const concurrentIds = allEntries.map((e) => e.chain_id).filter((id) => id.startsWith('CH-CC-'));
     expect(concurrentIds).toHaveLength(10);
     expect(new Set(concurrentIds).size).toBe(10);
   });

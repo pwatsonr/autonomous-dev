@@ -75,10 +75,7 @@ export class FakeBackend implements DeploymentBackend {
   }
 
   async healthCheck(_record: DeploymentRecord): Promise<HealthStatus> {
-    const next =
-      this.healthIdx < this.healthSeq.length
-        ? this.healthSeq[this.healthIdx]
-        : true;
+    const next = this.healthIdx < this.healthSeq.length ? this.healthSeq[this.healthIdx] : true;
     this.healthIdx += 1;
     return { healthy: next, checks: [] };
   }

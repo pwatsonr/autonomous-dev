@@ -47,7 +47,7 @@ export function generateSeed(roleId: string, iterationNumber: number, slot: numb
   let hash = 0;
   const input = `${roleId}-${iterationNumber}-${slot}`;
   for (let i = 0; i < input.length; i++) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(i);
+    hash = (hash << 5) - hash + input.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash);
@@ -98,7 +98,14 @@ export class PanelAssemblyService {
 
     // For iterations > 1 with a previous panel, apply rotation logic
     if (iterationNumber > 1 && previousPanel && previousPanel.length > 0) {
-      return this.applyRotation(documentType, authorId, iterationNumber, previousPanel, rotationPolicy, panelSize);
+      return this.applyRotation(
+        documentType,
+        authorId,
+        iterationNumber,
+        previousPanel,
+        rotationPolicy,
+        panelSize,
+      );
     }
 
     // Fresh assembly for iteration 1 (or when no previous panel)
@@ -158,7 +165,7 @@ export class PanelAssemblyService {
         }
 
         // Ensure unique reviewer_id vs existing assignments
-        if (assignments.some(a => a.reviewer_id === extraAssignment.reviewer_id)) {
+        if (assignments.some((a) => a.reviewer_id === extraAssignment.reviewer_id)) {
           const uniqueSeed = generateSeed(primaryRoleId, iterationNumber, slotIndex + 200);
           extraAssignment = this.createAssignment(primaryRoleId, uniqueSeed, 'primary');
         }
@@ -185,7 +192,7 @@ export class PanelAssemblyService {
     switch (policy) {
       case 'rotate_none':
         // Return same panel as previous iteration (reuse seeds)
-        return previousPanel.map(a => ({ ...a }));
+        return previousPanel.map((a) => ({ ...a }));
 
       case 'rotate_specialist': {
         // Primary: same role, same seed. Specialist: new seed.

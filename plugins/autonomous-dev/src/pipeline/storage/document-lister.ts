@@ -44,9 +44,7 @@ export async function listDocuments(
   filter?: DocumentFilter,
 ): Promise<DocumentHandle[]> {
   // 1. Determine which types to scan
-  const typesToScan: DocumentType[] = filter?.type
-    ? [filter.type]
-    : [...PIPELINE_ORDER];
+  const typesToScan: DocumentType[] = filter?.type ? [filter.type] : [...PIPELINE_ORDER];
 
   const handles: DocumentHandle[] = [];
 
@@ -57,9 +55,7 @@ export async function listDocuments(
     let entries: string[];
     try {
       const dirEntries = await fs.readdir(typeDir, { withFileTypes: true });
-      entries = dirEntries
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name);
+      entries = dirEntries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
     } catch (err: unknown) {
       // If the type directory doesn't exist, skip it
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -71,12 +67,7 @@ export async function listDocuments(
     // 3. For each document directory, read frontmatter from current.md
     for (const documentId of entries) {
       try {
-        const content = await readDocument(
-          pipelineId,
-          type,
-          documentId,
-          directoryManager,
-        );
+        const content = await readDocument(pipelineId, type, documentId, directoryManager);
 
         const fm = content.frontmatter;
         const handle: DocumentHandle = {

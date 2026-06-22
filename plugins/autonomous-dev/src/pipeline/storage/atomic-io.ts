@@ -15,10 +15,7 @@ import * as path from 'path';
  * @param content String content to write
  * @throws AtomicWriteError on permission denied, disk full, or invalid path
  */
-export async function atomicWrite(
-  targetPath: string,
-  content: string,
-): Promise<void> {
+export async function atomicWrite(targetPath: string, content: string): Promise<void> {
   const tmpPath = `${targetPath}.${Date.now()}.tmp`;
   try {
     const fd = await fs.open(tmpPath, 'w');
@@ -32,10 +29,7 @@ export async function atomicWrite(
   } catch (err: unknown) {
     // Best-effort cleanup of temp file
     await fs.unlink(tmpPath).catch(() => {});
-    throw new AtomicWriteError(
-      `Atomic write to ${targetPath} failed`,
-      err as Error,
-    );
+    throw new AtomicWriteError(`Atomic write to ${targetPath} failed`, err as Error);
   }
 }
 
@@ -50,25 +44,22 @@ export async function atomicWrite(
  * @param target Relative path the symlink should point to (e.g. "v1.1.md")
  * @param linkPath Absolute path of the symlink (e.g. "/path/to/current.md")
  */
-export async function atomicSymlink(
-  target: string,
-  linkPath: string,
-): Promise<void> {
+export async function atomicSymlink(target: string, linkPath: string): Promise<void> {
   const tmpLink = `${linkPath}.${Date.now()}.tmp`;
   try {
     await fs.symlink(target, tmpLink);
     await fs.rename(tmpLink, linkPath);
   } catch (err: unknown) {
     await fs.unlink(tmpLink).catch(() => {});
-    throw new AtomicWriteError(
-      `Atomic symlink swap at ${linkPath} failed`,
-      err as Error,
-    );
+    throw new AtomicWriteError(`Atomic symlink swap at ${linkPath} failed`, err as Error);
   }
 }
 
 export class AtomicWriteError extends Error {
-  constructor(message: string, public readonly cause: Error) {
+  constructor(
+    message: string,
+    public readonly cause: Error,
+  ) {
     super(message);
     this.name = 'AtomicWriteError';
   }

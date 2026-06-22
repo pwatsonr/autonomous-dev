@@ -8,14 +8,9 @@
  * guidance history and a cancellation option.
  */
 
-import type { EscalationEngine } from "./escalation-engine";
-import type { FailureContext } from "./classifier";
-import type {
-  AuditTrail,
-  EscalationMessage,
-  EscalationOption,
-  RequestContext,
-} from "./types";
+import type { EscalationEngine } from './escalation-engine';
+import type { FailureContext } from './classifier';
+import type { AuditTrail, EscalationMessage, EscalationOption, RequestContext } from './types';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -165,8 +160,7 @@ export class ReEscalationManager {
     failureContext: FailureContext,
     requestContext: RequestContext,
   ): EscalationMessage {
-    const latestEscalationId =
-      chain.escalationIds[chain.escalationIds.length - 1];
+    const latestEscalationId = chain.escalationIds[chain.escalationIds.length - 1];
 
     // Build the enriched context for the meta-escalation
     const enrichedContext: RequestContext = {
@@ -179,8 +173,7 @@ export class ReEscalationManager {
     const message = result.message;
 
     // Override summary with loop detection notice
-    message.summary =
-      `[LOOP DETECTED] This issue has been escalated ${chain.count} times without resolution.`;
+    message.summary = `[LOOP DETECTED] This issue has been escalated ${chain.count} times without resolution.`;
 
     // Build guidance history text for technical_details
     const guidanceHistoryText = chain.guidanceHistory
@@ -188,22 +181,20 @@ export class ReEscalationManager {
         (attempt, index) =>
           `Attempt ${index + 1}: Applied "${attempt.guidanceApplied}" -> Failed: "${attempt.failureReason}"`,
       )
-      .join("\n");
+      .join('\n');
 
     message.technical_details =
       `Re-escalation loop detected after ${chain.count} attempts.\n\n` +
       `Guidance History:\n${guidanceHistoryText}`;
 
     // Ensure cancellation option is present
-    const hasCancelOption = message.options.some(
-      (opt) => opt.action === "cancel",
-    );
+    const hasCancelOption = message.options.some((opt) => opt.action === 'cancel');
     if (!hasCancelOption) {
       message.options.push({
-        option_id: "opt-cancel",
-        label: "Cancel this request",
-        action: "cancel",
-        description: "Stop attempting to resolve this issue",
+        option_id: 'opt-cancel',
+        label: 'Cancel this request',
+        action: 'cancel',
+        description: 'Stop attempting to resolve this issue',
       });
     }
 
@@ -212,7 +203,7 @@ export class ReEscalationManager {
 
     // Emit audit event
     void this.auditTrail.append({
-      event_type: "re_escalation_loop_detected",
+      event_type: 're_escalation_loop_detected',
       payload: {
         originalEscalationId: chain.originalEscalationId,
         count: chain.count,

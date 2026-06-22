@@ -100,7 +100,10 @@ export function validateConfig(cfg: ParallelConfig): void {
   }
 
   // worktree_cleanup_delay_seconds: integer >= 0
-  if (!Number.isInteger(cfg.worktree_cleanup_delay_seconds) || cfg.worktree_cleanup_delay_seconds < 0) {
+  if (
+    !Number.isInteger(cfg.worktree_cleanup_delay_seconds) ||
+    cfg.worktree_cleanup_delay_seconds < 0
+  ) {
     throw new ConfigValidationError('worktree_cleanup_delay_seconds', 'must be an integer >= 0');
   }
 

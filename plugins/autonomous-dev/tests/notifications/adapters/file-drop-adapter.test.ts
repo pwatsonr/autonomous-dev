@@ -79,7 +79,7 @@ describe('FileDropDeliveryAdapter', () => {
 
     // Find the batch file
     const files = fs.readdirSync(tmpDir);
-    const batchFile = files.find(f => f.startsWith('batch-'));
+    const batchFile = files.find((f) => f.startsWith('batch-'));
     expect(batchFile).toBeDefined();
 
     const content = fs.readFileSync(path.join(tmpDir, batchFile!), 'utf-8');
@@ -119,14 +119,12 @@ describe('FileDropDeliveryAdapter', () => {
   });
 
   it('batch file name starts with batch-', () => {
-    const payloads: NotificationPayload[] = [
-      makePayload({ notification_id: 'n1' }),
-    ];
+    const payloads: NotificationPayload[] = [makePayload({ notification_id: 'n1' })];
 
     adapter.deliverBatch(payloads);
 
     const files = fs.readdirSync(tmpDir);
-    const batchFile = files.find(f => f.startsWith('batch-'));
+    const batchFile = files.find((f) => f.startsWith('batch-'));
     expect(batchFile).toBeDefined();
     expect(batchFile).toMatch(/^batch-.*\.json$/);
   });

@@ -70,13 +70,13 @@ describe('Strategy Registry', () => {
 
   test('all strategy ids are unique', () => {
     const strategies = getAllStrategies();
-    const ids = strategies.map(s => s.id);
+    const ids = strategies.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   test('all strategies have the four expected ids', () => {
     const strategies = getAllStrategies();
-    const ids = strategies.map(s => s.id).sort();
+    const ids = strategies.map((s) => s.id).sort();
     const expected: DecompositionStrategyId[] = ['direct', 'domain', 'phase', 'task'];
     expect(ids).toEqual(expected);
   });

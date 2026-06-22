@@ -12,10 +12,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import {
-  runEvaluatorsAdd,
-  runEvaluatorsList,
-} from '../../intake/adapters/cli_adapter_evaluators';
+import { runEvaluatorsAdd, runEvaluatorsList } from '../../intake/adapters/cli_adapter_evaluators';
 
 interface CapturedIO {
   stdout: string;

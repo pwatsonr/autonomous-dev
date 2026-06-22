@@ -62,15 +62,15 @@ function logRegistryEvent(eventType: string, details: Record<string, unknown>): 
  * - REJECTED -> ACTIVE (returns to active)
  */
 const VALID_TRANSITIONS: Record<AgentState, AgentState[]> = {
-  'REGISTERED':   ['ACTIVE', 'FROZEN'],
-  'ACTIVE':       ['FROZEN', 'SHADOWED', 'UNDER_REVIEW'],
-  'FROZEN':       ['ACTIVE'],
-  'SHADOWED':     ['ACTIVE'],
-  'UNDER_REVIEW': ['VALIDATING', 'ACTIVE'],
-  'VALIDATING':   ['PROMOTED', 'REJECTED', 'CANARY'],
-  'CANARY':       ['PROMOTED', 'REJECTED'],
-  'PROMOTED':     ['ACTIVE'],
-  'REJECTED':     ['ACTIVE'],
+  REGISTERED: ['ACTIVE', 'FROZEN'],
+  ACTIVE: ['FROZEN', 'SHADOWED', 'UNDER_REVIEW'],
+  FROZEN: ['ACTIVE'],
+  SHADOWED: ['ACTIVE'],
+  UNDER_REVIEW: ['VALIDATING', 'ACTIVE'],
+  VALIDATING: ['PROMOTED', 'REJECTED', 'CANARY'],
+  CANARY: ['PROMOTED', 'REJECTED'],
+  PROMOTED: ['ACTIVE'],
+  REJECTED: ['ACTIVE'],
 };
 
 // ---------------------------------------------------------------------------
@@ -288,9 +288,7 @@ export class AgentRegistry implements IAgentRegistry {
     if (taskDomain) {
       const domainLower = taskDomain.toLowerCase();
       for (const record of activeAgents) {
-        const hasMatch = record.agent.expertise.some(
-          (tag) => tag.toLowerCase() === domainLower,
-        );
+        const hasMatch = record.agent.expertise.some((tag) => tag.toLowerCase() === domainLower);
         if (hasMatch) {
           results.push({ agent: record, score: 1.0, matchType: 'exact' });
           seen.add(record.agent.name);
@@ -304,10 +302,7 @@ export class AgentRegistry implements IAgentRegistry {
     for (const record of activeAgents) {
       if (seen.has(record.agent.name)) continue;
 
-      const agentText = [
-        record.agent.description,
-        ...record.agent.expertise,
-      ].join(' ');
+      const agentText = [record.agent.description, ...record.agent.expertise].join(' ');
       const agentTokens = tokenize(agentText);
 
       const score = computeTokenOverlap(taskTokens, agentTokens);
@@ -364,7 +359,9 @@ export class AgentRegistry implements IAgentRegistry {
       throw new Error(`Cannot unfreeze: agent '${name}' not found in registry`);
     }
     if (record.state !== 'FROZEN') {
-      throw new Error(`Cannot unfreeze: agent '${name}' is not FROZEN (current state: ${record.state})`);
+      throw new Error(
+        `Cannot unfreeze: agent '${name}' is not FROZEN (current state: ${record.state})`,
+      );
     }
 
     record.state = 'ACTIVE';
@@ -397,7 +394,9 @@ export class AgentRegistry implements IAgentRegistry {
       throw new Error(`Cannot shadow: agent '${name}' is already SHADOWED`);
     }
     if (record.state !== 'ACTIVE') {
-      throw new Error(`Cannot shadow: agent '${name}' is not ACTIVE (current state: ${record.state})`);
+      throw new Error(
+        `Cannot shadow: agent '${name}' is not ACTIVE (current state: ${record.state})`,
+      );
     }
 
     const previousState = record.state;
@@ -420,7 +419,9 @@ export class AgentRegistry implements IAgentRegistry {
       throw new Error(`Cannot unshadow: agent '${name}' not found in registry`);
     }
     if (record.state !== 'SHADOWED') {
-      throw new Error(`Cannot unshadow: agent '${name}' is not SHADOWED (current state: ${record.state})`);
+      throw new Error(
+        `Cannot unshadow: agent '${name}' is not SHADOWED (current state: ${record.state})`,
+      );
     }
 
     record.state = 'ACTIVE';
@@ -515,7 +516,7 @@ export class AgentRegistry implements IAgentRegistry {
     if (!allowed || !allowed.includes(targetState)) {
       throw new Error(
         `Invalid state transition for '${name}': ${record.state} -> ${targetState}. ` +
-        `Allowed transitions: ${allowed?.join(', ') || 'none'}`,
+          `Allowed transitions: ${allowed?.join(', ') || 'none'}`,
       );
     }
 
@@ -542,7 +543,8 @@ export class AgentRegistry implements IAgentRegistry {
       return [];
     }
 
-    return fs.readdirSync(dir)
+    return fs
+      .readdirSync(dir)
       .filter((f) => f.endsWith('.md'))
       .sort()
       .map((f) => path.join(dir, f));

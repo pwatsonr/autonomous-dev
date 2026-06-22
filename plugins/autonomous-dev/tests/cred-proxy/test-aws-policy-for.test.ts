@@ -95,8 +95,6 @@ describe('awsPolicyFor', () => {
       cluster: '*',
       service: '*',
     });
-    expect(policy.Statement[0].Resource).toBe(
-      'arn:aws:ecs:us-east-1; --:123:service/*/*',
-    );
+    expect(policy.Statement[0].Resource).toBe('arn:aws:ecs:us-east-1; --:123:service/*/*');
   });
 });

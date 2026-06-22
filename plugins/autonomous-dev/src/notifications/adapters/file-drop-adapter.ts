@@ -1,9 +1,5 @@
 import * as path from 'path';
-import type {
-  DeliveryAdapter,
-  DeliveryResult,
-  NotificationPayload,
-} from '../types';
+import type { DeliveryAdapter, DeliveryResult, NotificationPayload } from '../types';
 
 /**
  * Writes raw JSON to a configured directory.
@@ -14,7 +10,7 @@ import type {
  * All writes are atomic using a temp-file + rename pattern.
  */
 export class FileDropDeliveryAdapter implements DeliveryAdapter {
-  readonly method = "file_drop" as const;
+  readonly method = 'file_drop' as const;
 
   constructor(private outputDir: string) {}
 

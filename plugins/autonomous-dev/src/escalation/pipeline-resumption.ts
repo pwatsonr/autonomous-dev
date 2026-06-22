@@ -22,10 +22,10 @@
  * error is returned so the human can retry.
  */
 
-import type { EscalationChainManager } from "./chain-manager";
-import type { AuditTrail, ResolvedRoute } from "./types";
-import type { ResolvedAction } from "./response-types";
-import type { StoredEscalation } from "./response-validator";
+import type { EscalationChainManager } from './chain-manager';
+import type { AuditTrail, ResolvedRoute } from './types';
+import type { ResolvedAction } from './response-types';
+import type { StoredEscalation } from './response-validator';
 
 // ---------------------------------------------------------------------------
 // PipelineExecutor interface
@@ -107,31 +107,22 @@ export class PipelineResumptionCoordinator {
    * @param responder   Who responded (for audit trail).
    * @returns A ResumeResult indicating success or failure.
    */
-  resume(
-    escalation: StoredEscalation,
-    action: ResolvedAction,
-    responder: string,
-  ): ResumeResult {
+  resume(escalation: StoredEscalation, action: ResolvedAction, responder: string): ResumeResult {
     const requestId = escalation.requestId;
-    const gate = escalation.gate ?? "unknown";
+    const gate = escalation.gate ?? 'unknown';
 
     try {
       switch (action.action) {
-        case "approve":
+        case 'approve':
           return this.handleApprove(escalation, gate, requestId, responder);
 
-        case "retry_with_changes":
-          return this.handleRetryWithChanges(
-            escalation,
-            requestId,
-            action.guidance,
-            responder,
-          );
+        case 'retry_with_changes':
+          return this.handleRetryWithChanges(escalation, requestId, action.guidance, responder);
 
-        case "cancel":
+        case 'cancel':
           return this.handleCancel(escalation, requestId, responder);
 
-        case "override_proceed":
+        case 'override_proceed':
           return this.handleOverrideProceed(
             escalation,
             gate,
@@ -140,13 +131,8 @@ export class PipelineResumptionCoordinator {
             responder,
           );
 
-        case "delegate":
-          return this.handleDelegate(
-            escalation,
-            requestId,
-            action.target,
-            responder,
-          );
+        case 'delegate':
+          return this.handleDelegate(escalation, requestId, action.target, responder);
 
         default: {
           const _exhaustive: never = action;
@@ -156,8 +142,7 @@ export class PipelineResumptionCoordinator {
     } catch (error) {
       // Transactional semantics: pipeline remains paused, chain NOT cancelled.
       // The human can retry their response.
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       return {
         success: false,
@@ -196,17 +181,17 @@ export class PipelineResumptionCoordinator {
 
     // 4. Emit audit event
     this.auditTrail.append({
-      event_type: "escalation_resolved",
+      event_type: 'escalation_resolved',
       payload: {
         escalation_id: escalation.escalationId,
         request_id: requestId,
-        resolution: "approved",
+        resolution: 'approved',
         responder,
         gate,
       },
     });
 
-    return { success: true, action: "approve", requestId };
+    return { success: true, action: 'approve', requestId };
   }
 
   /**
@@ -233,17 +218,17 @@ export class PipelineResumptionCoordinator {
 
     // 4. Emit audit event
     this.auditTrail.append({
-      event_type: "escalation_resolved",
+      event_type: 'escalation_resolved',
       payload: {
         escalation_id: escalation.escalationId,
         request_id: requestId,
-        resolution: "retry_with_changes",
+        resolution: 'retry_with_changes',
         responder,
         guidance,
       },
     });
 
-    return { success: true, action: "retry_with_changes", requestId };
+    return { success: true, action: 'retry_with_changes', requestId };
   }
 
   /**
@@ -261,20 +246,20 @@ export class PipelineResumptionCoordinator {
     this.escalationChainManager.cancelChain(escalation.escalationId);
 
     // 2. Terminate request
-    this.pipelineExecutor.terminateRequest(requestId, "Cancelled by human");
+    this.pipelineExecutor.terminateRequest(requestId, 'Cancelled by human');
 
     // 3. Emit audit event
     this.auditTrail.append({
-      event_type: "escalation_resolved",
+      event_type: 'escalation_resolved',
       payload: {
         escalation_id: escalation.escalationId,
         request_id: requestId,
-        resolution: "cancelled",
+        resolution: 'cancelled',
         responder,
       },
     });
 
-    return { success: true, action: "cancel", requestId };
+    return { success: true, action: 'cancel', requestId };
   }
 
   /**
@@ -303,7 +288,7 @@ export class PipelineResumptionCoordinator {
 
     // 4. Emit human_override audit event
     this.auditTrail.append({
-      event_type: "human_override",
+      event_type: 'human_override',
       payload: {
         escalation_id: escalation.escalationId,
         request_id: requestId,
@@ -315,18 +300,18 @@ export class PipelineResumptionCoordinator {
 
     // 5. Emit escalation_resolved audit event
     this.auditTrail.append({
-      event_type: "escalation_resolved",
+      event_type: 'escalation_resolved',
       payload: {
         escalation_id: escalation.escalationId,
         request_id: requestId,
-        resolution: "override_proceed",
+        resolution: 'override_proceed',
         responder,
         justification,
         gate,
       },
     });
 
-    return { success: true, action: "override_proceed", requestId };
+    return { success: true, action: 'override_proceed', requestId };
   }
 
   /**
@@ -351,16 +336,16 @@ export class PipelineResumptionCoordinator {
     //    We construct a minimal EscalationMessage and ResolvedRoute for
     //    the chain manager's startChain method.
     const delegateMessage = {
-      schema_version: "v1" as const,
+      schema_version: 'v1' as const,
       escalation_id: escalation.escalationId,
       timestamp: new Date().toISOString(),
       request_id: requestId,
-      repository: "",
-      pipeline_phase: "",
-      escalation_type: "product" as const,
-      urgency: "soon" as const,
+      repository: '',
+      pipeline_phase: '',
+      escalation_type: 'product' as const,
+      urgency: 'soon' as const,
       summary: `Delegated from ${responder} to ${newTarget}`,
-      failure_reason: "Delegated escalation",
+      failure_reason: 'Delegated escalation',
       options: escalation.options,
       retry_count: 0,
     };
@@ -369,26 +354,26 @@ export class PipelineResumptionCoordinator {
       primary: {
         target_id: newTarget,
         display_name: newTarget,
-        channel: "default",
+        channel: 'default',
       },
       timeoutMinutes: 60,
-      timeoutBehavior: "pause",
+      timeoutBehavior: 'pause',
     };
 
     this.escalationChainManager.startChain(delegateMessage, delegateRoute);
 
     // 3. Emit audit event
     this.auditTrail.append({
-      event_type: "escalation_resolved",
+      event_type: 'escalation_resolved',
       payload: {
         escalation_id: escalation.escalationId,
         request_id: requestId,
-        resolution: "delegated",
+        resolution: 'delegated',
         responder,
         newTarget,
       },
     });
 
-    return { success: true, action: "delegate", requestId };
+    return { success: true, action: 'delegate', requestId };
   }
 }

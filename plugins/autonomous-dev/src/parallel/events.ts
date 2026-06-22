@@ -375,10 +375,7 @@ export class EventBus {
     if (!this.logDir) return;
     const dir = path.join(this.logDir, `req-${requestId}`);
     fs.mkdirSync(dir, { recursive: true });
-    this.logStream = fs.createWriteStream(
-      path.join(dir, 'events.log'),
-      { flags: 'a' },
-    );
+    this.logStream = fs.createWriteStream(path.join(dir, 'events.log'), { flags: 'a' });
   }
 
   /**

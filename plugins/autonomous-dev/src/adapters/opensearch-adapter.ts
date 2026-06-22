@@ -42,9 +42,7 @@ export function buildErrorAggregationQuery(
           { match: { level: 'ERROR' } },
           { range: { '@timestamp': { gte: `now-${windowHours}h` } } },
         ],
-        filter: [
-          { term: { 'service.name': service } },
-        ],
+        filter: [{ term: { 'service.name': service } }],
       },
     },
     aggs: {
@@ -77,9 +75,7 @@ export function buildErrorSampleQuery(
           { match: { level: 'ERROR' } },
           { range: { '@timestamp': { gte: `now-${windowHours}h` } } },
         ],
-        filter: [
-          { term: { 'service.name': service } },
-        ],
+        filter: [{ term: { 'service.name': service } }],
       },
     },
     collapse: { field: 'message.keyword' },
@@ -100,8 +96,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number, queryName: string): Pro
       ms,
     );
     promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
+      (val) => {
+        clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
     );
   });
 }
@@ -124,10 +126,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, queryName: string): Pro
  * }
  * ```
  */
-function parseSearchResponse(
-  queryName: string,
-  raw: unknown,
-): OpenSearchResult {
+function parseSearchResponse(queryName: string, raw: unknown): OpenSearchResult {
   const response = raw as Record<string, unknown>;
   const hitsWrapper = response?.hits as Record<string, unknown> | undefined;
 
@@ -137,7 +136,7 @@ function parseSearchResponse(
   if (typeof totalObj === 'number') {
     totalHits = totalObj;
   } else if (totalObj && typeof totalObj === 'object') {
-    totalHits = (totalObj as Record<string, unknown>).value as number ?? 0;
+    totalHits = ((totalObj as Record<string, unknown>).value as number) ?? 0;
   }
 
   // Parse individual hits
@@ -274,9 +273,7 @@ export class OpenSearchAdapter {
    */
   private isUnreachable(): boolean {
     if (!this.connectivity) return false;
-    const osResult = this.connectivity.results.find(
-      (r) => r.source === 'opensearch',
-    );
+    const osResult = this.connectivity.results.find((r) => r.source === 'opensearch');
     return osResult?.status === 'unreachable';
   }
 }

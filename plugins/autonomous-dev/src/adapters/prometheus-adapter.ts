@@ -38,8 +38,7 @@ export const PROMETHEUS_QUERIES: Record<string, (job: string, window: string) =>
   throughput: (job: string, window: string) =>
     `sum(rate(http_requests_total{job="${job}"}[${window}]))`,
 
-  availability: (job: string, window: string) =>
-    `avg_over_time(up{job="${job}"}[${window}]) * 100`,
+  availability: (job: string, window: string) => `avg_over_time(up{job="${job}"}[${window}]) * 100`,
 
   error_rate_by_endpoint: (job: string, window: string) =>
     `topk(5, sum by (handler) (rate(http_requests_total{job="${job}",status=~"5.."}[${window}])) / sum by (handler) (rate(http_requests_total{job="${job}"}[${window}])) * 100)`,
@@ -50,11 +49,9 @@ export const PROMETHEUS_QUERIES: Record<string, (job: string, window: string) =>
 // ---------------------------------------------------------------------------
 
 export const DETECTION_QUERIES: Record<string, (job: string, window?: string) => string> = {
-  crash_down: (job: string) =>
-    `up{job="${job}"} == 0`,
+  crash_down: (job: string) => `up{job="${job}"} == 0`,
 
-  crash_restarts: (job: string, window: string = '5m') =>
-    `changes(up{job="${job}"}[${window}])`,
+  crash_restarts: (job: string, window: string = '5m') => `changes(up{job="${job}"}[${window}])`,
 
   sustained_error_rate: (job: string) =>
     `sum(rate(http_requests_total{job="${job}",status=~"5.."}[1m])) / sum(rate(http_requests_total{job="${job}"}[1m])) * 100`,
@@ -71,8 +68,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number, queryName: string): Pro
       ms,
     );
     promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
+      (val) => {
+        clearTimeout(timer);
+        resolve(val);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
     );
   });
 }
@@ -95,11 +98,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, queryName: string): Pro
  * }
  * ```
  */
-function parseInstantResult(
-  queryName: string,
-  query: string,
-  raw: unknown,
-): PrometheusResult {
+function parseInstantResult(queryName: string, query: string, raw: unknown): PrometheusResult {
   const response = raw as Record<string, unknown>;
   const data = response?.data as Record<string, unknown> | undefined;
   const results = (data?.result as Array<Record<string, unknown>>) ?? [];
@@ -147,11 +146,7 @@ function parseInstantResult(
  * }
  * ```
  */
-function parseRangeResult(
-  queryName: string,
-  query: string,
-  raw: unknown,
-): PrometheusRangeResult {
+function parseRangeResult(queryName: string, query: string, raw: unknown): PrometheusRangeResult {
   const response = raw as Record<string, unknown>;
   const data = response?.data as Record<string, unknown> | undefined;
   const results = (data?.result as Array<Record<string, unknown>>) ?? [];
@@ -352,10 +347,7 @@ export class PrometheusAdapter {
   /**
    * Executes a single instant PromQL query via the prometheus_query MCP tool.
    */
-  private async executeQuery(
-    name: string,
-    query: string,
-  ): Promise<PrometheusResult> {
+  private async executeQuery(name: string, query: string): Promise<PrometheusResult> {
     const timeoutMs = this.budget.getTimeoutMs(this.source);
     const raw = await withTimeout(
       this.mcp.callTool('prometheus_query', { query }),
@@ -372,9 +364,7 @@ export class PrometheusAdapter {
    */
   private isUnreachable(): boolean {
     if (!this.connectivity) return false;
-    const promResult = this.connectivity.results.find(
-      (r) => r.source === 'prometheus',
-    );
+    const promResult = this.connectivity.results.find((r) => r.source === 'prometheus');
     return promResult?.status === 'unreachable';
   }
 }
