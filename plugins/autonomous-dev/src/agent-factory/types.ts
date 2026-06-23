@@ -308,8 +308,8 @@ export interface IAgentRegistry {
   list(): AgentRecord[];
   get(name: string, ctx?: ScopeContext): AgentRecord | undefined;
   getForTask(taskDescription: string, taskDomain?: string, ctx?: ScopeContext): RankedAgent[];
-  /** ONBOARD Phase 0: false => user-authoritative artifact (never improved/shadowed/promoted). */
-  isManaged(name: string, ctx?: ScopeContext): boolean;
+  /** ONBOARD Phase 0: true only if EVERY registered record for the name is managed (any managed:false variant, or unknown name, => false). */
+  isManaged(name: string): boolean;
   freeze(name: string): void;
   unfreeze(name: string): void;
   shadow(name: string): void;

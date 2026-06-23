@@ -402,14 +402,16 @@ export class AgentRegistry implements IAgentRegistry {
   }
 
   /**
-   * Whether the resolved agent is factory-managed (subject to the improvement
-   * lifecycle). `managed: false` artifacts are user-authoritative: loaded and
-   * used, but never analyzed/improved/shadowed/promoted/modified. An unknown
-   * name is treated as managed (no-op for callers). ONBOARD Phase 0, #584.
+   * Whether EVERY registered record for this name is factory-managed.
+   *
+   * Returns false (NOT managed → lifecycle must skip) if ANY scope variant of
+   * the name declares `managed: false` — so a user-authoritative variant cannot
+   * be spoofed by a same-named `global` record that `lookup()` would otherwise
+   * prefer. Also fail-closed: an unknown name returns false. ONBOARD #584.
    */
-  isManaged(name: string, ctx?: ScopeContext): boolean {
-    const rec = this.get(name, ctx);
-    return rec ? rec.agent.managed !== false : true;
+  isManaged(name: string): boolean {
+    const recs = this.recordsForName(name);
+    return recs.length > 0 && recs.every((r) => r.agent.managed !== false);
   }
 
   // -------------------------------------------------------------------------

@@ -451,18 +451,38 @@ function mapToParsedAgent(raw: Record<string, unknown>, body: string): ParsedAge
       raw.risk_tier !== undefined && raw.risk_tier !== null
         ? (asString(raw.risk_tier) as RiskTier)
         : undefined,
-    frozen: raw.frozen !== undefined && raw.frozen !== null ? Boolean(raw.frozen) : undefined,
+    frozen: asBoolFlag(raw.frozen),
     // ONBOARD Phase 0 (#584): scope defaults to 'global'; a present value is
-    // preserved verbatim (lenient parser; the registry warns on unknown-id
-    // scopes during resolution). managed mirrors the `frozen` pattern.
+    // preserved verbatim here and format-validated by the validator (rejects
+    // malformed scopes at load). `managed` uses strict boolean parsing so a
+    // quoted `managed: "false"` is never coerced to true.
     scope:
       raw.scope !== undefined && raw.scope !== null
         ? (asString(raw.scope) as ArtifactScope)
         : 'global',
-    managed: raw.managed !== undefined && raw.managed !== null ? Boolean(raw.managed) : undefined,
+    managed: asBoolFlag(raw.managed),
     description: asString(raw.description),
     system_prompt: body,
   };
+}
+
+/**
+ * Parse a boolean-ish frontmatter value. Accepts real booleans and the common
+ * stringy forms (true/false/yes/no/on/off/1/0, case-insensitive) so a quoted
+ * `managed: "false"` is NOT silently coerced to `true` (ONBOARD #584, where
+ * Boolean("false") === true would invert a security-relevant flag). Absent,
+ * null, or unrecognized => undefined (the field's default).
+ */
+function asBoolFlag(val: unknown): boolean | undefined {
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val === 1 ? true : val === 0 ? false : undefined;
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'true' || s === 'yes' || s === 'on' || s === '1') return true;
+    if (s === 'false' || s === 'no' || s === 'off' || s === '0') return false;
+  }
+  return undefined;
 }
 
 function asString(val: unknown): string {

@@ -130,6 +130,15 @@ export class PerformanceAnalyzer {
         return this.errorResult(`Agent '${agentName}' not found in registry`);
       }
 
+      // ONBOARD Phase 0 (#584): defense-in-depth at the analysis sink — never
+      // analyze a managed:false (user-authoritative) agent, even if a caller
+      // reaches here bypassing the observation-trigger / CLI guards.
+      if (!this.registry.isManaged(agentName)) {
+        return this.errorResult(
+          `Agent '${agentName}' is managed:false (user-authoritative); analysis is not permitted`,
+        );
+      }
+
       // Step 2: Look up the performance-analyst agent
       const analystRecord = this.registry.get(PERFORMANCE_ANALYST_AGENT);
       if (!analystRecord) {

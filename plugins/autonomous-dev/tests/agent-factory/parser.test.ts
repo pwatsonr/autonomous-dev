@@ -314,6 +314,32 @@ function test_parse_scope_managed_explicit(): void {
   console.log('PASS: test_parse_scope_managed_explicit');
 }
 
+function test_parse_managed_stringy_not_inverted(): void {
+  // ONBOARD #584: a quoted/stringy falsey `managed` must parse to false, never
+  // be coerced to true (the old Boolean("false") === true inversion).
+  for (const val of ['"false"', "'false'", 'no', 'off']) {
+    const content = [
+      '---',
+      'name: auth-agent',
+      'version: 1.0.0',
+      'role: executor',
+      'model: claude-sonnet-4-20250514',
+      'temperature: 0.0',
+      'turn_limit: 10',
+      'tools: [Read]',
+      'expertise: [x]',
+      'description: A user-authoritative agent',
+      `managed: ${val}`,
+      '---',
+      '# Prompt',
+    ].join('\n');
+    const r = parseAgentString(content);
+    assert(r.success === true, `expected success for managed: ${val}`);
+    assert(r.agent!.managed === false, `managed: ${val} must parse to false, got ${r.agent!.managed}`);
+  }
+  console.log('PASS: test_parse_managed_stringy_not_inverted');
+}
+
 // ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
@@ -339,4 +365,5 @@ describe('parser', () => {
   it('test_parse_preserves_full_body_with_newlines', test_parse_preserves_full_body_with_newlines);
   it('test_parse_scope_managed_defaults', test_parse_scope_managed_defaults);
   it('test_parse_scope_managed_explicit', test_parse_scope_managed_explicit);
+  it('test_parse_managed_stringy_not_inverted', test_parse_managed_stringy_not_inverted);
 });

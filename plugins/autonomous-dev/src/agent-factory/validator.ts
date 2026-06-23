@@ -265,6 +265,27 @@ const rule010Temperature: ValidationRule = {
   },
 };
 
+const SCOPE_FORMAT_RE = /^(global|project:[a-z0-9-]+|repo:[a-z0-9/._-]+)$/;
+
+// ONBOARD Phase 0 (#584): reject a malformed `scope` at load so it cannot
+// silently register and then never resolve for any request.
+const rule011ScopeFormat: ValidationRule = {
+  id: 'RULE_011_SCOPE_FORMAT',
+  field: 'scope',
+  validate(agent: ParsedAgent): ValidationError | null {
+    const scope = agent.scope;
+    if (scope !== undefined && !SCOPE_FORMAT_RE.test(scope)) {
+      return {
+        rule: 'RULE_011_SCOPE_FORMAT',
+        field: 'scope',
+        message: `Invalid scope '${scope}'; expected 'global', 'project:<id>', or 'repo:<id>'`,
+        severity: 'error',
+      };
+    }
+    return null;
+  },
+};
+
 // ---------------------------------------------------------------------------
 // Exported rule list (for introspection / testing)
 // ---------------------------------------------------------------------------
@@ -280,6 +301,7 @@ export const VALIDATION_RULES: ValidationRule[] = [
   rule008TurnLimit,
   rule009ModelRegistry,
   rule010Temperature,
+  rule011ScopeFormat,
 ];
 
 // ---------------------------------------------------------------------------
