@@ -485,6 +485,11 @@ export class AgentRegistry implements IAgentRegistry {
     if (!record) {
       throw new Error(`Cannot shadow: agent '${name}' not found in registry`);
     }
+    if (record.agent.managed === false) {
+      throw new Error(
+        `Cannot shadow: agent '${name}' is managed:false (user-authoritative, ONBOARD #584)`,
+      );
+    }
     if (record.state === 'SHADOWED') {
       throw new Error(`Cannot shadow: agent '${name}' is already SHADOWED`);
     }
