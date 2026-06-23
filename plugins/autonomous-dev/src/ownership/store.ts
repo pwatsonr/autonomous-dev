@@ -58,7 +58,16 @@ export function readOwnership(io: OwnershipStoreIO = defaultStoreIO): Ownership 
   return loadOwnershipConfig(readManifest(io).ownership);
 }
 
-/** Persist the ownership tree into the manifest, preserving all other keys. */
+/**
+ * Persist the ownership tree into the manifest, preserving all other keys.
+ *
+ * NOTE (ONBOARD #584 review): this is a read-modify-write with no cross-process
+ * lock. Acceptable today because the manifest is written ONLY by operator CLI
+ * commands (this store + `config init`) — the daemon never writes it at runtime
+ * — so the only race is two concurrent ownership commands, which is rare and
+ * recoverable (re-run). A file lock is tracked as a follow-up (#586) for if the
+ * manifest ever gains a runtime writer.
+ */
 export function writeOwnership(ownership: Ownership, io: OwnershipStoreIO = defaultStoreIO): void {
   const manifest = readManifest(io);
   manifest.ownership = ownership;

@@ -10,7 +10,7 @@
 
 import { performance } from 'node:perf_hooks';
 
-import { resolveStandards } from '../../intake/standards/resolver';
+import { resolveStandards as resolveStandardsImpl } from '../../intake/standards/resolver';
 import { ValidationError, AuthorizationError } from '../../intake/standards/errors';
 import * as authModule from '../../intake/standards/auth';
 import type { Rule } from '../../intake/standards/types';
@@ -29,6 +29,19 @@ function makeRule(overrides: Partial<Rule> & { id: string }): Rule {
     evaluator: 'pattern-grep',
     ...overrides,
   };
+}
+
+// Local positional wrapper — keeps the scenario tests readable. The production
+// API is the named-options object (exercised via this wrapper and the explicit
+// options-object test at the end). ONBOARD #584 review round 2 (F10).
+function resolveStandards(
+  defaultRules: Rule[],
+  orgRules: Rule[],
+  repoRules: Rule[],
+  requestOverrides: Rule[],
+  projectRules: Rule[] = [],
+) {
+  return resolveStandardsImpl({ defaultRules, orgRules, projectRules, repoRules, requestOverrides });
 }
 
 // ---------------------------------------------------------------------------
@@ -276,5 +289,18 @@ describe('resolveStandards — project tier (ONBOARD #584)', () => {
     const org = [makeRule({ id: 'plat:a', description: 'org' })];
     const r = resolveStandards(def, org, [], []); // 4-arg call still valid
     expect(r.source.get('plat:a')).toBe('org');
+  });
+
+  it('production API: named-options object preserves the tier order (F10)', () => {
+    const r = resolveStandardsImpl({
+      defaultRules: [makeRule({ id: 'plat:a' })],
+      orgRules: [],
+      projectRules: [makeRule({ id: 'proj:b' })],
+      repoRules: [makeRule({ id: 'repo:c' })],
+      requestOverrides: [],
+    });
+    expect(r.source.get('plat:a')).toBe('default');
+    expect(r.source.get('proj:b')).toBe('project');
+    expect(r.source.get('repo:c')).toBe('repo');
   });
 });

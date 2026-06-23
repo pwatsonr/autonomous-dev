@@ -27,33 +27,34 @@ export interface ResolvedStandards {
 }
 
 /**
- * Merge the levels into a single rule set.
- *
- * Order of operations (each step overwrites prior matches by `rule.id`):
- *   1. defaults  → source `default`
- *   2. org       → source `org`
- *   3. project   → source `project` (ONBOARD Phase 0 #584; throws if it
- *                                    overrides an immutable org rule)
- *   4. repo      → source `repo`  (throws if it overrides an immutable org
- *                                  OR project rule)
- *   5. request   → source `request` (admin-gated; may override immutable)
- *
- * `projectRules` is an optional trailing parameter (default `[]`) so existing
- * 4-arg callers remain valid; it is applied between org and repo regardless of
- * its parameter position.
- *
- * @throws ValidationError    when a project/repo rule attempts to override an
- *                            immutable org/project rule.
- * @throws AuthorizationError when per-request overrides are present and
- *                            the caller is not an admin.
+ * Named inputs for {@link resolveStandards}. Field order matches the merge
+ * order so callers cannot transpose tiers — replaces the earlier positional
+ * signature where `projectRules` was a trailing arg whose apply-order did not
+ * match its position (ONBOARD #584 review).
  */
-export function resolveStandards(
-  defaultRules: Rule[],
-  orgRules: Rule[],
-  repoRules: Rule[],
-  requestOverrides: Rule[],
-  projectRules: Rule[] = [],
-): ResolvedStandards {
+export interface ResolveStandardsOptions {
+  defaultRules: Rule[];
+  orgRules: Rule[];
+  projectRules?: Rule[];
+  repoRules: Rule[];
+  requestOverrides: Rule[];
+}
+
+/**
+ * Merge the tiers into a single rule set, most-specific-wins.
+ *
+ * Order (each step overwrites prior matches by `rule.id`):
+ *   default → org → project → repo → request
+ *   - project/repo throw if they override an immutable org/project rule
+ *   - request is admin-gated and may override immutable rules
+ *
+ * @throws ValidationError    when a project/repo rule overrides an immutable
+ *                            org/project rule.
+ * @throws AuthorizationError when per-request overrides are present and the
+ *                            caller is not an admin.
+ */
+export function resolveStandards(opts: ResolveStandardsOptions): ResolvedStandards {
+  const { defaultRules, orgRules, projectRules = [], repoRules, requestOverrides } = opts;
   const rules = new Map<string, Rule>();
   const source = new Map<string, RuleSource>();
 

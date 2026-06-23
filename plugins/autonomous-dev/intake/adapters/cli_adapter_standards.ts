@@ -116,12 +116,12 @@ export async function standardsShowCommand(
   const repoPath = path.join(io.cwd(), '.autonomous-dev', 'standards.yaml');
   const org = (await loadStandardsFile(orgPath)).artifact;
   const repo = (await loadStandardsFile(repoPath)).artifact;
-  const resolved = resolveStandards(
-    def?.rules ?? [],
-    org?.rules ?? [],
-    repo?.rules ?? [],
-    [],
-  );
+  const resolved = resolveStandards({
+    defaultRules: def?.rules ?? [],
+    orgRules: org?.rules ?? [],
+    repoRules: repo?.rules ?? [],
+    requestOverrides: [],
+  });
 
   if (args.rule) {
     const r = resolved.rules.get(args.rule);
