@@ -221,3 +221,60 @@ describe('resolveStandards — inheritance & source tracking', () => {
     expect(r.source.get('repo:d')).toBe('repo');
   });
 });
+
+// ---------------------------------------------------------------------------
+// ONBOARD Phase 0 (#584): project tier — default → org → project → repo → request
+// ---------------------------------------------------------------------------
+
+describe('resolveStandards — project tier (ONBOARD #584)', () => {
+  it('project overrides org (mutable); source becomes `project`', () => {
+    const def = [makeRule({ id: 'plat:a' })];
+    const org = [makeRule({ id: 'plat:a', description: 'from org' })];
+    const project = [makeRule({ id: 'plat:a', description: 'from project' })];
+    const r = resolveStandards(def, org, [], [], project);
+    expect(r.rules.get('plat:a')?.description).toBe('from project');
+    expect(r.source.get('plat:a')).toBe('project');
+  });
+
+  it('repo overrides project (mutable); precedence project < repo', () => {
+    const project = [makeRule({ id: 'plat:a', description: 'from project' })];
+    const repo = [makeRule({ id: 'plat:a', description: 'from repo' })];
+    const r = resolveStandards([], [], repo, [], project);
+    expect(r.rules.get('plat:a')?.description).toBe('from repo');
+    expect(r.source.get('plat:a')).toBe('repo');
+  });
+
+  it('project cannot override an immutable org rule — throws', () => {
+    const org = [makeRule({ id: 'plat:locked', immutable: true })];
+    const project = [makeRule({ id: 'plat:locked', description: 'project attempt' })];
+    expect(() => resolveStandards([], org, [], [], project)).toThrow(ValidationError);
+    expect(() => resolveStandards([], org, [], [], project)).toThrow(/plat:locked/);
+  });
+
+  it('repo cannot override an immutable project rule — throws', () => {
+    const project = [makeRule({ id: 'plat:locked', immutable: true })];
+    const repo = [makeRule({ id: 'plat:locked', description: 'repo attempt' })];
+    expect(() => resolveStandards([], [], repo, [], project)).toThrow(ValidationError);
+    expect(() => resolveStandards([], [], repo, [], project)).toThrow(/project/);
+  });
+
+  it('full hierarchy default→org→project→repo with distinct ids tracks sources', () => {
+    const def = [makeRule({ id: 'plat:a' })];
+    const org = [makeRule({ id: 'org:b' })];
+    const project = [makeRule({ id: 'proj:c' })];
+    const repo = [makeRule({ id: 'repo:d' })];
+    const r = resolveStandards(def, org, repo, [], project);
+    expect(r.rules.size).toBe(4);
+    expect(r.source.get('plat:a')).toBe('default');
+    expect(r.source.get('org:b')).toBe('org');
+    expect(r.source.get('proj:c')).toBe('project');
+    expect(r.source.get('repo:d')).toBe('repo');
+  });
+
+  it('back-compat: omitting projectRules behaves exactly as before', () => {
+    const def = [makeRule({ id: 'plat:a' })];
+    const org = [makeRule({ id: 'plat:a', description: 'org' })];
+    const r = resolveStandards(def, org, [], []); // 4-arg call still valid
+    expect(r.source.get('plat:a')).toBe('org');
+  });
+});
