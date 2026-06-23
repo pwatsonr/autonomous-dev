@@ -306,8 +306,10 @@ export interface IAgentRegistry {
   load(agentsDir: string): Promise<RegistryLoadResult>;
   reload(agentsDir: string): Promise<RegistryLoadResult>;
   list(): AgentRecord[];
-  get(name: string): AgentRecord | undefined;
-  getForTask(taskDescription: string, taskDomain?: string): RankedAgent[];
+  get(name: string, ctx?: ScopeContext): AgentRecord | undefined;
+  getForTask(taskDescription: string, taskDomain?: string, ctx?: ScopeContext): RankedAgent[];
+  /** ONBOARD Phase 0: false => user-authoritative artifact (never improved/shadowed/promoted). */
+  isManaged(name: string, ctx?: ScopeContext): boolean;
   freeze(name: string): void;
   unfreeze(name: string): void;
   shadow(name: string): void;

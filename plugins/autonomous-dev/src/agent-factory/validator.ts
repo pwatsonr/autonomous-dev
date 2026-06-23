@@ -19,6 +19,7 @@ import {
   ValidationRule,
   AGENT_ROLES,
 } from './types';
+import { scopeKeyOf } from '../ownership/scope';
 
 // Re-export for convenience
 export type { ValidationResult };
@@ -82,11 +83,15 @@ const rule001NameUniqueness: ValidationRule = {
   id: 'RULE_001_NAME_UNIQUENESS',
   field: 'name',
   validate(agent: ParsedAgent, ctx: ValidationContext): ValidationError | null {
-    if (ctx.existingNames.has(agent.name)) {
+    // ONBOARD Phase 0 (#584): uniqueness is per (scope, name) — the same name
+    // may exist at different scopes (e.g. a repo override of a global agent).
+    // existingNames holds scope-keys (`${scope}::${name}`).
+    const key = scopeKeyOf(agent.scope ?? 'global', agent.name);
+    if (ctx.existingNames.has(key)) {
       return {
         rule: 'RULE_001_NAME_UNIQUENESS',
         field: 'name',
-        message: `Agent name '${agent.name}' conflicts with an already-registered agent`,
+        message: `Agent '${agent.name}' at scope '${agent.scope ?? 'global'}' conflicts with an already-registered agent`,
         severity: 'error',
       };
     }

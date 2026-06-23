@@ -53,7 +53,8 @@ function test_rule_001_name_uniqueness_pass(): void {
 
 function test_rule_001_name_uniqueness_fail(): void {
   const agent = validAgent({ name: 'code-executor' });
-  const result = validateAgent(agent, new Set(['code-executor']));
+  // Uniqueness is now per (scope, name); a default-scope agent keys as global::name.
+  const result = validateAgent(agent, new Set(['global::code-executor']));
 
   assertRuleError(result.errors, 'RULE_001', 'name');
   console.log('PASS: test_rule_001_name_uniqueness_fail');
