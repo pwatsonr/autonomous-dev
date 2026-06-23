@@ -258,6 +258,62 @@ function test_parse_preserves_full_body_with_newlines(): void {
   console.log('PASS: test_parse_preserves_full_body_with_newlines');
 }
 
+function test_parse_scope_managed_defaults(): void {
+  // No scope/managed frontmatter -> global / undefined (back-compat, ONBOARD #584).
+  const content = [
+    '---',
+    'name: minimal-agent',
+    'version: 1.0.0',
+    'role: reviewer',
+    'model: claude-sonnet-4-20250514',
+    'temperature: 0.0',
+    'turn_limit: 10',
+    'tools: [Read]',
+    'expertise: [testing]',
+    'description: A minimal agent',
+    '---',
+    '# Prompt',
+  ].join('\n');
+
+  const result = parseAgentString(content);
+  assert(result.success === true, 'expected success=true');
+  assert(
+    result.agent!.scope === 'global',
+    `scope should default to global, got ${result.agent!.scope}`,
+  );
+  assert(
+    result.agent!.managed === undefined,
+    `managed should be undefined (treated as managed), got ${result.agent!.managed}`,
+  );
+  console.log('PASS: test_parse_scope_managed_defaults');
+}
+
+function test_parse_scope_managed_explicit(): void {
+  // Repo-scoped, user-authoritative (managed:false) agent (ONBOARD #584).
+  const content = [
+    '---',
+    'name: vault-helper',
+    'version: 1.0.0',
+    'role: executor',
+    'model: claude-sonnet-4-20250514',
+    'temperature: 0.0',
+    'turn_limit: 10',
+    'tools: [Read]',
+    'expertise: [vault]',
+    'description: Repo-scoped authoritative helper',
+    'scope: repo:acme/api',
+    'managed: false',
+    '---',
+    '# Prompt',
+  ].join('\n');
+
+  const result = parseAgentString(content);
+  assert(result.success === true, 'expected success=true');
+  assert(result.agent!.scope === 'repo:acme/api', `scope mismatch: ${result.agent!.scope}`);
+  assert(result.agent!.managed === false, `managed should be false, got ${result.agent!.managed}`);
+  console.log('PASS: test_parse_scope_managed_explicit');
+}
+
 // ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
@@ -281,4 +337,6 @@ describe('parser', () => {
   it('test_parse_type_coercion', test_parse_type_coercion);
   it('test_parse_single_opening_delimiter_only', test_parse_single_opening_delimiter_only);
   it('test_parse_preserves_full_body_with_newlines', test_parse_preserves_full_body_with_newlines);
+  it('test_parse_scope_managed_defaults', test_parse_scope_managed_defaults);
+  it('test_parse_scope_managed_explicit', test_parse_scope_managed_explicit);
 });

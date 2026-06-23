@@ -19,6 +19,7 @@ import {
   VersionHistoryEntry,
   AgentRole,
   RiskTier,
+  ArtifactScope,
 } from './types';
 
 // Re-export for convenience
@@ -451,6 +452,14 @@ function mapToParsedAgent(raw: Record<string, unknown>, body: string): ParsedAge
         ? (asString(raw.risk_tier) as RiskTier)
         : undefined,
     frozen: raw.frozen !== undefined && raw.frozen !== null ? Boolean(raw.frozen) : undefined,
+    // ONBOARD Phase 0 (#584): scope defaults to 'global'; a present value is
+    // preserved verbatim (lenient parser; the registry warns on unknown-id
+    // scopes during resolution). managed mirrors the `frozen` pattern.
+    scope:
+      raw.scope !== undefined && raw.scope !== null
+        ? (asString(raw.scope) as ArtifactScope)
+        : 'global',
+    managed: raw.managed !== undefined && raw.managed !== null ? Boolean(raw.managed) : undefined,
     description: asString(raw.description),
     system_prompt: body,
   };

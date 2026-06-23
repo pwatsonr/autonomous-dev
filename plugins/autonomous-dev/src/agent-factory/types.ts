@@ -5,6 +5,12 @@
  * validation structures, and role/tier enumerations.
  */
 
+import type { ArtifactScope, ScopeContext } from '../ownership/types';
+
+// Re-export the scope primitives so the registry and other consumers can
+// import them from agent-factory/types (ONBOARD Phase 0, #584).
+export type { ArtifactScope, ScopeContext };
+
 // ---------------------------------------------------------------------------
 // Enums and literal types
 // ---------------------------------------------------------------------------
@@ -66,6 +72,14 @@ export interface ParsedAgent {
   version_history: VersionHistoryEntry[];
   risk_tier?: RiskTier;
   frozen?: boolean;
+  /** ONBOARD Phase 0: artifact scope — 'global' (default) | 'project:<id>' | 'repo:<id>'. */
+  scope?: ArtifactScope;
+  /**
+   * ONBOARD Phase 0: when false, the artifact is user-authoritative — loaded and
+   * used, but never analyzed/improved/shadowed/promoted/modified by the factory.
+   * Undefined defaults to managed:true. Distinct from the mutable FROZEN state.
+   */
+  managed?: boolean;
   description: string;
   /** The Markdown body (everything after the second --- delimiter). */
   system_prompt: string;
