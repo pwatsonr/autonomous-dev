@@ -19,6 +19,8 @@ export interface CommandResult {
 }
 
 const ID_RE = /^[a-z0-9-]+$/;
+const REPO_ID_RE = /^[a-z0-9/._-]+$/;
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /** Parse `key=value` tag pairs into a Tags map. Throws on malformed input. */
 export function parseTags(pairs: string[]): Tags {
@@ -28,7 +30,14 @@ export function parseTags(pairs: string[]): Tags {
     if (eq <= 0 || eq === pair.length - 1) {
       throw new Error(`Invalid tag "${pair}"; expected key=value.`);
     }
-    tags[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
+    const key = pair.slice(0, eq).trim();
+    if (key === '') {
+      throw new Error(`Invalid tag "${pair}"; empty key.`);
+    }
+    if (UNSAFE_KEYS.has(key)) {
+      throw new Error(`Invalid tag key "${key}".`);
+    }
+    tags[key] = pair.slice(eq + 1).trim();
   }
   return tags;
 }
@@ -63,7 +72,9 @@ export function assignRepo(
 ): CommandResult {
   const repoId = opts.repoId.trim();
   const projectId = opts.projectId.trim();
-  if (repoId === '') throw new Error('Repo id is required.');
+  if (!REPO_ID_RE.test(repoId)) {
+    throw new Error(`Invalid repo id "${repoId}"; use lowercase [a-z0-9/._-] (e.g. owner/name).`);
+  }
   if (!own.projects.some((p) => p.id === projectId)) {
     throw new Error(
       `Unknown project "${projectId}". Create it first: autonomous-dev project add ${projectId}`,

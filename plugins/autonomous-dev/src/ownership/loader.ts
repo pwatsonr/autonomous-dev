@@ -13,6 +13,8 @@
  * Design: docs/tdd/ONBOARD-phase0-ownership-scope.md (§4.1, ADR-1).
  */
 
+import * as path from 'path';
+
 import type { Ownership, Project, Repo, Tags, ScopeContext } from './types';
 
 /** The empty ownership tree returned when no/invalid config is present. */
@@ -27,6 +29,7 @@ function asTags(val: unknown): Tags {
   const out: Tags = {};
   for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
     if (v === null || v === undefined) continue;
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
     out[k] = typeof v === 'string' ? v : String(v);
   }
   return out;
@@ -74,10 +77,20 @@ export function loadOwnershipConfig(raw: unknown): Ownership {
 
   const org = typeof o.org === 'string' && o.org.trim() !== '' ? o.org.trim() : null;
 
-  const projects = Array.isArray(o.projects)
-    ? o.projects.map(asProject).filter((p): p is Project => p !== null)
-    : [];
-  const projectIds = new Set(projects.map((p) => p.id));
+  const projects: Project[] = [];
+  const projectIds = new Set<string>();
+  if (Array.isArray(o.projects)) {
+    for (const rawProject of o.projects) {
+      const p = asProject(rawProject);
+      if (p === null) continue;
+      if (projectIds.has(p.id)) {
+        console.warn(`[ownership] duplicate project id "${p.id}"; keeping the first.`);
+        continue;
+      }
+      projectIds.add(p.id);
+      projects.push(p);
+    }
+  }
 
   const repos = Array.isArray(o.repos)
     ? o.repos.map(asRepo).filter((r): r is Repo => r !== null)
@@ -113,6 +126,8 @@ export function scopeContextForRepo(o: Ownership, repoId: string): ScopeContext 
 
 /** Reverse lookup: the repo id whose `path` matches `absPath`, or undefined. */
 export function repoIdForPath(o: Ownership, absPath: string): string | undefined {
-  const repo = o.repos.find((r) => r.path === absPath);
+  if (!absPath) return undefined;
+  const target = path.resolve(absPath);
+  const repo = o.repos.find((r) => r.path !== undefined && path.resolve(r.path) === target);
   return repo ? repo.id : undefined;
 }

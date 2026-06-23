@@ -176,6 +176,43 @@ function test_store_missing_manifest(): void {
   console.log('PASS: test_store_missing_manifest');
 }
 
+// F6/F8 hardening — input validation (ONBOARD #584 review round 1)
+function test_command_input_hardening(): void {
+  // empty tag key after trim rejected
+  let threw = false;
+  try {
+    parseTags(['  =v']);
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'empty tag key rejected');
+  // prototype-pollution tag keys rejected
+  for (const k of ['__proto__', 'constructor', 'prototype']) {
+    threw = false;
+    try {
+      parseTags([`${k}=x`]);
+    } catch {
+      threw = true;
+    }
+    assert(threw, `unsafe tag key ${k} rejected`);
+  }
+  // invalid repoId rejected by assignRepo
+  const own = addProject(EMPTY, { id: 'p' }).ownership;
+  for (const bad of ['Up/Case', 'has space', 'a::b', '']) {
+    threw = false;
+    try {
+      assignRepo(own, { repoId: bad, projectId: 'p' });
+    } catch {
+      threw = true;
+    }
+    assert(threw, `invalid repoId "${bad}" rejected`);
+  }
+  // valid repoId (owner/name with dots/underscores) accepted
+  const r = assignRepo(own, { repoId: 'acme/api_v2.1', projectId: 'p' });
+  assert(r.ownership.repos[0].id === 'acme/api_v2.1', 'valid repoId accepted');
+  console.log('PASS: test_command_input_hardening');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -190,4 +227,5 @@ describe('ownership/commands + store', () => {
   it('test_list', test_list);
   it('test_store_roundtrip_preserves_keys', test_store_roundtrip_preserves_keys);
   it('test_store_missing_manifest', test_store_missing_manifest);
+  it('test_command_input_hardening', test_command_input_hardening);
 });

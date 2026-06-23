@@ -91,6 +91,41 @@ function test_flexible_tags_preserved(): void {
   console.log('PASS: test_flexible_tags_preserved');
 }
 
+// F6/F7/F9 hardening (ONBOARD #584 review round 1)
+function test_loader_hardening(): void {
+  // F7: duplicate project ids deduped (first kept)
+  const o = loadOwnershipConfig({
+    projects: [
+      { id: 'p', name: 'First' },
+      { id: 'p', name: 'Second' },
+    ],
+    repos: [],
+  });
+  assert(
+    o.projects.length === 1 && o.projects[0].name === 'First',
+    'dup project id deduped, first kept',
+  );
+
+  // F6: asTags skips prototype-pollution keys (own keys in a literal)
+  const o2 = loadOwnershipConfig({
+    projects: [{ id: 'q', name: 'Q', tags: { team: 'a', constructor: 'y', prototype: 'z' } }],
+    repos: [],
+  });
+  const keys = Object.keys(o2.projects[0].tags);
+  assert(keys.includes('team'), 'safe tag kept');
+  assert(!keys.includes('constructor') && !keys.includes('prototype'), 'unsafe tag keys skipped');
+
+  // F9: repoIdForPath normalizes trailing slash and ..
+  const o3 = loadOwnershipConfig({
+    projects: [{ id: 'p', name: 'P' }],
+    repos: [{ id: 'acme/api', path: '/work/api', projectId: 'p' }],
+  });
+  assert(repoIdForPath(o3, '/work/api/') === 'acme/api', 'trailing slash normalized');
+  assert(repoIdForPath(o3, '/work/foo/../api') === 'acme/api', 'dotdot normalized');
+  assert(repoIdForPath(o3, '/work/other') === undefined, 'non-match still undefined');
+  console.log('PASS: test_loader_hardening');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -103,4 +138,5 @@ describe('ownership/loader', () => {
   it('test_dangling_project_membership_dropped', test_dangling_project_membership_dropped);
   it('test_repo_id_for_path', test_repo_id_for_path);
   it('test_flexible_tags_preserved', test_flexible_tags_preserved);
+  it('test_loader_hardening', test_loader_hardening);
 });
