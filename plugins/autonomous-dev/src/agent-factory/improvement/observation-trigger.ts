@@ -90,6 +90,18 @@ export class ObservationTrigger {
       };
     }
 
+    // Step 2b: Guard — managed:false agents are user-authoritative and must
+    // never be analyzed for improvement (ONBOARD Phase 0, #584).
+    if (!this.registry.isManaged(agentName)) {
+      return {
+        triggered: false,
+        reason: 'agent is not managed (managed:false)',
+        agentName,
+        invocationCount: state.invocations_since_promotion,
+        threshold: state.threshold,
+      };
+    }
+
     // Step 3: Guard — no analysis already in progress
     if (agentState !== undefined && IN_PROGRESS_STATES.has(agentState)) {
       return {
@@ -150,6 +162,18 @@ export class ObservationTrigger {
       return {
         triggered: false,
         reason: 'agent is FROZEN (cannot force frozen agents)',
+        agentName,
+        invocationCount: this.observationTracker.getState(agentName).invocations_since_promotion,
+        threshold: this.observationTracker.getState(agentName).threshold,
+      };
+    }
+
+    // Guard: managed:false agents are user-authoritative; cannot be analyzed
+    // even by force (ONBOARD Phase 0, #584).
+    if (!this.registry.isManaged(agentName)) {
+      return {
+        triggered: false,
+        reason: 'agent is not managed (managed:false)',
         agentName,
         invocationCount: this.observationTracker.getState(agentName).invocations_since_promotion,
         threshold: this.observationTracker.getState(agentName).threshold,

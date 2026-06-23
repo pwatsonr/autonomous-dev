@@ -953,6 +953,11 @@ export async function commandAnalyze(
     return `Error: Agent '${name}' is FROZEN. Cannot analyze frozen agents.`;
   }
 
+  // ------ Guard: managed:false agents are user-authoritative (ONBOARD #584) ------
+  if (!registry.isManaged(name)) {
+    return `Error: Agent '${name}' is managed:false (user-authoritative). Cannot analyze.`;
+  }
+
   // ------ Guard: already UNDER_REVIEW ------
   if (record.state === 'UNDER_REVIEW') {
     return `Error: Agent '${name}' is already UNDER_REVIEW.`;
@@ -1303,6 +1308,11 @@ export async function commandImprove(
   // ------ Guard: FROZEN agents cannot be improved ------
   if (record.state === 'FROZEN') {
     return `Error: Agent '${name}' is FROZEN. Cannot improve frozen agents.`;
+  }
+
+  // ------ Guard: managed:false agents are user-authoritative (ONBOARD #584) ------
+  if (!registry.isManaged(name)) {
+    return `Error: Agent '${name}' is managed:false (user-authoritative). Cannot improve.`;
   }
 
   // ------ Guard: already UNDER_REVIEW ------

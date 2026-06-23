@@ -258,6 +258,113 @@ function test_parse_preserves_full_body_with_newlines(): void {
   console.log('PASS: test_parse_preserves_full_body_with_newlines');
 }
 
+function test_parse_scope_managed_defaults(): void {
+  // No scope/managed frontmatter -> global / undefined (back-compat, ONBOARD #584).
+  const content = [
+    '---',
+    'name: minimal-agent',
+    'version: 1.0.0',
+    'role: reviewer',
+    'model: claude-sonnet-4-20250514',
+    'temperature: 0.0',
+    'turn_limit: 10',
+    'tools: [Read]',
+    'expertise: [testing]',
+    'description: A minimal agent',
+    '---',
+    '# Prompt',
+  ].join('\n');
+
+  const result = parseAgentString(content);
+  assert(result.success === true, 'expected success=true');
+  assert(
+    result.agent!.scope === 'global',
+    `scope should default to global, got ${result.agent!.scope}`,
+  );
+  assert(
+    result.agent!.managed === undefined,
+    `managed should be undefined (treated as managed), got ${result.agent!.managed}`,
+  );
+  console.log('PASS: test_parse_scope_managed_defaults');
+}
+
+function test_parse_scope_managed_explicit(): void {
+  // Repo-scoped, user-authoritative (managed:false) agent (ONBOARD #584).
+  const content = [
+    '---',
+    'name: vault-helper',
+    'version: 1.0.0',
+    'role: executor',
+    'model: claude-sonnet-4-20250514',
+    'temperature: 0.0',
+    'turn_limit: 10',
+    'tools: [Read]',
+    'expertise: [vault]',
+    'description: Repo-scoped authoritative helper',
+    'scope: repo:acme/api',
+    'managed: false',
+    '---',
+    '# Prompt',
+  ].join('\n');
+
+  const result = parseAgentString(content);
+  assert(result.success === true, 'expected success=true');
+  assert(result.agent!.scope === 'repo:acme/api', `scope mismatch: ${result.agent!.scope}`);
+  assert(result.agent!.managed === false, `managed should be false, got ${result.agent!.managed}`);
+  console.log('PASS: test_parse_scope_managed_explicit');
+}
+
+function test_parse_managed_stringy_not_inverted(): void {
+  // ONBOARD #584: a quoted/stringy falsey `managed` must parse to false, never
+  // be coerced to true (the old Boolean("false") === true inversion).
+  for (const val of ['"false"', "'false'", 'no', 'off']) {
+    const content = [
+      '---',
+      'name: auth-agent',
+      'version: 1.0.0',
+      'role: executor',
+      'model: claude-sonnet-4-20250514',
+      'temperature: 0.0',
+      'turn_limit: 10',
+      'tools: [Read]',
+      'expertise: [x]',
+      'description: A user-authoritative agent',
+      `managed: ${val}`,
+      '---',
+      '# Prompt',
+    ].join('\n');
+    const r = parseAgentString(content);
+    assert(r.success === true, `expected success for managed: ${val}`);
+    assert(r.agent!.managed === false, `managed: ${val} must parse to false, got ${r.agent!.managed}`);
+  }
+  console.log('PASS: test_parse_managed_stringy_not_inverted');
+}
+
+function test_parse_rejects_garbage_boolean_fields(): void {
+  // ONBOARD #584 round 2: a present-but-unparseable managed/frozen must error,
+  // not silently default (a security-relevant flag must not fail open).
+  for (const line of ['managed: maybe', 'managed: 2', 'frozen: nope']) {
+    const content = [
+      '---',
+      'name: a',
+      'version: 1.0.0',
+      'role: executor',
+      'model: claude-sonnet-4-20250514',
+      'temperature: 0.0',
+      'turn_limit: 1',
+      'tools: [Read]',
+      'expertise: [x]',
+      'description: d',
+      line,
+      '---',
+      '# P',
+    ].join('\n');
+    const r = parseAgentString(content);
+    assert(r.success === false, `expected parse failure for "${line}", got success`);
+  }
+  console.log('PASS: test_parse_rejects_garbage_boolean_fields');
+}
+
 // ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
@@ -281,4 +388,8 @@ describe('parser', () => {
   it('test_parse_type_coercion', test_parse_type_coercion);
   it('test_parse_single_opening_delimiter_only', test_parse_single_opening_delimiter_only);
   it('test_parse_preserves_full_body_with_newlines', test_parse_preserves_full_body_with_newlines);
+  it('test_parse_scope_managed_defaults', test_parse_scope_managed_defaults);
+  it('test_parse_scope_managed_explicit', test_parse_scope_managed_explicit);
+  it('test_parse_managed_stringy_not_inverted', test_parse_managed_stringy_not_inverted);
+  it('test_parse_rejects_garbage_boolean_fields', test_parse_rejects_garbage_boolean_fields);
 });

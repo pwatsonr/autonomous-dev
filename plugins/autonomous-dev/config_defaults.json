@@ -75,6 +75,12 @@
     "overrides": {}
   },
 
+  "ownership": {
+    "org": null,
+    "projects": [],
+    "repos": []
+  },
+
   "trust": {
     "system_default_level": 1,
     "repositories": {},

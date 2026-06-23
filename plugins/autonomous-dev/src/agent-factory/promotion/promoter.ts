@@ -486,6 +486,12 @@ export class Promoter {
       return `Proposal must be validated_positive or meta_approved, current status: ${proposal.status}`;
     }
 
+    // Agent must be factory-managed — managed:false is user-authoritative and
+    // must never be promoted (ONBOARD Phase 0, #584).
+    if (!this.registry.isManaged(agentName)) {
+      return `Agent '${agentName}' is managed:false (user-authoritative) and cannot be promoted`;
+    }
+
     // Agent must be in state VALIDATING (or UNDER_REVIEW for bypassed)
     const agentState = this.registry.getState(agentName);
     const validStates = ['VALIDATING', 'UNDER_REVIEW'];

@@ -200,6 +200,10 @@ class DiskBackedRegistry implements IAgentRegistry {
   getForTask(_taskDescription: string, _taskDomain?: string): RankedAgent[] {
     return [];
   }
+  isManaged(name: string): boolean {
+    const r = this.agents.get(name);
+    return r ? r.agent.managed !== false : true;
+  }
   freeze(name: string): void {
     const r = this.agents.get(name);
     if (r) r.state = 'FROZEN';

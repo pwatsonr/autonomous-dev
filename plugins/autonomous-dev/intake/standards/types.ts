@@ -128,4 +128,4 @@ export interface StandardsArtifact {
  * whether a rule violation is the operator's responsibility (`org`/`repo`)
  * or the platform's (`default`).
  */
-export type RuleSource = 'default' | 'org' | 'repo' | 'request';
+export type RuleSource = 'default' | 'org' | 'project' | 'repo' | 'request';

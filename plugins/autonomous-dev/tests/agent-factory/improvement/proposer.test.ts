@@ -183,6 +183,10 @@ class MockRegistry implements IAgentRegistry {
   get(name: string): AgentRecord | undefined {
     return this.agents.get(name);
   }
+  isManaged(name: string): boolean {
+    const r = this.agents.get(name);
+    return r ? r.agent.managed !== false : true;
+  }
   getForTask(_taskDescription: string, _taskDomain?: string): RankedAgent[] {
     return [];
   }

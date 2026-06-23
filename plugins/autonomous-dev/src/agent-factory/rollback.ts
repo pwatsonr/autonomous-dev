@@ -98,6 +98,15 @@ export class RollbackManager {
       return this.failResult(agentName, `Agent '${agentName}' not found in registry`);
     }
 
+    // ONBOARD Phase 0 (#584): rollback rewrites the agent .md file — a "modify"
+    // path. A managed:false (user-authoritative) agent must never be modified.
+    if (!this.registry.isManaged(agentName)) {
+      return this.failResult(
+        agentName,
+        `Agent '${agentName}' is managed:false (user-authoritative); cannot roll back`,
+      );
+    }
+
     const currentVersion = record.agent.version;
 
     // Step 1: Identify the target version and commit

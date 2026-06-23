@@ -27,31 +27,58 @@ export interface ResolvedStandards {
 }
 
 /**
- * Merge the four levels into a single rule set.
- *
- * Order of operations (each step overwrites prior matches by `rule.id`):
- *   1. defaults  → source `default`
- *   2. org       → source `org`
- *   3. repo      → source `repo`  (throws if attempting to override an
- *                                  immutable org rule)
- *   4. request   → source `request` (throws if `isAdminRequest()` is false
- *                                    AND there is at least one override)
- *
- * @throws ValidationError    when a repo rule attempts to override an
- *                            immutable org rule.
- * @throws AuthorizationError when per-request overrides are present and
- *                            the caller is not an admin.
+ * Named inputs for {@link resolveStandards}. Field order matches the merge
+ * order so callers cannot transpose tiers — replaces the earlier positional
+ * signature where `projectRules` was a trailing arg whose apply-order did not
+ * match its position (ONBOARD #584 review).
  */
-export function resolveStandards(
-  defaultRules: Rule[],
-  orgRules: Rule[],
-  repoRules: Rule[],
-  requestOverrides: Rule[],
-): ResolvedStandards {
+export interface ResolveStandardsOptions {
+  defaultRules: Rule[];
+  orgRules: Rule[];
+  projectRules?: Rule[];
+  repoRules: Rule[];
+  requestOverrides: Rule[];
+}
+
+/**
+ * Merge the tiers into a single rule set, most-specific-wins.
+ *
+ * Order (each step overwrites prior matches by `rule.id`):
+ *   default → org → project → repo → request
+ *   - project/repo throw if they override an immutable org/project rule
+ *   - request is admin-gated and may override immutable rules
+ *
+ * @throws ValidationError    when a project/repo rule overrides an immutable
+ *                            org/project rule.
+ * @throws AuthorizationError when per-request overrides are present and the
+ *                            caller is not an admin.
+ */
+export function resolveStandards(opts: ResolveStandardsOptions): ResolvedStandards {
+  const { defaultRules, orgRules, projectRules = [], repoRules, requestOverrides } = opts;
   const rules = new Map<string, Rule>();
   const source = new Map<string, RuleSource>();
 
-  // 1. Seed with defaults.
+  // Apply a tier, rejecting any override of a rule locked immutable by a
+  // higher authoritative tier (org or project).
+  const applyTier = (tierRules: Rule[], tier: RuleSource): void => {
+    for (const r of tierRules) {
+      const existing = rules.get(r.id);
+      const existingSource = source.get(r.id);
+      if (
+        existing &&
+        existing.immutable &&
+        (existingSource === 'org' || existingSource === 'project')
+      ) {
+        throw new ValidationError(
+          `Rule "${r.id}" is marked immutable at the ${existingSource} level and cannot be overridden by the ${tier}.`,
+        );
+      }
+      rules.set(r.id, r);
+      source.set(r.id, tier);
+    }
+  };
+
+  // 1. Seed with defaults (always mutable).
   for (const r of defaultRules) {
     rules.set(r.id, r);
     source.set(r.id, 'default');
@@ -63,19 +90,13 @@ export function resolveStandards(
     source.set(r.id, 'org');
   }
 
-  // 3. Apply repo rules. Reject overrides of immutable org rules.
-  for (const r of repoRules) {
-    const existing = rules.get(r.id);
-    if (existing && existing.immutable && source.get(r.id) === 'org') {
-      throw new ValidationError(
-        `Rule "${r.id}" is marked immutable at the org level and cannot be overridden by the repo.`,
-      );
-    }
-    rules.set(r.id, r);
-    source.set(r.id, 'repo');
-  }
+  // 3. Apply project rules; cannot override an immutable org rule.
+  applyTier(projectRules, 'project');
 
-  // 4. Per-request overrides require admin authorization. Empty overrides
+  // 4. Apply repo rules; cannot override an immutable org or project rule.
+  applyTier(repoRules, 'repo');
+
+  // 5. Per-request overrides require admin authorization. Empty overrides
   //    skip the check so non-admin callers can pass `[]` without error.
   if (requestOverrides.length > 0 && !isAdminRequest()) {
     throw new AuthorizationError(

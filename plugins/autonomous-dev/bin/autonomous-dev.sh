@@ -1073,6 +1073,14 @@ case "${COMMAND}" in
         fi
         exec bun run "${PLUGIN_BIN_DIR}/agent-cli.ts" "$@"
         ;;
+    project|repo)
+        # Bun-executable wrapper for the ownership CLI (ONBOARD #584).
+        if ! command -v bun >/dev/null 2>&1; then
+            echo "ERROR: '${COMMAND}' subcommand requires bun on PATH" >&2
+            exit 127
+        fi
+        exec bun run "${PLUGIN_BIN_DIR}/ownership-cli.ts" "${COMMAND}" "$@"
+        ;;
     override-verification)
         cmd_override_verification "$@"
         ;;

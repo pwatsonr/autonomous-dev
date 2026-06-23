@@ -53,7 +53,8 @@ function test_rule_001_name_uniqueness_pass(): void {
 
 function test_rule_001_name_uniqueness_fail(): void {
   const agent = validAgent({ name: 'code-executor' });
-  const result = validateAgent(agent, new Set(['code-executor']));
+  // Uniqueness is now per (scope, name); a default-scope agent keys as global::name.
+  const result = validateAgent(agent, new Set(['global::code-executor']));
 
   assertRuleError(result.errors, 'RULE_001', 'name');
   console.log('PASS: test_rule_001_name_uniqueness_fail');
@@ -469,8 +470,24 @@ function test_validator_returns_all_errors(): void {
 // ---------------------------------------------------------------------------
 
 function test_validation_rules_count(): void {
-  assert(VALIDATION_RULES.length === 10, `expected 10 rules, got ${VALIDATION_RULES.length}`);
+  assert(VALIDATION_RULES.length === 11, `expected 11 rules, got ${VALIDATION_RULES.length}`);
   console.log('PASS: test_validation_rules_count');
+}
+
+function test_rule_011_scope_format(): void {
+  // Valid scopes pass (ONBOARD #584).
+  for (const scope of ['global', 'project:payments', 'repo:acme/api']) {
+    const a = validAgent({});
+    (a as { scope: string }).scope = scope;
+    assertNoRuleError(validateAgent(a).errors, 'RULE_011');
+  }
+  // Malformed scopes are rejected at load.
+  for (const scope of ['repo', 'garbage', 'Repo:acme', 'project:', 'repo:UP', 'repo:a b']) {
+    const a = validAgent({});
+    (a as { scope: string }).scope = scope;
+    assertRuleError(validateAgent(a).errors, 'RULE_011', 'scope');
+  }
+  console.log('PASS: test_rule_011_scope_format');
 }
 
 function test_tool_allowlist_shape(): void {
@@ -603,6 +620,7 @@ describe('validator', () => {
   it('test_rule_010_temperature_over_one_fail', test_rule_010_temperature_over_one_fail);
   it('test_validator_returns_all_errors', test_validator_returns_all_errors);
   it('test_validation_rules_count', test_validation_rules_count);
+  it('test_rule_011_scope_format', test_rule_011_scope_format);
   it('test_tool_allowlist_shape', test_tool_allowlist_shape);
   it('test_valid_agent_passes_all_rules', test_valid_agent_passes_all_rules);
   it('test_each_error_has_required_fields', test_each_error_has_required_fields);

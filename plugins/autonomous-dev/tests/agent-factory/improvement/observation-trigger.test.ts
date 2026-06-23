@@ -60,13 +60,17 @@ function makeConfig(overrides?: Partial<AgentFactoryConfig>): AgentFactoryConfig
 }
 
 /** Create a mock registry that tracks agent states. */
-function makeMockRegistry(states: Record<string, AgentState>): IAgentRegistry {
+function makeMockRegistry(
+  states: Record<string, AgentState>,
+  managed: Record<string, boolean> = {},
+): IAgentRegistry {
   return {
     load: async () => ({ loaded: 0, rejected: 0, errors: [], duration_ms: 0 }),
     reload: async () => ({ loaded: 0, rejected: 0, errors: [], duration_ms: 0 }),
     list: () => [],
     get: () => undefined,
     getForTask: () => [],
+    isManaged: (name: string) => managed[name] !== false,
     freeze: () => {},
     unfreeze: () => {},
     shadow: () => {},
@@ -205,6 +209,66 @@ function test_trigger_skips_frozen_agent(): void {
 
     auditLogger.close();
     console.log('PASS: test_trigger_skips_frozen_agent');
+  } finally {
+    cleanupDir(tmpDir);
+  }
+}
+
+function test_trigger_skips_unmanaged_agent(): void {
+  const tmpDir = makeTempDir();
+  try {
+    const config = makeConfig({ observation: { defaultThreshold: 5, perAgentOverrides: {} } });
+    // ACTIVE but managed:false (user-authoritative) — ONBOARD #584.
+    const registry = makeMockRegistry({ 'auth-agent': 'ACTIVE' }, { 'auth-agent': false });
+    const tracker = new ObservationTracker({
+      config,
+      statePath: path.join(tmpDir, 'state.json'),
+      logger: silentLogger,
+    });
+    const auditLogger = new AuditLogger(path.join(tmpDir, 'audit.log'));
+    const trigger = new ObservationTrigger(tracker, registry, config, auditLogger);
+
+    let decision;
+    for (let i = 0; i < 5; i++) {
+      decision = trigger.check('auth-agent', '1.0.0');
+    }
+
+    assert(decision!.triggered === false, 'should not trigger for managed:false agent');
+    assert(
+      decision!.reason === 'agent is not managed (managed:false)',
+      `reason mismatch, got "${decision!.reason}"`,
+    );
+
+    auditLogger.close();
+    console.log('PASS: test_trigger_skips_unmanaged_agent');
+  } finally {
+    cleanupDir(tmpDir);
+  }
+}
+
+function test_force_skips_unmanaged_agent(): void {
+  const tmpDir = makeTempDir();
+  try {
+    const config = makeConfig({ observation: { defaultThreshold: 5, perAgentOverrides: {} } });
+    const registry = makeMockRegistry({ 'auth-agent': 'ACTIVE' }, { 'auth-agent': false });
+    const tracker = new ObservationTracker({
+      config,
+      statePath: path.join(tmpDir, 'state.json'),
+      logger: silentLogger,
+    });
+    const auditLogger = new AuditLogger(path.join(tmpDir, 'audit.log'));
+    const trigger = new ObservationTrigger(tracker, registry, config, auditLogger);
+
+    const decision = trigger.forceCheck('auth-agent');
+
+    assert(decision.triggered === false, 'force should not trigger for managed:false agent');
+    assert(
+      decision.reason === 'agent is not managed (managed:false)',
+      `reason mismatch, got "${decision.reason}"`,
+    );
+
+    auditLogger.close();
+    console.log('PASS: test_force_skips_unmanaged_agent');
   } finally {
     cleanupDir(tmpDir);
   }
@@ -446,6 +510,8 @@ describe('observation trigger', () => {
   it('test_trigger_fires_at_threshold', test_trigger_fires_at_threshold);
   it('test_trigger_does_not_fire_below_threshold', test_trigger_does_not_fire_below_threshold);
   it('test_trigger_skips_frozen_agent', test_trigger_skips_frozen_agent);
+  it('test_trigger_skips_unmanaged_agent', test_trigger_skips_unmanaged_agent);
+  it('test_force_skips_unmanaged_agent', test_force_skips_unmanaged_agent);
   it('test_trigger_skips_under_review_agent', test_trigger_skips_under_review_agent);
   it('test_trigger_skips_validating_agent', test_trigger_skips_validating_agent);
   it('test_trigger_respects_per_agent_override', test_trigger_respects_per_agent_override);

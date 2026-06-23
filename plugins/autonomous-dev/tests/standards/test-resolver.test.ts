@@ -10,7 +10,7 @@
 
 import { performance } from 'node:perf_hooks';
 
-import { resolveStandards } from '../../intake/standards/resolver';
+import { resolveStandards as resolveStandardsImpl } from '../../intake/standards/resolver';
 import { ValidationError, AuthorizationError } from '../../intake/standards/errors';
 import * as authModule from '../../intake/standards/auth';
 import type { Rule } from '../../intake/standards/types';
@@ -29,6 +29,19 @@ function makeRule(overrides: Partial<Rule> & { id: string }): Rule {
     evaluator: 'pattern-grep',
     ...overrides,
   };
+}
+
+// Local positional wrapper — keeps the scenario tests readable. The production
+// API is the named-options object (exercised via this wrapper and the explicit
+// options-object test at the end). ONBOARD #584 review round 2 (F10).
+function resolveStandards(
+  defaultRules: Rule[],
+  orgRules: Rule[],
+  repoRules: Rule[],
+  requestOverrides: Rule[],
+  projectRules: Rule[] = [],
+) {
+  return resolveStandardsImpl({ defaultRules, orgRules, projectRules, repoRules, requestOverrides });
 }
 
 // ---------------------------------------------------------------------------
@@ -219,5 +232,75 @@ describe('resolveStandards — inheritance & source tracking', () => {
     expect(r.source.get('org:b')).toBe('org');
     expect(r.source.get('repo:c')).toBe('repo');
     expect(r.source.get('repo:d')).toBe('repo');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ONBOARD Phase 0 (#584): project tier — default → org → project → repo → request
+// ---------------------------------------------------------------------------
+
+describe('resolveStandards — project tier (ONBOARD #584)', () => {
+  it('project overrides org (mutable); source becomes `project`', () => {
+    const def = [makeRule({ id: 'plat:a' })];
+    const org = [makeRule({ id: 'plat:a', description: 'from org' })];
+    const project = [makeRule({ id: 'plat:a', description: 'from project' })];
+    const r = resolveStandards(def, org, [], [], project);
+    expect(r.rules.get('plat:a')?.description).toBe('from project');
+    expect(r.source.get('plat:a')).toBe('project');
+  });
+
+  it('repo overrides project (mutable); precedence project < repo', () => {
+    const project = [makeRule({ id: 'plat:a', description: 'from project' })];
+    const repo = [makeRule({ id: 'plat:a', description: 'from repo' })];
+    const r = resolveStandards([], [], repo, [], project);
+    expect(r.rules.get('plat:a')?.description).toBe('from repo');
+    expect(r.source.get('plat:a')).toBe('repo');
+  });
+
+  it('project cannot override an immutable org rule — throws', () => {
+    const org = [makeRule({ id: 'plat:locked', immutable: true })];
+    const project = [makeRule({ id: 'plat:locked', description: 'project attempt' })];
+    expect(() => resolveStandards([], org, [], [], project)).toThrow(ValidationError);
+    expect(() => resolveStandards([], org, [], [], project)).toThrow(/plat:locked/);
+  });
+
+  it('repo cannot override an immutable project rule — throws', () => {
+    const project = [makeRule({ id: 'plat:locked', immutable: true })];
+    const repo = [makeRule({ id: 'plat:locked', description: 'repo attempt' })];
+    expect(() => resolveStandards([], [], repo, [], project)).toThrow(ValidationError);
+    expect(() => resolveStandards([], [], repo, [], project)).toThrow(/project/);
+  });
+
+  it('full hierarchy default→org→project→repo with distinct ids tracks sources', () => {
+    const def = [makeRule({ id: 'plat:a' })];
+    const org = [makeRule({ id: 'org:b' })];
+    const project = [makeRule({ id: 'proj:c' })];
+    const repo = [makeRule({ id: 'repo:d' })];
+    const r = resolveStandards(def, org, repo, [], project);
+    expect(r.rules.size).toBe(4);
+    expect(r.source.get('plat:a')).toBe('default');
+    expect(r.source.get('org:b')).toBe('org');
+    expect(r.source.get('proj:c')).toBe('project');
+    expect(r.source.get('repo:d')).toBe('repo');
+  });
+
+  it('back-compat: omitting projectRules behaves exactly as before', () => {
+    const def = [makeRule({ id: 'plat:a' })];
+    const org = [makeRule({ id: 'plat:a', description: 'org' })];
+    const r = resolveStandards(def, org, [], []); // 4-arg call still valid
+    expect(r.source.get('plat:a')).toBe('org');
+  });
+
+  it('production API: named-options object preserves the tier order (F10)', () => {
+    const r = resolveStandardsImpl({
+      defaultRules: [makeRule({ id: 'plat:a' })],
+      orgRules: [],
+      projectRules: [makeRule({ id: 'proj:b' })],
+      repoRules: [makeRule({ id: 'repo:c' })],
+      requestOverrides: [],
+    });
+    expect(r.source.get('plat:a')).toBe('default');
+    expect(r.source.get('proj:b')).toBe('project');
+    expect(r.source.get('repo:c')).toBe('repo');
   });
 });

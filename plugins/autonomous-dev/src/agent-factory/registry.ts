@@ -21,7 +21,10 @@ import {
   RankedAgent,
   IAgentRegistry,
   ValidationContext,
+  ScopeContext,
+  ArtifactScope,
 } from './types';
+import { scopeKeyOf, mostSpecificEligible } from '../ownership/scope';
 
 import { parseAgentFile } from './parser';
 import { validateAgentWithContext } from './validator';
@@ -88,8 +91,15 @@ const VALID_TRANSITIONS: Record<AgentState, AgentState[]> = {
  * ```
  */
 export class AgentRegistry implements IAgentRegistry {
-  /** Agent records keyed by agent name. */
+  /** Agent records keyed by `${scope}::${name}` (ONBOARD Phase 0, #584). */
   private agents: Map<string, AgentRecord> = new Map();
+  /** Index from bare agent name -> the set of scope-keys registered for it. */
+  private nameIndex: Map<string, Set<string>> = new Map();
+
+  /** The effective scope of an agent ('global' when unset). */
+  private static scopeOf(agent: ParsedAgent): ArtifactScope {
+    return agent.scope ?? 'global';
+  }
 
   // -------------------------------------------------------------------------
   // Loading
@@ -175,28 +185,31 @@ export class AgentRegistry implements IAgentRegistry {
         continue;
       }
 
-      existingNames.add(entry.agent.name);
+      existingNames.add(scopeKeyOf(AgentRegistry.scopeOf(entry.agent), entry.agent.name));
       validatedAgents.push(entry);
     }
 
-    // Step 5: Uniqueness check — safety net over RULE_001
-    const seenNames = new Map<string, string>(); // name -> filePath
+    // Step 5: Uniqueness check — per (scope, name) (ONBOARD Phase 0, #584);
+    // safety net over RULE_001. The same name at different scopes is allowed.
+    const seenKeys = new Map<string, string>(); // scopeKey -> filePath
     const uniqueAgents: Array<{ filePath: string; agent: ParsedAgent; diskHash: string }> = [];
 
     for (const entry of validatedAgents) {
-      const existing = seenNames.get(entry.agent.name);
+      const scope = AgentRegistry.scopeOf(entry.agent);
+      const key = scopeKeyOf(scope, entry.agent.name);
+      const existing = seenKeys.get(key);
       if (existing) {
         errors.push({
           file: entry.filePath,
-          reason: `uniqueness: agent name '${entry.agent.name}' already registered from ${existing}`,
+          reason: `uniqueness: agent '${entry.agent.name}' at scope '${scope}' already registered from ${existing}`,
         });
         continue;
       }
-      seenNames.set(entry.agent.name, entry.filePath);
+      seenKeys.set(key, entry.filePath);
       uniqueAgents.push(entry);
     }
 
-    // Step 6: Register — insert into the in-memory map
+    // Step 6: Register — insert into the in-memory map keyed by (scope, name)
     for (const entry of uniqueAgents) {
       const initialState: AgentState = entry.agent.frozen === true ? 'FROZEN' : 'ACTIVE';
 
@@ -208,7 +221,14 @@ export class AgentRegistry implements IAgentRegistry {
         filePath: entry.filePath,
       };
 
-      this.agents.set(entry.agent.name, record);
+      const key = scopeKeyOf(AgentRegistry.scopeOf(entry.agent), entry.agent.name);
+      this.agents.set(key, record);
+      let keys = this.nameIndex.get(entry.agent.name);
+      if (!keys) {
+        keys = new Set<string>();
+        this.nameIndex.set(entry.agent.name, keys);
+      }
+      keys.add(key);
     }
 
     const result: RegistryLoadResult = {
@@ -236,6 +256,7 @@ export class AgentRegistry implements IAgentRegistry {
   async reload(agentsDir: string): Promise<RegistryLoadResult> {
     logRegistryEvent('registry_reload_started', { agentsDir });
     this.agents.clear();
+    this.nameIndex.clear();
     return this.load(agentsDir);
   }
 
@@ -251,13 +272,18 @@ export class AgentRegistry implements IAgentRegistry {
   }
 
   /**
-   * Return a single agent record by exact name match.
+   * Return a single agent record by name, scope-resolved.
+   *
+   * Without `ctx`, returns the global record for the name (or the sole record
+   * if only one scope exists) — back-compat with the pre-scope behavior. With
+   * `ctx`, returns the most-specific eligible record (repo > project > global).
    *
    * @param name  The agent name (must match `ParsedAgent.name` exactly).
-   * @returns     The AgentRecord, or undefined if not found.
+   * @param ctx   Optional scope context of the request target.
+   * @returns     The AgentRecord, or undefined if none applies.
    */
-  get(name: string): AgentRecord | undefined {
-    return this.agents.get(name);
+  get(name: string, ctx?: ScopeContext): AgentRecord | undefined {
+    return ctx ? this.resolve(name, ctx) : this.lookup(name);
   }
 
   /**
@@ -277,12 +303,15 @@ export class AgentRegistry implements IAgentRegistry {
    * @param taskDomain       Optional domain tag for exact matching.
    * @returns                Ranked agents sorted by relevance.
    */
-  getForTask(taskDescription: string, taskDomain?: string): RankedAgent[] {
+  getForTask(taskDescription: string, taskDomain?: string, ctx?: ScopeContext): RankedAgent[] {
     const SIMILARITY_THRESHOLD = 0.6;
     const results: RankedAgent[] = [];
     const seen = new Set<string>();
 
-    const activeAgents = this.list().filter((r) => r.state === 'ACTIVE');
+    // Scope-resolve to the effective set (one record per name, most-specific
+    // eligible scope), then keep ACTIVE ones (ONBOARD Phase 0, #584). With no
+    // ctx, only global agents are eligible -> identical to the pre-scope set.
+    const activeAgents = this.effectiveActiveAgents(ctx);
 
     // Pass 1: exact tag matching
     if (taskDomain) {
@@ -318,6 +347,74 @@ export class AgentRegistry implements IAgentRegistry {
   }
 
   // -------------------------------------------------------------------------
+  // Scope resolution (ONBOARD Phase 0, #584)
+  // -------------------------------------------------------------------------
+
+  /** All records registered under a bare name, across scopes. */
+  private recordsForName(name: string): AgentRecord[] {
+    const keys = this.nameIndex.get(name);
+    if (!keys) return [];
+    const out: AgentRecord[] = [];
+    for (const key of keys) {
+      const rec = this.agents.get(key);
+      if (rec) out.push(rec);
+    }
+    return out;
+  }
+
+  /**
+   * Resolve the most-specific eligible record for a name in a scope context.
+   * With no ctx, only `global` is eligible (back-compat). Returns undefined if
+   * no eligible record exists. Precedence is independent of the `managed` flag.
+   */
+  private resolve(name: string, ctx?: ScopeContext): AgentRecord | undefined {
+    return mostSpecificEligible(
+      this.recordsForName(name),
+      (r) => AgentRegistry.scopeOf(r.agent),
+      ctx,
+    );
+  }
+
+  /**
+   * Resolve a record for a name for direct (scope-agnostic) access and state
+   * mutation (freeze/shadow/etc.). Prefers the global record; else the sole
+   * record; else (ambiguous across non-global scopes) undefined. For today's
+   * single-scope agents this returns that record unchanged (back-compat).
+   */
+  private lookup(name: string): AgentRecord | undefined {
+    const recs = this.recordsForName(name);
+    if (recs.length === 0) return undefined;
+    if (recs.length === 1) return recs[0];
+    return recs.find((r) => AgentRegistry.scopeOf(r.agent) === 'global');
+  }
+
+  /**
+   * The effective ACTIVE agent set for a scope context: for each name, the
+   * most-specific eligible record, kept only if ACTIVE.
+   */
+  private effectiveActiveAgents(ctx?: ScopeContext): AgentRecord[] {
+    const out: AgentRecord[] = [];
+    for (const name of this.nameIndex.keys()) {
+      const rec = this.resolve(name, ctx);
+      if (rec && rec.state === 'ACTIVE') out.push(rec);
+    }
+    return out;
+  }
+
+  /**
+   * Whether EVERY registered record for this name is factory-managed.
+   *
+   * Returns false (NOT managed → lifecycle must skip) if ANY scope variant of
+   * the name declares `managed: false` — so a user-authoritative variant cannot
+   * be spoofed by a same-named `global` record that `lookup()` would otherwise
+   * prefer. Also fail-closed: an unknown name returns false. ONBOARD #584.
+   */
+  isManaged(name: string): boolean {
+    const recs = this.recordsForName(name);
+    return recs.length > 0 && recs.every((r) => r.agent.managed !== false);
+  }
+
+  // -------------------------------------------------------------------------
   // State management
   // -------------------------------------------------------------------------
 
@@ -331,7 +428,7 @@ export class AgentRegistry implements IAgentRegistry {
    * @throws Error if the agent does not exist or is already frozen.
    */
   freeze(name: string): void {
-    const record = this.agents.get(name);
+    const record = this.lookup(name);
     if (!record) {
       throw new Error(`Cannot freeze: agent '${name}' not found in registry`);
     }
@@ -354,7 +451,7 @@ export class AgentRegistry implements IAgentRegistry {
    * @throws Error if the agent does not exist or is not frozen.
    */
   unfreeze(name: string): void {
-    const record = this.agents.get(name);
+    const record = this.lookup(name);
     if (!record) {
       throw new Error(`Cannot unfreeze: agent '${name}' not found in registry`);
     }
@@ -386,9 +483,14 @@ export class AgentRegistry implements IAgentRegistry {
    * @throws Error if the agent does not exist or is not ACTIVE.
    */
   shadow(name: string): void {
-    const record = this.agents.get(name);
+    const record = this.lookup(name);
     if (!record) {
       throw new Error(`Cannot shadow: agent '${name}' not found in registry`);
+    }
+    if (!this.isManaged(name)) {
+      throw new Error(
+        `Cannot shadow: agent '${name}' is managed:false (user-authoritative, ONBOARD #584)`,
+      );
     }
     if (record.state === 'SHADOWED') {
       throw new Error(`Cannot shadow: agent '${name}' is already SHADOWED`);
@@ -414,7 +516,7 @@ export class AgentRegistry implements IAgentRegistry {
    * @throws Error if the agent does not exist or is not SHADOWED.
    */
   unshadow(name: string): void {
-    const record = this.agents.get(name);
+    const record = this.lookup(name);
     if (!record) {
       throw new Error(`Cannot unshadow: agent '${name}' not found in registry`);
     }
@@ -442,7 +544,7 @@ export class AgentRegistry implements IAgentRegistry {
    * @throws Error if agent not found or not in ACTIVE state.
    */
   transitionToUnderReview(name: string): void {
-    const record = this.agents.get(name);
+    const record = this.lookup(name);
     if (!record) {
       throw new Error(`Agent '${name}' not found`);
     }
@@ -469,7 +571,7 @@ export class AgentRegistry implements IAgentRegistry {
    * @returns     The AgentState, or undefined if not found.
    */
   getState(name: string): AgentState | undefined {
-    return this.agents.get(name)?.state;
+    return this.lookup(name)?.state;
   }
 
   /**
@@ -483,7 +585,7 @@ export class AgentRegistry implements IAgentRegistry {
    * @throws Error if the agent does not exist.
    */
   setState(name: string, state: AgentState): void {
-    const record = this.agents.get(name);
+    const record = this.lookup(name);
     if (!record) {
       throw new Error(`Cannot set state: agent '${name}' not found in registry`);
     }
@@ -507,7 +609,7 @@ export class AgentRegistry implements IAgentRegistry {
    * @throws Error if the agent does not exist or the transition is invalid.
    */
   transition(name: string, targetState: AgentState): void {
-    const record = this.agents.get(name);
+    const record = this.lookup(name);
     if (!record) {
       throw new Error(`Agent '${name}' not found`);
     }
