@@ -92,9 +92,20 @@ export function loadOwnershipConfig(raw: unknown): Ownership {
     }
   }
 
-  const repos = Array.isArray(o.repos)
-    ? o.repos.map(asRepo).filter((r): r is Repo => r !== null)
-    : [];
+  const repos: Repo[] = [];
+  const repoIds = new Set<string>();
+  if (Array.isArray(o.repos)) {
+    for (const rawRepo of o.repos) {
+      const r = asRepo(rawRepo);
+      if (r === null) continue;
+      if (repoIds.has(r.id)) {
+        console.warn(`[ownership] duplicate repo id "${r.id}"; keeping the first.`);
+        continue;
+      }
+      repoIds.add(r.id);
+      repos.push(r);
+    }
+  }
 
   // Drop dangling project memberships to standalone (null) with a warning.
   for (const r of repos) {

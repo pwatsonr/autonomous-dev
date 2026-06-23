@@ -340,6 +340,31 @@ function test_parse_managed_stringy_not_inverted(): void {
   console.log('PASS: test_parse_managed_stringy_not_inverted');
 }
 
+function test_parse_rejects_garbage_boolean_fields(): void {
+  // ONBOARD #584 round 2: a present-but-unparseable managed/frozen must error,
+  // not silently default (a security-relevant flag must not fail open).
+  for (const line of ['managed: maybe', 'managed: 2', 'frozen: nope']) {
+    const content = [
+      '---',
+      'name: a',
+      'version: 1.0.0',
+      'role: executor',
+      'model: claude-sonnet-4-20250514',
+      'temperature: 0.0',
+      'turn_limit: 1',
+      'tools: [Read]',
+      'expertise: [x]',
+      'description: d',
+      line,
+      '---',
+      '# P',
+    ].join('\n');
+    const r = parseAgentString(content);
+    assert(r.success === false, `expected parse failure for "${line}", got success`);
+  }
+  console.log('PASS: test_parse_rejects_garbage_boolean_fields');
+}
+
 // ---------------------------------------------------------------------------
 // Assertions
 // ---------------------------------------------------------------------------
@@ -366,4 +391,5 @@ describe('parser', () => {
   it('test_parse_scope_managed_defaults', test_parse_scope_managed_defaults);
   it('test_parse_scope_managed_explicit', test_parse_scope_managed_explicit);
   it('test_parse_managed_stringy_not_inverted', test_parse_managed_stringy_not_inverted);
+  it('test_parse_rejects_garbage_boolean_fields', test_parse_rejects_garbage_boolean_fields);
 });

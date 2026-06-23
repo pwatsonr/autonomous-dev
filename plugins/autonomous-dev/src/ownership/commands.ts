@@ -37,7 +37,11 @@ export function parseTags(pairs: string[]): Tags {
     if (UNSAFE_KEYS.has(key)) {
       throw new Error(`Invalid tag key "${key}".`);
     }
-    tags[key] = pair.slice(eq + 1).trim();
+    const value = pair.slice(eq + 1).trim();
+    if (value === '') {
+      throw new Error(`Invalid tag "${pair}"; empty value.`);
+    }
+    tags[key] = value;
   }
   return tags;
 }

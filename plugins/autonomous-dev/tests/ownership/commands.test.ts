@@ -213,6 +213,22 @@ function test_command_input_hardening(): void {
   console.log('PASS: test_command_input_hardening');
 }
 
+// R2-2: writeOwnership must refuse to clobber a corrupt manifest (data loss).
+function test_store_refuses_corrupt_manifest(): void {
+  const io = fakeIO();
+  const p = manifestPath(io);
+  io.files[p] = '{ "repositories": { "allowlist": ["/x"] }, BROKEN'; // invalid JSON
+  let threw = false;
+  try {
+    writeOwnership(addProject(EMPTY, { id: 'x' }).ownership, io);
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'writeOwnership refuses to clobber a corrupt manifest');
+  assert(io.files[p].includes('BROKEN'), 'corrupt manifest left intact (not overwritten)');
+  console.log('PASS: test_store_refuses_corrupt_manifest');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -228,4 +244,5 @@ describe('ownership/commands + store', () => {
   it('test_store_roundtrip_preserves_keys', test_store_roundtrip_preserves_keys);
   it('test_store_missing_manifest', test_store_missing_manifest);
   it('test_command_input_hardening', test_command_input_hardening);
+  it('test_store_refuses_corrupt_manifest', test_store_refuses_corrupt_manifest);
 });

@@ -69,7 +69,26 @@ export function readOwnership(io: OwnershipStoreIO = defaultStoreIO): Ownership 
  * manifest ever gains a runtime writer.
  */
 export function writeOwnership(ownership: Ownership, io: OwnershipStoreIO = defaultStoreIO): void {
-  const manifest = readManifest(io);
+  const p = manifestPath(io);
+  const raw = io.readFile(p);
+  let manifest: Record<string, unknown> = {};
+  if (raw !== undefined) {
+    // The file exists — REFUSE to overwrite it unless it's a valid JSON object,
+    // so a corrupt/hand-edited manifest is never silently clobbered (which would
+    // wipe repositories/trust/notifications). ONBOARD #584 review round 2.
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error(
+        `Refusing to write ownership: ${p} exists but is not valid JSON. Fix or remove it first (writing would clobber other config keys).`,
+      );
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(`Refusing to write ownership: ${p} is not a JSON object.`);
+    }
+    manifest = parsed as Record<string, unknown>;
+  }
   manifest.ownership = ownership;
-  io.writeFile(manifestPath(io), `${JSON.stringify(manifest, null, 2)}\n`);
+  io.writeFile(p, `${JSON.stringify(manifest, null, 2)}\n`);
 }

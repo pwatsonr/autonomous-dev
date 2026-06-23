@@ -92,6 +92,20 @@ export function parseAgentString(content: string): ParsedAgentResult {
     };
   }
 
+  // ----- Step 2b: strict boolean fields (ONBOARD #584 review) -----
+  // A present-but-unparseable `managed`/`frozen` must error, not silently
+  // default — e.g. `managed: maybe` must NOT become managed:true (fail-open on
+  // a security-relevant flag).
+  for (const field of ['managed', 'frozen'] as const) {
+    const v = raw[field];
+    if (v !== undefined && v !== null && asBoolFlag(v) === undefined) {
+      return {
+        success: false,
+        errors: [{ message: `Invalid ${field}: ${JSON.stringify(v)} (expected true or false)`, field }],
+      };
+    }
+  }
+
   // ----- Step 3: map to ParsedAgent -----
   const agent = mapToParsedAgent(raw, extraction.body);
 

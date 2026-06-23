@@ -954,7 +954,7 @@ export async function commandAnalyze(
   }
 
   // ------ Guard: managed:false agents are user-authoritative (ONBOARD #584) ------
-  if (record.agent.managed === false) {
+  if (!registry.isManaged(name)) {
     return `Error: Agent '${name}' is managed:false (user-authoritative). Cannot analyze.`;
   }
 
@@ -1311,7 +1311,7 @@ export async function commandImprove(
   }
 
   // ------ Guard: managed:false agents are user-authoritative (ONBOARD #584) ------
-  if (record.agent.managed === false) {
+  if (!registry.isManaged(name)) {
     return `Error: Agent '${name}' is managed:false (user-authoritative). Cannot improve.`;
   }
 
