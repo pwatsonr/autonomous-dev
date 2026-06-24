@@ -261,6 +261,19 @@ export async function readRepoMemoryTopics(repoId: string): Promise<MemoryTopic[
     return topics;
 }
 
+/** Topic NAMES for a repo's scoped memory (readdir only, no file reads — for list rows). */
+export async function readRepoMemoryTopicNames(repoId: string): Promise<string[]> {
+    if (!isSafeRepoId(repoId)) return [];
+    try {
+        return (await fs.readdir(onboardRepoMemoryDir(repoId)))
+            .filter((n) => n.endsWith(".md"))
+            .map((n) => n.replace(/\.md$/, ""))
+            .sort();
+    } catch {
+        return [];
+    }
+}
+
 /** True iff the repo has any scoped-memory doc. Cheap (readdir only). */
 async function repoHasMemory(repoId: string): Promise<boolean> {
     if (!isSafeRepoId(repoId)) return false;

@@ -22,6 +22,7 @@ export type ViewName =
     | "audit"
     | "agents" // PLAN-038 TASK-005 — net-new /agents surface
     | "repos" //  PLAN-038 TASK-005 — net-new /repos surface
+    | "onboard" // ONBOARD Phase 3 (#594) — org/project/repo browser
     | "404"
     | "500";
 
@@ -918,6 +919,58 @@ export interface RenderProps {
     agents: AgentsPageData;
     // PLAN-038 TASK-007 — Repos surface input. See ReposPageData below.
     repos: ReposPageData;
+    // ONBOARD Phase 3 (#594) — org/project/repo browser. See OnboardPageData below.
+    onboard: OnboardPageData;
+}
+
+// ONBOARD Phase 3 (#594) — browser surface data shape. Composed by the route
+// from onboard-readers (ownership + questions + memory + ingestion status).
+
+export interface OnboardProjectRow {
+    id: string;
+    name: string;
+    tags: Record<string, string>;
+    repoCount: number;
+}
+
+export interface OnboardRepoRow {
+    id: string;
+    projectId: string | null;
+    tags: Record<string, string>;
+    /** participate_in_auto_improvement === true. */
+    enrolled: boolean;
+    /** has a pending blocking question. */
+    blocked: boolean;
+    /** memory topic names (chips). */
+    topics: string[];
+}
+
+export interface MemoryTopicProp {
+    topic: string;
+    summary: string;
+}
+
+export interface OnboardIngestionStatusProp {
+    reposTotal: number;
+    reposWithMemory: number;
+    reposBlocked: number;
+    questionsPending: number;
+    proposalsPending: number;
+}
+
+export interface OnboardPageData {
+    org: string | null;
+    projects: OnboardProjectRow[];
+    /** the current page of (filtered) repos. */
+    repos: OnboardRepoRow[];
+    filter: { project?: string; tag?: string; q?: string };
+    page: number;
+    pageSize: number;
+    totalRepos: number;
+    totalPages: number;
+    status: OnboardIngestionStatusProp;
+    /** CSRF token for the enrollment toggle (wired in P3.5). */
+    csrfToken?: string;
 }
 
 // PLAN-038 TASK-007 / TDD-037 §5.1.1a — Agents surface data shape.
