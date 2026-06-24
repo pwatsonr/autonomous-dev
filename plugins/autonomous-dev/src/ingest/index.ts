@@ -6,3 +6,4 @@ export * from './extractors';
 export * from './orchestrator';
 export * from './questions';
 export * from './inference';
+export * from './adapters';
