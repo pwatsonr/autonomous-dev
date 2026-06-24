@@ -8,11 +8,11 @@
  */
 
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 
 import type { Ownership } from './types';
 import { loadOwnershipConfig } from './loader';
+import { resolveAbsoluteHome } from '../home';
 
 /** Injectable IO boundary for the manifest (real fs in prod, fake in tests). */
 export interface OwnershipStoreIO {
@@ -24,7 +24,7 @@ export interface OwnershipStoreIO {
 }
 
 export const defaultStoreIO: OwnershipStoreIO = {
-  homedir: () => (process.env.HOME && path.isAbsolute(process.env.HOME) ? process.env.HOME : os.homedir()),
+  homedir: () => resolveAbsoluteHome(),
   readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });

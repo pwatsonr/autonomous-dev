@@ -110,7 +110,7 @@ function test_resolve_memory_layers(): void {
 // P1 review: a traversal-shaped scope id must never write/read outside the memory root
 function test_scope_id_traversal_guard(): void {
   const io = fakeIO();
-  for (const bad of ['repo:../../etc/passwd', 'repo:a/../b', 'repo:a//b', 'project:..']) {
+  for (const bad of ['repo:../../etc/passwd', 'repo:a/../b', 'repo:a//b', 'project:..', 'foo:bar']) {
     let threw = false;
     try {
       writeMemoryDoc(bad as Parameters<typeof writeMemoryDoc>[0], 'overview', 'x', io);

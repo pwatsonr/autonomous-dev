@@ -8,11 +8,11 @@
  */
 
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 
 import type { MemoryScope, MemoryContext, MemoryDoc, MemoryLayer, ResolvedMemory } from './types';
 import { scopesForContext, scopeDir } from './resolver';
+import { resolveAbsoluteHome } from '../home';
 
 /** Injectable IO boundary for the memory tree. */
 export interface MemoryStoreIO {
@@ -24,7 +24,7 @@ export interface MemoryStoreIO {
 }
 
 export const defaultMemoryIO: MemoryStoreIO = {
-  homedir: () => (process.env.HOME && path.isAbsolute(process.env.HOME) ? process.env.HOME : os.homedir()),
+  homedir: () => resolveAbsoluteHome(),
   readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -38,23 +38,22 @@ export const defaultMemoryIO: MemoryStoreIO = {
 
 const TOPIC_RE = /^[a-z0-9._-]+$/i;
 const SCOPE_ID_RE = /^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$/i;
-
-/** The id portion of a non-global scope (undefined for `global`). */
-function scopeIdOf(scope: MemoryScope): string | undefined {
-  const idx = scope.indexOf(':');
-  return idx >= 0 ? scope.slice(idx + 1) : undefined;
-}
+const SCOPE_KINDS = new Set(['org', 'project', 'repo']);
 
 /**
- * A scope id is safe to turn into a directory path iff it has no traversal
- * (`..`), no empty/absolute segment, and matches the id charset. `global` is
- * always safe. Defense-in-depth so a malformed/hostile repo id can never make
- * a memory write/read escape the memory root (R1).
+ * A scope is safe to turn into a directory path iff it is `global`, or a known
+ * kind (org/project/repo) whose id has no traversal (`..`), no empty/absolute
+ * segment (`//`), and matches the id charset. Defense-in-depth so a
+ * malformed/hostile id — or an `as`-cast scope with an unknown prefix — can
+ * never make a memory write/read escape the memory root (R1).
  */
 function isSafeScope(scope: MemoryScope): boolean {
-  const id = scopeIdOf(scope);
-  if (id === undefined) return true; // global
-  return SCOPE_ID_RE.test(id) && !id.includes('..') && !id.includes('//');
+  if (scope === 'global') return true;
+  const idx = scope.indexOf(':');
+  if (idx < 0) return false;
+  const kind = scope.slice(0, idx);
+  const id = scope.slice(idx + 1);
+  return SCOPE_KINDS.has(kind) && SCOPE_ID_RE.test(id) && !id.includes('..') && !id.includes('//');
 }
 
 /** Absolute path of the memory root. */

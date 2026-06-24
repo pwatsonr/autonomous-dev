@@ -9,8 +9,9 @@
  */
 
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
+
+import { resolveAbsoluteHome } from '../home';
 
 export interface Question {
   id: string;
@@ -28,7 +29,7 @@ export interface QuestionStoreIO {
 }
 
 export const defaultQuestionIO: QuestionStoreIO = {
-  homedir: () => (process.env.HOME && path.isAbsolute(process.env.HOME) ? process.env.HOME : os.homedir()),
+  homedir: () => resolveAbsoluteHome(),
   readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
