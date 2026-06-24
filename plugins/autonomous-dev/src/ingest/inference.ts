@@ -26,6 +26,27 @@ export interface ProposedProject {
   confidence: number; // 0..1
 }
 
+/** CODEOWNERS-style owner tokens (@org/team, @user) found in text, deduped + lowercased. */
+export function parseOwners(text: string): string[] {
+  const set = new Set<string>();
+  for (const m of text.matchAll(/@[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?/gi)) set.add(m[0].toLowerCase());
+  return [...set].sort();
+}
+
+/**
+ * Build inference signals for a repo from its resolved per-repo memory docs
+ * (the substrate ingestion wrote). Owners come from the `ownership` doc
+ * (CODEOWNERS); the name prefix is derived from the id. Deps are left empty for
+ * now — they are a weak tiebreaker the graph layer (P1.6) will enrich.
+ */
+export function signalsFromMemory(
+  repoId: string,
+  docs: { topic: string; content: string }[],
+): RepoSignals {
+  const ownersDoc = docs.find((d) => d.topic === 'ownership');
+  return { repoId, owners: ownersDoc ? parseOwners(ownersDoc.content) : [], deps: [] };
+}
+
 /** Grouping prefix from a repo id ('acme/payments-api' → 'payments'). */
 export function namePrefixOf(repoId: string): string | undefined {
   const name = repoId.includes('/') ? repoId.split('/').pop()! : repoId;

@@ -20,6 +20,7 @@ export interface CommandResult {
 
 const ID_RE = /^[a-z0-9-]+$/;
 const REPO_ID_RE = /^[a-z0-9/._-]+$/;
+const ORG_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /** Parse `key=value` tag pairs into a Tags map. Throws on malformed input. */
@@ -66,6 +67,42 @@ export function addProject(
   return {
     ownership: { ...own, projects: [...own.projects, project] },
     message: `Added project "${id}".`,
+  };
+}
+
+/** `org link <org>` — record the linked GitHub org login (ONBOARD Phase 1 #587). */
+export function linkOrg(own: Ownership, org: string): CommandResult {
+  const login = org.trim();
+  if (!ORG_RE.test(login)) {
+    throw new Error(`Invalid org login "${login}"; use GitHub login chars ([a-z0-9-], no leading/trailing dash).`);
+  }
+  return { ownership: { ...own, org: login }, message: `Linked org "${login}".` };
+}
+
+/**
+ * Register repo ids as STANDALONE (projectId null), UNENROLLED — idempotent.
+ * Used by `org ingest` to record crawled repos. Ingestion ≠ enroll: a freshly
+ * ingested repo is never auto-enrolled in auto-improvement (FR-G2 / AC4). Malformed
+ * ids (best-effort crawl output) are skipped, not fatal.
+ */
+export function registerRepos(own: Ownership, repoIds: string[]): CommandResult {
+  const repos = [...own.repos];
+  const skipped: string[] = [];
+  let added = 0;
+  for (const raw of repoIds) {
+    const repoId = raw.trim().toLowerCase();
+    if (!REPO_ID_RE.test(repoId)) {
+      skipped.push(raw);
+      continue;
+    }
+    if (repos.some((r) => r.id === repoId)) continue; // already known — leave membership/enrollment intact
+    repos.push({ id: repoId, projectId: null, tags: {} });
+    added++;
+  }
+  const note = skipped.length ? ` (skipped ${skipped.length} malformed)` : '';
+  return {
+    ownership: { ...own, repos },
+    message: `Registered ${added} new repo(s) as standalone + unenrolled${note}.`,
   };
 }
 

@@ -1,4 +1,4 @@
-import { inferProjects, namePrefixOf } from '../../src/ingest/inference';
+import { inferProjects, namePrefixOf, parseOwners, signalsFromMemory } from '../../src/ingest/inference';
 import type { RepoSignals } from '../../src/ingest/inference';
 
 /**
@@ -59,6 +59,45 @@ function test_transitive_grouping(): void {
   console.log('PASS: test_transitive_grouping');
 }
 
+function test_parse_owners(): void {
+  const codeowners = '# comment\n*       @acme/payments @alice\n/docs   @acme/Docs-Team\n';
+  const owners = parseOwners(codeowners);
+  assert(owners.includes('@acme/payments'), 'team token');
+  assert(owners.includes('@alice'), 'user token');
+  assert(owners.includes('@acme/docs-team'), 'lowercased team');
+  assert(owners.length === 3 && owners[0] === '@acme/docs-team', 'deduped + sorted');
+  assert(parseOwners('no owners here').length === 0, 'no false positives on plain text');
+  console.log('PASS: test_parse_owners');
+}
+
+function test_signals_from_memory(): void {
+  const docs = [
+    { topic: 'overview', content: '# Overview' },
+    { topic: 'ownership', content: '* @acme/payments\n' },
+  ];
+  const s = signalsFromMemory('acme/orders', docs);
+  assert(s.repoId === 'acme/orders', 'repoId carried');
+  assert(s.owners.join(',') === '@acme/payments', 'owners parsed from ownership doc');
+  assert(s.deps.length === 0, 'deps empty (weak signal, future enrichment)');
+  // a repo with no ownership doc => no owners, still a valid signal
+  assert(signalsFromMemory('acme/lonely', []).owners.length === 0, 'missing ownership doc => no owners');
+  console.log('PASS: test_signals_from_memory');
+}
+
+function test_infer_from_memory_end_to_end(): void {
+  // signalsFromMemory + inferProjects compose: two repos sharing an owner group.
+  const mem: Record<string, { topic: string; content: string }[]> = {
+    'acme/orders': [{ topic: 'ownership', content: '* @acme/payments' }],
+    'acme/billing': [{ topic: 'ownership', content: '* @acme/payments' }],
+    'acme/website': [{ topic: 'ownership', content: '* @acme/web' }],
+  };
+  const signals = Object.keys(mem).map((id) => signalsFromMemory(id, mem[id]));
+  const props = inferProjects(signals);
+  assert(props.length === 1, 'one proposal (orders+billing); website is lone');
+  assert(props[0].repoIds.join(',') === 'acme/billing,acme/orders', 'grouped the shared-owner pair');
+  console.log('PASS: test_infer_from_memory_end_to_end');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -71,4 +110,7 @@ describe('ingest/inference (project inference)', () => {
   it('test_infer_by_name_prefix', test_infer_by_name_prefix);
   it('test_unrelated_no_proposal', test_unrelated_no_proposal);
   it('test_transitive_grouping', test_transitive_grouping);
+  it('test_parse_owners', test_parse_owners);
+  it('test_signals_from_memory', test_signals_from_memory);
+  it('test_infer_from_memory_end_to_end', test_infer_from_memory_end_to_end);
 });
