@@ -59,7 +59,8 @@ Commands:
                        shadow | unshadow | promote
   org link <org>       Link a GitHub org for onboarding (ONBOARD #587)
   org ingest [org]     Read-only crawl of the org into scoped memory
-  project infer        Propose project groupings from ingested memory
+  project infer        Propose project groupings (graph-enriched if Neo4j is up)
+  graph sync|status    Neo4j relationship graph (upsert / connectivity)
   questions list|answer  Manage ingestion's blocking questions
   artifact <verb>      Scoped skill auto-generation (ONBOARD #590):
                        propose | list | show | accept | reject
@@ -1092,8 +1093,8 @@ case "${COMMAND}" in
         fi
         exec bun run "${PLUGIN_BIN_DIR}/ownership-cli.ts" "${COMMAND}" "$@"
         ;;
-    org|questions)
-        # Bun-executable wrapper for the ingestion/org CLI (ONBOARD #587).
+    org|questions|graph)
+        # Bun-executable wrapper for the ingestion/org/graph CLI (ONBOARD #587).
         if ! command -v bun >/dev/null 2>&1; then
             echo "ERROR: '${COMMAND}' subcommand requires bun on PATH" >&2
             exit 127

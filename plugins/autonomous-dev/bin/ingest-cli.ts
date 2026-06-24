@@ -22,16 +22,28 @@ import { readOwnership, writeOwnership } from '../src/ownership/store';
 import { linkOrg, registerRepos, isOrgLogin } from '../src/ownership/commands';
 import { ingestOrg } from '../src/ingest/orchestrator';
 import { createGhOrgClient } from '../src/ingest/adapters';
-import { inferProjects, signalsFromMemory } from '../src/ingest/inference';
+import { signalsFromMemory } from '../src/ingest/inference';
 import { readScopeMemory } from '../src/memory/store';
 import { listQuestions, answerQuestion } from '../src/ingest/questions';
+import { readNeo4jCreds } from '../src/graph/secrets';
+import { httpGraphClient } from '../src/graph/client';
+import { syncGraph } from '../src/graph/importer';
+import { inferProjectsWithGraph } from '../src/graph/inference';
 
 const USAGE = `Usage:
   autonomous-dev org link <org>            Link a GitHub org
   autonomous-dev org ingest [org]          Read-only crawl of the org into scoped memory
-  autonomous-dev project infer             Propose project groupings from ingested memory
+  autonomous-dev project infer             Propose project groupings (graph-enriched if Neo4j is up)
+  autonomous-dev graph sync                Upsert the org/project/repo/owner graph into Neo4j
+  autonomous-dev graph status              Show Neo4j connectivity + node counts
   autonomous-dev questions list [--repo <id>] [--status pending|answered]
   autonomous-dev questions answer <id> <choice>`;
+
+/** A graph client from the stored Neo4j credential, or undefined if not configured. */
+function graphClient() {
+  const creds = readNeo4jCreds();
+  return creds ? { client: httpGraphClient(creds), httpUrl: creds.httpUrl } : undefined;
+}
 
 /** i-th positional argument (skips flags), or '' if the next token is a flag/missing. */
 function positional(args: string[], i = 0): string {
@@ -120,7 +132,9 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     const signals = own.repos.map((r) => signalsFromMemory(r.id, readScopeMemory(`repo:${r.id}`)));
-    const proposals = inferProjects(signals);
+    const gc = graphClient();
+    const { proposals, source } = await inferProjectsWithGraph(gc?.client, signals);
+    process.stdout.write(`(inference source: ${source}${source === 'file' && gc ? ' — Neo4j unreachable, fell back' : ''})\n`);
     if (proposals.length === 0) {
       process.stdout.write('(no project groupings inferred — repos share no owner/name signal)\n');
       return 0;
@@ -134,6 +148,47 @@ async function main(argv: string[]): Promise<number> {
       );
     }
     process.stdout.write('Apply a grouping with:\n  autonomous-dev project add <id>\n  autonomous-dev repo assign <repo> --project <id>\n');
+    return 0;
+  }
+
+  if (family === 'graph' && verb === 'sync') {
+    const own = readOwnership();
+    if (!own.org) {
+      process.stderr.write('No org linked. Run: autonomous-dev org link <org> first.\n');
+      return 1;
+    }
+    const gc = graphClient();
+    if (!gc) {
+      process.stdout.write('Neo4j not configured (~/.autonomous-dev/secrets/neo4j.json absent) — graph layer skipped.\n');
+      return 0;
+    }
+    const signals = own.repos.map((r) => signalsFromMemory(r.id, readScopeMemory(`repo:${r.id}`)));
+    process.stdout.write(`Syncing graph for org "${own.org}" → ${gc.httpUrl}…\n`);
+    const res = await syncGraph(gc.client, own.org, own, signals);
+    if (res.ok) {
+      process.stdout.write(`Graph synced: ${res.applied} upsert statement(s) for ${own.projects.length} project(s) + ${own.repos.length} repo(s).\n`);
+      return 0;
+    }
+    process.stderr.write(`Graph sync failed (${res.applied} applied): ${res.error}\n`);
+    return 1;
+  }
+
+  if (family === 'graph' && verb === 'status') {
+    const gc = graphClient();
+    if (!gc) {
+      process.stdout.write('Neo4j: not configured (~/.autonomous-dev/secrets/neo4j.json absent).\n');
+      return 0;
+    }
+    if (!(await gc.client.verifyConnectivity())) {
+      process.stderr.write(`Neo4j: UNREACHABLE (${gc.httpUrl}).\n`);
+      return 1;
+    }
+    process.stdout.write(`Neo4j: reachable (${gc.httpUrl}).\n`);
+    const counts = await gc.client.run([{ statement: 'MATCH (n) RETURN labels(n)[0] AS label, count(*) AS n ORDER BY label' }]);
+    if (counts.ok && counts.results) {
+      const data = (counts.results[0] as { data?: { row?: unknown[] }[] })?.data ?? [];
+      for (const d of data) process.stdout.write(`  ${String(d.row?.[0] ?? '?')}: ${String(d.row?.[1] ?? 0)}\n`);
+    }
     return 0;
   }
 
