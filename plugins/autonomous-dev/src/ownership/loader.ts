@@ -60,6 +60,9 @@ function asRepo(val: unknown): Repo | null {
     remote: typeof o.remote === 'string' ? o.remote : undefined,
     projectId,
     tags: asTags(o.tags),
+    // ONBOARD Phase 1: only an explicit `true` enrolls; everything else (absent,
+    // false, garbage) is NOT enrolled (ingest ≠ enroll).
+    participate_in_auto_improvement: o.participate_in_auto_improvement === true ? true : undefined,
   };
 }
 

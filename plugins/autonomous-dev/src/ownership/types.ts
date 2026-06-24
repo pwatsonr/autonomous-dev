@@ -36,6 +36,11 @@ export interface Repo {
   /** Project membership; null = standalone. */
   projectId: string | null;
   tags: Tags;
+  /**
+   * ONBOARD Phase 1 (#587): opted into auto-improvement. Default (absent) =
+   * NOT enrolled — ingestion is read-only and never auto-enrolls (ingest ≠ enroll).
+   */
+  participate_in_auto_improvement?: boolean;
 }
 
 /** The Org -> projects -> repos tree, persisted in the config manifest. */

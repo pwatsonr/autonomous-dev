@@ -141,7 +141,34 @@ export function listRepos(own: Ownership, projectId?: string): string {
       const tags = Object.entries(r.tags)
         .map(([k, v]) => `${k}=${v}`)
         .join(',');
-      return `${r.id}  project: ${r.projectId ?? '-'}${tags ? `  [${tags}]` : ''}`;
+      const enrolled = r.participate_in_auto_improvement === true ? '  *enrolled*' : '';
+      return `${r.id}  project: ${r.projectId ?? '-'}${enrolled}${tags ? `  [${tags}]` : ''}`;
     })
     .join('\n');
+}
+
+/** `repo enroll|unenroll <repoId>` — flip the auto-improvement opt-in (AC4). */
+export function setEnrollment(
+  own: Ownership,
+  opts: { repoId: string; enrolled: boolean },
+): CommandResult {
+  const repoId = opts.repoId.trim();
+  const repos = [...own.repos];
+  const idx = repos.findIndex((r) => r.id === repoId);
+  if (idx < 0) {
+    throw new Error(`Unknown repo "${repoId}". Assign or ingest it first.`);
+  }
+  repos[idx] = {
+    ...repos[idx],
+    participate_in_auto_improvement: opts.enrolled ? true : undefined,
+  };
+  return {
+    ownership: { ...own, repos },
+    message: `Repo "${repoId}" ${opts.enrolled ? 'ENROLLED in' : 'unenrolled from'} auto-improvement.`,
+  };
+}
+
+/** Whether a repo is enrolled in auto-improvement. Default (ingest≠enroll) = false. */
+export function isEnrolled(own: Ownership, repoId: string): boolean {
+  return own.repos.find((r) => r.id === repoId)?.participate_in_auto_improvement === true;
 }

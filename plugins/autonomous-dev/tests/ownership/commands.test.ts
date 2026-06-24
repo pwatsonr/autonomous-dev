@@ -2,6 +2,8 @@ import {
   addProject,
   assignRepo,
   tagRepo,
+  setEnrollment,
+  isEnrolled,
   listProjects,
   listRepos,
   parseTags,
@@ -229,6 +231,31 @@ function test_store_refuses_corrupt_manifest(): void {
   console.log('PASS: test_store_refuses_corrupt_manifest');
 }
 
+// P1.3 — ingest ≠ enroll toggle (AC4)
+function test_enrollment(): void {
+  let own = addProject(EMPTY, { id: 'p' }).ownership;
+  own = assignRepo(own, { repoId: 'acme/api', projectId: 'p' }).ownership;
+  // default: NOT enrolled (ingest ≠ enroll)
+  assert(isEnrolled(own, 'acme/api') === false, 'default not enrolled');
+
+  own = setEnrollment(own, { repoId: 'acme/api', enrolled: true }).ownership;
+  assert(isEnrolled(own, 'acme/api') === true, 'enrolled after enroll');
+
+  own = setEnrollment(own, { repoId: 'acme/api', enrolled: false }).ownership;
+  assert(isEnrolled(own, 'acme/api') === false, 'unenrolled');
+
+  // unknown repo rejected on enroll, and reads as not-enrolled
+  let threw = false;
+  try {
+    setEnrollment(own, { repoId: 'nope', enrolled: true });
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'enroll unknown repo rejected');
+  assert(isEnrolled(own, 'nope') === false, 'unknown repo not enrolled');
+  console.log('PASS: test_enrollment');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -245,4 +272,5 @@ describe('ownership/commands + store', () => {
   it('test_store_missing_manifest', test_store_missing_manifest);
   it('test_command_input_hardening', test_command_input_hardening);
   it('test_store_refuses_corrupt_manifest', test_store_refuses_corrupt_manifest);
+  it('test_enrollment', test_enrollment);
 });
