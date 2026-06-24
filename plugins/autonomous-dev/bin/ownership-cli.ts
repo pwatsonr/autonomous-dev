@@ -16,6 +16,7 @@ import {
   addProject,
   assignRepo,
   tagRepo,
+  setEnrollment,
   listProjects,
   listRepos,
 } from '../src/ownership/commands';
@@ -26,6 +27,8 @@ const USAGE = `Usage:
   autonomous-dev project list
   autonomous-dev repo assign <repoId> --project <projectId> [--path <p>] [--remote <r>]
   autonomous-dev repo tag <repoId> --set k=v [--set k=v ...]
+  autonomous-dev repo enroll <repoId>      (opt into auto-improvement)
+  autonomous-dev repo unenroll <repoId>
   autonomous-dev repo list [--project <projectId>]`;
 
 /** First positional argument (the id), or '' if the next token is a flag. */
@@ -80,6 +83,15 @@ function main(argv: string[]): number {
       const { ownership, message } = tagRepo(readOwnership(), {
         repoId: positional(rest),
         set: multi(rest, '--set'),
+      });
+      writeOwnership(ownership);
+      process.stdout.write(`${message}\n`);
+      return 0;
+    }
+    if (family === 'repo' && (verb === 'enroll' || verb === 'unenroll')) {
+      const { ownership, message } = setEnrollment(readOwnership(), {
+        repoId: positional(rest),
+        enrolled: verb === 'enroll',
       });
       writeOwnership(ownership);
       process.stdout.write(`${message}\n`);

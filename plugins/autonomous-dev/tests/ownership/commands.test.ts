@@ -2,9 +2,15 @@ import {
   addProject,
   assignRepo,
   tagRepo,
+  setEnrollment,
+  isEnrolled,
   listProjects,
   listRepos,
   parseTags,
+  linkOrg,
+  registerRepos,
+  repoIdFromScope,
+  mayAutoImproveScope,
 } from '../../src/ownership/commands';
 import { readOwnership, writeOwnership, manifestPath } from '../../src/ownership/store';
 import type { OwnershipStoreIO } from '../../src/ownership/store';
@@ -229,6 +235,120 @@ function test_store_refuses_corrupt_manifest(): void {
   console.log('PASS: test_store_refuses_corrupt_manifest');
 }
 
+// P1.3 — ingest ≠ enroll toggle (AC4)
+function test_enrollment(): void {
+  let own = addProject(EMPTY, { id: 'p' }).ownership;
+  own = assignRepo(own, { repoId: 'acme/api', projectId: 'p' }).ownership;
+  // default: NOT enrolled (ingest ≠ enroll)
+  assert(isEnrolled(own, 'acme/api') === false, 'default not enrolled');
+
+  own = setEnrollment(own, { repoId: 'acme/api', enrolled: true }).ownership;
+  assert(isEnrolled(own, 'acme/api') === true, 'enrolled after enroll');
+
+  own = setEnrollment(own, { repoId: 'acme/api', enrolled: false }).ownership;
+  assert(isEnrolled(own, 'acme/api') === false, 'unenrolled');
+
+  // unknown repo rejected on enroll, and reads as not-enrolled
+  let threw = false;
+  try {
+    setEnrollment(own, { repoId: 'nope', enrolled: true });
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'enroll unknown repo rejected');
+  assert(isEnrolled(own, 'nope') === false, 'unknown repo not enrolled');
+  console.log('PASS: test_enrollment');
+}
+
+// P1 operator CLI — org link
+function test_link_org(): void {
+  const r = linkOrg(EMPTY, 'acme-corp');
+  assert(r.ownership.org === 'acme-corp', 'org linked');
+  // re-link replaces
+  assert(linkOrg(r.ownership, 'other').ownership.org === 'other', 'relink replaces');
+  for (const bad of ['-bad', 'bad-', 'has space', 'a/b', '', 'a'.repeat(40)]) {
+    let threw = false;
+    try {
+      linkOrg(EMPTY, bad);
+    } catch {
+      threw = true;
+    }
+    assert(threw, `invalid org "${bad}" rejected`);
+  }
+  console.log('PASS: test_link_org');
+}
+
+// P1 review: traversal-shaped repo ids must be rejected (assign/tag/enroll throw;
+// registerRepos skips) — defense-in-depth so an id can't escape a path segment.
+function test_repo_id_traversal_rejected(): void {
+  const own = assignRepo(addProject(EMPTY, { id: 'p' }).ownership, { repoId: 'acme/api', projectId: 'p' }).ownership;
+  for (const bad of ['../etc/passwd', 'a/../b', 'a//b', '..']) {
+    for (const op of [
+      () => assignRepo(own, { repoId: bad, projectId: 'p' }),
+      () => tagRepo(own, { repoId: bad, set: ['x=y'] }),
+      () => setEnrollment(own, { repoId: bad, enrolled: true }),
+    ]) {
+      let threw = false;
+      try {
+        op();
+      } catch {
+        threw = true;
+      }
+      assert(threw, `traversal id "${bad}" rejected`);
+    }
+    // registerRepos skips (does not throw) malformed ids
+    assert(registerRepos(EMPTY, [bad]).ownership.repos.length === 0, `traversal id "${bad}" not registered`);
+  }
+  console.log('PASS: test_repo_id_traversal_rejected');
+}
+
+// P1 operator CLI — registerRepos (org ingest records crawled repos)
+function test_register_repos(): void {
+  const r = registerRepos(EMPTY, ['Acme/API', 'acme/web']);
+  assert(r.ownership.repos.length === 2, 'two repos registered');
+  assert(r.ownership.repos[0].id === 'acme/api', 'id lowercased');
+  assert(r.ownership.repos[0].projectId === null, 'standalone (no project)');
+  assert(isEnrolled(r.ownership, 'acme/api') === false, 'ingest != enroll (unenrolled)');
+
+  // idempotent + preserves existing membership/enrollment
+  let own = assignRepo(addProject(r.ownership, { id: 'p' }).ownership, {
+    repoId: 'acme/api',
+    projectId: 'p',
+  }).ownership;
+  own = setEnrollment(own, { repoId: 'acme/api', enrolled: true }).ownership;
+  const r2 = registerRepos(own, ['acme/api', 'acme/new']);
+  assert(r2.ownership.repos.length === 3, 'only the new repo added');
+  assert(isEnrolled(r2.ownership, 'acme/api') === true, 're-register preserves enrollment');
+  const apiRepo = r2.ownership.repos.find((x) => x.id === 'acme/api');
+  assert(apiRepo?.projectId === 'p', 're-register preserves project membership');
+
+  // malformed ids skipped, not fatal
+  const r3 = registerRepos(EMPTY, ['ok/repo', 'has space', 'a::b']);
+  assert(r3.ownership.repos.length === 1, 'only well-formed id registered');
+  assert(r3.message.includes('skipped 2 malformed'), 'reports skipped count');
+  console.log('PASS: test_register_repos');
+}
+
+// P1.3b — the FR-G2 auto-improvement enrollment gate
+function test_auto_improve_gate(): void {
+  // a freshly INGESTED repo (registerRepos) is recorded but unenrolled...
+  let own = registerRepos(EMPTY, ['acme/api']).ownership;
+  assert(mayAutoImproveScope(own, 'global') === true, 'global scope not repo-gated');
+  assert(mayAutoImproveScope(own, 'project:payments') === true, 'project scope not repo-gated (phase 1)');
+  // ...so a repo-scoped artifact for it may NOT be auto-improved (ingest ≠ enroll).
+  assert(mayAutoImproveScope(own, 'repo:acme/api') === false, 'ingested-but-unenrolled repo is gated OFF');
+  assert(mayAutoImproveScope(own, 'repo:unknown/x') === false, 'unknown repo fail-closed');
+
+  // after explicit enrollment, the gate opens for that repo only.
+  own = setEnrollment(own, { repoId: 'acme/api', enrolled: true }).ownership;
+  assert(mayAutoImproveScope(own, 'repo:acme/api') === true, 'enrolled repo gate opens');
+  assert(mayAutoImproveScope(own, 'repo:other/x') === false, 'a different repo stays gated');
+
+  assert(repoIdFromScope('repo:o/r') === 'o/r', 'repoIdFromScope extracts id');
+  assert(repoIdFromScope('global') === undefined, 'repoIdFromScope undefined for global');
+  console.log('PASS: test_auto_improve_gate');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -245,4 +365,9 @@ describe('ownership/commands + store', () => {
   it('test_store_missing_manifest', test_store_missing_manifest);
   it('test_command_input_hardening', test_command_input_hardening);
   it('test_store_refuses_corrupt_manifest', test_store_refuses_corrupt_manifest);
+  it('test_enrollment', test_enrollment);
+  it('test_link_org', test_link_org);
+  it('test_register_repos', test_register_repos);
+  it('test_auto_improve_gate', test_auto_improve_gate);
+  it('test_repo_id_traversal_rejected', test_repo_id_traversal_rejected);
 });

@@ -57,6 +57,10 @@ Commands:
   reconcile            Detect/repair drift (run 'reconcile --help' for options)
   agent <verb> <name>  Agent-factory action: inspect | freeze | unfreeze |
                        shadow | unshadow | promote
+  org link <org>       Link a GitHub org for onboarding (ONBOARD #587)
+  org ingest [org]     Read-only crawl of the org into scoped memory
+  project infer        Propose project groupings from ingested memory
+  questions list|answer  Manage ingestion's blocking questions
   override-verification <REQ-id> --reason "<text>"
                        PLAN-042 Phase D — authorize one request to advance
                        past a VERIFICATION_FAILED gate. Per-request and
@@ -1079,7 +1083,20 @@ case "${COMMAND}" in
             echo "ERROR: '${COMMAND}' subcommand requires bun on PATH" >&2
             exit 127
         fi
+        # `project infer` belongs to the ingestion CLI (ONBOARD #587); every
+        # other project/repo verb is ownership CLI (#584).
+        if [[ "${COMMAND}" == "project" && "${1:-}" == "infer" ]]; then
+            exec bun run "${PLUGIN_BIN_DIR}/ingest-cli.ts" project "$@"
+        fi
         exec bun run "${PLUGIN_BIN_DIR}/ownership-cli.ts" "${COMMAND}" "$@"
+        ;;
+    org|questions)
+        # Bun-executable wrapper for the ingestion/org CLI (ONBOARD #587).
+        if ! command -v bun >/dev/null 2>&1; then
+            echo "ERROR: '${COMMAND}' subcommand requires bun on PATH" >&2
+            exit 127
+        fi
+        exec bun run "${PLUGIN_BIN_DIR}/ingest-cli.ts" "${COMMAND}" "$@"
         ;;
     override-verification)
         cmd_override_verification "$@"
