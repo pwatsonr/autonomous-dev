@@ -56,7 +56,8 @@ export async function inferProjectsWithGraph(
 ): Promise<GraphInferResult> {
   if (client) {
     const signals = await graphRepoSignals(client);
-    if (signals) return { proposals: inferProjects(signals), source: 'graph' };
+    // undefined = graph error → fall back to file; [] = graph up but empty → use graph (don't mask "run graph sync").
+    if (signals !== undefined) return { proposals: inferProjects(signals), source: 'graph' };
   }
   return { proposals: inferProjects(fallbackSignals), source: 'file' };
 }

@@ -58,6 +58,14 @@ async function test_falls_back_to_file(): Promise<void> {
   console.log('PASS: test_falls_back_to_file');
 }
 
+async function test_empty_graph_uses_graph_source(): Promise<void> {
+  // M2: Neo4j up but EMPTY (no repos) → source 'graph' (don't mask "you forgot to run graph sync")
+  const empty = rowsClient([]);
+  const res = await inferProjectsWithGraph(empty, FILE_SIGNALS);
+  assert(res.source === 'graph' && res.proposals.length === 0, 'empty graph → graph source, not file fallback');
+  console.log('PASS: test_empty_graph_uses_graph_source');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -68,4 +76,5 @@ describe('graph/inference', () => {
   it('test_graph_signals_parsed', test_graph_signals_parsed);
   it('test_infers_from_graph', test_infers_from_graph);
   it('test_falls_back_to_file', test_falls_back_to_file);
+  it('test_empty_graph_uses_graph_source', test_empty_graph_uses_graph_source);
 });

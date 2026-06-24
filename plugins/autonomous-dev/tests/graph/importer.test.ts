@@ -79,6 +79,34 @@ async function test_sync_degrades(): Promise<void> {
   console.log('PASS: test_sync_degrades');
 }
 
+async function test_chunk_size_guard(): Promise<void> {
+  // B2: chunkSize 0 must NOT infinite-loop — treated as 1
+  const captured: GraphStatement[] = [];
+  let runs = 0;
+  const client: GraphClient = {
+    async run(s) {
+      runs++;
+      captured.push(...s);
+      return { ok: true, results: [] };
+    },
+    async verifyConnectivity() {
+      return true;
+    },
+  };
+  const res = await syncGraph(client, 'acme', OWN, SIGNALS, 0);
+  assert(res.ok && res.applied === captured.length, 'chunkSize 0 terminates + applies all');
+  assert(runs === captured.length, 'chunkSize 0 → one run per statement (treated as 1)');
+  console.log('PASS: test_chunk_size_guard');
+}
+
+function test_no_orphan_project(): void {
+  // M1: a repo whose projectId points at a non-existent project must NOT emit IN_PROJECT
+  const own: Ownership = { org: 'acme', projects: [], repos: [{ id: 'acme/x', projectId: 'ghost', tags: {} }] };
+  const stmts = buildGraphStatements('acme', own, []);
+  assert(!stmts.some((s) => s.statement.includes('IN_PROJECT')), 'dangling projectId → no orphan Project / IN_PROJECT');
+  console.log('PASS: test_no_orphan_project');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -90,4 +118,6 @@ describe('graph/importer', () => {
   it('test_values_are_parameters_not_interpolated', test_values_are_parameters_not_interpolated);
   it('test_sync_runs_and_chunks', test_sync_runs_and_chunks);
   it('test_sync_degrades', test_sync_degrades);
+  it('test_chunk_size_guard', test_chunk_size_guard);
+  it('test_no_orphan_project', test_no_orphan_project);
 });
