@@ -4,3 +4,4 @@
 export * from './types';
 export * from './extractors';
 export * from './orchestrator';
+export * from './questions';
