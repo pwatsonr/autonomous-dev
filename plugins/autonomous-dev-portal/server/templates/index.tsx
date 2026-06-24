@@ -36,6 +36,7 @@ import { DashboardView } from "./views/dashboard";
 import { LogsView } from "./views/logs";
 import { NotFoundView } from "./views/404";
 import { OnboardView } from "./views/onboard";
+import { OnboardIngestionView } from "./views/onboard-ingestion";
 import { OpsView } from "./views/ops";
 import { ReposView } from "./views/repos";
 import { RequestDetailView } from "./views/request-detail";
@@ -93,6 +94,8 @@ function renderViewBody<V extends ViewName>(
             return <ReposView {...(props as RenderProps["repos"])} />;
         case "onboard":
             return <OnboardView {...(props as RenderProps["onboard"])} />;
+        case "onboard-ingestion":
+            return <OnboardIngestionView {...(props as RenderProps["onboard-ingestion"])} />;
         case "404":
             return <NotFoundView {...(props as RenderProps["404"])} />;
         case "500":
@@ -146,6 +149,8 @@ function activePathFor(view: ViewName): string {
             return "/repos";
         case "onboard":
             return "/onboard";
+        case "onboard-ingestion":
+            return "/onboard/ingestion";
         case "dashboard":
         case "request-detail":
         case "404":

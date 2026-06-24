@@ -23,6 +23,7 @@ export type ViewName =
     | "agents" // PLAN-038 TASK-005 — net-new /agents surface
     | "repos" //  PLAN-038 TASK-005 — net-new /repos surface
     | "onboard" // ONBOARD Phase 3 (#594) — org/project/repo browser
+    | "onboard-ingestion" // ONBOARD Phase 3 (#594) — live ingestion status
     | "404"
     | "500";
 
@@ -921,6 +922,24 @@ export interface RenderProps {
     repos: ReposPageData;
     // ONBOARD Phase 3 (#594) — org/project/repo browser. See OnboardPageData below.
     onboard: OnboardPageData;
+    // ONBOARD Phase 3 (#594) — live ingestion status. See OnboardIngestionPageData below.
+    "onboard-ingestion": OnboardIngestionPageData;
+}
+
+// ONBOARD Phase 3 (#594) — live ingestion view data.
+export interface OnboardIngestionRepoRow {
+    id: string;
+    projectId: string | null;
+    hasMemory: boolean;
+    blocked: boolean;
+    topicCount: number;
+}
+
+export interface OnboardIngestionPageData {
+    org: string | null;
+    status: OnboardIngestionStatusProp;
+    /** all repos, sorted blocked → pending → ingested. */
+    repos: OnboardIngestionRepoRow[];
 }
 
 // ONBOARD Phase 3 (#594) — browser surface data shape. Composed by the route

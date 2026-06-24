@@ -68,6 +68,14 @@ export interface IngestionStatus {
     proposalsPending: number;
 }
 
+export interface IngestionRepoRow {
+    id: string;
+    projectId: string | null;
+    hasMemory: boolean;
+    blocked: boolean;
+    topicCount: number;
+}
+
 export interface MemoryTopic {
     topic: string;
     summary: string;
@@ -308,4 +316,29 @@ export async function readIngestionStatus(now: () => number = nowMs): Promise<In
     };
     cache.set("ingestion-status", status, t);
     return status;
+}
+
+/** Per-repo ingestion progress (has-memory / blocked / topic count). Cached 5s. Never throws. */
+export async function readIngestionRepoList(now: () => number = nowMs): Promise<IngestionRepoRow[]> {
+    const t = now();
+    const cached = cache.get<IngestionRepoRow[]>("ingestion-repos", t);
+    if (cached !== undefined) return cached;
+
+    const own = await readOnboardOwnership(now);
+    const questions = await readOnboardQuestions(now);
+    const pending = new Set(questions.filter((q) => q.status === "pending").map((q) => q.repoId));
+
+    const rows: IngestionRepoRow[] = [];
+    for (const r of own.repos) {
+        const topics = await readRepoMemoryTopicNames(r.id);
+        rows.push({
+            id: r.id,
+            projectId: r.projectId,
+            hasMemory: topics.length > 0,
+            blocked: pending.has(r.id),
+            topicCount: topics.length,
+        });
+    }
+    cache.set("ingestion-repos", rows, t);
+    return rows;
 }

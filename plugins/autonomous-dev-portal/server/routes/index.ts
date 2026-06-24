@@ -80,7 +80,7 @@ import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
 import { requestDetailHandler, artifactFragmentHandler } from "./request-detail";
 import { reposHandler } from "./repos";
-import { onboardHandler, onboardRepoMemoryHandler } from "./onboard";
+import { onboardHandler, onboardIngestionHandler, onboardRepoMemoryHandler } from "./onboard";
 import { requestsHandler } from "./requests";
 import { settingsHandler } from "./settings";
 import {
@@ -416,6 +416,7 @@ export function registerRoutes(
     app.get("/repos", reposHandler);
     // ONBOARD Phase 3 (#594) — org/project/repo browser + memory drill-in (slash-safe param).
     app.get("/onboard", onboardHandler);
+    app.get("/onboard/ingestion", onboardIngestionHandler);
     app.get("/onboard/repo/:repo{.+}", onboardRepoMemoryHandler);
     app.get("/api/agents", agentsApiHandler);
     // PLAN-038 polish — row click loads the inspect modal HTML fragment.

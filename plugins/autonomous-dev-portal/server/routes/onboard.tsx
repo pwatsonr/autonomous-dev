@@ -10,10 +10,16 @@ import {
     readOnboardOwnership,
     readOnboardQuestions,
     readIngestionStatus,
+    readIngestionRepoList,
     readRepoMemoryTopicNames,
     readRepoMemoryTopics,
 } from "../wiring/onboard-readers";
-import type { OnboardPageData, OnboardRepoRow, OnboardProjectRow } from "../types/render";
+import type {
+    OnboardPageData,
+    OnboardRepoRow,
+    OnboardProjectRow,
+    OnboardIngestionPageData,
+} from "../types/render";
 
 const PAGE_SIZE = 25;
 
@@ -81,6 +87,18 @@ export const onboardHandler = async (c: Context): Promise<Response> => {
         ...(csrfToken ? { csrfToken } : {}),
     };
     return renderPage(c, "onboard", data);
+};
+
+/** GET /onboard/ingestion — live ingestion status (aggregate + per-repo progress, polled). */
+export const onboardIngestionHandler = async (c: Context): Promise<Response> => {
+    const own = await readOnboardOwnership();
+    const status = await readIngestionStatus();
+    const list = await readIngestionRepoList();
+    // sort: blocked → pending(no memory) → ingested, then by id.
+    const rank = (r: { blocked: boolean; hasMemory: boolean }): number => (r.blocked ? 0 : r.hasMemory ? 2 : 1);
+    const repos = [...list].sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+    const data: OnboardIngestionPageData = { org: own.org, status, repos };
+    return renderPage(c, "onboard-ingestion", data);
 };
 
 /** GET /onboard/repo/:repo{.+} — the memory drill-in fragment (repo ids contain slashes). */

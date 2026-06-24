@@ -116,6 +116,25 @@ describe("GET /onboard", () => {
     });
 });
 
+describe("GET /onboard/ingestion", () => {
+    test("renders the aggregate + per-repo progress (ingested/blocked/pending)", async () => {
+        seed();
+        const res = await app().request("/onboard/ingestion");
+        expect(res.status).toBe(200);
+        const html = await res.text();
+        expect(html).toContain("Ingestion");
+        expect(html).toContain("ingested"); // acme/orders has memory
+        expect(html).toContain("blocked"); // acme/site has a pending question
+        expect(html).toContain("pending"); // acme/billing: no memory, not blocked
+    });
+
+    test("no org → honest empty state", async () => {
+        writeFileSync(userConfigPath(), JSON.stringify({}), "utf8");
+        const html = await (await app().request("/onboard/ingestion")).text();
+        expect(html).toContain("No org linked");
+    });
+});
+
 describe("GET /onboard/repo/:repo", () => {
     test("drill-in renders the repo's memory topics", async () => {
         seed();
