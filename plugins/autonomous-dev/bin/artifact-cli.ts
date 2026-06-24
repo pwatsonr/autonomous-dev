@@ -81,13 +81,13 @@ async function main(argv: string[]): Promise<number> {
       return 1;
     }
     process.stdout.write(`Proposing scoped skills from ${repoIds.length} repo(s)…\n`);
-    const { proposals, skipped } = await proposeArtifacts({
+    const { proposals, skipped, detectionErrors } = await proposeArtifacts({
       repoIds,
       ownership: own,
       runtime: claudeArtifactRuntime(),
       reviewerSystemPrompt: reviewerSystemPrompt(),
     });
-    if (proposals.length === 0 && skipped.length === 0) {
+    if (proposals.length === 0 && skipped.length === 0 && detectionErrors.length === 0) {
       process.stdout.write('No opportunities detected.\n');
       return 0;
     }
@@ -96,12 +96,18 @@ async function main(argv: string[]): Promise<number> {
       process.stdout.write(`${mark} ${p.scope}  ${p.name}  (${Math.round(p.confidence * 100)}%)  id=${p.id}\n`);
     }
     for (const s of skipped) process.stdout.write(`· skipped ${s.scope} ${s.suggestedName}: ${s.reason}\n`);
+    for (const e of detectionErrors) process.stdout.write(`! detector ${e.detector} failed on ${e.repoId}: ${e.error}\n`);
     process.stdout.write('\nReview: autonomous-dev artifact show <id>; promote: autonomous-dev artifact accept <id>\n');
     return 0;
   }
 
   if (verb === 'list') {
+    const STATUSES = ['pending_meta_review', 'meta_approved', 'meta_rejected', 'promoted', 'rejected'];
     const status = flag(rest, '--status');
+    if (status && !STATUSES.includes(status)) {
+      process.stderr.write(`Invalid --status "${status}". One of: ${STATUSES.join(', ')}\n`);
+      return 1;
+    }
     const ps = listProposals(undefined, status ? { status: status as never } : undefined);
     if (ps.length === 0) {
       process.stdout.write('(no proposals)\n');
@@ -141,9 +147,12 @@ async function main(argv: string[]): Promise<number> {
       return 1;
     }
     const toolOverride = multi(rest, '--allow-tool');
+    if (rest.includes('--allow-tool') && toolOverride.length === 0) {
+      process.stderr.write('Warning: --allow-tool given without a value; ignored.\n');
+    }
     const { path: target } = promoteProposal(id, { ownership: readOwnership(), toolOverride: toolOverride.length ? toolOverride : undefined });
     process.stdout.write(`Promoted ${id}\n  wrote ${target}\n`);
-    if (toolOverride.length) process.stdout.write(`  operator-authorized tools: ${toolOverride.join(', ')}\n`);
+    if (toolOverride.length) process.stdout.write(`  ⚠ operator-authorized tools beyond read-only: ${toolOverride.join(', ')}\n`);
     return 0;
   }
 

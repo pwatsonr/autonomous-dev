@@ -15,7 +15,7 @@ import type { ArtifactScope } from '../ownership/types';
 import type { GeneratedArtifact, ArtifactKind, ArtifactParseResult } from './types';
 import { ARTIFACT_KINDS } from './types';
 
-/** Structural check that a value is a valid ArtifactScope (id non-empty for project/repo). */
+/** Structural check that a value is a valid ArtifactScope (safe id charset for project/repo). */
 export function isArtifactScope(s: unknown): s is ArtifactScope {
   if (s === 'global') return true;
   if (typeof s !== 'string') return false;
@@ -23,7 +23,8 @@ export function isArtifactScope(s: unknown): s is ArtifactScope {
   if (idx < 0) return false;
   const kind = s.slice(0, idx);
   const id = s.slice(idx + 1);
-  return (kind === 'project' || kind === 'repo') && id.length > 0;
+  // id must be a safe path segment (no `:`, traversal, etc.) — mirrors memory/store isSafeScope.
+  return (kind === 'project' || kind === 'repo') && /^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$/i.test(id);
 }
 
 /** Serialize an artifact to a scoped skill `.md` (frontmatter + body). */

@@ -16,13 +16,13 @@ import type { Ownership, ArtifactScope } from '../ownership/types';
 import { readScopeMemory, defaultMemoryIO } from '../memory/store';
 import type { MemoryStoreIO } from '../memory/store';
 import { detectOpportunities } from './detectors';
-import type { OpportunityDetector } from './detectors';
+import type { OpportunityDetector, Opportunity } from './detectors';
 import { decideScopes } from './scope-decider';
 import { generateArtifact } from './generator';
 import { enforceArtifactConstraints } from './constraints';
 import { reviewArtifact } from './meta-review';
 import type { ArtifactRuntime } from './runtime';
-import { serializeArtifact } from './parser';
+import { serializeArtifact, parseArtifact } from './parser';
 import {
   upsertProposal,
   getProposal,
@@ -46,6 +46,8 @@ export interface ProposeOptions {
 export interface ProposeResult {
   proposals: ArtifactProposal[];
   skipped: { suggestedName: string; scope: string; reason: string }[];
+  /** per-repo detector failures (FR-A4) — surfaced for --verbose. */
+  detectionErrors: { repoId: string; detector: string; error: string }[];
 }
 
 /** Run the full pipeline for a set of repos and PARK the results. */
@@ -53,14 +55,27 @@ export async function proposeArtifacts(opts: ProposeOptions): Promise<ProposeRes
   const memIO = opts.memIO ?? defaultMemoryIO;
   const storeIO = opts.storeIO ?? defaultArtifactStoreIO;
 
-  const allOpps = opts.repoIds.flatMap((id) => detectOpportunities(id, memIO, opts.detectors).opportunities);
+  const allOpps: Opportunity[] = [];
+  const detectionErrors: { repoId: string; detector: string; error: string }[] = [];
+  for (const id of opts.repoIds) {
+    const d = detectOpportunities(id, memIO, opts.detectors);
+    allOpps.push(...d.opportunities);
+    for (const e of d.errors) detectionErrors.push({ repoId: id, detector: e.detector, error: e.error });
+  }
   const scoped = decideScopes(allOpps, opts.ownership, opts.k);
 
   const proposals: ArtifactProposal[] = [];
   const skipped: { suggestedName: string; scope: string; reason: string }[] = [];
 
   for (const sp of scoped) {
-    const repoDocs = readScopeMemory(`repo:${sp.repoIds[0]}`, memIO);
+    // Never silently overwrite an already-promoted proposal (B5 — preserves the audit + on-disk skill).
+    const existing = getProposal(proposalId(sp.kind, sp.scope, sp.suggestedName), storeIO);
+    if (existing && existing.status === 'promoted') {
+      skipped.push({ suggestedName: sp.suggestedName, scope: sp.scope, reason: 'already promoted (re-propose skipped)' });
+      continue;
+    }
+    // Ground generation in ALL member repos' memory (B4), bounded so the prompt stays sane.
+    const repoDocs = sp.repoIds.slice(0, 3).flatMap((rid) => readScopeMemory(`repo:${rid}`, memIO));
     const opportunity = {
       id: `${sp.kind}:${sp.suggestedName}:${sp.repoIds[0]}`,
       kind: sp.kind,
@@ -113,7 +128,7 @@ export async function proposeArtifacts(opts: ProposeOptions): Promise<ProposeRes
     proposals.push(upsertProposal(base, storeIO));
   }
 
-  return { proposals, skipped };
+  return { proposals, skipped, detectionErrors };
 }
 
 /** Relative dir for a scope under the artifact store (mirrors the memory tree, no org). */
@@ -144,8 +159,10 @@ export function promoteProposal(id: string, opts: PromoteOptions = {}): PromoteR
   const storeIO = opts.storeIO ?? defaultArtifactStoreIO;
   const p = getProposal(id, storeIO);
   if (!p) throw new Error(`Unknown proposal "${id}".`);
-  if (p.status !== 'meta_approved') {
-    throw new Error(`Proposal "${id}" is not promotable (status: ${p.status}).`);
+  // Require the FULL approved state, not just the status flag (defends against a hand-edited
+  // proposals.json that flips status without a real meta-review / despite constraint violations).
+  if (p.status !== 'meta_approved' || p.metaReview?.verdict !== 'approved' || (p.constraintViolations?.length ?? 0) > 0) {
+    throw new Error(`Proposal "${id}" is not promotable (status: ${p.status}, verdict: ${p.metaReview?.verdict ?? 'none'}).`);
   }
 
   // The promoted skill GETS the operator-authorized tools (override widens its surface).
@@ -164,7 +181,18 @@ export function promoteProposal(id: string, opts: PromoteOptions = {}): PromoteR
   }
 
   const target = artifactPath(storeIO, p.scope, p.name);
-  storeIO.writeFile(target, serializeArtifact(finalArtifact));
+  // R1 containment: the resolved path MUST stay under the artifacts root.
+  const root = path.join(storeIO.homedir(), '.autonomous-dev', 'artifacts');
+  if (path.resolve(target) !== target || !path.resolve(target).startsWith(path.resolve(root) + path.sep)) {
+    throw new Error(`Refusing to write outside the artifact store: ${target}`);
+  }
+  const serialized = serializeArtifact(finalArtifact);
+  // AC5: the promoted file must be re-parseable (guards against a serializer edge case).
+  const reparse = parseArtifact(serialized);
+  if (!reparse.success) {
+    throw new Error(`Refusing to promote "${id}": serialized skill is not re-parseable (${reparse.errors.map((e) => e.message).join('; ')}).`);
+  }
+  storeIO.writeFile(target, serialized);
   if (opts.toolOverride && opts.toolOverride.length > 0) {
     p.toolOverride = opts.toolOverride;
     p.artifact = finalArtifact;

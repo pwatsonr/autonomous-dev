@@ -69,6 +69,15 @@ function test_parse_verdict(): void {
   console.log('PASS: test_parse_verdict');
 }
 
+// B3: brace-balanced parsing — approve survives prose with stray braces; nested braces in messages parse
+function test_parse_verdict_braces(): void {
+  const prose = parseVerdict('Looks good {see note}. {"verdict":"approve","findings":[]} done.');
+  assert(!!prose && prose.verdict === 'approved', 'approve survives surrounding prose with stray braces');
+  const nested = parseVerdict('{"verdict":"block","findings":[{"severity":"blocking","message":"bad {token} here"}]}');
+  assert(!!nested && nested.verdict === 'rejected' && nested.findings[0].message.includes('{token}'), 'nested braces in message parse');
+  console.log('PASS: test_parse_verdict_braces');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -81,4 +90,5 @@ describe('artifact-factory/meta-review', () => {
   it('test_hard_override', test_hard_override);
   it('test_fail_closed', test_fail_closed);
   it('test_parse_verdict', test_parse_verdict);
+  it('test_parse_verdict_braces', test_parse_verdict_braces);
 });

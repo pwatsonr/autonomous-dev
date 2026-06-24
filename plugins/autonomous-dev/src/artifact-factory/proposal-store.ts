@@ -65,7 +65,7 @@ export const defaultArtifactStoreIO: ArtifactStoreIO = {
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.tmp.${process.pid}`;
-    fs.writeFileSync(tmp, data, 'utf-8');
+    fs.writeFileSync(tmp, data, { encoding: 'utf-8', mode: 0o600 });
     fs.renameSync(tmp, filePath);
   },
   now: () => new Date().toISOString(),
@@ -82,26 +82,41 @@ export function proposalId(kind: ArtifactKind, scope: ArtifactScope, name: strin
 export function loadProposals(io: ArtifactStoreIO = defaultArtifactStoreIO): ArtifactProposal[] {
   const raw = io.readFile(proposalsPath(io));
   if (!raw) return [];
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as ArtifactProposal[]) : [];
+    parsed = JSON.parse(raw);
   } catch {
-    return [];
+    parsed = undefined;
   }
+  if (Array.isArray(parsed)) return parsed as ArtifactProposal[];
+  // Corrupt or wrong-shaped store — PRESERVE it (don't let the next save silently wipe it).
+  try {
+    io.writeFile(`${proposalsPath(io)}.corrupt-${io.now()}`, raw);
+  } catch {
+    /* best-effort */
+  }
+  return [];
 }
 
 function saveProposals(ps: ArtifactProposal[], io: ArtifactStoreIO): void {
   io.writeFile(proposalsPath(io), `${JSON.stringify(ps, null, 2)}\n`);
 }
 
-/** Insert or replace a proposal by id (idempotent re-propose). */
+/** Insert or replace a proposal by id (idempotent re-propose; audit history is append-only). */
 export function upsertProposal(p: ArtifactProposal, io: ArtifactStoreIO = defaultArtifactStoreIO): ArtifactProposal {
   const ps = loadProposals(io);
   const idx = ps.findIndex((x) => x.id === p.id);
-  if (idx >= 0) ps[idx] = p;
-  else ps.push(p);
+  let stored = p;
+  if (idx >= 0) {
+    const prior = ps[idx];
+    // Preserve the prior history + any prior operator tool override (monotonic audit; B5).
+    stored = { ...p, history: [...prior.history, ...p.history], toolOverride: p.toolOverride ?? prior.toolOverride };
+    ps[idx] = stored;
+  } else {
+    ps.push(stored);
+  }
   saveProposals(ps, io);
-  return p;
+  return stored;
 }
 
 export function getProposal(id: string, io: ArtifactStoreIO = defaultArtifactStoreIO): ArtifactProposal | undefined {
@@ -117,7 +132,16 @@ export function listProposals(
   return ps;
 }
 
-/** Transition a proposal's status + append a history entry. Throws if absent. */
+/** Allowed status transitions (mirrors the agent store's VALID_TRANSITIONS). */
+const VALID_TRANSITIONS: Record<ArtifactProposalStatus, ArtifactProposalStatus[]> = {
+  pending_meta_review: ['meta_approved', 'meta_rejected', 'rejected'],
+  meta_approved: ['promoted', 'rejected'],
+  meta_rejected: ['rejected'],
+  promoted: [],
+  rejected: [],
+};
+
+/** Transition a proposal's status + append a history entry. Throws if absent or transition is illegal. */
 export function setStatus(
   id: string,
   status: ArtifactProposalStatus,
@@ -128,6 +152,9 @@ export function setStatus(
   const ps = loadProposals(io);
   const p = ps.find((x) => x.id === id);
   if (!p) throw new Error(`Unknown proposal "${id}".`);
+  if (p.status !== status && !VALID_TRANSITIONS[p.status].includes(status)) {
+    throw new Error(`Illegal status transition ${p.status} → ${status} for "${id}".`);
+  }
   p.status = status;
   p.history.push({ at: io.now(), event, detail });
   saveProposals(ps, io);

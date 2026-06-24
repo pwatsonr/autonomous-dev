@@ -29,7 +29,7 @@ export const defaultMemoryIO: MemoryStoreIO = {
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.tmp.${process.pid}`;
-    fs.writeFileSync(tmp, data, 'utf-8');
+    fs.writeFileSync(tmp, data, { encoding: 'utf-8', mode: 0o600 });
     fs.renameSync(tmp, filePath);
   },
   listDir: (dirPath) =>

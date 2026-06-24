@@ -104,6 +104,15 @@ function test_is_artifact_scope(): void {
   console.log('PASS: test_is_artifact_scope');
 }
 
+// B1: an INTERNAL --- in the body (not the first line) must round-trip intact
+function test_body_with_internal_delimiter(): void {
+  const a: GeneratedArtifact = { ...SAMPLE, body: 'line1\n\n---\n\nline2' };
+  const res = parseArtifact(serializeArtifact(a));
+  assert(res.success, `parses: ${JSON.stringify(res.errors)}`);
+  assert(res.artifact!.body === 'line1\n\n---\n\nline2', 'internal --- in body round-trips intact');
+  console.log('PASS: test_body_with_internal_delimiter');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -116,4 +125,5 @@ describe('artifact-factory/parser', () => {
   it('test_parse_hand_written', test_parse_hand_written);
   it('test_parse_rejects_invalid', test_parse_rejects_invalid);
   it('test_is_artifact_scope', test_is_artifact_scope);
+  it('test_body_with_internal_delimiter', test_body_with_internal_delimiter);
 });

@@ -4,6 +4,8 @@ import {
   listProposals,
   setStatus,
   proposalId,
+  loadProposals,
+  proposalsPath,
 } from '../../src/artifact-factory/proposal-store';
 import type { ArtifactProposal, ArtifactStoreIO } from '../../src/artifact-factory/proposal-store';
 import type { GeneratedArtifact } from '../../src/artifact-factory/types';
@@ -90,6 +92,48 @@ function test_set_status_history(): void {
   console.log('PASS: test_set_status_history');
 }
 
+// M2: a corrupt store is PRESERVED, not silently wiped
+function test_corrupt_preserve(): void {
+  const io = fakeIO();
+  io.files[proposalsPath(io)] = '{ this is : not json';
+  const ps = loadProposals(io);
+  assert(ps.length === 0, 'corrupt store loads as empty');
+  const corruptKey = Object.keys(io.files).find((k) => k.includes('.corrupt-'));
+  assert(!!corruptKey && io.files[corruptKey].includes('not json'), 'corrupt content preserved to a .corrupt- file');
+  console.log('PASS: test_corrupt_preserve');
+}
+
+// F7: illegal status transitions are rejected
+function test_illegal_transition(): void {
+  const io = fakeIO();
+  upsertProposal(proposal('meta_rejected'), io);
+  const id = 'skill::repo:acme/api::vault-access';
+  let threw = false;
+  try {
+    setStatus(id, 'promoted', 'x', io);
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'meta_rejected → promoted is illegal');
+  assert(setStatus(id, 'rejected', 'x', io).status === 'rejected', 'meta_rejected → rejected allowed');
+  console.log('PASS: test_illegal_transition');
+}
+
+// B5: prior history is preserved on re-upsert (append-only audit)
+function test_history_merge(): void {
+  const io = fakeIO();
+  const p1 = proposal('meta_rejected');
+  p1.history = [{ at: 't0', event: 'generated' }];
+  upsertProposal(p1, io);
+  const p2 = proposal('meta_approved');
+  p2.history = [{ at: 't1', event: 'regenerated' }];
+  upsertProposal(p2, io);
+  const got = getProposal('skill::repo:acme/api::vault-access', io)!;
+  assert(got.history.length === 2, 'prior history preserved on re-upsert');
+  assert(got.status === 'meta_approved', 'status updated on re-upsert');
+  console.log('PASS: test_history_merge');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -99,4 +143,7 @@ function assert(condition: boolean, message: string): void {
 describe('artifact-factory/proposal-store', () => {
   it('test_upsert_get_list', test_upsert_get_list);
   it('test_set_status_history', test_set_status_history);
+  it('test_corrupt_preserve', test_corrupt_preserve);
+  it('test_illegal_transition', test_illegal_transition);
+  it('test_history_merge', test_history_merge);
 });

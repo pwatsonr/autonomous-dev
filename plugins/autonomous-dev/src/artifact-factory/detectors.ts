@@ -37,7 +37,7 @@ function docByTopic(docs: MemoryDoc[], topic: string): MemoryDoc | undefined {
 }
 
 function firstMatchLine(content: string, re: RegExp): string | undefined {
-  for (const line of content.split('\n')) {
+  for (const line of content.slice(0, 200_000).split('\n')) {
     if (re.test(line)) return line.trim().slice(0, 200);
   }
   return undefined;
@@ -94,12 +94,18 @@ export const testConventionDetector: OpportunityDetector = {
   },
 };
 
-/** A rich overview/README → a domain-context skill capturing the glossary. */
+/** A rich, STRUCTURED overview/README → a domain-context skill capturing the glossary. */
 export const domainGlossaryDetector: OpportunityDetector = {
   name: 'domain-glossary',
   detect(repoId, docs) {
     const doc = docByTopic(docs, 'overview');
-    if (!doc || doc.content.trim().length < 600) return [];
+    if (!doc) return [];
+    const content = doc.content.slice(0, 200_000);
+    if (content.trim().length < 600) return [];
+    // Require a structural signal — not just length — to cut noise from long prose READMEs.
+    const headings = (content.match(/^##\s/gm) ?? []).length;
+    const hasGlossary = /\b(glossary|terminology|domain\s+model|key\s+concepts|ubiquitous\s+language)\b/i.test(content);
+    if (headings < 2 && !hasGlossary) return [];
     return [
       {
         id: oppId('skill', 'domain-context', repoId),

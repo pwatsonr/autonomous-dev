@@ -58,11 +58,16 @@ function test_test_and_domain_detectors(): void {
   ]);
   assert(tc.length === 1 && tc[0].suggestedName === 'run-tests', 'test-convention → run-tests');
 
-  const longReadme = `# Service\n\n${'The orders domain. '.repeat(60)}`;
+  const longReadme = `# Service\n\n## Overview\n## Domain Glossary\n\n${'The orders domain. '.repeat(60)}`;
   const dg = domainGlossaryDetector.detect('a/b', [{ topic: 'overview', content: longReadme }]);
-  assert(dg.length === 1 && dg[0].suggestedName === 'domain-context', 'rich overview → domain-context');
+  assert(dg.length === 1 && dg[0].suggestedName === 'domain-context', 'rich STRUCTURED overview → domain-context');
   // a short overview is below threshold → no opportunity
   assert(domainGlossaryDetector.detect('a/b', [{ topic: 'overview', content: '# Tiny' }]).length === 0, 'short overview skipped');
+  // a long but UNSTRUCTURED prose readme (no headings/glossary) → no opportunity (H3 noise cut)
+  assert(
+    domainGlossaryDetector.detect('a/b', [{ topic: 'overview', content: 'flat prose. '.repeat(80) }]).length === 0,
+    'long unstructured prose skipped',
+  );
   console.log('PASS: test_test_and_domain_detectors');
 }
 
