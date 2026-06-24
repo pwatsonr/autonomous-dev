@@ -11,7 +11,7 @@
  * and listed; vocabulary not hardcoded").
  */
 
-import type { Ownership, Project, Repo, Tags } from './types';
+import type { Ownership, Project, Repo, Tags, ArtifactScope } from './types';
 
 export interface CommandResult {
   ownership: Ownership;
@@ -208,4 +208,27 @@ export function setEnrollment(
 /** Whether a repo is enrolled in auto-improvement. Default (ingest≠enroll) = false. */
 export function isEnrolled(own: Ownership, repoId: string): boolean {
   return own.repos.find((r) => r.id === repoId)?.participate_in_auto_improvement === true;
+}
+
+/** The repo id of a `repo:<id>` artifact scope, else undefined (global/project). */
+export function repoIdFromScope(scope: ArtifactScope): string | undefined {
+  return scope.startsWith('repo:') ? scope.slice('repo:'.length) : undefined;
+}
+
+/**
+ * The AUTO-IMPROVEMENT enrollment gate (ONBOARD FR-G2). PROACTIVE
+ * auto-generation/improvement of a REPO-scoped artifact is permitted only if that
+ * repo is enrolled (opt-in; ingestion never enrolls). Global/project-scoped
+ * artifacts are not repo-gated here. Fail-closed: an unknown/unenrolled repo
+ * returns false.
+ *
+ * This is the single canonical gate that Phase 2 (scoped auto-generation) and
+ * Phase 4 (scoped triggers) MUST consult before acting on a repo absent an
+ * explicit operator request. (Operator-requested work is NOT gated by this —
+ * enrollment governs proactive behavior, not requested behavior.)
+ */
+export function mayAutoImproveScope(own: Ownership, scope: ArtifactScope): boolean {
+  const repoId = repoIdFromScope(scope);
+  if (repoId === undefined) return true; // global / project — not repo-gated in Phase 1
+  return isEnrolled(own, repoId);
 }

@@ -9,6 +9,8 @@ import {
   parseTags,
   linkOrg,
   registerRepos,
+  repoIdFromScope,
+  mayAutoImproveScope,
 } from '../../src/ownership/commands';
 import { readOwnership, writeOwnership, manifestPath } from '../../src/ownership/store';
 import type { OwnershipStoreIO } from '../../src/ownership/store';
@@ -303,6 +305,26 @@ function test_register_repos(): void {
   console.log('PASS: test_register_repos');
 }
 
+// P1.3b — the FR-G2 auto-improvement enrollment gate
+function test_auto_improve_gate(): void {
+  // a freshly INGESTED repo (registerRepos) is recorded but unenrolled...
+  let own = registerRepos(EMPTY, ['acme/api']).ownership;
+  assert(mayAutoImproveScope(own, 'global') === true, 'global scope not repo-gated');
+  assert(mayAutoImproveScope(own, 'project:payments') === true, 'project scope not repo-gated (phase 1)');
+  // ...so a repo-scoped artifact for it may NOT be auto-improved (ingest ≠ enroll).
+  assert(mayAutoImproveScope(own, 'repo:acme/api') === false, 'ingested-but-unenrolled repo is gated OFF');
+  assert(mayAutoImproveScope(own, 'repo:unknown/x') === false, 'unknown repo fail-closed');
+
+  // after explicit enrollment, the gate opens for that repo only.
+  own = setEnrollment(own, { repoId: 'acme/api', enrolled: true }).ownership;
+  assert(mayAutoImproveScope(own, 'repo:acme/api') === true, 'enrolled repo gate opens');
+  assert(mayAutoImproveScope(own, 'repo:other/x') === false, 'a different repo stays gated');
+
+  assert(repoIdFromScope('repo:o/r') === 'o/r', 'repoIdFromScope extracts id');
+  assert(repoIdFromScope('global') === undefined, 'repoIdFromScope undefined for global');
+  console.log('PASS: test_auto_improve_gate');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -322,4 +344,5 @@ describe('ownership/commands + store', () => {
   it('test_enrollment', test_enrollment);
   it('test_link_org', test_link_org);
   it('test_register_repos', test_register_repos);
+  it('test_auto_improve_gate', test_auto_improve_gate);
 });
