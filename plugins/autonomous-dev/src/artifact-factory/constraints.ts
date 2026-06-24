@@ -48,18 +48,21 @@ const SECRET_PATTERNS: { rule: string; re: RegExp }[] = [
   { rule: 'slack_token', re: /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/ },
   { rule: 'jwt', re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/ },
   { rule: 'google_api_key', re: /\bAIza[0-9A-Za-z_-]{30,}\b/ },
+  { rule: 'sk_token', re: /\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\b/ }, // OpenAI / Anthropic
+  { rule: 'stripe_key', re: /\b[srp]k_(?:live|test)_[A-Za-z0-9]{20,}\b/ },
 ];
 
 const INJECTION_PATTERNS: { rule: string; re: RegExp }[] = [
   { rule: 'ignore_instructions', re: /\bignore\s+(all\s+)?(the\s+)?(previous|prior|above|earlier|preceding)\s+(instructions?|context|prompts?|rules?)\b/i },
   { rule: 'disregard_override', re: /\b(disregard|forget|discard|override|replace)\s+(all\s+)?(the\s+)?(previous|prior|above|earlier|preceding|your)\b/i },
   { rule: 'new_instructions', re: /\b(new|updated|revised|real)\s+instructions?\s*[:.]/i },
-  { rule: 'from_now_on', re: /\bfrom\s+now\s+on\b/i },
+  // "from now on" only flags when followed by an imperative (avoids benign "from now on we use X").
+  { rule: 'from_now_on', re: /\bfrom\s+now\s+on\b[,:]?\s+(you|ignore|disregard|always|never|do\s+not|respond|reply|act|treat|forget|output|print)\b/i },
   { rule: 'identity_override', re: /\b(you\s+are\s+now|you\s+must\s+now|act\s+as|pretend\s+to\s+be|roleplay\s+as)\b/i },
   { rule: 'role_marker', re: /<\/?(system|assistant|user)>|<\|im_(start|end)\|>|(?:^|\n)\s*(System|Assistant|Human)\s*:/i },
   {
     rule: 'exfil_directive',
-    re: /\b(reveal|print|echo|output|dump|leak|exfiltrate|send|disclose|cat|embed)\b[\s\S]{0,80}?\b(secret|password|passwd|token|credential|api[_\s-]?key|bearer|cookie|private\s*key|\.env|env(?:ironment)?\s*(?:var|vars|variable)|auth\s*header)/i,
+    re: /\b(reveal|exfiltrate|leak|disclose|dump|send|output|echo)\b[\s\S]{0,60}?\b(secret|password|passwd|token|credential|api[_\s-]?key|bearer|cookie|private\s*key|\.env|env(?:ironment)?\s*(?:var|vars|variable)|auth\s*header)/i,
   },
 ];
 

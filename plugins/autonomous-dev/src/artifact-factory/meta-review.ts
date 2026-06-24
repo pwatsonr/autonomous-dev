@@ -131,7 +131,7 @@ export function parseVerdict(raw: string): { verdict: 'approved' | 'rejected'; f
   if (!o) o = extractVerdictObject(txt);
   if (!o) return undefined;
   const vRaw = String(o.verdict ?? o.status ?? '').toLowerCase();
-  const verdict = /^(approve|approved|pass)$/.test(vRaw) ? 'approved' : 'rejected';
+  const verdict = /^(approve|approved)$/.test(vRaw) ? 'approved' : 'rejected';
   const findings: ArtifactMetaFinding[] = Array.isArray(o.findings)
     ? (o.findings as unknown[]).map((f) => {
         const fo = (f ?? {}) as Record<string, unknown>;

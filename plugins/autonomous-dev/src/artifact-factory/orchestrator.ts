@@ -164,6 +164,10 @@ export function promoteProposal(id: string, opts: PromoteOptions = {}): PromoteR
   if (p.status !== 'meta_approved' || p.metaReview?.verdict !== 'approved' || (p.constraintViolations?.length ?? 0) > 0) {
     throw new Error(`Proposal "${id}" is not promotable (status: ${p.status}, verdict: ${p.metaReview?.verdict ?? 'none'}).`);
   }
+  // The on-disk target uses p.scope; the constraint re-check uses p.artifact.scope — they must agree.
+  if (p.scope !== p.artifact.scope) {
+    throw new Error(`Proposal "${id}" scope/artifact-scope mismatch (${p.scope} vs ${p.artifact.scope}).`);
+  }
 
   // The promoted skill GETS the operator-authorized tools (override widens its surface).
   const finalArtifact = {
@@ -194,9 +198,9 @@ export function promoteProposal(id: string, opts: PromoteOptions = {}): PromoteR
   }
   storeIO.writeFile(target, serialized);
   if (opts.toolOverride && opts.toolOverride.length > 0) {
-    p.toolOverride = opts.toolOverride;
-    p.artifact = finalArtifact;
-    upsertProposal(p, storeIO);
+    // upsertProposal re-merges prior history from disk; pass history:[] so the loaded
+    // copy's history isn't doubled (it is preserved by the merge against disk).
+    upsertProposal({ ...p, toolOverride: opts.toolOverride, artifact: finalArtifact, history: [] }, storeIO);
   }
   const promoted = setStatus(id, 'promoted', 'promoted', storeIO, `wrote ${target}`);
   return { path: target, proposal: promoted };

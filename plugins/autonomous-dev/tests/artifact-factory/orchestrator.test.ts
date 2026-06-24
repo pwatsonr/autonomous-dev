@@ -5,7 +5,7 @@ import {
   artifactPath,
   artifactScopeDir,
 } from '../../src/artifact-factory/orchestrator';
-import { proposalId, upsertProposal } from '../../src/artifact-factory/proposal-store';
+import { proposalId, upsertProposal, getProposal } from '../../src/artifact-factory/proposal-store';
 import type { ArtifactStoreIO } from '../../src/artifact-factory/proposal-store';
 import { writeMemoryDoc } from '../../src/memory/store';
 import type { MemoryStoreIO } from '../../src/memory/store';
@@ -192,6 +192,10 @@ async function test_tool_override_on_promote(): Promise<void> {
   const { path: target } = promoteProposal(VAULT_ID, { ownership: OWN, storeIO, toolOverride: ['Bash'] });
   const written = storeIO.files[target] ?? '';
   assert(written.includes('Bash'), 'operator-authorized Bash written into the promoted skill');
+  // B5 regression guard: history must NOT be doubled — prior (generated+meta_approved) + promoted = 3.
+  const after = getProposal(VAULT_ID, storeIO)!;
+  assert(after.history.length === 3, `history not doubled, got ${after.history.length}`);
+  assert(after.toolOverride?.join(',') === 'Bash', 'tool override recorded');
   console.log('PASS: test_tool_override_on_promote');
 }
 
