@@ -92,6 +92,17 @@ function test_idempotent_and_robust_store(): void {
   console.log('PASS: test_idempotent_and_robust_store');
 }
 
+// P1 review: id/repoId are stored TRIMMED so lookups by the trimmed value resolve
+function test_trims_id_and_repo(): void {
+  const io = fakeIO();
+  enqueueQuestion({ id: ' q1 ', repoId: ' acme/api ', question: 'which?', options: ['a', 'b'] }, io);
+  assert(isRepoBlocked('acme/api', io), 'repo blocked under trimmed id');
+  const ans = answerQuestion('q1', 'a', io);
+  assert(ans.answer === 'a' && ans.status === 'answered', 'answer resolves under trimmed id');
+  assert(!isRepoBlocked('acme/api', io), 'unblocked after answer');
+  console.log('PASS: test_trims_id_and_repo');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -102,4 +113,5 @@ describe('ingest/questions (blocking queue)', () => {
   it('test_enqueue_blocks_and_answer_unblocks', test_enqueue_blocks_and_answer_unblocks);
   it('test_answer_validation', test_answer_validation);
   it('test_idempotent_and_robust_store', test_idempotent_and_robust_store);
+  it('test_trims_id_and_repo', test_trims_id_and_repo);
 });

@@ -24,7 +24,7 @@ export interface MemoryStoreIO {
 }
 
 export const defaultMemoryIO: MemoryStoreIO = {
-  homedir: () => process.env.HOME ?? os.homedir(),
+  homedir: () => (process.env.HOME && path.isAbsolute(process.env.HOME) ? process.env.HOME : os.homedir()),
   readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -37,6 +37,25 @@ export const defaultMemoryIO: MemoryStoreIO = {
 };
 
 const TOPIC_RE = /^[a-z0-9._-]+$/i;
+const SCOPE_ID_RE = /^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$/i;
+
+/** The id portion of a non-global scope (undefined for `global`). */
+function scopeIdOf(scope: MemoryScope): string | undefined {
+  const idx = scope.indexOf(':');
+  return idx >= 0 ? scope.slice(idx + 1) : undefined;
+}
+
+/**
+ * A scope id is safe to turn into a directory path iff it has no traversal
+ * (`..`), no empty/absolute segment, and matches the id charset. `global` is
+ * always safe. Defense-in-depth so a malformed/hostile repo id can never make
+ * a memory write/read escape the memory root (R1).
+ */
+function isSafeScope(scope: MemoryScope): boolean {
+  const id = scopeIdOf(scope);
+  if (id === undefined) return true; // global
+  return SCOPE_ID_RE.test(id) && !id.includes('..') && !id.includes('//');
+}
 
 /** Absolute path of the memory root. */
 export function memoryRoot(io: MemoryStoreIO = defaultMemoryIO): string {
@@ -48,6 +67,7 @@ export function readScopeMemory(
   scope: MemoryScope,
   io: MemoryStoreIO = defaultMemoryIO,
 ): MemoryDoc[] {
+  if (!isSafeScope(scope)) return []; // skip an unsafe scope rather than crash resolution
   const dir = path.join(memoryRoot(io), scopeDir(scope));
   const docs: MemoryDoc[] = [];
   for (const name of [...io.listDir(dir)].sort()) {
@@ -67,6 +87,9 @@ export function writeMemoryDoc(
 ): void {
   if (!TOPIC_RE.test(topic)) {
     throw new Error(`Invalid memory topic "${topic}"; use [a-z0-9._-].`);
+  }
+  if (!isSafeScope(scope)) {
+    throw new Error(`Refusing to write memory: unsafe scope id in "${scope}".`);
   }
   io.writeFile(path.join(memoryRoot(io), scopeDir(scope), `${topic}.md`), content);
 }

@@ -28,7 +28,7 @@ export interface QuestionStoreIO {
 }
 
 export const defaultQuestionIO: QuestionStoreIO = {
-  homedir: () => process.env.HOME ?? os.homedir(),
+  homedir: () => (process.env.HOME && path.isAbsolute(process.env.HOME) ? process.env.HOME : os.homedir()),
   readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -62,12 +62,15 @@ export function enqueueQuestion(
   q: { id: string; repoId: string; question: string; options: string[] },
   io: QuestionStoreIO = defaultQuestionIO,
 ): Question {
-  if (!q.id.trim()) throw new Error('Question id is required.');
-  if (!q.repoId.trim()) throw new Error('Question repoId is required.');
+  const id = q.id.trim();
+  const repoId = q.repoId.trim();
+  if (!id) throw new Error('Question id is required.');
+  if (!repoId) throw new Error('Question repoId is required.');
   if (q.options.length === 0) throw new Error('Question needs at least one option.');
   const qs = loadQuestions(io);
-  const question: Question = { id: q.id, repoId: q.repoId, question: q.question, options: q.options, status: 'pending' };
-  const idx = qs.findIndex((x) => x.id === q.id);
+  // Store the TRIMMED id/repoId so lookups (answerQuestion / isRepoBlocked) resolve.
+  const question: Question = { id, repoId, question: q.question, options: q.options, status: 'pending' };
+  const idx = qs.findIndex((x) => x.id === id);
   if (idx >= 0) qs[idx] = question;
   else qs.push(question);
   saveQuestions(qs, io);

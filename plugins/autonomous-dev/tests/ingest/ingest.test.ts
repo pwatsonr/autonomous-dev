@@ -103,11 +103,45 @@ async function test_ingest_org_incremental(): Promise<void> {
     listRepos: async () => metas,
     openRepo: async (m) => sources[m.id],
   };
-  // o/stale is already up-to-date at sha s1
-  const res = await ingestOrg('o', client, io, { knownShas: { 'o/stale': 's1' } });
+  // o/stale is already up-to-date at sha s1 (mixed-case key must still match the lowercased id)
+  const res = await ingestOrg('o', client, io, { knownShas: { 'O/Stale': 's1' }, isBlocked: () => false });
   assert(res.repos.length === 1 && res.repos[0].repoId === 'o/new', 'only the new repo ingested');
   assert(res.skipped.includes('o/stale') && res.skipped.includes('o/archived'), 'stale + archived skipped');
   console.log('PASS: test_ingest_org_incremental');
+}
+
+async function test_ingest_org_isolates_repo_failures(): Promise<void> {
+  const io = fakeMemoryIO();
+  const metas: RepoMeta[] = [
+    { id: 'o/good', defaultBranch: 'main', headSha: 'g1' },
+    { id: 'o/bad', defaultBranch: 'main', headSha: 'b1' },
+  ];
+  const client: OrgClient = {
+    listRepos: async () => metas,
+    openRepo: async (m) => {
+      if (m.id === 'o/bad') throw new Error('clone failed');
+      return fakeRepo(m, { 'README.md': 'ok' });
+    },
+  };
+  const res = await ingestOrg('o', client, io, { isBlocked: () => false });
+  assert(res.repos.length === 2, 'both repos recorded (one as a failure)');
+  const bad = res.repos.find((r) => r.repoId === 'o/bad');
+  assert(!!bad && bad.errors.some((e) => e.topic === 'openRepo'), 'failed repo isolated with error');
+  const good = res.repos.find((r) => r.repoId === 'o/good');
+  assert(!!good && good.topicsWritten.includes('overview'), 'good repo still ingested after the failure');
+  console.log('PASS: test_ingest_org_isolates_repo_failures');
+}
+
+async function test_ingest_org_skips_blocked(): Promise<void> {
+  const io = fakeMemoryIO();
+  const metas: RepoMeta[] = [{ id: 'o/blocked', defaultBranch: 'main', headSha: 'x1' }];
+  const client: OrgClient = {
+    listRepos: async () => metas,
+    openRepo: async (m) => fakeRepo(m, { 'README.md': 'hi' }),
+  };
+  const res = await ingestOrg('o', client, io, { isBlocked: (id) => id === 'o/blocked' });
+  assert(res.repos.length === 0 && res.skipped.includes('o/blocked'), 'blocked repo skipped, not ingested');
+  console.log('PASS: test_ingest_org_skips_blocked');
 }
 
 function assert(condition: boolean, message: string): void {
@@ -120,4 +154,6 @@ describe('ingest (read-only org crawl)', () => {
   it('test_ingest_repo_writes_memory', test_ingest_repo_writes_memory);
   it('test_ingest_repo_best_effort', test_ingest_repo_best_effort);
   it('test_ingest_org_incremental', test_ingest_org_incremental);
+  it('test_ingest_org_isolates_repo_failures', test_ingest_org_isolates_repo_failures);
+  it('test_ingest_org_skips_blocked', test_ingest_org_skips_blocked);
 });

@@ -19,9 +19,22 @@ export interface CommandResult {
 }
 
 const ID_RE = /^[a-z0-9-]+$/;
-const REPO_ID_RE = /^[a-z0-9/._-]+$/;
+// owner/name or a path-basename slug (ADR-8), anchored so it can't start/end with
+// a separator. isSafeRepoId additionally rejects traversal (`..`) and `//` so the
+// id can never escape a directory when used as a memory/clone path segment.
+const REPO_ID_RE = /^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$/;
 const ORG_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** A repo id safe to use as a filesystem path segment (no traversal). */
+function isSafeRepoId(id: string): boolean {
+  return REPO_ID_RE.test(id) && !id.includes('..') && !id.includes('//');
+}
+
+/** A valid GitHub org/user login (1–39 chars, no leading/trailing dash). */
+export function isOrgLogin(s: string): boolean {
+  return ORG_RE.test(s) && s.length >= 1 && s.length <= 39;
+}
 
 /** Parse `key=value` tag pairs into a Tags map. Throws on malformed input. */
 export function parseTags(pairs: string[]): Tags {
@@ -73,8 +86,8 @@ export function addProject(
 /** `org link <org>` — record the linked GitHub org login (ONBOARD Phase 1 #587). */
 export function linkOrg(own: Ownership, org: string): CommandResult {
   const login = org.trim();
-  if (!ORG_RE.test(login)) {
-    throw new Error(`Invalid org login "${login}"; use GitHub login chars ([a-z0-9-], no leading/trailing dash).`);
+  if (!isOrgLogin(login)) {
+    throw new Error(`Invalid org login "${login}"; 1–39 GitHub login chars ([a-z0-9-], no leading/trailing dash).`);
   }
   return { ownership: { ...own, org: login }, message: `Linked org "${login}".` };
 }
@@ -91,7 +104,7 @@ export function registerRepos(own: Ownership, repoIds: string[]): CommandResult 
   let added = 0;
   for (const raw of repoIds) {
     const repoId = raw.trim().toLowerCase();
-    if (!REPO_ID_RE.test(repoId)) {
+    if (!isSafeRepoId(repoId)) {
       skipped.push(raw);
       continue;
     }
@@ -113,8 +126,8 @@ export function assignRepo(
 ): CommandResult {
   const repoId = opts.repoId.trim();
   const projectId = opts.projectId.trim();
-  if (!REPO_ID_RE.test(repoId)) {
-    throw new Error(`Invalid repo id "${repoId}"; use lowercase [a-z0-9/._-] (e.g. owner/name).`);
+  if (!isSafeRepoId(repoId)) {
+    throw new Error(`Invalid repo id "${repoId}"; use lowercase [a-z0-9/._-] (e.g. owner/name), no "..".`);
   }
   if (!own.projects.some((p) => p.id === projectId)) {
     throw new Error(
@@ -142,6 +155,9 @@ export function assignRepo(
 /** `repo tag <repoId> --set k=v ...` (vocabulary not constrained — AC4) */
 export function tagRepo(own: Ownership, opts: { repoId: string; set: string[] }): CommandResult {
   const repoId = opts.repoId.trim();
+  if (!isSafeRepoId(repoId)) {
+    throw new Error(`Invalid repo id "${repoId}".`);
+  }
   const repos = [...own.repos];
   const idx = repos.findIndex((r) => r.id === repoId);
   if (idx < 0) {
@@ -190,6 +206,9 @@ export function setEnrollment(
   opts: { repoId: string; enrolled: boolean },
 ): CommandResult {
   const repoId = opts.repoId.trim();
+  if (!isSafeRepoId(repoId)) {
+    throw new Error(`Invalid repo id "${repoId}".`);
+  }
   const repos = [...own.repos];
   const idx = repos.findIndex((r) => r.id === repoId);
   if (idx < 0) {

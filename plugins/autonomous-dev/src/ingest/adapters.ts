@@ -18,6 +18,12 @@ import * as path from 'path';
 
 import type { OrgClient, RepoSource, RepoMeta } from './types';
 
+// A repo id from gh is always `owner/name`; require that shape and a safe path
+// charset so it can never escape the scratch dir or the memory root, and never
+// be mistaken for a `gh`/`git` flag (no leading dash).
+const SAFE_REPO_ID = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i;
+const ORG_LOGIN_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i;
+
 export interface CommandRunner {
   run(cmd: string, args: string[], opts?: { cwd?: string }): { stdout: string; code: number };
 }
@@ -88,12 +94,16 @@ export function createGhOrgClient(opts: {
   const runner = opts.runner ?? execRunner;
   return {
     async listRepos(org: string): Promise<RepoMeta[]> {
+      if (!ORG_LOGIN_RE.test(org) || org.length > 39) {
+        throw new Error(`Invalid org login "${org}".`);
+      }
       const metas: RepoMeta[] = [];
       let after: string | null = null;
-      // paginate
+      // paginate. org/after are passed as RAW string fields (`-f`), not `-F`:
+      // `-F` would treat an `@`-prefixed value as a local file to upload.
       for (;;) {
-        const args = ['api', 'graphql', '-f', `query=${REPOS_QUERY}`, '-F', `org=${org}`];
-        if (after) args.push('-F', `after=${after}`);
+        const args = ['api', 'graphql', '-f', `query=${REPOS_QUERY}`, '-f', `org=${org}`];
+        if (after) args.push('-f', `after=${after}`);
         const { stdout, code } = runner.run('gh', args);
         if (code !== 0) throw new Error(`gh api graphql failed for org "${org}" (exit ${code})`);
         const conn = (JSON.parse(stdout).data.organization.repositories) as {
@@ -102,8 +112,10 @@ export function createGhOrgClient(opts: {
         };
         for (const n of conn.nodes) {
           if (!n.defaultBranchRef) continue; // empty repo — nothing to crawl
+          const id = n.nameWithOwner.toLowerCase();
+          if (!SAFE_REPO_ID.test(id)) continue; // skip an id that isn't a safe owner/name path segment
           metas.push({
-            id: n.nameWithOwner.toLowerCase(),
+            id,
             defaultBranch: n.defaultBranchRef.name,
             headSha: n.defaultBranchRef.target.oid,
             archived: n.isArchived,
@@ -116,6 +128,9 @@ export function createGhOrgClient(opts: {
     },
 
     async openRepo(meta: RepoMeta): Promise<RepoSource> {
+      if (!SAFE_REPO_ID.test(meta.id)) {
+        throw new Error(`Refusing to clone unsafe repo id "${meta.id}".`);
+      }
       const dir = path.join(opts.scratchDir, meta.id.replace(/\//g, '__'));
       // shallow, single-branch, READ-ONLY clone (no push/commit ever issued).
       const { code } = runner.run('gh', [

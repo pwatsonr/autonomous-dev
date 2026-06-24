@@ -45,7 +45,7 @@ export const codeownersExtractor: Extractor = {
       repo.readFile('CODEOWNERS') ??
       repo.readFile('.github/CODEOWNERS') ??
       repo.readFile('docs/CODEOWNERS');
-    if (c === undefined) return undefined;
+    if (c === undefined || c.trim() === '') return undefined;
     return { topic: 'ownership', content: `# Ownership — ${repo.meta.id}\n\n\`\`\`\n${c.slice(0, CAP)}\n\`\`\`` };
   },
 };
@@ -55,7 +55,7 @@ export const overviewExtractor: Extractor = {
   topic: 'overview',
   extract(repo) {
     const c = repo.readFile('README.md') ?? repo.readFile('readme.md') ?? repo.readFile('README');
-    if (c === undefined) return undefined;
+    if (c === undefined || c.trim() === '') return undefined;
     return { topic: 'overview', content: `# Overview — ${repo.meta.id}\n\n${c.slice(0, CAP)}` };
   },
 };
@@ -64,15 +64,14 @@ export const overviewExtractor: Extractor = {
 export const buildDeployExtractor: Extractor = {
   topic: 'build-deploy',
   extract(repo) {
-    const candidates = [
-      'Dockerfile',
-      'docker-compose.yml',
-      '.github/workflows',
-      'Makefile',
-      'k8s',
-      'helm',
+    // File markers detected by content; directory markers ONLY by listing, so a
+    // top-level FILE coincidentally named `k8s`/`helm` is not mistaken for tooling.
+    const fileMarkers = ['Dockerfile', 'docker-compose.yml', 'Makefile'];
+    const dirMarkers = ['.github/workflows', 'k8s', 'helm'];
+    const present = [
+      ...fileMarkers.filter((p) => repo.readFile(p) !== undefined),
+      ...dirMarkers.filter((p) => repo.listFiles(p).length > 0),
     ];
-    const present = candidates.filter((p) => repo.readFile(p) !== undefined || repo.listFiles(p).length > 0);
     if (present.length === 0) return undefined;
     return {
       topic: 'build-deploy',

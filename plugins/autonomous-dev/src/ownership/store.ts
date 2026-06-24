@@ -24,7 +24,7 @@ export interface OwnershipStoreIO {
 }
 
 export const defaultStoreIO: OwnershipStoreIO = {
-  homedir: () => process.env.HOME ?? os.homedir(),
+  homedir: () => (process.env.HOME && path.isAbsolute(process.env.HOME) ? process.env.HOME : os.homedir()),
   readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });

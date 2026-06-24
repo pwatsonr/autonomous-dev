@@ -67,6 +67,11 @@ function test_parse_owners(): void {
   assert(owners.includes('@acme/docs-team'), 'lowercased team');
   assert(owners.length === 3 && owners[0] === '@acme/docs-team', 'deduped + sorted');
   assert(parseOwners('no owners here').length === 0, 'no false positives on plain text');
+  // email-form owners (GitHub CODEOWNERS supports them) must NOT yield a bogus @domain owner
+  const withEmail = parseOwners('* alice@acme.com bob@acme.com @real/team');
+  assert(withEmail.join(',') === '@real/team', `emails ignored, only real handles: got ${withEmail.join(',')}`);
+  // commented-out owners are stripped
+  assert(parseOwners('# was @old-team\n* @new-team').join(',') === '@new-team', 'comment owners stripped');
   console.log('PASS: test_parse_owners');
 }
 

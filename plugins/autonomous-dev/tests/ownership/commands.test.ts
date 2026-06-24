@@ -266,7 +266,7 @@ function test_link_org(): void {
   assert(r.ownership.org === 'acme-corp', 'org linked');
   // re-link replaces
   assert(linkOrg(r.ownership, 'other').ownership.org === 'other', 'relink replaces');
-  for (const bad of ['-bad', 'bad-', 'has space', 'a/b', '']) {
+  for (const bad of ['-bad', 'bad-', 'has space', 'a/b', '', 'a'.repeat(40)]) {
     let threw = false;
     try {
       linkOrg(EMPTY, bad);
@@ -276,6 +276,30 @@ function test_link_org(): void {
     assert(threw, `invalid org "${bad}" rejected`);
   }
   console.log('PASS: test_link_org');
+}
+
+// P1 review: traversal-shaped repo ids must be rejected (assign/tag/enroll throw;
+// registerRepos skips) — defense-in-depth so an id can't escape a path segment.
+function test_repo_id_traversal_rejected(): void {
+  const own = assignRepo(addProject(EMPTY, { id: 'p' }).ownership, { repoId: 'acme/api', projectId: 'p' }).ownership;
+  for (const bad of ['../etc/passwd', 'a/../b', 'a//b', '..']) {
+    for (const op of [
+      () => assignRepo(own, { repoId: bad, projectId: 'p' }),
+      () => tagRepo(own, { repoId: bad, set: ['x=y'] }),
+      () => setEnrollment(own, { repoId: bad, enrolled: true }),
+    ]) {
+      let threw = false;
+      try {
+        op();
+      } catch {
+        threw = true;
+      }
+      assert(threw, `traversal id "${bad}" rejected`);
+    }
+    // registerRepos skips (does not throw) malformed ids
+    assert(registerRepos(EMPTY, [bad]).ownership.repos.length === 0, `traversal id "${bad}" not registered`);
+  }
+  console.log('PASS: test_repo_id_traversal_rejected');
 }
 
 // P1 operator CLI — registerRepos (org ingest records crawled repos)
@@ -345,4 +369,5 @@ describe('ownership/commands + store', () => {
   it('test_link_org', test_link_org);
   it('test_register_repos', test_register_repos);
   it('test_auto_improve_gate', test_auto_improve_gate);
+  it('test_repo_id_traversal_rejected', test_repo_id_traversal_rejected);
 });

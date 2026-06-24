@@ -19,7 +19,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { readOwnership, writeOwnership } from '../src/ownership/store';
-import { linkOrg, registerRepos } from '../src/ownership/commands';
+import { linkOrg, registerRepos, isOrgLogin } from '../src/ownership/commands';
 import { ingestOrg } from '../src/ingest/orchestrator';
 import { createGhOrgClient } from '../src/ingest/adapters';
 import { inferProjects, signalsFromMemory } from '../src/ingest/inference';
@@ -38,14 +38,25 @@ function positional(args: string[], i = 0): string {
   return args[i] && !args[i].startsWith('--') ? args[i] : '';
 }
 
-/** Value following the first occurrence of `--flag`, or undefined. */
+/** Value following the first occurrence of `--flag`, or undefined (not the next flag). */
 function flag(args: string[], name: string): string | undefined {
   const idx = args.indexOf(name);
-  return idx >= 0 && idx + 1 < args.length ? args[idx + 1] : undefined;
+  if (idx < 0 || idx + 1 >= args.length) return undefined;
+  const value = args[idx + 1];
+  return value.startsWith('--') ? undefined : value;
+}
+
+/** An ABSOLUTE home dir (refuses an empty/relative $HOME so writes never land under CWD — R1). */
+function homeDir(): string {
+  const h = process.env.HOME;
+  if (h && path.isAbsolute(h)) return h;
+  const fallback = os.homedir();
+  if (!path.isAbsolute(fallback)) throw new Error('Cannot resolve an absolute home directory.');
+  return fallback;
 }
 
 function ingestHome(): string {
-  return path.join(process.env.HOME ?? os.homedir(), '.autonomous-dev', 'ingest');
+  return path.join(homeDir(), '.autonomous-dev', 'ingest');
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -64,10 +75,17 @@ async function main(argv: string[]): Promise<number> {
       process.stderr.write('No org linked. Run: autonomous-dev org link <org> (or pass <org>).\n');
       return 1;
     }
-    const scratchDir = path.join(ingestHome(), 'clones');
+    if (!isOrgLogin(org)) {
+      process.stderr.write(`Invalid org login "${org}"; 1–39 chars [a-z0-9-], no leading/trailing dash.\n`);
+      return 1;
+    }
+    const ingestRoot = ingestHome();
+    const scratchDir = path.join(ingestRoot, 'clones');
     // Scratch hygiene: clear our own throwaway shallow clones so re-runs don't
-    // collide. Defensive path guard before any recursive remove.
-    if (!scratchDir.includes('/.autonomous-dev/ingest/')) {
+    // collide. Hard guard before any recursive remove: the resolved path MUST be
+    // exactly <home>/.autonomous-dev/ingest/clones.
+    const expected = path.resolve(ingestRoot, 'clones');
+    if (path.resolve(scratchDir) !== expected) {
       process.stderr.write('Refusing to use an unexpected scratch dir.\n');
       return 2;
     }

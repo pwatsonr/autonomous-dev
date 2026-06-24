@@ -88,6 +88,47 @@ async function test_only_readonly_commands(): Promise<void> {
   console.log('PASS: test_only_readonly_commands');
 }
 
+async function test_rejects_unsafe_ids_and_org(): Promise<void> {
+  // a node whose nameWithOwner isn't a safe owner/name is skipped, not ingested
+  const page = JSON.stringify({
+    data: {
+      organization: {
+        repositories: {
+          nodes: [
+            { nameWithOwner: 'acme/ok', isArchived: false, defaultBranchRef: { name: 'main', target: { oid: 's' } } },
+            { nameWithOwner: '../evil', isArchived: false, defaultBranchRef: { name: 'main', target: { oid: 's' } } },
+            { nameWithOwner: 'no-slash', isArchived: false, defaultBranchRef: { name: 'main', target: { oid: 's' } } },
+          ],
+          pageInfo: { hasNextPage: false, endCursor: 'c' },
+        },
+      },
+    },
+  });
+  const runner = recordingRunner(() => ({ stdout: page, code: 0 }));
+  const client = createGhOrgClient({ scratchDir: '/tmp/scratch', runner });
+  const metas = await client.listRepos('acme');
+  assert(metas.length === 1 && metas[0].id === 'acme/ok', 'unsafe ids (../evil, no-slash) skipped');
+
+  // invalid org login is rejected before any gh call
+  let threw = false;
+  try {
+    await client.listRepos('bad org!');
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'invalid org login rejected');
+
+  // openRepo refuses an unsafe id
+  let threw2 = false;
+  try {
+    await client.openRepo({ id: '../evil', defaultBranch: 'main', headSha: 's' });
+  } catch {
+    threw2 = true;
+  }
+  assert(threw2, 'openRepo refuses unsafe id');
+  console.log('PASS: test_rejects_unsafe_ids_and_org');
+}
+
 function test_filesystem_repo_source(): void {
   const files: Record<string, string> = {
     '/scratch/o__r/README.md': '# hi',
@@ -117,5 +158,6 @@ function assert(condition: boolean, message: string): void {
 describe('ingest/adapters (gh/git, read-only)', () => {
   it('test_list_repos_parses_and_paginates', test_list_repos_parses_and_paginates);
   it('test_only_readonly_commands', test_only_readonly_commands);
+  it('test_rejects_unsafe_ids_and_org', test_rejects_unsafe_ids_and_org);
   it('test_filesystem_repo_source', test_filesystem_repo_source);
 });

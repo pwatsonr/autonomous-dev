@@ -107,6 +107,26 @@ function test_resolve_memory_layers(): void {
   console.log('PASS: test_resolve_memory_layers');
 }
 
+// P1 review: a traversal-shaped scope id must never write/read outside the memory root
+function test_scope_id_traversal_guard(): void {
+  const io = fakeIO();
+  for (const bad of ['repo:../../etc/passwd', 'repo:a/../b', 'repo:a//b', 'project:..']) {
+    let threw = false;
+    try {
+      writeMemoryDoc(bad as Parameters<typeof writeMemoryDoc>[0], 'overview', 'x', io);
+    } catch {
+      threw = true;
+    }
+    assert(threw, `writeMemoryDoc refuses unsafe scope "${bad}"`);
+    // read skips (returns []) rather than crashing resolution
+    assert(readScopeMemory(bad as Parameters<typeof readScopeMemory>[0], io).length === 0, `read skips unsafe scope "${bad}"`);
+  }
+  // nothing escaped the memory root
+  const escaped = Object.keys(io.files).some((p) => !p.startsWith(memoryRoot(io)) || p.includes('..'));
+  assert(!escaped, 'no file written outside the memory root');
+  console.log('PASS: test_scope_id_traversal_guard');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -118,4 +138,5 @@ describe('memory (scoped)', () => {
   it('test_scope_dir', test_scope_dir);
   it('test_write_read_roundtrip', test_write_read_roundtrip);
   it('test_resolve_memory_layers', test_resolve_memory_layers);
+  it('test_scope_id_traversal_guard', test_scope_id_traversal_guard);
 });

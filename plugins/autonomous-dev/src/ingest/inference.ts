@@ -26,10 +26,19 @@ export interface ProposedProject {
   confidence: number; // 0..1
 }
 
-/** CODEOWNERS-style owner tokens (@org/team, @user) found in text, deduped + lowercased. */
+/**
+ * CODEOWNERS-style owner tokens (@org/team, @user) found in text, deduped +
+ * lowercased. Comment lines are stripped first, and an `@` immediately preceded
+ * by a word char is NOT matched — so email-form owners (`* alice@acme.com`,
+ * which GitHub CODEOWNERS supports) do not produce a bogus `@acme.com` owner
+ * that would wrongly cluster unrelated repos sharing an email domain.
+ */
 export function parseOwners(text: string): string[] {
   const set = new Set<string>();
-  for (const m of text.matchAll(/@[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?/gi)) set.add(m[0].toLowerCase());
+  const withoutComments = text.replace(/^\s*#.*$/gm, '');
+  for (const m of withoutComments.matchAll(/(?<![a-z0-9._%+-])@[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?/gi)) {
+    set.add(m[0].toLowerCase());
+  }
   return [...set].sort();
 }
 
@@ -117,6 +126,7 @@ export function inferProjects(repos: RepoSignals[]): ProposedProject[] {
   const parent = new Map<string, string>();
   for (const r of repos) parent.set(r.repoId, r.repoId);
   const find = (x: string): string => {
+    if (!parent.has(x)) parent.set(x, x); // defensive: never deref an uninitialised key
     let root = x;
     while (parent.get(root) !== root) root = parent.get(root)!;
     let cur = x;
