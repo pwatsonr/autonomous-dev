@@ -24,6 +24,7 @@ export type ViewName =
     | "repos" //  PLAN-038 TASK-005 — net-new /repos surface
     | "onboard" // ONBOARD Phase 3 (#594) — org/project/repo browser
     | "onboard-ingestion" // ONBOARD Phase 3 (#594) — live ingestion status
+    | "onboard-questions" // ONBOARD Phase 3 (#594) — blocking-question answer UI
     | "404"
     | "500";
 
@@ -924,6 +925,30 @@ export interface RenderProps {
     onboard: OnboardPageData;
     // ONBOARD Phase 3 (#594) — live ingestion status. See OnboardIngestionPageData below.
     "onboard-ingestion": OnboardIngestionPageData;
+    // ONBOARD Phase 3 (#594) — blocking-question answer UI. See OnboardQuestionsPageData below.
+    "onboard-questions": OnboardQuestionsPageData;
+}
+
+// ONBOARD Phase 3 (#594) — blocking-question answer surface.
+export interface OnboardQuestionProp {
+    id: string;
+    repoId: string;
+    question: string;
+    /** clean string[] options when optionsValid; [] otherwise. */
+    options: string[];
+    status: "pending" | "answered";
+    answer?: string;
+    /** false → options aren't a clean string[]; the row renders read-only. */
+    optionsValid: boolean;
+}
+
+export interface OnboardQuestionsPageData {
+    org: string | null;
+    pending: OnboardQuestionProp[];
+    /** answered questions, shown collapsed below the pending list. */
+    answered: OnboardQuestionProp[];
+    /** CSRF token threaded into each answer form's hidden `_csrf`. */
+    csrfToken?: string;
 }
 
 // ONBOARD Phase 3 (#594) — live ingestion view data.

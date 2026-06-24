@@ -248,6 +248,14 @@ export async function startServer(): Promise<Server<unknown>> {
             audit,
             logger: log,
         },
+        // ONBOARD Phase 3 (#594) — onboard WRITE routes (answer a blocking
+        // question). Audit the operator's answer; the SSE broadcast is left to
+        // the no-op default (the ingestion view polls every 5s, so the pending
+        // count self-heals without a bespoke SSE event type).
+        onboardActions: {
+            audit,
+            logger: log,
+        },
     });
 
     // SPEC-037-2-01 FR-7 — close SSE connections gracefully on signal so

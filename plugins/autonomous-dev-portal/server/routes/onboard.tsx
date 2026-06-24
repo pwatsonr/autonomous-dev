@@ -19,6 +19,7 @@ import type {
     OnboardRepoRow,
     OnboardProjectRow,
     OnboardIngestionPageData,
+    OnboardQuestionsPageData,
 } from "../types/render";
 
 const PAGE_SIZE = 25;
@@ -99,6 +100,22 @@ export const onboardIngestionHandler = async (c: Context): Promise<Response> => 
     const repos = [...list].sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
     const data: OnboardIngestionPageData = { org: own.org, status, repos };
     return renderPage(c, "onboard-ingestion", data);
+};
+
+/** GET /onboard/questions — the blocking-question answer UI (pending + answered). */
+export const onboardQuestionsHandler = async (c: Context): Promise<Response> => {
+    const own = await readOnboardOwnership();
+    const questions = await readOnboardQuestions();
+    const pending = questions.filter((q) => q.status === "pending");
+    const answered = questions.filter((q) => q.status === "answered");
+    const csrfToken = c.get("csrfToken") as string | undefined;
+    const data: OnboardQuestionsPageData = {
+        org: own.org,
+        pending,
+        answered,
+        ...(csrfToken ? { csrfToken } : {}),
+    };
+    return renderPage(c, "onboard-questions", data);
 };
 
 /** GET /onboard/repo/:repo{.+} — the memory drill-in fragment (repo ids contain slashes). */

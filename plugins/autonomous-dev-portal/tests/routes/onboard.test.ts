@@ -3,7 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Hono } from "hono";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -132,6 +132,68 @@ describe("GET /onboard/ingestion", () => {
         writeFileSync(userConfigPath(), JSON.stringify({}), "utf8");
         const html = await (await app().request("/onboard/ingestion")).text();
         expect(html).toContain("No org linked");
+    });
+});
+
+describe("GET /onboard/questions", () => {
+    test("renders the pending question with its options as a form", async () => {
+        seed();
+        const res = await app().request("/onboard/questions");
+        expect(res.status).toBe(200);
+        const html = await res.text();
+        expect(html).toContain("which project?");
+        expect(html).toContain("acme/site");
+        expect(html).toContain('value="payments"');
+        expect(html).toContain('value="web"');
+        // CSRF-carrying form posts to the answer route.
+        expect(html).toContain("/onboard/questions/q1/answer");
+    });
+
+    test("no org → honest empty state", async () => {
+        writeFileSync(userConfigPath(), JSON.stringify({}), "utf8");
+        const html = await (await app().request("/onboard/questions")).text();
+        expect(html).toContain("No org linked");
+    });
+});
+
+describe("POST /onboard/questions/:id/answer", () => {
+    async function post(id: string, body: string): Promise<Response> {
+        return app().request(`/onboard/questions/${id}/answer`, {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body,
+        });
+    }
+
+    test("a valid answer writes the file + returns the answered fragment", async () => {
+        seed();
+        const res = await post("q1", "choice=web");
+        expect(res.status).toBe(200);
+        const html = await res.text();
+        expect(html).toContain("answered");
+        expect(html).toContain("web");
+        // Persisted to disk.
+        const after = JSON.parse(readFileSync(onboardQuestionsPath(), "utf8"));
+        expect(after[0].status).toBe("answered");
+        expect(after[0].answer).toBe("web");
+    });
+
+    test("a choice not in the options → 422 (no write)", async () => {
+        seed();
+        const res = await post("q1", "choice=bogus");
+        expect(res.status).toBe(422);
+        const after = JSON.parse(readFileSync(onboardQuestionsPath(), "utf8"));
+        expect(after[0].status).toBe("pending");
+    });
+
+    test("a missing choice → 422", async () => {
+        seed();
+        expect((await post("q1", "")).status).toBe(422);
+    });
+
+    test("an unknown question id → 404", async () => {
+        seed();
+        expect((await post("does-not-exist", "choice=web")).status).toBe(404);
     });
 });
 
