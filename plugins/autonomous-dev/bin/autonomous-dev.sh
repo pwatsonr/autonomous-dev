@@ -61,6 +61,8 @@ Commands:
   org ingest [org]     Read-only crawl of the org into scoped memory
   project infer        Propose project groupings from ingested memory
   questions list|answer  Manage ingestion's blocking questions
+  artifact <verb>      Scoped skill auto-generation (ONBOARD #590):
+                       propose | list | show | accept | reject
   override-verification <REQ-id> --reason "<text>"
                        PLAN-042 Phase D — authorize one request to advance
                        past a VERIFICATION_FAILED gate. Per-request and
@@ -1097,6 +1099,14 @@ case "${COMMAND}" in
             exit 127
         fi
         exec bun run "${PLUGIN_BIN_DIR}/ingest-cli.ts" "${COMMAND}" "$@"
+        ;;
+    artifact)
+        # Bun-executable wrapper for the artifact-factory CLI (ONBOARD #590).
+        if ! command -v bun >/dev/null 2>&1; then
+            echo "ERROR: 'artifact' subcommand requires bun on PATH" >&2
+            exit 127
+        fi
+        exec bun run "${PLUGIN_BIN_DIR}/artifact-cli.ts" "$@"
         ;;
     override-verification)
         cmd_override_verification "$@"
