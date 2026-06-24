@@ -41,13 +41,13 @@ export function serializeArtifact(a: GeneratedArtifact): string {
   return `---\n${front}\n---\n\n${a.body.trim()}\n`;
 }
 
-interface Extracted {
+export interface Extracted {
   yaml: string;
   body: string;
 }
 
 /** Split `---\n…\n---\n` frontmatter from the body, or undefined if absent. */
-function extractFrontmatter(content: string): Extracted | undefined {
+export function extractFrontmatter(content: string): Extracted | undefined {
   const firstNewline = content.indexOf('\n');
   if (firstNewline === -1) return undefined;
   if (content.slice(0, firstNewline).replace(/\r$/, '') !== '---') return undefined;
