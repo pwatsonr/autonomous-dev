@@ -104,6 +104,29 @@ export function agentStatesPath(): string {
     return join(stateDirRoot(), "agent-states.json");
 }
 
+// ONBOARD (Phase 3, #594) — the daemon plugin's ONBOARD state the portal READS.
+// Ownership lives in userConfigPath() under `.ownership`; the rest under stateDirRoot().
+
+/** Root of the scoped-memory tree (`${state}/memory`). */
+export function onboardMemoryRoot(): string {
+    return join(stateDirRoot(), "memory");
+}
+
+/** A repo's scoped-memory dir (`${state}/memory/repo/<owner>/<name>`). */
+export function onboardRepoMemoryDir(repoId: string): string {
+    return join(onboardMemoryRoot(), "repo", repoId);
+}
+
+/** The blocking-question queue (`${state}/ingest/questions.json`). */
+export function onboardQuestionsPath(): string {
+    return join(stateDirRoot(), "ingest", "questions.json");
+}
+
+/** The generated-artifact proposals (`${state}/artifacts/proposals.json`). */
+export function onboardProposalsPath(): string {
+    return join(stateDirRoot(), "artifacts", "proposals.json");
+}
+
 /**
  * Canonical kit-parity fixture root. CI screenshot regression points
  * `AUTONOMOUS_DEV_STATE_DIR` here to reproduce the kit-screenshot KPIs

@@ -49,6 +49,8 @@ export interface ShellRailState {
     approvalsCount?: number;
     requestsCount?: number;
     agentsAlertCount?: number;
+    /** ONBOARD #594 — pending blocking-question count (Questions nav badge). */
+    onboardQuestionsCount?: number;
 }
 
 const HEARTBEAT_TTL_MS = 5_000;
@@ -292,6 +294,19 @@ export async function deriveShellRailState(
     } catch {
         // All three remain undefined → no badges render. RailNav handles
         // that as the "no badge" branch (SPEC-037-3-02 AC-03).
+    }
+
+    // Source 5 (ONBOARD #594): pending blocking-question count for the
+    // Questions nav badge. Reads the SAME reader the Questions surface uses
+    // (honesty contract); never throws, but wrapped defensively.
+    try {
+        const { readOnboardQuestions } = await import("../wiring/onboard-readers");
+        const questions = await readOnboardQuestions();
+        state.onboardQuestionsCount = questions.filter(
+            (q) => q.status === "pending",
+        ).length;
+    } catch {
+        // Leave undefined → no badge.
     }
 
     // Source 4 (#396): circuit-breaker state from the daemon's

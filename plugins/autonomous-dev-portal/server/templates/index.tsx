@@ -35,6 +35,9 @@ import { CostsView } from "./views/costs";
 import { DashboardView } from "./views/dashboard";
 import { LogsView } from "./views/logs";
 import { NotFoundView } from "./views/404";
+import { OnboardView } from "./views/onboard";
+import { OnboardIngestionView } from "./views/onboard-ingestion";
+import { OnboardQuestionsView } from "./views/onboard-questions";
 import { OpsView } from "./views/ops";
 import { ReposView } from "./views/repos";
 import { RequestDetailView } from "./views/request-detail";
@@ -90,6 +93,12 @@ function renderViewBody<V extends ViewName>(
             return <AgentsView {...(props as RenderProps["agents"])} />;
         case "repos":
             return <ReposView {...(props as RenderProps["repos"])} />;
+        case "onboard":
+            return <OnboardView {...(props as RenderProps["onboard"])} />;
+        case "onboard-ingestion":
+            return <OnboardIngestionView {...(props as RenderProps["onboard-ingestion"])} />;
+        case "onboard-questions":
+            return <OnboardQuestionsView {...(props as RenderProps["onboard-questions"])} />;
         case "404":
             return <NotFoundView {...(props as RenderProps["404"])} />;
         case "500":
@@ -141,6 +150,12 @@ function activePathFor(view: ViewName): string {
             return "/agents";
         case "repos":
             return "/repos";
+        case "onboard":
+            return "/onboard";
+        case "onboard-ingestion":
+            return "/onboard/ingestion";
+        case "onboard-questions":
+            return "/onboard/questions";
         case "dashboard":
         case "request-detail":
         case "404":

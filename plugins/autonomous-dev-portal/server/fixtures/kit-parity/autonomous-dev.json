@@ -1,1 +1,15 @@
-{}
+{
+  "ownership": {
+    "org": "acme",
+    "projects": [
+      { "id": "payments", "name": "Payments", "tags": { "team": "pay" } },
+      { "id": "web", "name": "Web", "tags": { "team": "web" } }
+    ],
+    "repos": [
+      { "id": "acme/orders", "projectId": "payments", "tags": { "team": "pay" }, "participate_in_auto_improvement": true },
+      { "id": "acme/billing", "projectId": "payments", "tags": { "team": "pay" } },
+      { "id": "acme/site", "projectId": "web", "tags": { "team": "web" } },
+      { "id": "acme/docs", "projectId": "web", "tags": { "team": "web" }, "participate_in_auto_improvement": true }
+    ]
+  }
+}

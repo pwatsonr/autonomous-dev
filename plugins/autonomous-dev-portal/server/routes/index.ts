@@ -80,6 +80,16 @@ import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
 import { requestDetailHandler, artifactFragmentHandler } from "./request-detail";
 import { reposHandler } from "./repos";
+import {
+    onboardHandler,
+    onboardIngestionHandler,
+    onboardQuestionsHandler,
+    onboardRepoMemoryHandler,
+} from "./onboard";
+import {
+    buildOnboardActionRoutes,
+    type OnboardActionDeps,
+} from "./onboard-actions";
 import { requestsHandler } from "./requests";
 import { settingsHandler } from "./settings";
 import {
@@ -162,6 +172,13 @@ export interface RegisterRoutesOptions {
      * `artifact-comments-disabled`.
      */
     artifactComments?: ArtifactCommentDeps;
+    /**
+     * ONBOARD Phase 3 (#594) — optional audit/logger/SSE deps for the onboard
+     * WRITE routes (answer a question). The routes mount unconditionally (the
+     * backing store is the filesystem, always present); these deps only wire
+     * the audit trail + SSE broadcast. Omitted in tests → no-op sinks.
+     */
+    onboardActions?: OnboardActionDeps;
 }
 
 function disabledHandler(error: string) {
@@ -413,6 +430,14 @@ export function registerRoutes(
     // TASK-015 wires the real composition readers.
     app.get("/agents", agentsHandler);
     app.get("/repos", reposHandler);
+    // ONBOARD Phase 3 (#594) — org/project/repo browser + memory drill-in (slash-safe param).
+    app.get("/onboard", onboardHandler);
+    app.get("/onboard/ingestion", onboardIngestionHandler);
+    app.get("/onboard/questions", onboardQuestionsHandler);
+    app.get("/onboard/repo/:repo{.+}", onboardRepoMemoryHandler);
+    // ONBOARD Phase 3 (#594) — onboard WRITE routes. Mounted unconditionally;
+    // deps default to no-op sinks when `options.onboardActions` is omitted.
+    app.route("/", buildOnboardActionRoutes(options.onboardActions));
     app.get("/api/agents", agentsApiHandler);
     // PLAN-038 polish — row click loads the inspect modal HTML fragment.
     app.get("/agents/:name/inspect-modal", agentsInspectModalHandler);

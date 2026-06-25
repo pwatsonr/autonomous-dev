@@ -101,6 +101,8 @@ export interface ShellProps {
     requestsCount?: number;
     /** SPEC-037-3-02 — agent-alert count badge for the Agents item. */
     agentsAlertCount?: number;
+    /** ONBOARD #594 — pending blocking-question count badge for the Questions item. */
+    onboardQuestionsCount?: number;
     /** Daemon status pill in the RailOpsBar. */
     daemonStatus?: DaemonStatusTone;
     /** SPEC-037-3-04 AC-02 — daemon heartbeat age in seconds (right-aligned). */
@@ -188,7 +190,7 @@ interface RailOpsRowProps {
     value: string;
 }
 
-function RailOpsRow({ tone, label, value }: RailOpsRowProps): unknown {
+function RailOpsRow({ tone, label, value }: RailOpsRowProps): JSX.Element {
     return (
         <div class="line">
             <span class={`dot ${tone}`}></span>
@@ -218,6 +220,7 @@ export const ShellLayout: FC<ShellProps> = ({
     approvalsCount,
     requestsCount,
     agentsAlertCount,
+    onboardQuestionsCount,
     daemonStatus = "unknown",
     daemonAgeSeconds,
     killSwitchEngaged = false,
@@ -298,6 +301,7 @@ export const ShellLayout: FC<ShellProps> = ({
                 <link rel="stylesheet" href={asset("/static/v3/approvals.css")} />
                 <link rel="stylesheet" href={asset("/static/v3/ops.css")} />
                 <link rel="stylesheet" href={asset("/static/v3/logs.css")} />
+                <link rel="stylesheet" href={asset("/static/v3/onboard.css")} />
                 {/* #417 tier-1: rules for previously-unstyled template
                     classes (see tests/unit/css-coverage.test.ts). */}
                 <link rel="stylesheet" href={asset("/static/v3/components.css")} />
@@ -374,6 +378,7 @@ export const ShellLayout: FC<ShellProps> = ({
                             approvalsCount={approvalsCount}
                             requestsCount={requestsCount}
                             agentsAlertCount={agentsAlertCount}
+                            onboardQuestionsCount={onboardQuestionsCount}
                         />
                         {/* SPEC-037-3-04 — 3-line metrics layout. The MTD row
                             is conditionally rendered; Daemon + Breaker rows

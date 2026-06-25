@@ -22,6 +22,9 @@ export type ViewName =
     | "audit"
     | "agents" // PLAN-038 TASK-005 — net-new /agents surface
     | "repos" //  PLAN-038 TASK-005 — net-new /repos surface
+    | "onboard" // ONBOARD Phase 3 (#594) — org/project/repo browser
+    | "onboard-ingestion" // ONBOARD Phase 3 (#594) — live ingestion status
+    | "onboard-questions" // ONBOARD Phase 3 (#594) — blocking-question answer UI
     | "404"
     | "500";
 
@@ -918,6 +921,100 @@ export interface RenderProps {
     agents: AgentsPageData;
     // PLAN-038 TASK-007 — Repos surface input. See ReposPageData below.
     repos: ReposPageData;
+    // ONBOARD Phase 3 (#594) — org/project/repo browser. See OnboardPageData below.
+    onboard: OnboardPageData;
+    // ONBOARD Phase 3 (#594) — live ingestion status. See OnboardIngestionPageData below.
+    "onboard-ingestion": OnboardIngestionPageData;
+    // ONBOARD Phase 3 (#594) — blocking-question answer UI. See OnboardQuestionsPageData below.
+    "onboard-questions": OnboardQuestionsPageData;
+}
+
+// ONBOARD Phase 3 (#594) — blocking-question answer surface.
+export interface OnboardQuestionProp {
+    id: string;
+    repoId: string;
+    question: string;
+    /** clean string[] options when optionsValid; [] otherwise. */
+    options: string[];
+    status: "pending" | "answered";
+    answer?: string;
+    /** false → options aren't a clean string[]; the row renders read-only. */
+    optionsValid: boolean;
+}
+
+export interface OnboardQuestionsPageData {
+    org: string | null;
+    pending: OnboardQuestionProp[];
+    /** answered questions, shown collapsed below the pending list. */
+    answered: OnboardQuestionProp[];
+    /** CSRF token threaded into each answer form's hidden `_csrf`. */
+    csrfToken?: string;
+}
+
+// ONBOARD Phase 3 (#594) — live ingestion view data.
+export interface OnboardIngestionRepoRow {
+    id: string;
+    projectId: string | null;
+    hasMemory: boolean;
+    blocked: boolean;
+    topicCount: number;
+}
+
+export interface OnboardIngestionPageData {
+    org: string | null;
+    status: OnboardIngestionStatusProp;
+    /** all repos, sorted blocked → pending → ingested. */
+    repos: OnboardIngestionRepoRow[];
+}
+
+// ONBOARD Phase 3 (#594) — browser surface data shape. Composed by the route
+// from onboard-readers (ownership + questions + memory + ingestion status).
+
+export interface OnboardProjectRow {
+    id: string;
+    name: string;
+    tags: Record<string, string>;
+    repoCount: number;
+}
+
+export interface OnboardRepoRow {
+    id: string;
+    projectId: string | null;
+    tags: Record<string, string>;
+    /** participate_in_auto_improvement === true. */
+    enrolled: boolean;
+    /** has a pending blocking question. */
+    blocked: boolean;
+    /** memory topic names (chips). */
+    topics: string[];
+}
+
+export interface MemoryTopicProp {
+    topic: string;
+    summary: string;
+}
+
+export interface OnboardIngestionStatusProp {
+    reposTotal: number;
+    reposWithMemory: number;
+    reposBlocked: number;
+    questionsPending: number;
+    proposalsPending: number;
+}
+
+export interface OnboardPageData {
+    org: string | null;
+    projects: OnboardProjectRow[];
+    /** the current page of (filtered) repos. */
+    repos: OnboardRepoRow[];
+    filter: { project?: string; tag?: string; q?: string };
+    page: number;
+    pageSize: number;
+    totalRepos: number;
+    totalPages: number;
+    status: OnboardIngestionStatusProp;
+    /** CSRF token for the enrollment toggle (wired in P3.5). */
+    csrfToken?: string;
 }
 
 // PLAN-038 TASK-007 / TDD-037 §5.1.1a — Agents surface data shape.

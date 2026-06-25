@@ -1,0 +1,17 @@
+[
+  {
+    "id": "q-site-project",
+    "repoId": "acme/site",
+    "question": "Which project does acme/site belong to?",
+    "options": ["payments", "web"],
+    "status": "pending"
+  },
+  {
+    "id": "q-orders-lang",
+    "repoId": "acme/orders",
+    "question": "What is the primary language of acme/orders?",
+    "options": ["TypeScript", "Go", "Python"],
+    "status": "answered",
+    "answer": "TypeScript"
+  }
+]
