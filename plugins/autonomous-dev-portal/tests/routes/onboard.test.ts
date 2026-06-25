@@ -197,6 +197,51 @@ describe("POST /onboard/questions/:id/answer", () => {
     });
 });
 
+describe("POST /onboard/{enroll,unenroll}", () => {
+    async function post(path: string, repo: string): Promise<Response> {
+        return app().request(path, {
+            method: "POST",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            body: `repo=${encodeURIComponent(repo)}`,
+        });
+    }
+    function enrolledFlag(repoId: string): boolean | undefined {
+        const m = JSON.parse(readFileSync(userConfigPath(), "utf8"));
+        return m.ownership.repos.find((r: { id: string }) => r.id === repoId)
+            ?.participate_in_auto_improvement;
+    }
+
+    test("enroll flips a not-enrolled repo + returns the enrolled row", async () => {
+        seed();
+        const res = await post("/onboard/enroll", "acme/billing");
+        expect(res.status).toBe(200);
+        const html = await res.text();
+        expect(html).toContain("acme/billing");
+        expect(html).toContain("enrolled");
+        expect(html).toContain("unenroll"); // the button now offers the inverse
+        expect(enrolledFlag("acme/billing")).toBe(true);
+    });
+
+    test("unenroll flips an enrolled repo back", async () => {
+        seed();
+        const res = await post("/onboard/unenroll", "acme/orders");
+        expect(res.status).toBe(200);
+        const html = await res.text();
+        expect(html).toContain("not enrolled");
+        expect(enrolledFlag("acme/orders")).toBe(false);
+    });
+
+    test("a missing repo field → 422", async () => {
+        seed();
+        expect((await post("/onboard/enroll", "")).status).toBe(422);
+    });
+
+    test("an unknown repo → 404", async () => {
+        seed();
+        expect((await post("/onboard/enroll", "acme/ghost")).status).toBe(404);
+    });
+});
+
 describe("GET /onboard/repo/:repo", () => {
     test("drill-in renders the repo's memory topics", async () => {
         seed();

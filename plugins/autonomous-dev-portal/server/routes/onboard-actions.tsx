@@ -11,6 +11,7 @@
 // only checks the field is present).
 
 import { Hono } from "hono";
+import type { Context } from "hono";
 
 import type { ActionLogger, AuditAppender, SSEBroadcaster } from "./_action-deps";
 import { noopActionLogger, noopBroadcaster, resolveActor } from "./_action-deps";
@@ -18,7 +19,13 @@ import {
     OnboardAnswerError,
     OnboardQuestionAnswered,
 } from "../templates/views/onboard-questions";
-import { answerQuestion } from "../wiring/onboard-writers";
+import { RepoRow, OnboardRowError } from "../templates/views/onboard";
+import { answerQuestion, setEnrollment } from "../wiring/onboard-writers";
+import {
+    readOnboardQuestions,
+    readRepoMemoryTopicNames,
+} from "../wiring/onboard-readers";
+import type { OnboardRepoRow } from "../types/render";
 
 export interface OnboardActionDeps {
     audit?: AuditAppender;
@@ -87,6 +94,65 @@ export function buildOnboardActionRoutes(deps: OnboardActionDeps = {}): Hono {
             />,
         );
     });
+
+    // ------------------------------------------------------------------
+    // POST /onboard/{enroll,unenroll} — toggle a repo's participation in
+    // auto-improvement (writes the ownership manifest). The repo id rides in
+    // the FORM BODY (via hx-vals), not the path: a greedy `:repo{.+}` param
+    // can't be disambiguated from a trailing `/enroll` static segment.
+    // Returns the re-rendered repo row (hx-swap outerHTML on `closest tr`).
+    // ------------------------------------------------------------------
+    const toggle = async (c: Context, enrolled: boolean): Promise<Response> => {
+        let form: Record<string, unknown> = {};
+        try {
+            form = (await c.req.parseBody()) as Record<string, unknown>;
+        } catch {
+            return c.html(<OnboardRowError message="invalid form body" />, 422);
+        }
+        const repoId = typeof form.repo === "string" ? form.repo : "";
+        if (repoId.length === 0) {
+            return c.html(<OnboardRowError message="missing repo" />, 422);
+        }
+        const actor = resolveActor(c.get("auth"));
+        const result = await setEnrollment(repoId, enrolled);
+        if (!result.ok) {
+            if (result.reason === "unknown") {
+                return c.html(<OnboardRowError message="repo not found in ownership" />, 404);
+            }
+            if (result.reason === "corrupt") {
+                logger.error("onboard_enroll_corrupt", { repo: repoId });
+                return c.html(
+                    <OnboardRowError message="ownership manifest is malformed — fix it in the daemon" />,
+                    409,
+                );
+            }
+            logger.error("onboard_enroll_io", { repo: repoId });
+            return c.html(<OnboardRowError message="write failed" />, 500);
+        }
+
+        // Enrich the ownership-level repo with blocked + topics for the row
+        // (these don't change on a toggle, so a cached read is fine).
+        const questions = await readOnboardQuestions();
+        const blocked = questions.some(
+            (q) => q.status === "pending" && q.repoId === repoId,
+        );
+        const topics = await readRepoMemoryTopicNames(repoId);
+        const row: OnboardRepoRow = { ...result.repo, blocked, topics };
+
+        if (deps.audit !== undefined) {
+            void deps.audit.append({
+                event: enrolled ? "onboard_repo_enrolled" : "onboard_repo_unenrolled",
+                actor,
+                repo: repoId,
+            });
+        }
+        broadcast.publish("onboard_enrollment_changed", { repoId, enrolled });
+
+        return c.html(<RepoRow r={row} />);
+    };
+
+    router.post("/onboard/enroll", (c) => toggle(c, true));
+    router.post("/onboard/unenroll", (c) => toggle(c, false));
 
     return router;
 }

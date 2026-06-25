@@ -15,7 +15,7 @@
 //   - atomicWriteJson (tmp + fsync + rename, 0600) — never a torn file.
 
 import { atomicWriteJson, readJsonOrNull } from "./atomic-json";
-import { onboardQuestionsPath } from "./state-paths";
+import { onboardQuestionsPath, userConfigPath } from "./state-paths";
 
 export type AnswerResult =
     | {
@@ -86,6 +86,100 @@ export async function answerQuestion(
             repoId: typeof entry.repoId === "string" ? entry.repoId : "",
             question: typeof entry.question === "string" ? entry.question : "",
             answer: choice,
+        },
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Enrollment toggle — the SECOND write surface. This edits the OWNERSHIP
+// MANIFEST itself (userConfigPath), the most sensitive operator state, so the
+// refuse-to-clobber discipline is stricter than the question writer: we only
+// ever write back a manifest we successfully read as a well-formed object, and
+// we mutate exactly one repo's `participate_in_auto_improvement` flag — every
+// other top-level key, every other repo/project, and every other field on the
+// toggled repo is preserved by spread (never rebuilt from a narrowed shape).
+// ---------------------------------------------------------------------------
+
+export type EnrollResult =
+    | {
+          ok: true;
+          repo: {
+              id: string;
+              projectId: string | null;
+              tags: Record<string, string>;
+              enrolled: boolean;
+          };
+      }
+    | { ok: false; reason: "unknown" | "corrupt" | "io" };
+
+function coerceTags(v: unknown): Record<string, string> {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
+    const out: Record<string, string> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+        if (typeof val === "string") out[k] = val;
+    }
+    return out;
+}
+
+/**
+ * Set repo `repoId`'s enrollment to `enrolled` in the ownership manifest.
+ *   unknown → 404 (no manifest, or no such repo in ownership.repos)
+ *   corrupt → 409 (manifest unreadable/malformed — refuse to clobber)
+ *   io      → 500 (write failed)
+ */
+export async function setEnrollment(
+    repoId: string,
+    enrolled: boolean,
+): Promise<EnrollResult> {
+    let manifest: unknown;
+    try {
+        manifest = await readJsonOrNull<unknown>(userConfigPath());
+    } catch {
+        // Unparseable JSON — never overwrite a file we couldn't read.
+        return { ok: false, reason: "corrupt" };
+    }
+    if (manifest === null) {
+        // No manifest at all → the repo can't exist to be toggled.
+        return { ok: false, reason: "unknown" };
+    }
+    if (typeof manifest !== "object" || Array.isArray(manifest)) {
+        return { ok: false, reason: "corrupt" };
+    }
+    const m = manifest as Record<string, unknown>;
+    const ownership = m.ownership;
+    if (ownership === null || typeof ownership !== "object" || Array.isArray(ownership)) {
+        return { ok: false, reason: "corrupt" };
+    }
+    const own = ownership as Record<string, unknown>;
+    if (!Array.isArray(own.repos)) {
+        return { ok: false, reason: "corrupt" };
+    }
+    const repos = own.repos as unknown[];
+    const idx = repos.findIndex(
+        (r) => (r as { id?: unknown } | null)?.id === repoId,
+    );
+    if (idx < 0) return { ok: false, reason: "unknown" };
+    const repo = repos[idx] as Record<string, unknown>;
+
+    // Mutate ONLY this repo's participate flag (set the boolean explicitly so an
+    // opt-out is distinguishable from never-decided); preserve everything else.
+    const updatedRepo = { ...repo, participate_in_auto_improvement: enrolled };
+    const nextRepos = repos.slice();
+    nextRepos[idx] = updatedRepo;
+    const nextManifest = { ...m, ownership: { ...own, repos: nextRepos } };
+    try {
+        await atomicWriteJson(userConfigPath(), nextManifest);
+    } catch {
+        return { ok: false, reason: "io" };
+    }
+
+    return {
+        ok: true,
+        repo: {
+            id: repoId,
+            projectId: typeof repo.projectId === "string" ? repo.projectId : null,
+            tags: coerceTags(repo.tags),
+            enrolled,
         },
     };
 }

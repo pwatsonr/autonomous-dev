@@ -7,8 +7,8 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { answerQuestion } from "../../server/wiring/onboard-writers";
-import { onboardQuestionsPath } from "../../server/wiring/state-paths";
+import { answerQuestion, setEnrollment } from "../../server/wiring/onboard-writers";
+import { onboardQuestionsPath, userConfigPath } from "../../server/wiring/state-paths";
 
 interface Ctx {
     stateDir: string;
@@ -124,5 +124,100 @@ describe("answerQuestion", () => {
         expect(await answerQuestion("q1", "1")).toEqual({ ok: false, reason: "io" });
         // The corrupt file is left exactly as-is (not overwritten).
         expect(readFileSync(p, "utf8")).toBe("{ not json");
+    });
+});
+
+function seedManifest(manifest: unknown): void {
+    const p = userConfigPath();
+    mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, JSON.stringify(manifest), "utf8");
+}
+
+function readManifest(): any {
+    return JSON.parse(readFileSync(userConfigPath(), "utf8"));
+}
+
+describe("setEnrollment", () => {
+    test("enrolls a not-enrolled repo (participate flag = true on disk)", async () => {
+        seedManifest({
+            ownership: { org: "acme", projects: [], repos: [{ id: "acme/x", projectId: null, tags: {} }] },
+        });
+        const res = await setEnrollment("acme/x", true);
+        expect(res.ok).toBe(true);
+        if (res.ok) expect(res.repo.enrolled).toBe(true);
+        expect(readManifest().ownership.repos[0].participate_in_auto_improvement).toBe(true);
+    });
+
+    test("unenrolls an enrolled repo (participate flag = false on disk)", async () => {
+        seedManifest({
+            ownership: {
+                org: "acme",
+                projects: [],
+                repos: [{ id: "acme/x", projectId: null, tags: {}, participate_in_auto_improvement: true }],
+            },
+        });
+        const res = await setEnrollment("acme/x", false);
+        expect(res.ok).toBe(true);
+        expect(readManifest().ownership.repos[0].participate_in_auto_improvement).toBe(false);
+    });
+
+    test("preserves OTHER top-level keys, OTHER repos, and extra fields on the toggled repo", async () => {
+        seedManifest({
+            schemaVersion: 7,
+            settings: { trust: "high" },
+            ownership: {
+                org: "acme",
+                projects: [{ id: "p1", name: "P1", tags: {} }],
+                repos: [
+                    { id: "acme/x", projectId: "p1", tags: { team: "a" }, note: "keep-me" },
+                    { id: "acme/y", projectId: null, tags: {}, participate_in_auto_improvement: true },
+                ],
+            },
+        });
+        await setEnrollment("acme/x", true);
+        const after = readManifest();
+        // Other top-level keys intact.
+        expect(after.schemaVersion).toBe(7);
+        expect(after.settings).toEqual({ trust: "high" });
+        // Project list intact.
+        expect(after.ownership.projects).toEqual([{ id: "p1", name: "P1", tags: {} }]);
+        // Toggled repo: flag set, extra field + tags preserved.
+        const x = after.ownership.repos.find((r: any) => r.id === "acme/x");
+        expect(x.participate_in_auto_improvement).toBe(true);
+        expect(x.note).toBe("keep-me");
+        expect(x.tags).toEqual({ team: "a" });
+        // Other repo untouched.
+        const y = after.ownership.repos.find((r: any) => r.id === "acme/y");
+        expect(y.participate_in_auto_improvement).toBe(true);
+    });
+
+    test("unknown repo id → unknown (no write)", async () => {
+        seedManifest({ ownership: { org: "acme", projects: [], repos: [{ id: "acme/x", projectId: null, tags: {} }] } });
+        expect(await setEnrollment("acme/nope", true)).toEqual({ ok: false, reason: "unknown" });
+        // file unchanged: repo still has no flag
+        expect(readManifest().ownership.repos[0].participate_in_auto_improvement).toBeUndefined();
+    });
+
+    test("no manifest file → unknown", async () => {
+        expect(await setEnrollment("acme/x", true)).toEqual({ ok: false, reason: "unknown" });
+    });
+
+    test("refuses a manifest whose ownership is not an object (corrupt, no write)", async () => {
+        seedManifest({ ownership: "nope" });
+        expect(await setEnrollment("acme/x", true)).toEqual({ ok: false, reason: "corrupt" });
+        expect(readManifest().ownership).toBe("nope"); // untouched
+    });
+
+    test("refuses a manifest whose repos is not an array (corrupt, no write)", async () => {
+        seedManifest({ ownership: { org: "acme", projects: [], repos: { not: "array" } } });
+        expect(await setEnrollment("acme/x", true)).toEqual({ ok: false, reason: "corrupt" });
+    });
+
+    test("refuses an unparseable manifest file (corrupt, leaves it as-is)", async () => {
+        const p = userConfigPath();
+        mkdirSync(dirname(p), { recursive: true });
+        writeFileSync(p, "{ broken", "utf8");
+        expect(await setEnrollment("acme/x", true)).toEqual({ ok: false, reason: "corrupt" });
+        expect(readFileSync(p, "utf8")).toBe("{ broken");
     });
 });

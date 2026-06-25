@@ -21,7 +21,9 @@ function qs(filter: { project?: string; tag?: string; q?: string }, page?: numbe
     return s ? `?${s}` : "";
 }
 
-const RepoRow: FC<{ r: OnboardRepoRow }> = ({ r }) => (
+/** A single repo row. Exported so the enrollment-toggle POST can return just
+ *  this fragment (hx-swap outerHTML on `closest tr`). */
+export const RepoRow: FC<{ r: OnboardRepoRow }> = ({ r }) => (
     <tr>
         <td class="repo-name">{r.id}</td>
         <td class="mono">{r.projectId ?? "—"}</td>
@@ -40,7 +42,19 @@ const RepoRow: FC<{ r: OnboardRepoRow }> = ({ r }) => (
             )}
             {r.blocked && (
                 <span class="chip warn" title="blocked on a pending question"> blocked</span>
-            )}
+            )}{" "}
+            <button
+                type="button"
+                class="btn xs"
+                hx-post={`/onboard/${r.enrolled ? "unenroll" : "enroll"}`}
+                hx-vals={JSON.stringify({ repo: r.id })}
+                hx-include="#onboard-csrf"
+                hx-target="closest tr"
+                hx-swap="outerHTML"
+                aria-label={r.enrolled ? `Unenroll ${r.id}` : `Enroll ${r.id}`}
+            >
+                {r.enrolled ? "unenroll" : "enroll"}
+            </button>
         </td>
         <td>
             {r.topics.length === 0 ? (
@@ -72,10 +86,14 @@ export const OnboardView: FC<RenderProps["onboard"]> = ({
     totalRepos,
     totalPages,
     status,
+    csrfToken,
 }) => (
     <section id="onboard-body" class="onboard-surface">
         <Topbar title="Onboard" subTitle={org ? `org: ${org}` : "no org linked"} />
         <div class="main-inner">
+            {/* Shared CSRF token for the enrollment-toggle buttons (hx-include).
+                Belt-and-suspenders alongside the global X-CSRF-Token header. */}
+            <input type="hidden" id="onboard-csrf" name="_csrf" value={csrfToken ?? ""} />
             {org === null ? (
                 <p class="empty">
                     No org linked yet. Run <code>autonomous-dev org link &lt;org&gt;</code> then{" "}
@@ -190,6 +208,15 @@ export const OnboardView: FC<RenderProps["onboard"]> = ({
             )}
         </div>
     </section>
+);
+
+/** Error fragment returned when an enrollment toggle fails (toast picks up the status). */
+export const OnboardRowError: FC<{ message: string }> = ({ message }) => (
+    <tr class="onboard-row-error">
+        <td colSpan={6}>
+            <span class="chip err">error</span> <span class="meta">{message}</span>
+        </td>
+    </tr>
 );
 
 /** Drill-in fragment: a repo's scoped-memory topic summaries (GET /onboard/repo/:repo). */
