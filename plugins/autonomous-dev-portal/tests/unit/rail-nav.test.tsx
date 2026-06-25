@@ -27,10 +27,11 @@ async function render(node: unknown): Promise<string> {
     return typeof v === "string" ? v : String(v);
 }
 
-describe("RailNav — SPEC-037-3-01 (9-item nav)", () => {
-    test("N-08: renders nine anchors with the documented hrefs in order", async () => {
+describe("RailNav — SPEC-037-3-01 (12-item nav)", () => {
+    test("N-08: renders twelve anchors with the documented hrefs in order", async () => {
         // BUG-22 (PR #296) added Logs (OPERATE) and Repos (SYSTEM) so
         // operators can discover those pages without typing the URL.
+        // ONBOARD #594 added the Onboard group (Onboard / Ingestion / Questions).
         const html = await render(<RailNav activePath="/" />);
         const hrefs = [...html.matchAll(/href=["']([^"']+)["']/g)].map(
             (m) => m[1],
@@ -45,6 +46,9 @@ describe("RailNav — SPEC-037-3-01 (9-item nav)", () => {
             "/repos",
             "/settings",
             "/ops",
+            "/onboard",
+            "/onboard/ingestion",
+            "/onboard/questions",
         ]);
     });
 
@@ -55,12 +59,12 @@ describe("RailNav — SPEC-037-3-01 (9-item nav)", () => {
         );
     });
 
-    test("renders two rail-nav-group containers (operate + system)", async () => {
+    test("renders three rail-nav-group containers (operate + system + onboard)", async () => {
         const html = await render(<RailNav activePath="/" />);
         const groups = [...html.matchAll(/data-group=["']([^"']+)["']/g)].map(
             (m) => m[1],
         );
-        expect(groups).toEqual(["operate", "system"]);
+        expect(groups).toEqual(["operate", "system", "onboard"]);
     });
 
     test("N-10: Operate group has 5 items, System group has 4 (post-BUG-22)", () => {
@@ -105,7 +109,7 @@ describe("RailNav — SPEC-037-3-01 (9-item nav)", () => {
         const anchorSegments = [...html.matchAll(/<a[^>]*>[\s\S]*?<\/a>/g)].map(
             (m) => m[0],
         );
-        expect(anchorSegments.length).toBe(9);
+        expect(anchorSegments.length).toBe(12);
         for (const segment of anchorSegments) {
             // Each anchor has an `<span class="ic">` that contains an
             // inline <svg> (Lucide markup).
@@ -191,12 +195,34 @@ describe("RailNav — SPEC-037-3-01 (9-item nav)", () => {
         expect(html).not.toContain('class="count"');
     });
 
-    test("NAV_ITEMS exposes 9 entries split 5/4 across operate/system (post-BUG-22)", () => {
-        expect(NAV_ITEMS.length).toBe(9);
+    test("NAV_ITEMS exposes 12 entries split 5/4/3 across operate/system/onboard", () => {
+        expect(NAV_ITEMS.length).toBe(12);
         const operate = NAV_ITEMS.filter((i) => i.group === "operate");
         const system = NAV_ITEMS.filter((i) => i.group === "system");
+        const onboard = NAV_ITEMS.filter((i) => i.group === "onboard");
         expect(operate.length).toBe(5);
         expect(system.length).toBe(4);
+        expect(onboard.length).toBe(3);
+    });
+
+    test("N-18: the ONBOARD group renders after SYSTEM with the 3 onboard items", async () => {
+        const html = await render(<RailNav activePath="/onboard/questions" />);
+        const systemIdx = html.indexOf('<div class="rail-nav-group-label">SYSTEM</div>');
+        const onboardIdx = html.indexOf('<div class="rail-nav-group-label">ONBOARD</div>');
+        expect(onboardIdx).toBeGreaterThan(systemIdx);
+        // The active Questions item is marked current.
+        const questions = html.match(/<a[^>]*href=["']\/onboard\/questions["'][^>]*>/);
+        expect(questions).not.toBeNull();
+        expect(questions![0]).toContain('aria-current="page"');
+    });
+
+    test("N-19: every onboard nav item has a non-empty inline icon (icons exist on disk)", async () => {
+        const html = await render(<RailNav activePath="/" />);
+        for (const href of ["/onboard", "/onboard/ingestion", "/onboard/questions"]) {
+            const start = html.indexOf(`href="${href}"`);
+            const end = html.indexOf("</a>", start);
+            expect(html.slice(start, end)).toMatch(/<span class="ic"[^>]*>[\s\S]*<svg/);
+        }
     });
 });
 
@@ -278,5 +304,33 @@ describe("RailNav — SPEC-037-3-02 (count badges)", () => {
             const end = html.indexOf("</a>", start);
             expect(html.slice(start, end)).not.toContain('class="count"');
         }
+    });
+
+    test("N-20: onboardQuestionsCount=2 renders the badge on /onboard/questions only", async () => {
+        const html = await render(
+            <RailNav activePath="/" onboardQuestionsCount={2} />,
+        );
+        const countMatches = html.match(/<span class="count">/g) ?? [];
+        expect(countMatches.length).toBe(1);
+        const start = html.indexOf('href="/onboard/questions"');
+        const end = html.indexOf("</a>", start);
+        const seg = html.slice(start, end);
+        expect(seg).toContain('<span class="count">2</span>');
+        // aria-label augmented for screen readers.
+        const anchor = html.match(/<a[^>]*href=["']\/onboard\/questions["'][^>]*>/);
+        expect(anchor![0]).toContain('aria-label="Questions (2 pending)"');
+        // The other onboard items carry no badge.
+        for (const href of ["/onboard", "/onboard/ingestion"]) {
+            const s = html.indexOf(`href="${href}"`);
+            const e = html.indexOf("</a>", s);
+            expect(html.slice(s, e)).not.toContain('class="count"');
+        }
+    });
+
+    test("N-21: onboardQuestionsCount=0 / omitted suppresses the Questions badge", async () => {
+        expect(
+            await render(<RailNav activePath="/" onboardQuestionsCount={0} />),
+        ).not.toContain('class="count"');
+        expect(await render(<RailNav activePath="/" />)).not.toContain('class="count"');
     });
 });

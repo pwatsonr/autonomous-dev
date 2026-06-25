@@ -35,8 +35,8 @@ import type { FC } from "hono/jsx";
 
 import { icon } from "../lib/icons";
 
-/** Group identifier for the two rail-nav sections. */
-export type NavGroup = "operate" | "system";
+/** Group identifier for the rail-nav sections. */
+export type NavGroup = "operate" | "system" | "onboard";
 
 /** Single navigation entry rendered inside the rail. */
 export interface NavItem {
@@ -69,12 +69,18 @@ export const NAV_ITEMS: readonly NavItem[] = [
     { href: "/repos", label: "Repos", group: "system", iconName: "git-branch" },
     { href: "/settings", label: "Settings", group: "system", iconName: "sliders" },
     { href: "/ops", label: "Ops", group: "system", iconName: "terminal" },
+    // ONBOARD Phase 3 (#594) — org-onboarding surfaces. The Questions item
+    // carries a pending-count badge (onboardQuestionsCount).
+    { href: "/onboard", label: "Onboard", group: "onboard", iconName: "users" },
+    { href: "/onboard/ingestion", label: "Ingestion", group: "onboard", iconName: "database" },
+    { href: "/onboard/questions", label: "Questions", group: "onboard", iconName: "attention-needed" },
 ];
 
 /** Group label text rendered inside each `.rail-nav-group-label`. */
 const GROUP_LABELS: Record<NavGroup, string> = {
     operate: "OPERATE",
     system: "SYSTEM",
+    onboard: "ONBOARD",
 };
 
 /**
@@ -87,6 +93,7 @@ const BADGE_MAP: Record<string, keyof RailNavCounts> = {
     "/approvals": "approvalsCount",
     "/requests": "requestsCount",
     "/agents": "agentsAlertCount",
+    "/onboard/questions": "onboardQuestionsCount",
 };
 
 /**
@@ -99,13 +106,15 @@ const BADGE_NOUN: Record<string, string> = {
     "/approvals": "pending",
     "/requests": "active",
     "/agents": "",
+    "/onboard/questions": "pending",
 };
 
-/** Internal shape passed into `renderItem` so the 3 optional counts flow as one arg. */
+/** Internal shape passed into `renderItem` so the optional counts flow as one arg. */
 interface RailNavCounts {
     approvalsCount?: number;
     requestsCount?: number;
     agentsAlertCount?: number;
+    onboardQuestionsCount?: number;
 }
 
 export interface RailNavProps extends RailNavCounts {
@@ -187,14 +196,17 @@ export const RailNav: FC<RailNavProps> = ({
     approvalsCount,
     requestsCount,
     agentsAlertCount,
+    onboardQuestionsCount,
 }) => {
     const counts: RailNavCounts = {
         approvalsCount,
         requestsCount,
         agentsAlertCount,
+        onboardQuestionsCount,
     };
     const operate = NAV_ITEMS.filter((i) => i.group === "operate");
     const system = NAV_ITEMS.filter((i) => i.group === "system");
+    const onboard = NAV_ITEMS.filter((i) => i.group === "onboard");
     return (
         <nav class="rail-nav" aria-label="Primary">
             <div class="rail-nav-group" data-group="operate">
@@ -208,6 +220,12 @@ export const RailNav: FC<RailNavProps> = ({
                     {GROUP_LABELS.system}
                 </div>
                 {system.map((item) => renderItem(item, activePath, counts))}
+            </div>
+            <div class="rail-nav-group" data-group="onboard">
+                <div class="rail-nav-group-label">
+                    {GROUP_LABELS.onboard}
+                </div>
+                {onboard.map((item) => renderItem(item, activePath, counts))}
             </div>
         </nav>
     );

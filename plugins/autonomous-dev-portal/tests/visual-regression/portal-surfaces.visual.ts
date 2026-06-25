@@ -50,6 +50,11 @@ const SURFACES: Array<{ path: string; name: string }> = [
     { path: "/settings", name: "settings" },
     { path: "/agents", name: "agents" },
     { path: "/repos", name: "repos" },
+    // ONBOARD Phase 3 (#594) — org-onboarding surfaces (data from the
+    // kit-parity ownership manifest + ingest/questions.json + memory tree).
+    { path: "/onboard", name: "onboard" },
+    { path: "/onboard/ingestion", name: "onboard-ingestion" },
+    { path: "/onboard/questions", name: "onboard-questions" },
 ];
 
 async function waitForPort(port: number, timeoutMs = 5_000): Promise<void> {
@@ -81,6 +86,10 @@ test.beforeAll(async () => {
             PORTAL_PORT: String(PORT),
             NODE_ENV: "test",
             AUTONOMOUS_DEV_STATE_DIR: FIXTURE_STATE_DIR,
+            // ONBOARD #594 — pin ownership to the fixture so the onboard
+            // surfaces (and settings) read the kit-parity manifest, not the
+            // operator's real ~/.claude/autonomous-dev.json (hermeticity).
+            AUTONOMOUS_DEV_USER_CONFIG: join(FIXTURE_STATE_DIR, "autonomous-dev.json"),
             // #361: freeze the render clock so the kit-parity fixtures (dated
             // relative to this reference) produce reproducible screenshots.
             // Must match the reference the fixtures are built around — the

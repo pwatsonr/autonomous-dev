@@ -1,0 +1,128 @@
+/* v3/onboard.css — ONBOARD surfaces (#594): org/project/repo browser, live
+   ingestion status, and the blocking-question answer UI. Most visual weight
+   comes from composed primitives (.card / .chip / .tbl / .btn / .kpi); this
+   sheet adds the surface-specific spacing + the few bespoke bits (pager,
+   link-btn, memory panel). All values use design tokens; no raw hex; no
+   hardcoded px for font-size/padding/margin/gap/border-radius (0/1px excepted). */
+
+/* ============================================================
+   Surface wrappers — layout comes from .main-inner; these are
+   structural hooks for the three onboard sections.
+   ============================================================ */
+.onboard-surface,
+.onboard-ingestion-surface,
+.onboard-questions-surface {
+    display: block;
+}
+
+/* Section sub-heading, e.g. "Pending · 1" / "Answered · 1". */
+.section-title {
+    font-size: var(--t-meta);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-2);
+    margin: var(--s-5) 0 var(--s-2h);
+}
+
+/* ============================================================
+   Browser — filter strip + pagination
+   ============================================================ */
+.onboard-filters {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    margin-bottom: var(--s-4);
+}
+
+.pager {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    margin-top: var(--s-4);
+}
+.pager-link {
+    color: var(--fg-1);
+    text-decoration: none;
+    font-size: var(--t-meta);
+    padding: var(--s-1) var(--s-2h);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-2);
+}
+.pager-link:hover {
+    background: var(--bg-2);
+}
+.pager-pos {
+    color: var(--fg-2);
+    font-size: var(--t-meta);
+}
+
+/* "view memory" — a link-styled button inside a repo row. */
+.link-btn {
+    background: none;
+    border: none;
+    color: var(--fg-2);
+    font: inherit;
+    font-size: var(--t-meta);
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+}
+.link-btn:hover {
+    color: var(--fg-0);
+}
+
+/* ============================================================
+   Memory drill-in panel (GET /onboard/repo/:repo)
+   ============================================================ */
+.onboard-detail {
+    margin-top: var(--s-4);
+}
+.memory-panel {
+    background: var(--bg-1);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-2);
+    padding: var(--s-4);
+    margin-top: var(--s-3);
+}
+.memory-panel-title {
+    font-size: var(--t-13);
+    font-weight: 600;
+    color: var(--fg-0);
+    margin-bottom: var(--s-2h);
+}
+.memory-topics {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* ============================================================
+   Question answer cards (POST /onboard/questions/:id/answer)
+   ============================================================ */
+.onboard-q-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+}
+.onboard-q {
+    display: block;
+}
+.onboard-q-text {
+    color: var(--fg-1);
+    margin-bottom: var(--s-2h);
+}
+/* Answered cards read back muted. */
+.onboard-q.answered .onboard-q-text {
+    color: var(--fg-2);
+}
+/* Inline error fragments (failed answer / failed enrollment toggle). */
+.onboard-q-error,
+.onboard-row-error {
+    color: var(--fg-2);
+    font-size: var(--t-meta);
+    padding: var(--s-2) 0;
+}
