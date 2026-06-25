@@ -49,6 +49,13 @@ export interface TriggerRecord {
   origin: TriggerOrigin;
   createdAtMs: number;
   status: TriggerRecordStatus;
+  // Stabilization-watch fields (step 5), set when status → 'watching'.
+  /** The PR HEAD branch whose CI the watch tracks. */
+  watchPrBranch?: string;
+  /** Epoch ms the watch began (for the MAX_WATCH_DAYS hard cap). */
+  watchStartedAtMs?: number;
+  /** Epoch ms the current green streak began; undefined = no active streak. */
+  greenSinceMs?: number;
 }
 
 interface TriggerState {
@@ -173,5 +180,19 @@ export function updateRecordStatus(
   const idx = state.records.findIndex((r) => r.requestId === requestId);
   if (idx < 0) return;
   state.records[idx] = { ...state.records[idx], status };
+  saveState(state, io);
+}
+
+/** Merge a partial patch into a record (used by the stabilization watch to set
+ *  status + watch fields together). No-op if the record is absent. */
+export function patchRecord(
+  requestId: string,
+  patch: Partial<TriggerRecord>,
+  io: TriggerStoreIO = defaultTriggerStoreIO,
+): void {
+  const state = loadState(io);
+  const idx = state.records.findIndex((r) => r.requestId === requestId);
+  if (idx < 0) return;
+  state.records[idx] = { ...state.records[idx], ...patch, requestId };
   saveState(state, io);
 }
