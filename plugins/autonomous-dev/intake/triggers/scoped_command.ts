@@ -19,6 +19,8 @@ export type ScopeType = (typeof SCOPE_TYPES)[number];
 export const MIN_TASK_LENGTH = 10;
 /** Mirrors `MAX_DESCRIPTION_LENGTH` in `intake/handlers/submit_handler.ts`. */
 export const MAX_TASK_LENGTH = 10_000;
+/** Upper bound on a scope id (an `owner/name` repo or a project slug). */
+export const MAX_SCOPE_ID_LENGTH = 200;
 
 export type ScopedTriggerParseError =
   | 'bad-scope-type'
@@ -55,11 +57,19 @@ export function parseScopedTrigger(args: readonly string[]): ParsedScopedTrigger
       message: `scope type must be one of: ${SCOPE_TYPES.join(', ')}`,
     };
   }
-  if (typeof scopeId !== 'string' || scopeId.trim().length === 0) {
+  const trimmedScopeId = typeof scopeId === 'string' ? scopeId.trim() : '';
+  if (trimmedScopeId.length === 0) {
     return {
       ok: false,
       reason: 'missing-scope-id',
       message: 'a scope id (project or repo) is required',
+    };
+  }
+  if (trimmedScopeId.length > MAX_SCOPE_ID_LENGTH) {
+    return {
+      ok: false,
+      reason: 'missing-scope-id',
+      message: `scope id is too long (max ${MAX_SCOPE_ID_LENGTH} characters)`,
     };
   }
   const task = taskWords.join(' ').trim();
@@ -81,5 +91,5 @@ export function parseScopedTrigger(args: readonly string[]): ParsedScopedTrigger
     };
   }
 
-  return { ok: true, scopeType: scopeTypeRaw, scopeId: scopeId.trim(), task };
+  return { ok: true, scopeType: scopeTypeRaw, scopeId: trimmedScopeId, task };
 }

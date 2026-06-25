@@ -69,4 +69,14 @@ describe('resolveScope', () => {
     expect(r.found).toBe(false);
     if (!r.found) expect(r.reason).toBe('unknown-project');
   });
+
+  it('matches case-insensitively and returns the canonical stored id', () => {
+    const r = resolveScope(OWN, 'repo', 'ACME/Orders');
+    expect(r.found).toBe(true);
+    if (r.found) {
+      expect(r.scopeId).toBe('acme/orders');
+      expect(r.scope).toBe('repo:acme/orders');
+      expect(r.repoIds).toEqual(['acme/orders']);
+    }
+  });
 });

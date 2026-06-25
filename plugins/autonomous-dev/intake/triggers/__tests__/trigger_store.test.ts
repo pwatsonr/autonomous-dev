@@ -123,6 +123,34 @@ describe('trigger_store', () => {
     expect(files.get(sidecar as string)).toBe('{ not valid json');
   });
 
+  it('drops individually-corrupt records on load (keeps the valid ones)', () => {
+    const files = new Map<string, string>();
+    const { io } = memIO(files);
+    files.set(
+      triggerStatePath(io),
+      JSON.stringify({
+        seen: {},
+        records: [
+          {
+            requestId: 'R-good',
+            scope: 'repo:a/b',
+            scopeId: 'a/b',
+            scopeType: 'repo',
+            targetRepo: 'a/b',
+            origin: { platform: 'discord' },
+            createdAtMs: 1,
+            status: 'enqueued',
+          },
+          { requestId: 42 }, // wrong type
+          'nope',
+          null,
+        ],
+      }),
+    );
+    expect(listRecords(io)).toHaveLength(1);
+    expect(getRecord('R-good', io)).toBeDefined();
+  });
+
   it('updateRecordStatus patches an existing record (no-op when absent)', () => {
     const files = new Map<string, string>();
     const { io } = memIO(files);

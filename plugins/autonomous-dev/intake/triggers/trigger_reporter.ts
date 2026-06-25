@@ -53,9 +53,17 @@ export type TerminalOutcome =
 // Formatting (pure)
 // ---------------------------------------------------------------------------
 
+/** Collapse newlines so user-/PR-derived text can't break audit-log lines. */
+function oneLine(s: string): string {
+  return s.replace(/[\r\n]+/g, ' ').trim();
+}
+
 export function formatAccepted(record: TriggerRecord, info: AcceptedInfo = {}): TriggerMessage {
-  const cost = info.costUsd !== undefined ? `~$${info.costUsd.toFixed(2)}` : 'an estimated cost';
-  const eta = info.eta ? `, ETA ${info.eta}` : '';
+  const cost =
+    info.costUsd !== undefined && Number.isFinite(info.costUsd) && info.costUsd >= 0
+      ? `~$${info.costUsd.toFixed(2)}`
+      : 'an estimated cost';
+  const eta = info.eta ? `, ETA ${oneLine(info.eta)}` : '';
   return {
     title: `Accepted — ${record.requestId}`,
     body:
@@ -67,13 +75,13 @@ export function formatAccepted(record: TriggerRecord, info: AcceptedInfo = {}): 
 
 export function formatTerminal(record: TriggerRecord, outcome: TerminalOutcome): TriggerMessage {
   if (outcome.status === 'done') {
-    const pr = outcome.prUrl ? `\nPR: ${outcome.prUrl}` : '';
+    const pr = outcome.prUrl ? `\nPR: ${oneLine(outcome.prUrl)}` : '';
     return {
       title: `Done — ${record.requestId}`,
       body: `Finished ${record.scope}: ${record.targetRepo}.${pr}`,
     };
   }
-  const reason = outcome.reason ? `\nReason: ${outcome.reason}` : '';
+  const reason = outcome.reason ? `\nReason: ${oneLine(outcome.reason)}` : '';
   return {
     title: `Failed — ${record.requestId}`,
     body: `Could not complete ${record.scope}: ${record.targetRepo}.${reason}`,

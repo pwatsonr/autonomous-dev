@@ -27,13 +27,31 @@ export interface CheckRun {
 type Norm = 'pass' | 'fail' | 'pending' | 'skip' | 'unknown';
 
 function normalizeRun(run: CheckRun): Norm {
-  const v = (run.bucket ?? run.conclusion ?? run.state ?? '').toLowerCase();
-  if (['pass', 'success', 'completed', 'neutral'].includes(v)) return 'pass';
-  if (['fail', 'failure', 'error', 'cancel', 'cancelled', 'timed_out', 'action_required'].includes(v)) {
-    return 'fail';
+  // Field precedence: `bucket` (gh's own rollup) is authoritative when present.
+  // Without a bucket, a run is only conclusive once `state === 'completed'` AND
+  // it carries a `conclusion`; a completed run with no conclusion is `unknown`
+  // (NOT pass), and any non-completed `state` (in_progress/queued/…) is pending.
+  // This stops a `{conclusion:'success', state:'in_progress'}` row from reading
+  // green while CI is still running.
+  let raw: string;
+  if (run.bucket !== undefined && run.bucket !== '') {
+    raw = run.bucket;
+  } else if (run.state === 'completed') {
+    raw = run.conclusion ?? 'unknown';
+  } else {
+    raw = run.state ?? run.conclusion ?? '';
   }
-  if (['pending', 'in_progress', 'queued', 'waiting', 'expected'].includes(v)) return 'pending';
-  if (['skip', 'skipping', 'skipped'].includes(v)) return 'skip';
+  const v = raw.trim().toLowerCase();
+  if (['pass', 'success', 'neutral'].includes(v)) return 'pass';
+  if (['fail', 'failure', 'error', 'timed_out'].includes(v)) return 'fail';
+  // `action_required` is awaiting manual approval (pending), not a failure.
+  if (['pending', 'in_progress', 'queued', 'waiting', 'expected', 'action_required'].includes(v)) {
+    return 'pending';
+  }
+  // A cancelled/skipped run is not a failure of the change → treat as skip.
+  if (['skip', 'skipping', 'skipped', 'cancel', 'cancelled', 'canceling', 'stale'].includes(v)) {
+    return 'skip';
+  }
   return 'unknown';
 }
 

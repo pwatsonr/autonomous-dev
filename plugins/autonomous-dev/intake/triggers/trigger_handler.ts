@@ -78,15 +78,17 @@ export class TriggerHandler implements CommandHandler {
     // repo; project scope has no single repo (scope_authz does the per-repo
     // check inside execute()).
     if (command.args[0] === 'repo' && typeof command.args[1] === 'string') {
-      return { targetRepo: command.args[1] };
+      return { targetRepo: command.args[1].trim() };
     }
     return {};
   }
 
   async execute(command: IncomingCommand, userId: string): Promise<CommandResult> {
     const storeIO = this.deps.storeIO ?? defaultTriggerStoreIO;
+    // Trim so a whitespace-only message id can't both bypass dedupe (length>0)
+    // and pollute the seen-set; an effectively-empty id means "no dedupe key".
     const messageId =
-      typeof command.flags['messageId'] === 'string' ? command.flags['messageId'] : '';
+      typeof command.flags['messageId'] === 'string' ? command.flags['messageId'].trim() : '';
 
     // 0. Idempotency: a retried inbound webhook (same message id) must not
     //    re-enqueue. Survives restarts (the seen-set is read from disk). The
@@ -150,7 +152,14 @@ export class TriggerHandler implements CommandHandler {
     const channelType = command.source.channelType;
     const authorizeForChannel: RepoAuthorizeFn = (uid, repo) =>
       this.authorize(uid, repo, channelType);
-    const authz = canTriggerScope(resolved, userId, authorizeForChannel);
+    let authz: ReturnType<typeof canTriggerScope>;
+    try {
+      authz = canTriggerScope(resolved, userId, authorizeForChannel);
+    } catch {
+      // A throw from the injected AuthzEngine must not escape as a 500 — fail
+      // closed with a typed error (nothing has been enqueued yet).
+      return { success: false, error: 'authorization check failed', errorCode: 'INTERNAL_ERROR' };
+    }
     if (!authz.allowed) {
       return {
         success: false,
@@ -159,8 +168,10 @@ export class TriggerHandler implements CommandHandler {
       };
     }
 
-    // 6. Enqueue a normal pipeline request (mirrors SubmitHandler's build).
-    const now = new Date().toISOString().replace(/(\.\d{3})\d*Z$/, '$1Z');
+    // 6. Enqueue a normal pipeline request (mirrors SubmitHandler's build). One
+    //    clock (storeIO.now) for the row + the trigger record so they agree.
+    const nowMs = storeIO.now();
+    const now = new Date(nowMs).toISOString();
     const requestId = this.db.generateRequestId();
 
     const request: RequestEntity = {
@@ -211,24 +222,30 @@ export class TriggerHandler implements CommandHandler {
 
     // Record the trigger (origin + scope) and mark the message id seen so a
     // retry is deduped. Reporting (step 4) + the watch (step 5) read this.
-    commitTrigger(
-      {
-        requestId,
-        scope: resolved.scope,
-        scopeId: resolved.scopeId,
-        scopeType: resolved.scopeType,
-        targetRepo,
-        origin: {
-          platform: channelType,
-          channelId: command.source.platformChannelId,
-          userId: command.source.userId,
-          messageId: messageId.length > 0 ? messageId : undefined,
+    // Best-effort: the request is already enqueued, so a store-write failure
+    // degrades tracking/reporting but must not fail the run.
+    try {
+      commitTrigger(
+        {
+          requestId,
+          scope: resolved.scope,
+          scopeId: resolved.scopeId,
+          scopeType: resolved.scopeType,
+          targetRepo,
+          origin: {
+            platform: channelType,
+            channelId: command.source.platformChannelId,
+            userId: command.source.userId,
+            messageId: messageId.length > 0 ? messageId : undefined,
+          },
+          createdAtMs: nowMs,
+          status: 'enqueued',
         },
-        createdAtMs: storeIO.now(),
-        status: 'enqueued',
-      },
-      storeIO,
-    );
+        storeIO,
+      );
+    } catch {
+      /* best-effort tracking */
+    }
 
     return {
       success: true,

@@ -19,7 +19,7 @@ import {
 } from '../trigger_watch';
 
 const DAY = 86_400_000;
-const OPTS: WatchOpts = { nDays: 3, maxWatchDays: 14 };
+const OPTS: WatchOpts = { nDays: 3, maxWatchDays: 14, maxGapMs: DAY };
 
 function memIO(files: Map<string, string>): TriggerStoreIO {
   return {
@@ -63,10 +63,30 @@ describe('evaluateWatch', () => {
     expect(r.transitioned).toBe(false);
   });
 
-  it('green for ≥ N days → stable', () => {
-    const r = evaluateWatch(watching({ greenSinceMs: 0 }), { state: 'green' }, 3 * DAY, OPTS);
+  it('green for ≥ N days (continuously observed) → stable', () => {
+    // streak began at 0 AND green was observed within maxGapMs of now.
+    const r = evaluateWatch(
+      watching({ greenSinceMs: 0, lastGreenMs: 2.5 * DAY }),
+      { state: 'green' },
+      3 * DAY,
+      OPTS,
+    );
     expect(r.status).toBe('stable');
     expect(r.transitioned).toBe(true);
+  });
+
+  it('does NOT graduate to stable across an observation gap (blocker fix)', () => {
+    // streak nominally began at 0, but green was last OBSERVED at 0; a green
+    // tick at day 3 sees a 3-day gap (> maxGapMs=1d) → the streak restarts.
+    const r = evaluateWatch(
+      watching({ greenSinceMs: 0, lastGreenMs: 0 }),
+      { state: 'green' },
+      3 * DAY,
+      OPTS,
+    );
+    expect(r.status).toBe('watching');
+    expect(r.greenSinceMs).toBe(3 * DAY); // reset to now
+    expect(r.transitioned).toBe(false);
   });
 
   it('red resets the green streak but keeps watching', () => {
@@ -114,7 +134,7 @@ describe('advanceWatches', () => {
 
   it('drives a stable transition: persists status, audits, reports', async () => {
     const { io, audits, transitions } = setup();
-    patchRecord('R-1', { greenSinceMs: 0 }, io); // green since t=0
+    patchRecord('R-1', { greenSinceMs: 0, lastGreenMs: 2.5 * DAY }, io); // green since t=0, observed recently
     await advanceWatches({
       storeIO: io,
       checks: { getStatus: async () => ({ state: 'green' }) },
@@ -162,6 +182,28 @@ describe('advanceWatches', () => {
       opts: OPTS,
     });
     expect(getRecord('R-1', io)?.status).toBe('watching'); // unchanged
+  });
+
+  it('does not tick a watching record with no watchStartedAtMs (no start → no cap)', async () => {
+    const files = new Map<string, string>();
+    const io = memIO(files);
+    commitTrigger(rec('R-x'), io);
+    patchRecord('R-x', { status: 'watching', watchPrBranch: 'pr' }, io); // no watchStartedAtMs
+    let called = false;
+    await advanceWatches({
+      storeIO: io,
+      checks: {
+        getStatus: async () => {
+          called = true;
+          return { state: 'green' };
+        },
+      },
+      now: () => 99 * DAY,
+      audit: { append: () => undefined },
+      onTransition: async () => undefined,
+      opts: OPTS,
+    });
+    expect(called).toBe(false);
   });
 
   it('ignores records that are not watching', async () => {

@@ -38,31 +38,36 @@ export function resolveScope(
   scopeType: ScopeType,
   scopeId: string,
 ): ResolvedScope {
+  // Match case-insensitively (repo ids are stored lowercased; project ids are
+  // kebab slugs) and return the CANONICAL stored id so the enqueued target_repo
+  // + the scope tag are normalized regardless of how the user typed it.
+  const key = scopeId.toLowerCase();
+
   if (scopeType === 'repo') {
-    const repo = ownership.repos.find((r) => r.id === scopeId);
+    const repo = ownership.repos.find((r) => r.id.toLowerCase() === key);
     if (repo === undefined) return { found: false, reason: 'unknown-repo' };
     return {
       found: true,
-      scope: `repo:${scopeId}`,
+      scope: `repo:${repo.id}`,
       scopeType,
-      scopeId,
+      scopeId: repo.id,
       projectId: repo.projectId,
-      repoIds: [scopeId],
+      repoIds: [repo.id],
     };
   }
 
   // scopeType === 'project'
-  const project = ownership.projects.find((p) => p.id === scopeId);
+  const project = ownership.projects.find((p) => p.id.toLowerCase() === key);
   if (project === undefined) return { found: false, reason: 'unknown-project' };
   const repoIds = ownership.repos
-    .filter((r) => r.projectId === scopeId)
+    .filter((r) => r.projectId === project.id)
     .map((r) => r.id);
   return {
     found: true,
-    scope: `project:${scopeId}`,
+    scope: `project:${project.id}`,
     scopeType,
-    scopeId,
-    projectId: scopeId,
+    scopeId: project.id,
+    projectId: project.id,
     repoIds,
   };
 }

@@ -176,6 +176,17 @@ describe('TriggerHandler.execute', () => {
     expect(inserted).toHaveLength(1); // only the first attempt enqueued
   });
 
+  it('a whitespace-only message id is not used as a dedupe key', async () => {
+    const { db, inserted } = makeDb();
+    const storeIO = makeStore();
+    const h = new TriggerHandler(db, emitter, () => OWN, allow, { storeIO });
+    // Two distinct triggers that both carry a whitespace messageId must BOTH
+    // enqueue — the blank id must not suppress the second (or pollute seen).
+    await h.execute(cmd(['repo', 'acme/orders', 'a good task here'], '   '), 'u1');
+    await h.execute(cmd(['repo', 'acme/orders', 'another good task'], '   '), 'u1');
+    expect(inserted).toHaveLength(2);
+  });
+
   it('records the trigger in the store after a successful enqueue', async () => {
     const { db } = makeDb();
     const storeIO = makeStore();

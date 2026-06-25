@@ -21,6 +21,7 @@
  * @module intake/triggers/trigger_store
  */
 
+import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -56,6 +57,9 @@ export interface TriggerRecord {
   watchStartedAtMs?: number;
   /** Epoch ms the current green streak began; undefined = no active streak. */
   greenSinceMs?: number;
+  /** Epoch ms green was last OBSERVED; a gap > maxGapMs breaks the streak so
+   *  `stable` requires continuously-observed green, not just elapsed time. */
+  lastGreenMs?: number;
 }
 
 interface TriggerState {
@@ -77,7 +81,9 @@ export const defaultTriggerStoreIO: TriggerStoreIO = {
   readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    const tmp = `${filePath}.tmp.${process.pid}`;
+    // Unique tmp name (pid + random) so two writers in the same process don't
+    // collide on the temp file before the atomic rename.
+    const tmp = `${filePath}.tmp.${process.pid}.${randomBytes(6).toString('hex')}`;
     fs.writeFileSync(tmp, data, { encoding: 'utf-8', mode: 0o600 });
     fs.renameSync(tmp, filePath);
   },
@@ -100,6 +106,19 @@ function isState(v: unknown): v is TriggerState {
   );
 }
 
+/** A record is usable iff its identifying fields are the right type. Individually
+ *  corrupt records are dropped on load (vs discarding the whole store). */
+function isRecord(v: unknown): v is TriggerRecord {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r.requestId === 'string' &&
+    typeof r.scope === 'string' &&
+    typeof r.targetRepo === 'string' &&
+    typeof r.status === 'string'
+  );
+}
+
 /** Load the trigger state. Never throws: missing → empty; corrupt → empty
  *  (preserving the corrupt file in a sidecar so a save can't silently wipe it). */
 function loadState(io: TriggerStoreIO): TriggerState {
@@ -111,9 +130,11 @@ function loadState(io: TriggerStoreIO): TriggerState {
   } catch {
     parsed = undefined;
   }
-  if (isState(parsed)) return parsed;
+  if (isState(parsed)) {
+    return { seen: parsed.seen, records: parsed.records.filter(isRecord) };
+  }
   try {
-    io.writeFile(`${triggerStatePath(io)}.corrupt-${io.now()}`, raw);
+    io.writeFile(`${triggerStatePath(io)}.corrupt-${io.now()}.${randomBytes(4).toString('hex')}`, raw);
   } catch {
     /* best-effort */
   }
@@ -187,7 +208,7 @@ export function updateRecordStatus(
  *  status + watch fields together). No-op if the record is absent. */
 export function patchRecord(
   requestId: string,
-  patch: Partial<TriggerRecord>,
+  patch: Partial<Omit<TriggerRecord, 'requestId'>>,
   io: TriggerStoreIO = defaultTriggerStoreIO,
 ): void {
   const state = loadState(io);

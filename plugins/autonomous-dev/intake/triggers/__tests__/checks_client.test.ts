@@ -35,6 +35,22 @@ describe('reduceChecks', () => {
     expect(reduceChecks([{ conclusion: 'success' }]).state).toBe('green');
     expect(reduceChecks([{ state: 'failure' }]).state).toBe('red');
   });
+
+  it('cancelled → skip (does not break a green streak)', () => {
+    expect(reduceChecks([{ bucket: 'pass' }, { bucket: 'cancel' }]).state).toBe('green');
+  });
+
+  it('action_required → pending (awaiting approval, not failure)', () => {
+    expect(reduceChecks([{ bucket: 'pass' }, { state: 'action_required' }]).state).toBe('pending');
+  });
+
+  it('an in-flight run with a success conclusion reads pending, not green', () => {
+    expect(reduceChecks([{ conclusion: 'success', state: 'in_progress' }]).state).toBe('pending');
+  });
+
+  it('completed with no conclusion → unknown (not green)', () => {
+    expect(reduceChecks([{ state: 'completed' }]).state).toBe('unknown');
+  });
 });
 
 describe('ghChecksClient', () => {
