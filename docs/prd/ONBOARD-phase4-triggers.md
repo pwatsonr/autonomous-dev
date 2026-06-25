@@ -99,7 +99,7 @@ Extend `AuditEventType` **additively** (per P2 TC-2a) with: `trigger_received`, 
   - **(a) CI green for N days** — objective; needs the repo's GitHub Checks status. Strong where CI exists.
   - **(b) No reverts / new failures for N days** — catches real regressions; fuzzier detection.
   - **(c) No follow-up PRs/issues for N days** — cheap; weak signal.
-  - **Recommendation: (a) CI-green-for-N-days primary, reinforced by (b); fall back to (c) where no CI. N=3 default.** **Operator confirms primary signal + window before TDD.**
+  - **RESOLVED (operator, 2026-06-25): (a) CI-green-for-N-days, N=3** — primary signal = the PR HEAD branch's CI/Checks staying green for 3 consecutive days; reinforced by (b) no-reverts/new-failures; fall back to (c) where the repo has no CI. Per-scope override on N allowed.
 - **OQ-2 — inbound ingress.** Reuse the **existing** intake Discord/Slack HTTP adapters as ingress (recommended — already verify signatures + 3 s ACK), vs. routing through the portal, vs. a new listener. **Lean: reuse the existing intake adapters.** Resolve in TDD.
 - **OQ-3 — scope-authz predicate.** Build on `authz_engine.ts` with a new `(userId, platform, scope) → allow|deny` predicate; backing data = a per-scope allowlist, or map onto ownership/enrollment? Default-deny regardless. Resolve in TDD.
 - **OQ-4 — dedupe key + retention** (platform interaction/message id; TTL per FR-D2).
