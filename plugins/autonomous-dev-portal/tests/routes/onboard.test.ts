@@ -195,6 +195,12 @@ describe("POST /onboard/questions/:id/answer", () => {
         seed();
         expect((await post("does-not-exist", "choice=web")).status).toBe(404);
     });
+
+    test("a malformed (non-array) questions file → 409", async () => {
+        seed();
+        writeFileSync(onboardQuestionsPath(), JSON.stringify({ not: "an array" }), "utf8");
+        expect((await post("q1", "choice=web")).status).toBe(409);
+    });
 });
 
 describe("POST /onboard/{enroll,unenroll}", () => {
@@ -256,5 +262,10 @@ describe("GET /onboard/repo/:repo", () => {
         seed();
         const html = await (await app().request("/onboard/repo/acme/billing")).text();
         expect(html).toContain("No scoped memory");
+    });
+
+    test("an unsafe repo id → 404 (charset/traversal guard, not an empty panel)", async () => {
+        seed();
+        expect((await app().request("/onboard/repo/ev~il")).status).toBe(404);
     });
 });

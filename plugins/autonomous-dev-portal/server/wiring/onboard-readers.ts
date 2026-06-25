@@ -118,6 +118,16 @@ export function __resetOnboardReaderCacheForTests(): void {
     cache.clear();
 }
 
+/**
+ * Invalidate all cached onboard reads. Production callers (the write routes)
+ * invoke this after a successful answer/enrollment write so the next read —
+ * the rail badge, a page refresh, the ingestion poll — reflects the new state
+ * immediately instead of lagging up to the 5s TTL.
+ */
+export function invalidateOnboardReaderCache(): void {
+    cache.clear();
+}
+
 // ---------------------------------------------------------------------------
 // Tolerant coercion helpers
 // ---------------------------------------------------------------------------
@@ -135,9 +145,16 @@ function asTags(v: unknown): Record<string, string> {
     return out;
 }
 
-/** A repo id is safe to use as a path segment (no traversal). */
-function isSafeRepoId(id: string): boolean {
-    return id.length > 0 && !id.includes("..") && !id.startsWith("/");
+// A repo id is safe to use as a path when it's a positive-allowlist match:
+// org/repo-style, each slash-separated segment limited to [A-Za-z0-9._-] and
+// never a bare "." or ".." (so the "." in the charset can't form traversal).
+// Exported for a defense-in-depth guard at the drill-in route.
+const SAFE_REPO_SEGMENT = /^[A-Za-z0-9._-]+$/;
+export function isSafeRepoId(id: string): boolean {
+    if (id.length === 0) return false;
+    return id
+        .split("/")
+        .every((s) => s !== "." && s !== ".." && SAFE_REPO_SEGMENT.test(s));
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +223,10 @@ export async function readOnboardQuestions(now: () => number = nowMs): Promise<O
                     const id = asString(qo.id);
                     const repoId = asString(qo.repoId);
                     if (!id || !repoId) return undefined;
-                    const optionsValid = Array.isArray(qo.options) && qo.options.every((x) => typeof x === "string");
+                    const optionsValid =
+                        Array.isArray(qo.options) &&
+                        qo.options.length > 0 &&
+                        qo.options.every((x) => typeof x === "string");
                     return {
                         id,
                         repoId,

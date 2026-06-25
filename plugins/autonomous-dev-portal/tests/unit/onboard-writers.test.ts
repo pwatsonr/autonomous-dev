@@ -125,6 +125,21 @@ describe("answerQuestion", () => {
         // The corrupt file is left exactly as-is (not overwritten).
         expect(readFileSync(p, "utf8")).toBe("{ not json");
     });
+
+    test("empty options array → not-answerable (an empty list isn't answerable)", async () => {
+        seedQuestions([{ id: "q1", repoId: "a/x", question: "?", options: [], status: "pending" }]);
+        expect(await answerQuestion("q1", "anything")).toEqual({ ok: false, reason: "not-answerable" });
+        expect(readBack()[0].status).toBe("pending");
+    });
+
+    test("a present-but-non-array questions file → corrupt (refuses to clobber)", async () => {
+        const p = onboardQuestionsPath();
+        mkdirSync(dirname(p), { recursive: true });
+        writeFileSync(p, JSON.stringify({ not: "an array" }), "utf8");
+        expect(await answerQuestion("q1", "x")).toEqual({ ok: false, reason: "corrupt" });
+        // Untouched.
+        expect(JSON.parse(readFileSync(p, "utf8"))).toEqual({ not: "an array" });
+    });
 });
 
 function seedManifest(manifest: unknown): void {
@@ -219,5 +234,31 @@ describe("setEnrollment", () => {
         writeFileSync(p, "{ broken", "utf8");
         expect(await setEnrollment("acme/x", true)).toEqual({ ok: false, reason: "corrupt" });
         expect(readFileSync(p, "utf8")).toBe("{ broken");
+    });
+
+    test("manifest with NO ownership key → unknown (fresh install, not corrupt)", async () => {
+        seedManifest({ settings: { trust: "high" } });
+        expect(await setEnrollment("acme/x", true)).toEqual({ ok: false, reason: "unknown" });
+    });
+
+    test("a real toggle reports changed:true", async () => {
+        seedManifest({ ownership: { org: "a", projects: [], repos: [{ id: "a/x", projectId: null, tags: {} }] } });
+        const res = await setEnrollment("a/x", true);
+        expect(res.ok).toBe(true);
+        if (res.ok) expect(res.changed).toBe(true);
+    });
+
+    test("toggling to the SAME state is a no-op (changed:false, flag preserved)", async () => {
+        seedManifest({
+            ownership: {
+                org: "a",
+                projects: [],
+                repos: [{ id: "a/x", projectId: null, tags: {}, participate_in_auto_improvement: true }],
+            },
+        });
+        const res = await setEnrollment("a/x", true); // already enrolled
+        expect(res.ok).toBe(true);
+        if (res.ok) expect(res.changed).toBe(false);
+        expect(readManifest().ownership.repos[0].participate_in_auto_improvement).toBe(true);
     });
 });

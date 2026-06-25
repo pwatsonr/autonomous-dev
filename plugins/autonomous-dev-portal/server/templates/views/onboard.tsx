@@ -67,7 +67,7 @@ export const RepoRow: FC<{ r: OnboardRepoRow }> = ({ r }) => (
             <button
                 type="button"
                 class="link-btn"
-                hx-get={`/onboard/repo/${r.id}`}
+                hx-get={`/onboard/repo/${r.id.split("/").map(encodeURIComponent).join("/")}`}
                 hx-target="#onboard-detail"
                 hx-swap="innerHTML"
             >

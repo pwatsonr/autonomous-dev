@@ -16,6 +16,7 @@ import {
     readOnboardProposalsPending,
     readRepoMemoryTopics,
     readIngestionStatus,
+    isSafeRepoId,
 } from "../../server/wiring/onboard-readers";
 import {
     userConfigPath,
@@ -187,5 +188,30 @@ describe("onboard-readers / cache", () => {
         expect(b.org).toBe("one");
         const c = await readOnboardOwnership(() => 7000); // >5s → refresh
         expect(c.org).toBe("two");
+    });
+});
+
+describe("isSafeRepoId", () => {
+    test("accepts org/repo-style ids (incl. dots/dashes/underscores in segments)", () => {
+        for (const id of ["acme/orders", "my-org/my_repo", "a.b/c.d", "single", "a/b/c"]) {
+            expect(isSafeRepoId(id)).toBe(true);
+        }
+    });
+
+    test("rejects traversal segments + out-of-charset chars + empty", () => {
+        for (const id of [
+            "",
+            "..",
+            "../etc/passwd",
+            "a/../b",
+            "/abs",
+            "a/./b",
+            "a b", // space
+            "x~y", // tilde
+            "a/b\\c", // backslash
+            "evil$",
+        ]) {
+            expect(isSafeRepoId(id)).toBe(false);
+        }
     });
 });

@@ -13,6 +13,7 @@ import {
     readIngestionRepoList,
     readRepoMemoryTopicNames,
     readRepoMemoryTopics,
+    isSafeRepoId,
 } from "../wiring/onboard-readers";
 import type {
     OnboardPageData,
@@ -121,6 +122,12 @@ export const onboardQuestionsHandler = async (c: Context): Promise<Response> => 
 /** GET /onboard/repo/:repo{.+} — the memory drill-in fragment (repo ids contain slashes). */
 export const onboardRepoMemoryHandler = async (c: Context): Promise<Response> => {
     const repoId = c.req.param("repo");
+    // Defense in depth: the reader already returns [] for unsafe ids, but reject
+    // them explicitly at the route so a traversal probe gets an honest 404 (not
+    // an empty panel that looks like "this repo has no memory").
+    if (typeof repoId !== "string" || !isSafeRepoId(repoId)) {
+        return c.text("not found", 404);
+    }
     const topics = await readRepoMemoryTopics(repoId);
     return c.html(<OnboardRepoMemoryPanel repoId={repoId} topics={topics} />);
 };

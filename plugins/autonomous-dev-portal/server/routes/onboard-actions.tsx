@@ -24,6 +24,7 @@ import { answerQuestion, setEnrollment } from "../wiring/onboard-writers";
 import {
     readOnboardQuestions,
     readRepoMemoryTopicNames,
+    invalidateOnboardReaderCache,
 } from "../wiring/onboard-readers";
 import type { OnboardRepoRow } from "../types/render";
 
@@ -58,6 +59,13 @@ export function buildOnboardActionRoutes(deps: OnboardActionDeps = {}): Hono {
             if (result.reason === "unknown") {
                 return c.html(<OnboardAnswerError message="question not found" />, 404);
             }
+            if (result.reason === "corrupt") {
+                logger.error("onboard_answer_corrupt", { id });
+                return c.html(
+                    <OnboardAnswerError message="questions file is malformed — fix it in the daemon" />,
+                    409,
+                );
+            }
             if (result.reason === "io") {
                 logger.error("onboard_answer_io", { id });
                 return c.html(<OnboardAnswerError message="write failed" />, 500);
@@ -68,6 +76,10 @@ export function buildOnboardActionRoutes(deps: OnboardActionDeps = {}): Hono {
                     : "question is not answerable";
             return c.html(<OnboardAnswerError message={message} />, 422);
         }
+
+        // Bust the read cache so the rail badge, a page refresh, and the
+        // ingestion poll reflect the answer immediately (not after the 5s TTL).
+        invalidateOnboardReaderCache();
 
         // Audit is fire-and-forget (keep the HTMX response tight); broadcast lets
         // the ingestion/rail surfaces refresh their pending count.
@@ -130,6 +142,22 @@ export function buildOnboardActionRoutes(deps: OnboardActionDeps = {}): Hono {
             return c.html(<OnboardRowError message="write failed" />, 500);
         }
 
+        // A real state change busts the read cache (so the /onboard KPI strip
+        // and rail reflect it immediately) and emits audit + broadcast. A no-op
+        // toggle (already in the requested state) skips all three — it still
+        // returns the correct row so the button re-renders consistently.
+        if (result.changed) {
+            invalidateOnboardReaderCache();
+            if (deps.audit !== undefined) {
+                void deps.audit.append({
+                    event: enrolled ? "onboard_repo_enrolled" : "onboard_repo_unenrolled",
+                    actor,
+                    repo: repoId,
+                });
+            }
+            broadcast.publish("onboard_enrollment_changed", { repoId, enrolled });
+        }
+
         // Enrich the ownership-level repo with blocked + topics for the row
         // (these don't change on a toggle, so a cached read is fine).
         const questions = await readOnboardQuestions();
@@ -138,15 +166,6 @@ export function buildOnboardActionRoutes(deps: OnboardActionDeps = {}): Hono {
         );
         const topics = await readRepoMemoryTopicNames(repoId);
         const row: OnboardRepoRow = { ...result.repo, blocked, topics };
-
-        if (deps.audit !== undefined) {
-            void deps.audit.append({
-                event: enrolled ? "onboard_repo_enrolled" : "onboard_repo_unenrolled",
-                actor,
-                repo: repoId,
-            });
-        }
-        broadcast.publish("onboard_enrollment_changed", { repoId, enrolled });
 
         return c.html(<RepoRow r={row} />);
     };
