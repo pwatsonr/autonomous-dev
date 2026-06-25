@@ -33,6 +33,12 @@ import { channelTypeToRequestSource } from '../types/request_source';
 import { canTriggerScope, type RepoAuthorizeFn } from './scope_authz';
 import { resolveScope } from './scope_resolution';
 import { parseScopedTrigger } from './scoped_command';
+import {
+  commitTrigger,
+  defaultTriggerStoreIO,
+  hasSeen,
+  type TriggerStoreIO,
+} from './trigger_store';
 
 /**
  * Per-repo authorize decision WITH the originating channel (for audit). The
@@ -48,6 +54,8 @@ export type TriggerAuthorizeFn = (
 
 export interface TriggerHandlerDeps {
   injectionRules?: InjectionRule[];
+  /** Injected store seam (defaults to real fs); tests pass an in-memory IO. */
+  storeIO?: TriggerStoreIO;
 }
 
 export class TriggerHandler implements CommandHandler {
@@ -76,6 +84,17 @@ export class TriggerHandler implements CommandHandler {
   }
 
   async execute(command: IncomingCommand, userId: string): Promise<CommandResult> {
+    const storeIO = this.deps.storeIO ?? defaultTriggerStoreIO;
+    const messageId =
+      typeof command.flags['messageId'] === 'string' ? command.flags['messageId'] : '';
+
+    // 0. Idempotency: a retried inbound webhook (same message id) must not
+    //    re-enqueue. Survives restarts (the seen-set is read from disk). The
+    //    intake router is sequential, so check-then-commit cannot race.
+    if (messageId.length > 0 && hasSeen(messageId, storeIO)) {
+      return { success: true, data: { requestId: null, alreadyReceived: true } };
+    }
+
     // 1. Parse the scoped grammar.
     const parsed = parseScopedTrigger(command.args);
     if (!parsed.ok) {
@@ -189,6 +208,27 @@ export class TriggerHandler implements CommandHandler {
         position,
       }),
     });
+
+    // Record the trigger (origin + scope) and mark the message id seen so a
+    // retry is deduped. Reporting (step 4) + the watch (step 5) read this.
+    commitTrigger(
+      {
+        requestId,
+        scope: resolved.scope,
+        scopeId: resolved.scopeId,
+        scopeType: resolved.scopeType,
+        targetRepo,
+        origin: {
+          platform: channelType,
+          channelId: command.source.platformChannelId,
+          userId: command.source.userId,
+          messageId: messageId.length > 0 ? messageId : undefined,
+        },
+        createdAtMs: storeIO.now(),
+        status: 'enqueued',
+      },
+      storeIO,
+    );
 
     return {
       success: true,
