@@ -10,6 +10,8 @@
  */
 
 import * as fs from 'fs';
+import * as path from 'path';
+
 import * as yaml from 'js-yaml';
 
 // ---------------------------------------------------------------------------
@@ -92,6 +94,26 @@ const ESCAPE_CHARS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Pattern compilation
+// ---------------------------------------------------------------------------
+
+/**
+ * Compile a rule pattern into a RegExp. The YAML rules are authored with the
+ * PCRE/Python inline case-insensitive flag `(?i)`, which JavaScript's RegExp
+ * does not support (it throws at construction). Strip any `(?i)` and fold it
+ * into the JS `i` flag so the rule matches case-insensitively as written.
+ */
+function compilePattern(pattern: string, baseFlags = 'g'): RegExp {
+  let source = pattern;
+  let flags = baseFlags;
+  if (source.includes('(?i)')) {
+    source = source.replace(/\(\?i\)/g, '');
+    if (!flags.includes('i')) flags += 'i';
+  }
+  return new RegExp(source, flags);
+}
+
+// ---------------------------------------------------------------------------
 // Rule loading and validation
 // ---------------------------------------------------------------------------
 
@@ -160,9 +182,9 @@ export function loadRules(filePath: string): InjectionRule[] {
       );
     }
 
-    // Validate pattern is a valid regex
+    // Validate pattern is a valid regex (via the (?i)-aware compiler).
     try {
-      new RegExp(rule.pattern, 'g');
+      compilePattern(rule.pattern);
     } catch (err) {
       throw new Error(
         `Invalid rule "${rule.id}": pattern is not a valid regex: ${(err as Error).message}`,
@@ -219,7 +241,7 @@ export function sanitize(text: string, rules: InjectionRule[]): SanitizationResu
   const appliedRules: AppliedRule[] = [];
 
   for (const rule of rules) {
-    const regex = new RegExp(rule.pattern, 'g');
+    const regex = compilePattern(rule.pattern);
     const matches = sanitizedText.match(regex);
 
     if (!matches || matches.length === 0) {
@@ -241,7 +263,7 @@ export function sanitize(text: string, rules: InjectionRule[]): SanitizationResu
 
       case 'escape':
         // Replace special characters in matched regions.
-        sanitizedText = applyEscape(sanitizedText, new RegExp(rule.pattern, 'g'));
+        sanitizedText = applyEscape(sanitizedText, compilePattern(rule.pattern));
         break;
     }
 
@@ -259,4 +281,40 @@ export function sanitize(text: string, rules: InjectionRule[]): SanitizationResu
     flaggedForReview,
     appliedRules,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Default rules
+// ---------------------------------------------------------------------------
+
+/**
+ * Absolute path to the injection rules shipped with the plugin
+ * (`intake/config/injection-rules.yaml`). Resolved relative to this module so
+ * it is correct whether sanitizer runs from source (ts-jest, `intake/core`) or
+ * bundled into `intake/adapters/cli_adapter.js` — both sit one level under
+ * `intake/`, so `../config` lands on the same file.
+ */
+export function defaultInjectionRulesPath(): string {
+  return path.resolve(__dirname, '..', 'config', 'injection-rules.yaml');
+}
+
+/**
+ * Best-effort load of the shipped default injection rules. On a missing or
+ * corrupt file it logs to stderr and returns `[]` (degrade to "no extra
+ * filtering") rather than throwing and bricking router construction. The
+ * injection_corpus test gates the shipped file, so `[]` only happens on a
+ * genuine deploy-time config fault. Production router builders pass the result
+ * to the Submit/Trigger handlers so chat-originated input is sanitized.
+ */
+export function loadDefaultInjectionRules(): InjectionRule[] {
+  try {
+    return loadRules(defaultInjectionRulesPath());
+  } catch (err) {
+    process.stderr.write(
+      `[sanitizer] failed to load default injection rules: ${
+        err instanceof Error ? err.message : String(err)
+      }\n`,
+    );
+    return [];
+  }
 }

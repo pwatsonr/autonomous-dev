@@ -1,7 +1,7 @@
 version: 1
 rules:
   - id: system_prompt_override
-    pattern: '(?i)(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?|context)'
+    pattern: '(?i)(ignore|disregard|forget)\s+((all\s+)?(previous|prior|above)|your|my)\s+(prior\s+|previous\s+|above\s+)?(instructions?|prompts?|rules?|context)'
     severity: critical
     action: block
     message: "Request contains a suspected prompt injection pattern."
@@ -37,7 +37,7 @@ rules:
     message: "Request contains embedded instructions."
 
   - id: data_exfiltration
-    pattern: '(?i)(repeat|print|show|reveal|output)\s+(the\s+)?(system\s+prompt|instructions|configuration|api\s+key|secret|token)'
+    pattern: '(?i)(repeat|print|show|reveal|output)\s+((me|us)\s+)?((the|your|my|all)\s+)?(system\s+prompt|instructions|configuration|api\s+key|secret|token)'
     severity: critical
     action: block
     message: "Request attempts to extract system information."
