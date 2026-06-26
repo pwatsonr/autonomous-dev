@@ -101,11 +101,15 @@ SIGTERM/SIGINT drain both. It's bun-run glue validated offline (constructor
 wiring + import resolution + the no-token smoke); the **true** validation is your
 first live run with real tokens.
 
-Run it as a long-lived process alongside the daemon — e.g. a launchd/systemd unit
-that execs `autonomous-dev triggers serve` with the bot-token env (mirror the
-watch-tick timer plist, but `KeepAlive` instead of `StartInterval`). The first
-`/autodev` in a channel the bot is in should enqueue a run (visible via
-`autonomous-dev request list` + the portal) and reply with an accept-ack.
+Run it as a long-lived process alongside the daemon using the ready-made
+KeepAlive unit `templates/com.autonomous-dev.triggers-serve.plist.template`:
+substitute the `{{…}}` placeholders, fill in the bot tokens, `chmod 600` (it
+holds secrets), copy to `~/Library/LaunchAgents/`, then `launchctl bootstrap
+gui/$(id -u) <path>`. It points at the stable `~/.local/bin/autonomous-dev`
+wrapper so it survives upgrades, and `KeepAlive { SuccessfulExit: false }`
+restarts it on a crash but NOT on the clean no-token exit. The first `/autodev`
+in a channel the bot is in should enqueue a run (visible via `autonomous-dev
+request list` + the portal) and reply with an accept-ack.
 
 ## Schedule the watch-tick
 
