@@ -186,11 +186,41 @@ async function fileFailureIssueCmd(argv: string[]): Promise<number> {
   return res.ok ? 0 : 1;
 }
 
+/**
+ * `autonomous-dev triggers serve` — start the long-running Discord/Slack inbound
+ * listeners so a `/autodev` chat command reaches the registered TriggerHandler.
+ *
+ * The serve graph (concrete platform service construction) lives in the sibling
+ * `triggers-serve.ts` entrypoint, which owns its own keep-alive + signal
+ * handling. We `exec`-replace this process into it (mirroring the bash
+ * `exec bun run …` idiom) so the daemon supervises a single long-lived PID
+ * rather than a child of this short-lived dispatcher.
+ */
+function serveCmd(argv: string[]): never {
+  const servePath = path.join(__dirname, 'triggers-serve.ts');
+  // Replace the current process image with `bun run triggers-serve.ts …`.
+  // execFileSync inherits stdio and blocks; on a clean child exit we mirror its
+  // code. (We use execFileSync rather than spawn so SIGTERM/SIGINT to this PID
+  // is delivered to bun, which forwards it to the serve process's handlers.)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const { execFileSync } = require('child_process') as typeof import('child_process');
+  try {
+    execFileSync('bun', ['run', servePath, ...argv], { stdio: 'inherit' });
+    process.exit(0);
+  } catch (err) {
+    const code = (err as { status?: number }).status;
+    process.exit(typeof code === 'number' ? code : 1);
+  }
+}
+
 async function main(argv: string[]): Promise<number> {
   const [verb] = argv;
   if (verb === 'watch-tick') return watchTick();
   if (verb === 'file-failure-issue') return fileFailureIssueCmd(argv.slice(1));
-  process.stderr.write('usage: autonomous-dev triggers (watch-tick | file-failure-issue …)\n');
+  if (verb === 'serve') serveCmd(argv.slice(1)); // never returns
+  process.stderr.write(
+    'usage: autonomous-dev triggers (watch-tick | file-failure-issue | serve …)\n',
+  );
   return 1;
 }
 
