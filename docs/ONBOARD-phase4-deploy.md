@@ -83,27 +83,29 @@ mode works too (the HMAC verifier + `/slack/commands` endpoint are built).
 2. Note the **Signing Secret**, add a **Bot token** (`chat:write`, `commands`),
    and (Socket Mode) an **App token**.
 
-## Start the listener process (the remaining wire)
+## Start the listener process
 
-The Discord/Slack **services exist** (`DiscordService`,
-`startSlackService`) but nothing starts them yet — this is the one piece to wire
-at deploy, when tokens are in hand to validate it. It's deliberately not built
-blind because its only real test is a live token run. Construct an
-`IntakeRouter` (mirror `intake/adapters/cli_adapter.ts initRouter()` — it now
-loads injection rules) and start whichever services are enabled:
+The inbound listener is **built** — `autonomous-dev triggers serve`. It reuses
+the same router the CLI builds (`initRouter()` — Repository, AuthzEngine, rate
+limiter, injection rules, and the registered TriggerHandler), then starts
+whichever platforms have a bot token in the environment:
 
-- **Discord**: `new DiscordService(loadConfigFromEnv(), adapter).start()` where
-  `adapter = new DiscordAdapter(client, router, identityResolver, formatter,
-  componentHandler, …)` — see the constructor in `discord_adapter.ts` and the
-  helper impls (`discord_client.ts`, `discord_identity.ts`,
-  `discord_interaction_handler.ts`, `discord_rate_limiter.ts`).
-- **Slack**: `startSlackService({ router, adapter, commandHandler,
-  interactionHandler, config })` — see `startSlackService` in
-  `intake/adapters/slack/main.ts` for the dep shapes.
+- **Discord** if `DISCORD_BOT_TOKEN` is set (Gateway; also needs
+  `DISCORD_APPLICATION_ID` + `DISCORD_GUILD_ID`).
+- **Slack** if `SLACK_BOT_TOKEN` is set (Socket Mode when `SLACK_APP_TOKEN` is
+  also set, else HTTP).
 
-Run it under launchd/systemd alongside the daemon. The first `/autodev` in a
-channel the bot is in should enqueue a run (visible via `autonomous-dev request
-list` + the portal) and reply with an accept-ack.
+With **no** tokens it prints `no platforms enabled` and exits 0 (a safe smoke
+test). Best-effort: one platform failing to start doesn't kill the other;
+SIGTERM/SIGINT drain both. It's bun-run glue validated offline (constructor
+wiring + import resolution + the no-token smoke); the **true** validation is your
+first live run with real tokens.
+
+Run it as a long-lived process alongside the daemon — e.g. a launchd/systemd unit
+that execs `autonomous-dev triggers serve` with the bot-token env (mirror the
+watch-tick timer plist, but `KeepAlive` instead of `StartInterval`). The first
+`/autodev` in a channel the bot is in should enqueue a run (visible via
+`autonomous-dev request list` + the portal) and reply with an accept-ack.
 
 ## Schedule the watch-tick
 
