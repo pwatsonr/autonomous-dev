@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ONBOARD Phase 6 (#583): inbound trigger LISTENER (launchd KeepAlive unit).
+
+  Runs `autonomous-dev triggers serve` as a long-lived process so a `/autodev`
+  chat command reaches the daemon's TriggerHandler. Separate from the daemon
+  plist + points at the STABLE ~/.local/bin/autonomous-dev wrapper (which the
+  deploy repoints to the current version each release), so this unit survives
+  version upgrades without edits.
+
+  KeepAlive { SuccessfulExit: false } = restart if it CRASHES (non-zero exit /
+  gateway drop) but NOT if it exits 0. So with no bot tokens it prints
+  "no platforms enabled", exits 0, and does NOT restart-loop — fill in tokens and
+  reload to bring it up. ThrottleInterval caps the restart rate.
+
+  NOTE: intentionally no ProcessType=Background / LowPriorityBackgroundIO (unlike
+  the daemon + watch-tick) — the listener is latency-sensitive (Discord's 3-second
+  ack deadline), so it runs at default priority.
+
+  Install (operator):
+    1. Substitute {{USER_HOME}} / {{DAEMON_HOME}} / {{EXTRA_PATH_DIRS}}.
+    2. Fill in the bot tokens below.
+    3. `chmod 600` this file (it holds secrets).
+    4. Copy to ~/Library/LaunchAgents/ and
+       `launchctl bootstrap gui/$(id -u) <path>`.
+    Tear down: `launchctl bootout gui/$(id -u)/com.autonomous-dev.triggers-serve`.
+    Tighter secret-handling: leave the token values empty here and instead
+    source them from a 0600 file in a tiny wrapper script you point
+    ProgramArguments at.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.autonomous-dev.triggers-serve</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{USER_HOME}}/.local/bin/autonomous-dev</string>
+        <string>triggers</string>
+        <string>serve</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart on crash, but not on a clean (exit 0) stop. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Don't restart-loop faster than every 10s. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>{{DAEMON_HOME}}/logs/triggers-serve-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{DAEMON_HOME}}/logs/triggers-serve-stderr.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{EXTRA_PATH_DIRS}}/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <key>HOME</key>
+        <string>{{USER_HOME}}</string>
+
+        <!-- ===== Bot tokens — fill in, then `chmod 600` this file ===== -->
+        <!-- Discord (Gateway): set ALL THREE to enable Discord. -->
+        <key>DISCORD_BOT_TOKEN</key>
+        <string></string>
+        <key>DISCORD_APPLICATION_ID</key>
+        <string></string>
+        <key>DISCORD_GUILD_ID</key>
+        <string></string>
+        <!-- Slack: set SLACK_BOT_TOKEN to enable. Add SLACK_APP_TOKEN for Socket
+             Mode (no public endpoint needed); else HTTP mode uses
+             SLACK_SIGNING_SECRET (and needs a public Request URL). -->
+        <key>SLACK_BOT_TOKEN</key>
+        <string></string>
+        <key>SLACK_APP_TOKEN</key>
+        <string></string>
+        <key>SLACK_SIGNING_SECRET</key>
+        <string></string>
+    </dict>
+</dict>
+</plist>
