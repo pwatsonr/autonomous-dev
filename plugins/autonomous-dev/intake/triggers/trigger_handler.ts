@@ -28,6 +28,7 @@ import type {
 import type { IntakeEventEmitter } from '../core/intake_router';
 import { sanitize, type InjectionRule } from '../core/sanitizer';
 import type { Repository, RequestEntity } from '../db/repository';
+import { writeStateJson } from '../lib/state_json_writer';
 import { channelTypeToRequestSource } from '../types/request_source';
 
 import { canTriggerScope, type RepoAuthorizeFn } from './scope_authz';
@@ -117,7 +118,8 @@ export class TriggerHandler implements CommandHandler {
     }
 
     // 3. Resolve the scope against ownership.
-    const resolved = resolveScope(this.ownershipReader(), parsed.scopeType, parsed.scopeId);
+    const ownership = this.ownershipReader();
+    const resolved = resolveScope(ownership, parsed.scopeType, parsed.scopeId);
     if (!resolved.found) {
       return {
         success: false,
@@ -168,6 +170,21 @@ export class TriggerHandler implements CommandHandler {
       };
     }
 
+    // 5b. Resolve the repo id → its local checkout path. The daemon discovers
+    //     work by scanning allowlisted repo PATHS for state.json files
+    //     (select_request in supervisor-loop.sh) — it never reads the intake
+    //     DB. So a trigger can only run a repo that exists on disk; resolve the
+    //     path now and refuse if there's no local checkout (an ingested-only
+    //     repo can't be acted on). The path is also what state.json keys on.
+    const repoPath = ownership.repos.find((r) => r.id === targetRepo)?.path;
+    if (typeof repoPath !== 'string' || repoPath.trim().length === 0) {
+      return {
+        success: false,
+        error: `Repo ${targetRepo} has no local checkout for the daemon to run; clone it and add its path to the allowlist first.`,
+        errorCode: 'REPO_NOT_RUNNABLE',
+      };
+    }
+
     // 6. Enqueue a normal pipeline request (mirrors SubmitHandler's build). One
     //    clock (storeIO.now) for the row + the trigger record so they agree.
     const nowMs = storeIO.now();
@@ -180,7 +197,10 @@ export class TriggerHandler implements CommandHandler {
       description: parsed.task,
       raw_input: command.rawText,
       priority: 'normal',
-      target_repo: targetRepo,
+      // The intake row + state.json key on the repo's local PATH (mirrors
+      // SubmitHandler so the daemon + reconcile find it); the human-facing repo
+      // id stays in the trigger record, audit log, and the user-facing result.
+      target_repo: repoPath,
       status: 'queued',
       current_phase: 'intake',
       phase_progress: null,
@@ -204,6 +224,39 @@ export class TriggerHandler implements CommandHandler {
     };
 
     this.db.insertRequest(request);
+
+    // Bridge to the daemon's FILE-based work queue. select_request() scans
+    // `<allowlisted repo>/.autonomous-dev/requests/*/state.json` and never reads
+    // the intake DB, so the row above is invisible on its own — SubmitHandler
+    // writes this same file. WITHOUT it a trigger enqueues into a void and never
+    // runs. state.json is the daemon's source of truth for execution.
+    try {
+      writeStateJson(
+        {
+          request_id: request.request_id,
+          status: request.status,
+          current_phase: request.current_phase,
+          priority: request.priority,
+          created_at: request.created_at,
+          updated_at: request.updated_at,
+          title: request.title,
+          description: request.description,
+          target_repo: repoPath,
+          source_channel: channelType, // raw channel for state.json (per SubmitHandler)
+          type: request.type,
+        },
+        repoPath,
+      );
+    } catch {
+      // The DB row exists but the daemon can't see the request without
+      // state.json; fail closed with a typed error (the orphan row is
+      // reconcilable) rather than report a queued run that will never execute.
+      return {
+        success: false,
+        error: 'Could not stage the request for the daemon (state.json write failed).',
+        errorCode: 'INTERNAL_ERROR',
+      };
+    }
 
     const position = this.db.getQueuePosition(requestId);
     this.emitter.emit('request_submitted', { requestId, userId, priority: 'normal', position });
