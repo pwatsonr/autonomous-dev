@@ -19,6 +19,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
 
+import { botNotifier } from '../intake/triggers/bot_notifier';
 import { ghChecksClient, type ExecFn } from '../intake/triggers/checks_client';
 import { ghIssueFiler, failureFingerprint } from '../intake/triggers/issue_filer';
 import type { TriggerAuditSink, TriggerNotifier } from '../intake/triggers/trigger_reporter';
@@ -43,16 +44,6 @@ const ghExec: ExecFn = async (cmd, args) => {
     const stdout = (err as { stdout?: string }).stdout ?? '';
     return { stdout, ok: false };
   }
-};
-
-/** v1 logging notifier — DEPLOY swaps this for the bot-post once tokens exist. */
-const logNotifier: TriggerNotifier = {
-  send: async (origin, message) => {
-    process.stdout.write(
-      `[trigger-notify ${origin.platform}/${origin.channelId ?? '-'}] ${message.title}: ${message.body}\n`,
-    );
-    return { ok: true };
-  },
 };
 
 const logAudit: TriggerAuditSink = {
@@ -91,6 +82,24 @@ async function watchTick(): Promise<number> {
     }
   };
 
+  // Real bot-post notifier from env tokens (best-effort; absent tokens →
+  // ok:false, still audited). Echo every attempt to the daemon log for ops.
+  const bot = botNotifier({
+    discordToken: process.env.DISCORD_BOT_TOKEN,
+    slackToken: process.env.SLACK_BOT_TOKEN,
+  });
+  const notifier: TriggerNotifier = {
+    send: async (origin, message) => {
+      const out = await bot.send(origin, message);
+      process.stdout.write(
+        `[trigger-notify ${origin.platform}/${origin.channelId ?? '-'} ok=${out.ok}${
+          out.error ? ` err=${out.error}` : ''
+        }] ${message.title}\n`,
+      );
+      return out;
+    },
+  };
+
   const res = await runWatchTick({
     storeIO: defaultTriggerStoreIO,
     readOutcome,
@@ -98,7 +107,7 @@ async function watchTick(): Promise<number> {
     checks: ghChecksClient(ghExec),
     now: () => Date.now(),
     audit: logAudit,
-    reporter: { notifier: logNotifier, audit: logAudit },
+    reporter: { notifier, audit: logAudit },
     // Auto-file a GitHub issue on a terminal failure (pipeline failed / watch
     // regressed / expired) on the target repo, deduped by fingerprint.
     issueFiler: ghIssueFiler(ghExec),
