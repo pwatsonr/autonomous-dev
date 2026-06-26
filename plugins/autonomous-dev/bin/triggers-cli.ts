@@ -20,6 +20,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import { ghChecksClient, type ExecFn } from '../intake/triggers/checks_client';
+import { ghIssueFiler, failureFingerprint } from '../intake/triggers/issue_filer';
 import type { TriggerAuditSink, TriggerNotifier } from '../intake/triggers/trigger_reporter';
 import { defaultTriggerStoreIO, type TriggerRecord } from '../intake/triggers/trigger_store';
 import { outcomeFromState, runWatchTick, type RequestOutcome } from '../intake/triggers/watch_tick';
@@ -98,17 +99,89 @@ async function watchTick(): Promise<number> {
     now: () => Date.now(),
     audit: logAudit,
     reporter: { notifier: logNotifier, audit: logAudit },
+    // Auto-file a GitHub issue on a terminal failure (pipeline failed / watch
+    // regressed / expired) on the target repo, deduped by fingerprint.
+    issueFiler: ghIssueFiler(ghExec),
   });
   process.stdout.write(
-    `watch-tick: started=${res.started} done=${res.reportedDone} failed=${res.reportedFailed}\n`,
+    `watch-tick: started=${res.started} done=${res.reportedDone} failed=${res.reportedFailed} issues=${res.issuesFiled}\n`,
   );
   return 0;
+}
+
+/** Minimal `--key value` flag parser for the failure-issue verb. */
+function parseFlags(argv: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i];
+    if (a.startsWith('--')) {
+      const key = a.slice(2);
+      const next = argv[i + 1];
+      out[key] = next !== undefined && !next.startsWith('--') ? argv[(i += 1)] : '';
+    }
+  }
+  return out;
+}
+
+/**
+ * `autonomous-dev triggers file-failure-issue` — open (or dedup-comment) a
+ * GitHub issue for a failure. Invoked best-effort by the daemon at terminal
+ * failure points. Resolves the target repo SLUG from `--repo`, else from
+ * `--repo-path` via ownership, else `--system-repo` (for system-level faults).
+ */
+async function fileFailureIssueCmd(argv: string[]): Promise<number> {
+  const flags = parseFlags(argv);
+  let repo = flags['repo'] ?? '';
+  if (!repo && flags['repo-path']) {
+    try {
+      repo = readOwnership().repos.find((r) => r.path === flags['repo-path'])?.id ?? '';
+    } catch {
+      repo = '';
+    }
+  }
+  if (!repo) repo = flags['system-repo'] ?? '';
+  if (!repo) {
+    process.stderr.write(
+      'file-failure-issue: need --repo <slug>, a resolvable --repo-path, or --system-repo\n',
+    );
+    return 1;
+  }
+  const failureClass = flags['class'] || 'failure';
+  const requestId = flags['request'] || undefined;
+  const phase = flags['phase'] || undefined;
+  const detail = (flags['detail'] || '').replace(/[\r\n]+/g, ' ').trim();
+  const title = `[autodev:${failureClass}]${requestId ? ` ${requestId}` : ''}${phase ? ` (phase ${phase})` : ''}`;
+  const body = [
+    `Autonomous-dev recorded a **${failureClass}**.`,
+    '',
+    requestId ? `- Request: \`${requestId}\`` : '',
+    `- Repo: \`${repo}\``,
+    phase ? `- Phase: \`${phase}\`` : '',
+    detail ? `- Detail: ${detail}` : '',
+    '',
+    'Filed automatically by autonomous-dev; recurrences dedup onto this issue.',
+  ]
+    .filter((l) => l !== '')
+    .join('\n');
+  const res = await ghIssueFiler(ghExec).file({
+    repo,
+    title,
+    body,
+    fingerprint: failureFingerprint({ repo, requestId, failureClass, phase }),
+  });
+  process.stdout.write(
+    `file-failure-issue: ok=${res.ok} deduped=${res.deduped ?? false}${res.url ? ` url=${res.url}` : ''}${
+      res.error ? ` error=${res.error}` : ''
+    }\n`,
+  );
+  return res.ok ? 0 : 1;
 }
 
 async function main(argv: string[]): Promise<number> {
   const [verb] = argv;
   if (verb === 'watch-tick') return watchTick();
-  process.stderr.write('usage: autonomous-dev triggers watch-tick\n');
+  if (verb === 'file-failure-issue') return fileFailureIssueCmd(argv.slice(1));
+  process.stderr.write('usage: autonomous-dev triggers (watch-tick | file-failure-issue …)\n');
   return 1;
 }
 
