@@ -27,6 +27,11 @@ import { readOwnership } from '../src/ownership/store';
 
 const execFileAsync = promisify(execFile);
 
+/** Path-safe request id (matches the store's isRecord guard). */
+const SAFE_REQUEST_ID = /^[A-Za-z0-9_-]+$/;
+/** A state.json is tiny; cap the read to avoid OOM on a buggy/huge file. */
+const MAX_STATE_BYTES = 1_000_000;
+
 /** Real `gh` runner for the checks client. Never throws — non-zero/spawn-error
  *  → { ok:false }, which the checks client maps to `unknown` (the watch holds). */
 const ghExec: ExecFn = async (cmd, args) => {
@@ -63,6 +68,9 @@ async function watchTick(): Promise<number> {
   );
 
   const readOutcome = (record: TriggerRecord): RequestOutcome => {
+    // Defense in depth: the store already drops non-path-safe requestIds on
+    // load (isRecord), but re-check here before composing a filesystem path.
+    if (!SAFE_REQUEST_ID.test(record.requestId)) return { status: 'unknown' };
     const repoPath = pathById.get(record.targetRepo);
     if (repoPath === undefined) return { status: 'unknown' };
     const stateFile = path.join(
@@ -72,13 +80,14 @@ async function watchTick(): Promise<number> {
       record.requestId,
       'state.json',
     );
-    let parsed: unknown;
     try {
-      parsed = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+      // A state.json is tiny; cap the read so a buggy/huge file can't OOM the tick.
+      if (fs.statSync(stateFile).size > MAX_STATE_BYTES) return { status: 'unknown' };
+      const parsed: unknown = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
+      return outcomeFromState(parsed as { status?: unknown });
     } catch {
       return { status: 'unknown' };
     }
-    return outcomeFromState(parsed as { status?: unknown });
   };
 
   const res = await runWatchTick({

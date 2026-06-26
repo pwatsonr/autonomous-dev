@@ -112,13 +112,21 @@ function isState(v: unknown): v is TriggerState {
   );
 }
 
-/** A record is usable iff its identifying fields are the right type. Individually
- *  corrupt records are dropped on load (vs discarding the whole store). */
+/** requestId is used as a filesystem path segment (the watch-tick reads
+ *  `<repo>/.autonomous-dev/requests/<requestId>/state.json`), so it MUST be
+ *  path-safe — no separators or traversal. Daemon ids (REQ-NNNNNN) match. */
+const SAFE_REQUEST_ID = /^[A-Za-z0-9_-]+$/;
+
+/** A record is usable iff its identifying fields are the right type AND its
+ *  requestId is path-safe. Individually corrupt records are dropped on load
+ *  (vs discarding the whole store) — this also defeats a crafted on-disk
+ *  requestId like `../../../etc/passwd` before it can reach any path join. */
 function isRecord(v: unknown): v is TriggerRecord {
   if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
   const r = v as Record<string, unknown>;
   return (
     typeof r.requestId === 'string' &&
+    SAFE_REQUEST_ID.test(r.requestId) &&
     typeof r.scope === 'string' &&
     typeof r.targetRepo === 'string' &&
     typeof r.status === 'string'

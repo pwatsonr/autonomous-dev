@@ -151,6 +151,40 @@ describe('trigger_store', () => {
     expect(getRecord('R-good', io)).toBeDefined();
   });
 
+  it('drops a record whose requestId is not path-safe (traversal guard)', () => {
+    const files = new Map<string, string>();
+    const { io } = memIO(files);
+    files.set(
+      triggerStatePath(io),
+      JSON.stringify({
+        seen: {},
+        records: [
+          {
+            requestId: '../../../etc/passwd',
+            scope: 'repo:a/b',
+            scopeId: 'a/b',
+            scopeType: 'repo',
+            targetRepo: 'a/b',
+            origin: { platform: 'discord' },
+            createdAtMs: 1,
+            status: 'enqueued',
+          },
+          {
+            requestId: 'REQ-000001',
+            scope: 'repo:a/b',
+            scopeId: 'a/b',
+            scopeType: 'repo',
+            targetRepo: 'a/b',
+            origin: { platform: 'discord' },
+            createdAtMs: 1,
+            status: 'enqueued',
+          },
+        ],
+      }),
+    );
+    expect(listRecords(io).map((r) => r.requestId)).toEqual(['REQ-000001']);
+  });
+
   it('updateRecordStatus patches an existing record (no-op when absent)', () => {
     const files = new Map<string, string>();
     const { io } = memIO(files);

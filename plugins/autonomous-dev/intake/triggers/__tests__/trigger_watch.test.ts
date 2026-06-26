@@ -89,6 +89,19 @@ describe('evaluateWatch', () => {
     expect(r.transitioned).toBe(false);
   });
 
+  it('clock skew (future lastGreenMs) does NOT count as a continuous streak', () => {
+    // lastGreenMs is AHEAD of now (a clock rewind) → negative gap → not recent
+    // → the streak restarts rather than graduating (round-2 fix).
+    const r = evaluateWatch(
+      watching({ greenSinceMs: 0, lastGreenMs: 5 * DAY }),
+      { state: 'green' },
+      3 * DAY,
+      OPTS,
+    );
+    expect(r.status).toBe('watching');
+    expect(r.greenSinceMs).toBe(3 * DAY); // reset to now
+  });
+
   it('red resets the green streak but keeps watching', () => {
     const r = evaluateWatch(watching({ greenSinceMs: DAY }), { state: 'red' }, 2 * DAY, OPTS);
     expect(r.status).toBe('watching');
@@ -204,6 +217,36 @@ describe('advanceWatches', () => {
       opts: OPTS,
     });
     expect(called).toBe(false);
+  });
+
+  it('serializes overlapping ticks (no concurrent store access)', async () => {
+    const files = new Map<string, string>();
+    const io = memIO(files);
+    commitTrigger(rec('R-a'), io);
+    startWatch('R-a', 'pr-a', 0, io);
+    commitTrigger(rec('R-b'), io);
+    startWatch('R-b', 'pr-b', 0, io);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const checks = {
+      getStatus: async (): Promise<{ state: 'pending' }> => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 3));
+        inFlight -= 1;
+        return { state: 'pending' };
+      },
+    };
+    const d = {
+      storeIO: io,
+      checks,
+      now: () => DAY,
+      audit: { append: () => undefined },
+      onTransition: async () => undefined,
+      opts: OPTS,
+    };
+    await Promise.all([advanceWatches(d), advanceWatches(d)]);
+    expect(maxInFlight).toBe(1); // chained, never concurrent
   });
 
   it('ignores records that are not watching', async () => {

@@ -4,7 +4,7 @@
  * @module intake/triggers/checks_client.test
  */
 
-import { ghChecksClient, reduceChecks, type ExecFn } from '../checks_client';
+import { ghChecksClient, reduceChecks, type CheckRun, type ExecFn } from '../checks_client';
 
 describe('reduceChecks', () => {
   it('all passing → green', () => {
@@ -50,6 +50,14 @@ describe('reduceChecks', () => {
 
   it('completed with no conclusion → unknown (not green)', () => {
     expect(reduceChecks([{ state: 'completed' }]).state).toBe('unknown');
+  });
+
+  it('ignores null / non-object runs (no crash)', () => {
+    expect(reduceChecks([null, { bucket: 'pass' }] as unknown as CheckRun[]).state).toBe('green');
+  });
+
+  it('a whitespace-only bucket falls through to the state field', () => {
+    expect(reduceChecks([{ bucket: '   ', state: 'in_progress' }]).state).toBe('pending');
   });
 });
 

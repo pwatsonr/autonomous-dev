@@ -37,17 +37,18 @@ export interface RequestOutcome {
 export function outcomeFromState(
   state: { status?: unknown; pr_url?: unknown; blocker?: unknown } | null,
 ): RequestOutcome {
-  const status = typeof state?.status === 'string' ? state.status.toLowerCase() : '';
+  // The pipeline writes a RequestStatus: queued | active | paused | cancelled |
+  // done | failed (see adapter_interface RequestStatus). Trim — a stray newline
+  // in state.json must not read as 'running'.
+  const status = typeof state?.status === 'string' ? state.status.trim().toLowerCase() : '';
   const prUrl = typeof state?.pr_url === 'string' ? state.pr_url : undefined;
   const reason = typeof state?.blocker === 'string' ? state.blocker : undefined;
-  if (['done', 'integrated', 'completed', 'merged'].includes(status)) {
-    return { status: 'done', ...(prUrl ? { prUrl } : {}) };
-  }
-  if (['failed', 'cancelled', 'canceled', 'error'].includes(status)) {
+  if (status === 'done') return { status: 'done', ...(prUrl ? { prUrl } : {}) };
+  if (status === 'failed' || status === 'cancelled') {
     return { status: 'failed', ...(reason ? { reason } : {}) };
   }
   if (status === '') return { status: 'unknown' };
-  return { status: 'running' };
+  return { status: 'running' }; // queued / active / paused → still in flight
 }
 
 export interface WatchTickDeps {

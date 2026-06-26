@@ -33,9 +33,10 @@ function normalizeRun(run: CheckRun): Norm {
   // (NOT pass), and any non-completed `state` (in_progress/queued/…) is pending.
   // This stops a `{conclusion:'success', state:'in_progress'}` row from reading
   // green while CI is still running.
+  const bucket = typeof run.bucket === 'string' ? run.bucket.trim() : '';
   let raw: string;
-  if (run.bucket !== undefined && run.bucket !== '') {
-    raw = run.bucket;
+  if (bucket !== '') {
+    raw = bucket;
   } else if (run.state === 'completed') {
     raw = run.conclusion ?? 'unknown';
   } else {
@@ -61,8 +62,10 @@ function normalizeRun(run: CheckRun): Norm {
  *   no checks → unknown (don't treat "no CI" as green — the watch falls back).
  */
 export function reduceChecks(runs: CheckRun[]): WatchCheckStatus {
-  if (runs.length === 0) return { state: 'unknown' };
-  const norm = runs.map(normalizeRun);
+  // Drop null / non-object entries (a malformed gh row must not crash the map).
+  const valid = runs.filter((r): r is CheckRun => typeof r === 'object' && r !== null);
+  if (valid.length === 0) return { state: 'unknown' };
+  const norm = valid.map(normalizeRun);
   if (norm.some((s) => s === 'fail')) return { state: 'red' };
   if (norm.some((s) => s === 'pending')) return { state: 'pending' };
   if (norm.every((s) => s === 'pass' || s === 'skip')) return { state: 'green' };

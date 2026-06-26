@@ -111,8 +111,11 @@ export function evaluateWatch(
     // The streak only CONTINUES if green was observed within maxGapMs; a longer
     // gap (red, pending, or a missed/errored tick) means we can't claim
     // continuous green, so the streak restarts now.
-    const recent =
-      record.lastGreenMs !== undefined && nowMs - record.lastGreenMs <= opts.maxGapMs;
+    // A NEGATIVE gap (clock skew / a future-dated lastGreenMs from a clock
+    // rewind) must NOT count as "recent" — we can't prove continuity, so the
+    // streak restarts (this closes the round-1 blocker via the skew path).
+    const gap = record.lastGreenMs !== undefined ? nowMs - record.lastGreenMs : Number.POSITIVE_INFINITY;
+    const recent = gap >= 0 && gap <= opts.maxGapMs;
     const greenSince = record.greenSinceMs !== undefined && recent ? record.greenSinceMs : nowMs;
     if (nowMs - greenSince >= opts.nDays * DAY_MS) {
       return {
@@ -147,24 +150,29 @@ export interface AdvanceWatchesDeps {
 }
 
 // Serialize overlapping ticks within this process — load-modify-save on the
-// store is not safe under concurrency. A second call while one is in flight
-// awaits the same run. (Cross-process safety would need a versioned store; the
-// daemon invokes this from one ticker, documented in the deploy guide.)
-let advanceInFlight: Promise<void> | null = null;
+// store is not safe under concurrency. Calls are CHAINED (queued), not
+// coalesced: a second call while one is in flight runs AFTER it (so a tick that
+// started new watches mid-loop is not silently dropped). (Cross-process safety
+// would need a versioned store; the daemon invokes this from one ticker,
+// documented in the deploy guide.)
+let advanceTail: Promise<void> = Promise.resolve();
 
 /**
  * Advance every active watch one tick: read CI, evaluate, persist any change,
  * and on a terminal transition audit + report. Best-effort: a checks/report
- * error for one record never aborts the others. Re-entrancy-guarded.
+ * error for one record never aborts the others. Serialized via a promise chain.
  */
-export async function advanceWatches(deps: AdvanceWatchesDeps): Promise<void> {
-  if (advanceInFlight !== null) return advanceInFlight;
-  advanceInFlight = runAdvance(deps);
-  try {
-    await advanceInFlight;
-  } finally {
-    advanceInFlight = null;
-  }
+export function advanceWatches(deps: AdvanceWatchesDeps): Promise<void> {
+  const next = advanceTail.then(
+    () => runAdvance(deps),
+    () => runAdvance(deps),
+  );
+  // The tail never rejects, so one failed run can't break the chain.
+  advanceTail = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
 }
 
 async function runAdvance(deps: AdvanceWatchesDeps): Promise<void> {

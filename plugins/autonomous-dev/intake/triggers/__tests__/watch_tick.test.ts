@@ -81,15 +81,16 @@ function harness(files: Map<string, string>, outcomes: Record<string, RequestOut
 }
 
 describe('outcomeFromState', () => {
-  it('maps terminal success statuses to done (+ prUrl)', () => {
+  it('maps done (case-insensitive, trimmed) to done + prUrl', () => {
     expect(outcomeFromState({ status: 'done', pr_url: 'https://gh/pr/1' })).toEqual({
       status: 'done',
       prUrl: 'https://gh/pr/1',
     });
-    expect(outcomeFromState({ status: 'INTEGRATED' }).status).toBe('done');
+    expect(outcomeFromState({ status: 'DONE' }).status).toBe('done');
+    expect(outcomeFromState({ status: ' done\n' }).status).toBe('done'); // trimmed
   });
 
-  it('maps failure statuses to failed (+ reason from blocker)', () => {
+  it('maps failed/cancelled to failed (+ reason from blocker)', () => {
     expect(outcomeFromState({ status: 'failed', blocker: 'tests red' })).toEqual({
       status: 'failed',
       reason: 'tests red',
@@ -97,8 +98,9 @@ describe('outcomeFromState', () => {
     expect(outcomeFromState({ status: 'cancelled' }).status).toBe('failed');
   });
 
-  it('maps an in-progress status to running, and absent/null to unknown', () => {
-    expect(outcomeFromState({ status: 'code' }).status).toBe('running');
+  it('maps in-flight statuses to running, and absent/null/non-status to unknown', () => {
+    expect(outcomeFromState({ status: 'active' }).status).toBe('running');
+    expect(outcomeFromState({ status: 'queued' }).status).toBe('running');
     expect(outcomeFromState({}).status).toBe('unknown');
     expect(outcomeFromState(null).status).toBe('unknown');
   });
