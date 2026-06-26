@@ -19,18 +19,23 @@
  * @module slack/main
  */
 
-import express, { type Express, type Request, type Response, type NextFunction } from 'express';
-import http from 'http';
 import crypto from 'crypto';
-import { parseCommandArgs } from '../claude_arg_parser';
-import { SlackVerifier } from './slack_verifier';
-import type { SlackCommandHandler } from './slack_command_handler';
-import type { SlackInteractionHandler } from './slack_interaction_handler';
-import type { SlackAdapter } from './slack_adapter';
+import http from 'http';
+
+import express, { type Express, type Request, type Response, type NextFunction } from 'express';
+
 import type {
   CommandResult,
   IncomingCommand,
 } from '../adapter_interface';
+import { parseCommandArgs } from '../claude_arg_parser';
+import { AUTODEV_COMMAND_NAME, buildTriggerCommand } from '../trigger_command_map';
+
+import type { SlackAdapter } from './slack_adapter';
+import type { SlackCommandHandler } from './slack_command_handler';
+import type { SlackInteractionHandler } from './slack_interaction_handler';
+import { SlackVerifier } from './slack_verifier';
+
 
 // ---------------------------------------------------------------------------
 // Logger interface (shared with the rest of the slack package)
@@ -394,6 +399,24 @@ export function mapSlashCommandPayload(body: SlackSlashCommandBody): IncomingCom
   const command = body.command ?? '';
   if (!command) {
     throw new Error(`unknown_command: ${command}`);
+  }
+
+  // Scoped trigger: `/autodev repo <id> <task...>` (or `project`). The text's
+  // first two whitespace tokens are the scope; the remainder is the task,
+  // preserved verbatim. Idempotency keys on the signature-verified trigger_id.
+  if (command === `/${AUTODEV_COMMAND_NAME}`) {
+    const raw = (body.text ?? '').trim();
+    const parts = raw.split(/\s+/).filter((p) => p.length > 0);
+    return buildTriggerCommand({
+      scopeType: parts[0] ?? '',
+      scopeId: parts[1] ?? '',
+      task: parts.slice(2).join(' '),
+      channelType: 'slack',
+      userId: body.user_id ?? '',
+      channelId: body.channel_id ?? undefined,
+      messageId: body.trigger_id ?? '',
+      rawText: raw,
+    });
   }
 
   let subcommand: string;

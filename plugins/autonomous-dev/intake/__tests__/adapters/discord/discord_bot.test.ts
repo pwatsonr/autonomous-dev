@@ -177,14 +177,17 @@ describe('Slash Command Payload (SPEC-008-3-01, Task 2)', () => {
   // Test 3: Payload structure -- 1 top-level command, 12 subcommands
   // (PRD-016 triage: refreshed assertions for added submit-bug + hotfix)
   // -----------------------------------------------------------------------
-  test('payload has exactly 1 top-level command named "ad" with 12 subcommands', () => {
-    expect(DISCORD_COMMANDS).toHaveLength(1);
+  test('payload has /ad (12 subcommands) + /autodev (2 subcommands)', () => {
+    expect(DISCORD_COMMANDS).toHaveLength(2);
 
-    const adCommand = DISCORD_COMMANDS[0];
-    expect(adCommand.name).toBe('ad');
-    expect(adCommand.description).toBe('Autonomous Dev pipeline commands');
-    expect(adCommand.type).toBe(1); // CHAT_INPUT
-    expect(adCommand.options).toHaveLength(12);
+    const adCommand = DISCORD_COMMANDS.find((c) => c.name === 'ad');
+    expect(adCommand).toBeDefined();
+    expect(adCommand?.description).toBe('Autonomous Dev pipeline commands');
+    expect(adCommand?.type).toBe(1); // CHAT_INPUT
+    expect(adCommand?.options).toHaveLength(12);
+
+    const autodev = DISCORD_COMMANDS.find((c) => c.name === 'autodev');
+    expect(autodev?.options).toHaveLength(2);
   });
 
   // -----------------------------------------------------------------------
@@ -444,7 +447,7 @@ describe('Command Registration (SPEC-008-3-01, Task 2)', () => {
     expect(logCalls[0].message).toBe('Discord slash commands registered');
     expect(logCalls[0].context).toEqual({
       guildId: '111222333444555666',
-      commandCount: 12,
+      commandCount: 14, // 12 /ad subcommands + 2 /autodev subcommands
     });
   });
 });

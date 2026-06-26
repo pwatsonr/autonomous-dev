@@ -194,6 +194,21 @@ describe('mapSlashCommandPayload', () => {
     );
   });
 
+  test('maps /autodev to a scoped trigger with the verified trigger_id as messageId', () => {
+    const cmd = mapSlashCommandPayload(
+      body({
+        command: '/autodev',
+        text: 'repo acme/orders fix the flaky retry test',
+        trigger_id: 'trg-123',
+      }),
+    );
+    expect(cmd.commandName).toBe('trigger'); // routes to TriggerHandler
+    expect(cmd.args).toEqual(['repo', 'acme/orders', 'fix the flaky retry test']);
+    expect(cmd.flags.messageId).toBe('trg-123'); // idempotency key from the signed payload
+    expect(cmd.source.channelType).toBe('slack');
+    expect(cmd.source.userId).toBe('U123');
+  });
+
   test('round-trip via getSlackContext recovers workspace/channel info', () => {
     const cmd = mapSlashCommandPayload(
       body({ team_id: 'TWORK', channel_id: 'CCHAN', team_domain: 'acme' }),

@@ -22,6 +22,7 @@
  * @module discord_adapter
  */
 
+import type { Repository } from '../../db/repository';
 import type {
   IntakeAdapter,
   AdapterHandle,
@@ -36,7 +37,8 @@ import type {
   CommandResult,
   PromptOption,
 } from '../adapter_interface';
-import type { Repository } from '../../db/repository';
+import { AUTODEV_COMMAND_NAME, buildTriggerCommand } from '../trigger_command_map';
+
 import type { DiscordIdentityResolver } from './discord_identity';
 import { AuthorizationError } from './discord_identity';
 import type { DiscordRateLimitHandler } from './discord_rate_limiter';
@@ -96,6 +98,10 @@ export interface ChatInputCommandInteraction {
   };
   /** The interaction user. */
   user: { id: string };
+  /** The top-level command name (e.g. `ad` | `autodev`). */
+  commandName: string;
+  /** The unique interaction id — the trigger idempotency key. */
+  id: string;
   /** The channel ID where the interaction was received. */
   channelId: string;
   /** String representation of the interaction. */
@@ -853,10 +859,8 @@ export class DiscordAdapter implements IntakeAdapter {
       // Step 1: IMMEDIATELY defer (must happen within 3 seconds)
       await interaction.deferReply();
 
-      // Step 2: Extract subcommand and options
+      // Step 2: Extract the subcommand (args/flags are computed per-command below).
       const subcommand = interaction.options.getSubcommand();
-      const args = this.extractArgs(interaction, subcommand);
-      const flags = this.extractFlags(interaction, subcommand);
 
       // Step 3: Resolve identity
       let userId: string;
@@ -870,27 +874,60 @@ export class DiscordAdapter implements IntakeAdapter {
         throw error;
       }
 
-      // Step 4: Construct IncomingCommand
-      const command: IncomingCommand = {
-        commandName: subcommand,
-        args,
-        flags,
-        rawText: interaction.toString(),
-        source: {
+      // Step 4: Construct the IncomingCommand. The scoped `/autodev` command maps
+      // to a 'trigger' — args = [scopeType, scopeId, task], and the idempotency
+      // key is the VERIFIED interaction id (a Gateway interaction is
+      // token-authenticated), so a retried interaction can't double-enqueue.
+      // Every other command keeps the existing subcommand → commandName mapping.
+      let command: IncomingCommand;
+      if (interaction.commandName === AUTODEV_COMMAND_NAME) {
+        command = buildTriggerCommand({
+          scopeType: subcommand, // 'repo' | 'project'
+          scopeId: interaction.options.getString('id', true),
+          task: interaction.options.getString('task', true),
           channelType: 'discord',
           userId,
-          platformChannelId: interaction.channelId,
-          timestamp: new Date(),
-        },
-      };
+          channelId: interaction.channelId ?? undefined,
+          messageId: interaction.id,
+          rawText: interaction.toString(),
+        });
+      } else {
+        command = {
+          commandName: subcommand,
+          args: this.extractArgs(interaction, subcommand),
+          flags: this.extractFlags(interaction, subcommand),
+          rawText: interaction.toString(),
+          source: {
+            channelType: 'discord',
+            userId,
+            platformChannelId: interaction.channelId,
+            timestamp: new Date(),
+          },
+        };
+      }
 
       // Step 5: Route through IntakeRouter
       const result = await this.router.route(command);
 
       // Step 6: Edit the deferred response
       if (result.success) {
-        const formatted = this.formatter.formatStatusEmbed(result.data);
-        await interaction.editReply({ embeds: [formatted] });
+        if (interaction.commandName === AUTODEV_COMMAND_NAME) {
+          const d = (result.data ?? {}) as {
+            requestId?: string | null;
+            scope?: string;
+            position?: number;
+            alreadyReceived?: boolean;
+          };
+          const content = d.alreadyReceived
+            ? '↩️ Already received that request — not re-queuing.'
+            : `✅ Queued \`${d.requestId ?? '?'}\` for ${d.scope ?? 'the target'}${
+                typeof d.position === 'number' ? ` (position ${d.position})` : ''
+              }. I'll report progress here.`;
+          await interaction.editReply({ content });
+        } else {
+          const formatted = this.formatter.formatStatusEmbed(result.data);
+          await interaction.editReply({ embeds: [formatted] });
+        }
       } else {
         await interaction.editReply({
           content: `Error: ${result.error}`,

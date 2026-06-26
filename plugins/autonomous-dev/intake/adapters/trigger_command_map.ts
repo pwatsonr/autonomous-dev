@@ -20,6 +20,10 @@
 
 import type { ChannelType, IncomingCommand } from './adapter_interface';
 
+/** The chat-platform command name for scoped triggers (`/autodev …`). Shared by
+ *  the Discord/Slack registration and dispatch so they cannot drift. */
+export const AUTODEV_COMMAND_NAME = 'autodev';
+
 export interface TriggerCommandInput {
   /** `'repo'` | `'project'` — validated downstream by `parseScopedTrigger`. */
   scopeType: string;

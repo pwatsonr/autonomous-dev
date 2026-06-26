@@ -96,17 +96,22 @@ function getSubcommandOptions(name: string): Array<Record<string, unknown>> {
 
 describe('Discord Slash Command Payload (SPEC-008-3-05, Task 14)', () => {
   // -----------------------------------------------------------------------
-  // Test 1: 1 top-level command with 12 subcommands
-  // (PRD-016 triage: refreshed for added submit-bug + hotfix subcommands)
+  // Test 1: 2 top-level commands — /ad (12 subcommands) + /autodev (2)
+  // (ONBOARD P6 #583: added the scoped /autodev trigger command)
   // -----------------------------------------------------------------------
-  test('payload has exactly 1 top-level command /ad with 12 subcommands', () => {
-    expect(DISCORD_COMMANDS).toHaveLength(1);
+  test('payload has /ad (12 subcommands) and /autodev (2 subcommands)', () => {
+    expect(DISCORD_COMMANDS).toHaveLength(2);
 
-    const adCommand = DISCORD_COMMANDS[0];
-    expect(adCommand.name).toBe('ad');
-    expect(adCommand.description).toBe('Autonomous Dev pipeline commands');
-    expect(adCommand.type).toBe(1); // CHAT_INPUT
-    expect(adCommand.options).toHaveLength(12);
+    const adCommand = DISCORD_COMMANDS.find((c) => c.name === 'ad');
+    expect(adCommand).toBeDefined();
+    expect(adCommand?.description).toBe('Autonomous Dev pipeline commands');
+    expect(adCommand?.type).toBe(1); // CHAT_INPUT
+    expect(adCommand?.options).toHaveLength(12);
+
+    const autodev = DISCORD_COMMANDS.find((c) => c.name === 'autodev');
+    expect(autodev).toBeDefined();
+    expect(autodev?.type).toBe(1);
+    expect(autodev?.options).toHaveLength(2);
   });
 
   // -----------------------------------------------------------------------
