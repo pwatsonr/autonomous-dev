@@ -199,10 +199,10 @@ describe('trigger_store', () => {
   it('countUserTriggersSince counts a requester\'s records within the window', () => {
     const files = new Map<string, string>();
     const { io } = memIO(files);
-    commitTrigger({ ...rec('R-1', 'm1'), createdAtMs: 1000 }, io);
-    commitTrigger({ ...rec('R-2', 'm2'), createdAtMs: 2000 }, io);
+    commitTrigger({ ...rec('R-1', 'm1'), createdAtMs: 1000, requesterId: 'u1' }, io);
+    commitTrigger({ ...rec('R-2', 'm2'), createdAtMs: 2000, requesterId: 'u1' }, io);
     commitTrigger(
-      { ...rec('R-3', 'm3'), createdAtMs: 2000, origin: { platform: 'discord', userId: 'u2' } },
+      { ...rec('R-3', 'm3'), createdAtMs: 2000, requesterId: 'u2', origin: { platform: 'discord', userId: 'u2' } },
       io,
     );
     expect(countUserTriggersSince('u1', 0, io)).toBe(2);

@@ -294,6 +294,32 @@ describe('TriggerHandler.execute', () => {
     expect(u2.success).toBe(true);
   });
 
+  it('rate limit keys on the resolved internal user, not the platform source id', async () => {
+    const { db, inserted } = makeDb();
+    const h = new TriggerHandler(db, emitter, () => OWN, allow, {
+      storeIO: makeStore(),
+      maxTriggersPerHour: 1,
+    });
+    // Same internal user 'u1' but two DIFFERENT platform source ids — they must
+    // share one bucket (keyed on the execute() userId), so the second is capped.
+    await h.execute(
+      {
+        ...cmd(['repo', 'acme/orders', 'first task here please'], 'm1'),
+        source: { channelType: 'discord', userId: 'plat-A', timestamp: new Date() },
+      },
+      'u1',
+    );
+    const second = await h.execute(
+      {
+        ...cmd(['repo', 'acme/orders', 'second task here please'], 'm2'),
+        source: { channelType: 'discord', userId: 'plat-B', timestamp: new Date() },
+      },
+      'u1',
+    );
+    expect(second.errorCode).toBe('RATE_LIMITED');
+    expect(inserted).toHaveLength(1);
+  });
+
   it('builds an authz context surfacing the repo for a repo scope', () => {
     const { db } = makeDb();
     const h = new TriggerHandler(db, emitter, () => OWN, allow, { storeIO: makeStore() });

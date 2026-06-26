@@ -199,7 +199,11 @@ export class TriggerHandler implements CommandHandler {
     //     rolling hour — distinct from the shared submit bucket. The daemon cost
     //     caps are the hard backstop; this stops a single-user queue flood.
     const nowMs = storeIO.now();
-    const requesterKey = command.source.userId;
+    // Key on the RESOLVED internal authz subject (the execute() userId), not the
+    // raw platform/source id — consistent with the router's authz + rate-limit
+    // subject, and not diluted across multiple platform accounts mapped to one
+    // user. The trigger record carries the same requesterId so the count agrees.
+    const requesterKey = userId;
     const maxPerHour = this.deps.maxTriggersPerHour ?? DEFAULT_MAX_TRIGGERS_PER_HOUR;
     if (requesterKey && maxPerHour > 0) {
       const recent = countUserTriggersSince(requesterKey, nowMs - HOUR_MS, storeIO);
@@ -311,6 +315,7 @@ export class TriggerHandler implements CommandHandler {
           scopeId: resolved.scopeId,
           scopeType: resolved.scopeType,
           targetRepo,
+          requesterId: userId,
           origin: {
             platform: channelType,
             channelId: command.source.platformChannelId,
