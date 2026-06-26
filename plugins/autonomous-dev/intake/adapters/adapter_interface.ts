@@ -316,7 +316,10 @@ export interface NotificationRoute {
 export type AuthzAction =
   | 'submit' | 'status' | 'list' | 'cancel' | 'pause'
   | 'resume' | 'priority' | 'logs' | 'feedback' | 'kill'
-  | 'approve_review' | 'config_change';
+  | 'approve_review' | 'config_change'
+  // ONBOARD Phase 4 (#596): scoped chat trigger — a scoped submit; the
+  // per-scope repo_permissions check (scope_authz) is the finer gate.
+  | 'trigger';
 
 /**
  * Context provided to the authorization system for access decisions.

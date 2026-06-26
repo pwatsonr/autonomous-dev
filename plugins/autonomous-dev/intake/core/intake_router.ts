@@ -8,6 +8,7 @@
  * @module intake_router
  */
 
+import { readOwnership } from '../../src/ownership/store';
 import type {
   AuthzAction,
   ChannelType,
@@ -17,28 +18,28 @@ import type {
   IncomingCommand,
 } from '../adapters/adapter_interface';
 import type { AuthzEngine } from '../authz/authz_engine';
-import type { RateLimiter } from '../rate_limit/rate_limiter';
+import type { DuplicateDetector } from '../core/duplicate_detector';
+import type { ClaudeApiClient } from '../core/request_parser';
+import type { InjectionRule } from '../core/sanitizer';
 import type { Repository } from '../db/repository';
-
-import { SubmitHandler } from '../handlers/submit_handler';
-import { StatusHandler } from '../handlers/status_handler';
-import { ListHandler } from '../handlers/list_handler';
 import { CancelHandler } from '../handlers/cancel_handler';
-import { PauseHandler } from '../handlers/pause_handler';
-import { ResumeHandler } from '../handlers/resume_handler';
-import { PriorityHandler } from '../handlers/priority_handler';
-import { LogsHandler } from '../handlers/logs_handler';
 import { FeedbackHandler } from '../handlers/feedback_handler';
 import { KillHandler } from '../handlers/kill_handler';
+import { ListHandler } from '../handlers/list_handler';
+import { LogsHandler } from '../handlers/logs_handler';
+import { PauseHandler } from '../handlers/pause_handler';
+import { PriorityHandler } from '../handlers/priority_handler';
+import { ResumeHandler } from '../handlers/resume_handler';
 import { InvalidStateError } from '../handlers/state_machine';
+import { StatusHandler } from '../handlers/status_handler';
+import { SubmitHandler } from '../handlers/submit_handler';
+import type { RateLimiter } from '../rate_limit/rate_limiter';
+import { TriggerHandler } from '../triggers/trigger_handler';
 
 // ---------------------------------------------------------------------------
 // Dependencies that SubmitHandler needs beyond the base repository
 // ---------------------------------------------------------------------------
 
-import type { ClaudeApiClient } from '../core/request_parser';
-import type { DuplicateDetector } from '../core/duplicate_detector';
-import type { InjectionRule } from '../core/sanitizer';
 
 // ---------------------------------------------------------------------------
 // EventEmitter contract (optional dependency)
@@ -206,6 +207,22 @@ export class IntakeRouter {
     this.handlers.set('logs', new LogsHandler(db));
     this.handlers.set('feedback', new FeedbackHandler(db, emitter));
     this.handlers.set('kill', new KillHandler(db, emitter));
+
+    // ONBOARD Phase 4 (#596): scoped chat trigger. Ownership is read fresh per
+    // request (operator CLI is the only writer). The per-repo authorize closes
+    // over the same AuthzEngine the coarse route() check uses, so the per-scope
+    // decision (incl. project multi-repo) stays consistent with config.
+    this.handlers.set(
+      'trigger',
+      new TriggerHandler(
+        db,
+        emitter,
+        () => readOwnership(),
+        (uid, repo, channel) =>
+          this.deps.authz.authorize(uid, 'trigger', { targetRepo: repo }, channel).granted,
+        { injectionRules: this.deps.injectionRules },
+      ),
+    );
   }
 
   // =========================================================================

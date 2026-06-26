@@ -54,6 +54,7 @@ const ACTION_REQUIRED_ROLE: Record<AuthzAction, Role> = {
   list: 'viewer',
   logs: 'viewer',
   submit: 'contributor',
+  trigger: 'contributor', // ONBOARD P4 (#596): scoped submit; scope_authz adds the per-repo gate
   feedback: 'contributor',
   cancel: 'contributor',
   pause: 'contributor',

@@ -1109,6 +1109,14 @@ case "${COMMAND}" in
         fi
         exec bun run "${PLUGIN_BIN_DIR}/artifact-cli.ts" "$@"
         ;;
+    triggers)
+        # Bun-executable wrapper for the scoped-trigger CLI (ONBOARD #596).
+        if ! command -v bun >/dev/null 2>&1; then
+            echo "ERROR: 'triggers' subcommand requires bun on PATH" >&2
+            exit 127
+        fi
+        exec bun run "${PLUGIN_BIN_DIR}/triggers-cli.ts" "$@"
+        ;;
     override-verification)
         cmd_override_verification "$@"
         ;;

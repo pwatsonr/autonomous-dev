@@ -147,6 +147,7 @@ const ACTION_REQUIRED_ROLE: Record<AuthzAction, Role> = {
   list: 'viewer',
   logs: 'viewer',
   submit: 'contributor',
+  trigger: 'contributor',
   feedback: 'contributor',
   cancel: 'contributor',
   pause: 'contributor',

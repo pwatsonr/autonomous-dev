@@ -83,28 +83,28 @@ const ROLES: Role[] = ['viewer', 'contributor', 'operator', 'admin'];
 const EXPECTED: Record<Role, Record<AuthzAction, boolean>> = {
   viewer: {
     status: true, list: true, logs: true,
-    submit: false, feedback: false,
+    submit: false, trigger: false, feedback: false,
     cancel: false, pause: false, resume: false, priority: false,
     approve_review: false,
     kill: false, config_change: false,
   },
   contributor: {
     status: true, list: true, logs: true,
-    submit: true, feedback: true,
+    submit: true, trigger: true, feedback: true,
     cancel: true, pause: true, resume: true, priority: true,
     approve_review: false,
     kill: false, config_change: false,
   },
   operator: {
     status: true, list: true, logs: true,
-    submit: true, feedback: true,
+    submit: true, trigger: true, feedback: true,
     cancel: true, pause: true, resume: true, priority: true,
     approve_review: true,
     kill: false, config_change: false,
   },
   admin: {
     status: true, list: true, logs: true,
-    submit: true, feedback: true,
+    submit: true, trigger: true, feedback: true,
     cancel: true, pause: true, resume: true, priority: true,
     approve_review: true,
     kill: true, config_change: true,
