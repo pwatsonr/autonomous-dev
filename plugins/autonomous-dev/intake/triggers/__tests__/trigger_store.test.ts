@@ -8,6 +8,7 @@
 import {
   SEEN_TTL_MS,
   commitTrigger,
+  countUserTriggersSince,
   getRecord,
   hasSeen,
   listRecords,
@@ -193,5 +194,21 @@ describe('trigger_store', () => {
     expect(getRecord('REQ-1', io)?.status).toBe('stable');
     updateRecordStatus('REQ-missing', 'expired', io); // no throw
     expect(getRecord('REQ-missing', io)).toBeUndefined();
+  });
+
+  it('countUserTriggersSince counts a requester\'s records within the window', () => {
+    const files = new Map<string, string>();
+    const { io } = memIO(files);
+    commitTrigger({ ...rec('R-1', 'm1'), createdAtMs: 1000 }, io);
+    commitTrigger({ ...rec('R-2', 'm2'), createdAtMs: 2000 }, io);
+    commitTrigger(
+      { ...rec('R-3', 'm3'), createdAtMs: 2000, origin: { platform: 'discord', userId: 'u2' } },
+      io,
+    );
+    expect(countUserTriggersSince('u1', 0, io)).toBe(2);
+    expect(countUserTriggersSince('u1', 1500, io)).toBe(1); // only R-2 is >= 1500
+    expect(countUserTriggersSince('u2', 0, io)).toBe(1);
+    expect(countUserTriggersSince('nobody', 0, io)).toBe(0);
+    expect(countUserTriggersSince('', 0, io)).toBe(0);
   });
 });

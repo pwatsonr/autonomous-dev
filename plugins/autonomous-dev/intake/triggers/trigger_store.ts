@@ -205,6 +205,23 @@ export function listRecords(io: TriggerStoreIO = defaultTriggerStoreIO): Trigger
   return loadState(io).records;
 }
 
+/**
+ * Count committed trigger records for `userId` created at or after `sinceMs`.
+ * Backs the per-user trigger rate limit (a flood of $-spending runs from one
+ * requester). The record set is small (one per accepted trigger) and the
+ * caller's window bounds relevance; an empty userId never matches.
+ */
+export function countUserTriggersSince(
+  userId: string,
+  sinceMs: number,
+  io: TriggerStoreIO = defaultTriggerStoreIO,
+): number {
+  if (userId.length === 0) return 0;
+  return loadState(io).records.filter(
+    (r) => r.origin.userId === userId && r.createdAtMs >= sinceMs,
+  ).length;
+}
+
 /** Patch a record's status (used by reporting + the watch). No-op if absent. */
 export function updateRecordStatus(
   requestId: string,
