@@ -30,7 +30,13 @@ import { resolveAbsoluteHome } from '../../src/home';
 /** How long a handled message id is remembered for dedupe (≥ MAX_WATCH_DAYS). */
 export const SEEN_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
-export type TriggerRecordStatus = 'enqueued' | 'watching' | 'stable' | 'regressed' | 'expired';
+export type TriggerRecordStatus =
+  | 'enqueued'
+  | 'watching'
+  | 'stable'
+  | 'regressed'
+  | 'expired'
+  | 'failed'; // the pipeline request failed; never entered the watch
 
 export interface TriggerOrigin {
   /** The originating channel type, e.g. 'discord' | 'slack'. */

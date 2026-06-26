@@ -77,16 +77,26 @@ handling).
    interaction/message id — the idempotency key) + the origin fields on
    `command.source` (`platformChannelId`, `userId`). The router then dispatches
    to `TriggerHandler` (already registered).
-2. **The watch tick + completion detection** — a periodic job (the daemon
-   supervisor loop, or `autonomous-dev triggers watch-tick`) must:
-   - for each `enqueued` trigger record whose pipeline request has reached
-     `done`, call `startWatch(requestId, prBranch)` + `reportTerminal(done, prUrl)`;
-     for `failed`, `reportTerminal(failed)`;
-   - call `advanceWatches({ checks: ghChecksClient(exec), now, audit, onTransition, storeIO })`
-     to tick the active watches.
-   The `onTransition`/reporter **notifier** is the bot-post to the origin
-   channel — it needs the bot token, so it is the one piece swapped from a
-   logging stub to the real transport at activation.
+2. **The watch tick** — `autonomous-dev triggers watch-tick` is BUILT
+   (`bin/triggers-cli.ts`). One tick: completion-detection over `enqueued`
+   triggers (reads each request's `state.json` at
+   `<repo.path>/.autonomous-dev/requests/<id>/state.json` → done → start the
+   watch + report done; failed → report failed), then `advanceWatches` over the
+   active watches (CI via `gh pr checks`). The watch branch is
+   `autonomous/<requestId>` (the pipeline's PR-branch convention). Two
+   activation steps remain:
+   - **Periodic invocation** — invoke `autonomous-dev triggers watch-tick` each
+     daemon iteration. Add it to `bin/supervisor-loop.sh` just before the
+     idle-backoff sleep (best-effort: `… triggers watch-tick >/dev/null 2>&1 ||
+     true`), or run it from a launchd/cron timer. (Deferred from the build to
+     avoid an untested edit to the daemon's core loop.)
+   - **The notifier** — the bin currently uses a logging stub
+     (`logNotifier`); swap it for the real Discord/Slack bot-post (origin
+     channel) once tokens exist. This is the one credential-bearing piece.
+   Caveat: `gh pr checks <branch>` needs the PR to still be open; if the
+   pipeline merges + deletes the branch, the checks read `unknown` and the watch
+   holds until the hard cap. Tracking the merged-commit checks
+   (`gh api repos/<repo>/commits/<sha>/check-runs`) is a fast-follow.
 
 ## Audit events (free-string, via the activity log)
 

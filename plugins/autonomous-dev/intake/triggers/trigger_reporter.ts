@@ -158,3 +158,38 @@ export async function reportTerminal(
   });
   await trySend(record, formatTerminal(record, outcome), deps);
 }
+
+export type WatchOutcome = 'stable' | 'regressed' | 'expired';
+
+export function formatWatch(record: TriggerRecord, status: WatchOutcome, reason: string): TriggerMessage {
+  const r = reason ? ` — ${oneLine(reason)}` : '';
+  if (status === 'stable') {
+    return {
+      title: `Stabilized — ${record.requestId}`,
+      body: `${record.scope}: ${record.targetRepo} held green${r}. Disengaging the watch.`,
+    };
+  }
+  if (status === 'regressed') {
+    return {
+      title: `Regressed — ${record.requestId}`,
+      body: `Heads up: ${record.scope}: ${record.targetRepo}${r}.`,
+    };
+  }
+  return {
+    title: `Watch expired — ${record.requestId}`,
+    body: `${record.scope}: ${record.targetRepo}${r}.`,
+  };
+}
+
+/**
+ * Report a terminal WATCH transition to origin. The watch loop already audits
+ * the transition (watch_stable/regressed/expired); this is the best-effort send.
+ */
+export async function reportWatch(
+  record: TriggerRecord,
+  status: WatchOutcome,
+  reason: string,
+  deps: ReporterDeps,
+): Promise<void> {
+  await trySend(record, formatWatch(record, status, reason), deps);
+}
