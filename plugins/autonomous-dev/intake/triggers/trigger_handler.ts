@@ -36,10 +36,17 @@ import { resolveScope } from './scope_resolution';
 import { parseScopedTrigger } from './scoped_command';
 import {
   commitTrigger,
+  countUserTriggersSince,
   defaultTriggerStoreIO,
   hasSeen,
   type TriggerStoreIO,
 } from './trigger_store';
+
+/** Default per-user trigger cap per rolling hour — each accepted trigger runs
+ *  the full pipeline (~$3 + a PR). The daemon cost caps are the hard backstop;
+ *  this stops a single requester from flooding the queue. 0 disables the cap. */
+const DEFAULT_MAX_TRIGGERS_PER_HOUR = 10;
+const HOUR_MS = 3_600_000;
 
 /**
  * Per-repo authorize decision WITH the originating channel (for audit). The
@@ -57,6 +64,8 @@ export interface TriggerHandlerDeps {
   injectionRules?: InjectionRule[];
   /** Injected store seam (defaults to real fs); tests pass an in-memory IO. */
   storeIO?: TriggerStoreIO;
+  /** Max accepted triggers per requester per rolling hour (default 10; 0 = off). */
+  maxTriggersPerHour?: number;
 }
 
 export class TriggerHandler implements CommandHandler {
@@ -185,9 +194,30 @@ export class TriggerHandler implements CommandHandler {
       };
     }
 
+    // 5c. Per-user trigger rate limit. Each accepted trigger runs the full
+    //     pipeline (~$3 + a PR), so cap how many one requester may fire per
+    //     rolling hour — distinct from the shared submit bucket. The daemon cost
+    //     caps are the hard backstop; this stops a single-user queue flood.
+    const nowMs = storeIO.now();
+    // Key on the RESOLVED internal authz subject (the execute() userId), not the
+    // raw platform/source id — consistent with the router's authz + rate-limit
+    // subject, and not diluted across multiple platform accounts mapped to one
+    // user. The trigger record carries the same requesterId so the count agrees.
+    const requesterKey = userId;
+    const maxPerHour = this.deps.maxTriggersPerHour ?? DEFAULT_MAX_TRIGGERS_PER_HOUR;
+    if (requesterKey && maxPerHour > 0) {
+      const recent = countUserTriggersSince(requesterKey, nowMs - HOUR_MS, storeIO);
+      if (recent >= maxPerHour) {
+        return {
+          success: false,
+          error: `Trigger rate limit reached (${recent}/${maxPerHour} this hour). Try again later.`,
+          errorCode: 'RATE_LIMITED',
+        };
+      }
+    }
+
     // 6. Enqueue a normal pipeline request (mirrors SubmitHandler's build). One
     //    clock (storeIO.now) for the row + the trigger record so they agree.
-    const nowMs = storeIO.now();
     const now = new Date(nowMs).toISOString();
     const requestId = this.db.generateRequestId();
 
@@ -285,6 +315,7 @@ export class TriggerHandler implements CommandHandler {
           scopeId: resolved.scopeId,
           scopeType: resolved.scopeType,
           targetRepo,
+          requesterId: userId,
           origin: {
             platform: channelType,
             channelId: command.source.platformChannelId,

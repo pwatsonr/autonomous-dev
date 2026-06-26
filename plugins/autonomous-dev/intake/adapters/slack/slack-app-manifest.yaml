@@ -79,6 +79,13 @@ features:
       description: Submit a P0 bug requiring immediate attention
       usage_hint: "<title>"
       should_escape: false
+    # ONBOARD Phase 4/6 (#583): scoped trigger. `/autodev repo <id> <task>` (or
+    # project) runs the full pipeline on the target and watches it to stable.
+    - command: /autodev
+      url: https://${SLACK_HOST}/slack/commands
+      description: Trigger an autonomous-dev pipeline run on a scoped target
+      usage_hint: "repo|project <id> <task>"
+      should_escape: false
 
 oauth_config:
   scopes:

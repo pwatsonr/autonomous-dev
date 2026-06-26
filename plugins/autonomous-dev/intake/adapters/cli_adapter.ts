@@ -36,15 +36,15 @@
  * SPEC-011-1-03 sketches `new IntakeRouter()` but the real constructor
  * requires `IntakeRouterDeps` (see `intake/core/intake_router.ts:62-94`).
  * `initRouter()` builds the deps using the same defaults as the integration
- * tests in `intake/__tests__/integration/`. Optional dependencies
- * (`claudeClient`, `duplicateDetector`, `injectionRules`) are left undefined
- * for now; the SubmitHandler tolerates this for non-NLP code paths.
+ * tests in `intake/__tests__/integration/`. `injectionRules` are loaded from the
+ * shipped rules (best-effort) so chat/CLI input is sanitized; `claudeClient` and
+ * `duplicateDetector` are left undefined (the SubmitHandler tolerates this).
  *
  * @module cli_adapter
  */
 
-import * as os from 'os';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 import {
@@ -54,20 +54,7 @@ import {
   Option,
 } from 'commander';
 
-import type {
-  ChannelType,
-  IncomingCommand,
-  CommandResult,
-} from './adapter_interface';
 import { loadBugContext } from '../cli/bug-context-loader';
-import { registerStandardsCommand } from './cli_adapter_standards';
-import { registerChainsCommand } from '../cli/chains_command';
-import { registerDeployBackendsCommand } from '../cli/deploy_backends_command';
-import { registerDeployApproveCommand } from '../cli/deploy_approve_command';
-import { registerDeployRejectCommand } from '../cli/deploy_reject_command';
-import { registerDeployPlanCommand } from '../cli/deploy_plan_command';
-import { registerDeployCostCommand } from '../cli/deploy_cost_command';
-import { registerDeployLogsCommand } from '../cli/deploy_logs_command';
 import {
   formatErrors,
   runInteractivePrompts,
@@ -75,7 +62,21 @@ import {
   defaultPromptIO,
   type PromptIO,
 } from '../cli/bug-prompts';
+import { registerChainsCommand } from '../cli/chains_command';
+import { registerDeployApproveCommand } from '../cli/deploy_approve_command';
+import { registerDeployBackendsCommand } from '../cli/deploy_backends_command';
+import { registerDeployCostCommand } from '../cli/deploy_cost_command';
+import { registerDeployLogsCommand } from '../cli/deploy_logs_command';
+import { registerDeployPlanCommand } from '../cli/deploy_plan_command';
+import { registerDeployRejectCommand } from '../cli/deploy_reject_command';
 import type { BugReport, Severity } from '../types/bug-report';
+
+import type {
+  ChannelType,
+  IncomingCommand,
+  CommandResult,
+} from './adapter_interface';
+import { registerStandardsCommand } from './cli_adapter_standards';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -934,6 +935,7 @@ export async function initRouter(): Promise<IntakeRouterLike> {
   const { AuditLogger } = await import('../authz/audit_logger');
   const { RateLimiter } = await import('../rate_limit/rate_limiter');
   const { IntakeRouter } = await import('../core/intake_router');
+  const { loadDefaultInjectionRules } = await import('../core/sanitizer');
   const { setHandoffDatabase } = await import('../core/handoff_manager');
   const { setAllowedRepositories } = await import('../core/path_security');
   /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
@@ -973,11 +975,13 @@ export async function initRouter(): Promise<IntakeRouterLike> {
     authz,
     rateLimiter,
     db: repo,
-    // claudeClient, duplicateDetector, and injectionRules are intentionally
-    // omitted. The SubmitHandler handles undefined deps gracefully:
-    // - claudeClient undefined  -> skips NLP parse, uses raw description
-    // - duplicateDetector undefined -> skips duplicate detection
-    // - injectionRules undefined -> skips sanitization
+    // claudeClient and duplicateDetector are intentionally omitted — SubmitHandler
+    // degrades gracefully (raw description; no duplicate detection). injectionRules
+    // ARE now wired: chat/CLI-originated input must be sanitized (security fix; the
+    // router threads these to both SubmitHandler and TriggerHandler). The loader is
+    // best-effort — a missing rules file degrades to no filtering rather than a
+    // crash, and the injection_corpus test gates the shipped rules.
+    injectionRules: loadDefaultInjectionRules(),
   });
 }
 

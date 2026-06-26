@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ONBOARD Phase 6 (#583): periodic trigger watch-tick (launchd timer).
+
+  Separate from the daemon plist so it survives version upgrades WITHOUT editing
+  the daemon's core loop. It points at the STABLE wrapper
+  (~/.local/bin/autonomous-dev), which the deploy repoints to the current version
+  each release — so this timer never needs updating.
+
+  Each tick detects trigger completions, advances the CI-green-for-N-days
+  stabilization watch, reports status back to the originating channel, and
+  auto-files a GitHub issue on a terminal failure — all best-effort + idempotent.
+
+  Install (operator): substitute {{USER_HOME}}/{{DAEMON_HOME}}/{{EXTRA_PATH_DIRS}},
+  fill in the bot tokens, `chmod 600` the file (it holds secrets), copy to
+  ~/Library/LaunchAgents/, then `launchctl bootstrap gui/$(id -u) <path>`.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.autonomous-dev.watch-tick</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{USER_HOME}}/.local/bin/autonomous-dev</string>
+        <string>triggers</string>
+        <string>watch-tick</string>
+    </array>
+
+    <!-- Run every 10 minutes. -->
+    <key>StartInterval</key>
+    <integer>600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>{{DAEMON_HOME}}/logs/watch-tick-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{DAEMON_HOME}}/logs/watch-tick-stderr.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{EXTRA_PATH_DIRS}}/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <key>HOME</key>
+        <string>{{USER_HOME}}</string>
+        <!-- Bot tokens for posting status back to the channel. Fill these in and
+             `chmod 600` this plist. Without them the watch still runs; reports
+             are audited-only (visible in the logs + portal). For tighter
+             secret-handling, source them from a 0600 file in a wrapper instead. -->
+        <key>DISCORD_BOT_TOKEN</key>
+        <string></string>
+        <key>SLACK_BOT_TOKEN</key>
+        <string></string>
+        <!-- Optional: auto-file failure issues for non-triggered (submitted)
+             requests too; the daemon honors AUTODEV_FAILURE_ISSUES on its own
+             plist, not here. This timer always files for triggered requests. -->
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>LowPriorityBackgroundIO</key>
+    <true/>
+</dict>
+</plist>

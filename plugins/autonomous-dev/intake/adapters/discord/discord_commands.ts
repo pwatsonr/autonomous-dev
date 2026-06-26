@@ -17,6 +17,8 @@
 
 import { Client, REST, Routes } from 'discord.js';
 
+import { AUTODEV_COMMAND_NAME } from '../trigger_command_map';
+
 // ---------------------------------------------------------------------------
 // Logger interface
 // ---------------------------------------------------------------------------
@@ -297,6 +299,56 @@ export const DISCORD_COMMANDS = [
       },
     ],
   },
+  // ONBOARD Phase 4/6 (#583): the scoped trigger command. `/autodev repo <id>
+  // <task>` (or `project`) runs the full pipeline on the target and watches it
+  // to stabilization. Maps to commandName 'trigger' in the adapter dispatch.
+  {
+    name: AUTODEV_COMMAND_NAME,
+    description: 'Trigger an autonomous-dev pipeline run on a scoped target',
+    type: 1, // CHAT_INPUT
+    options: [
+      {
+        name: 'repo',
+        description: 'Run on a single repo',
+        type: OptionType.SUB_COMMAND,
+        options: [
+          {
+            name: 'id',
+            description: 'Repo (owner/name)',
+            type: OptionType.STRING,
+            required: true,
+          },
+          {
+            name: 'task',
+            description: 'What should the pipeline do?',
+            type: OptionType.STRING,
+            required: true,
+            max_length: 10000,
+          },
+        ],
+      },
+      {
+        name: 'project',
+        description: 'Run on a project (resolves to its repo)',
+        type: OptionType.SUB_COMMAND,
+        options: [
+          {
+            name: 'id',
+            description: 'Project id',
+            type: OptionType.STRING,
+            required: true,
+          },
+          {
+            name: 'task',
+            description: 'What should the pipeline do?',
+            type: OptionType.STRING,
+            required: true,
+            max_length: 10000,
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -352,7 +404,7 @@ export async function registerCommands(
 
   log.info('Discord slash commands registered', {
     guildId: resolvedGuildId,
-    commandCount: DISCORD_COMMANDS[0].options!.length,
+    commandCount: DISCORD_COMMANDS.reduce((n, c) => n + (c.options ? c.options.length : 0), 0),
   });
 }
 

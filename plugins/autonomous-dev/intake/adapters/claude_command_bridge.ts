@@ -49,15 +49,18 @@
 
 import * as path from 'path';
 
+import { loadDefaultInjectionRules } from '../core/sanitizer';
+
 import type {
   IncomingCommand,
   CommandResult,
   ErrorResponse,
   ChannelType,
 } from './adapter_interface';
-import type { ClaudeIdentityResolver } from './claude_identity';
-import { ValidationError, parseCommandArgs } from './claude_arg_parser';
 import type { ValidationFn, IntakeRouter, CLIFormatter } from './claude_adapter';
+import { ValidationError, parseCommandArgs } from './claude_arg_parser';
+import type { ClaudeIdentityResolver } from './claude_identity';
+
 
 // ---------------------------------------------------------------------------
 // ClaudeCommandBridge (existing in-process surface, SPEC-008-2-04)
@@ -654,9 +657,11 @@ export async function initRouter(): Promise<IntakeRouter> {
     authz,
     rateLimiter,
     db: repo,
-    // TODO(PLAN-011-2): wire optional deps (claudeClient, duplicateDetector,
-    //                   injectionRules) once the bridge is invoked end-to-end
-    //                   from the bash proxy and SubmitHandler needs them.
+    // injectionRules wired (security fix): the router threads these to the
+    // Submit/Trigger handlers so bridge-originated input is sanitized. Best-effort
+    // load — a missing rules file degrades to no filtering, not a crash.
+    // (claudeClient/duplicateDetector still omitted; SubmitHandler degrades.)
+    injectionRules: loadDefaultInjectionRules(),
   });
 
   return router as unknown as IntakeRouter;

@@ -15,6 +15,7 @@
  * @module intake/triggers/watch_tick
  */
 
+import { failureFingerprint, type IssueFiler } from './issue_filer';
 import { reportTerminal, reportWatch, type ReporterDeps } from './trigger_reporter';
 import { listRecords, patchRecord, type TriggerRecord, type TriggerStoreIO } from './trigger_store';
 import {
@@ -61,6 +62,9 @@ export interface WatchTickDeps {
   now: () => number;
   audit: WatchAuditSink;
   reporter: ReporterDeps;
+  /** Optional auto-issue filer: opens a GitHub issue on a terminal FAILURE
+   *  (pipeline failed, watch regressed/expired). Omitted = no issues filed. */
+  issueFiler?: IssueFiler;
   opts?: WatchOpts;
 }
 
@@ -68,6 +72,7 @@ export interface WatchTickResult {
   started: number;
   reportedDone: number;
   reportedFailed: number;
+  issuesFiled: number;
 }
 
 async function safe(fn: () => Promise<void>): Promise<void> {
@@ -78,12 +83,53 @@ async function safe(fn: () => Promise<void>): Promise<void> {
   }
 }
 
+/** Build + file a failure issue, best-effort. Returns whether one was filed.
+ *  The repo SLUG is the record's targetRepo (e.g. `owner/name`); the dedup
+ *  fingerprint keys on repo+request+class so recurrences collapse to one issue. */
+async function fileFailureIssue(
+  filer: IssueFiler | undefined,
+  record: TriggerRecord,
+  failureClass: string,
+  detail: string,
+): Promise<boolean> {
+  if (!filer) return false;
+  try {
+    const res = await filer.file({
+      repo: record.targetRepo,
+      title: `[autodev:${failureClass}] ${record.requestId} on ${record.scope}`,
+      body: failureIssueBody(record, failureClass, detail),
+      fingerprint: failureFingerprint({
+        repo: record.targetRepo,
+        requestId: record.requestId,
+        failureClass,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function failureIssueBody(record: TriggerRecord, failureClass: string, detail: string): string {
+  const lines = [
+    `Autonomous-dev recorded a **${failureClass}** for request \`${record.requestId}\`.`,
+    '',
+    `- Scope: \`${record.scope}\``,
+    `- Target repo: \`${record.targetRepo}\``,
+  ];
+  if (record.watchPrBranch) lines.push(`- PR branch: \`${record.watchPrBranch}\``);
+  const clean = detail.replace(/[\r\n]+/g, ' ').trim();
+  if (clean) lines.push(`- Detail: ${clean}`);
+  lines.push('', 'Filed automatically by autonomous-dev; recurrences dedup onto this issue.');
+  return lines.join('\n');
+}
+
 /**
  * Run one tick: detect completions of enqueued triggers, then advance the
  * active stabilization watches. Never throws; returns a small summary.
  */
 export async function runWatchTick(deps: WatchTickDeps): Promise<WatchTickResult> {
-  const result: WatchTickResult = { started: 0, reportedDone: 0, reportedFailed: 0 };
+  const result: WatchTickResult = { started: 0, reportedDone: 0, reportedFailed: 0, issuesFiled: 0 };
   const opts = deps.opts ?? DEFAULT_WATCH_OPTS;
 
   // 1. Completion detection over enqueued records.
@@ -116,6 +162,9 @@ export async function runWatchTick(deps: WatchTickDeps): Promise<WatchTickResult
           deps.reporter,
         ),
       );
+      if (await fileFailureIssue(deps.issueFiler, record, 'pipeline-failed', outcome.reason ?? '')) {
+        result.issuesFiled += 1;
+      }
     }
     // running / unknown → leave enqueued for a later tick
   }
@@ -126,7 +175,14 @@ export async function runWatchTick(deps: WatchTickDeps): Promise<WatchTickResult
     checks: deps.checks,
     now: deps.now,
     audit: deps.audit,
-    onTransition: (rec, status, reason) => reportWatch(rec, status, reason, deps.reporter),
+    onTransition: async (rec, status, reason) => {
+      await safe(() => reportWatch(rec, status, reason, deps.reporter));
+      if (status === 'regressed' || status === 'expired') {
+        if (await fileFailureIssue(deps.issueFiler, rec, status, reason)) {
+          result.issuesFiled += 1;
+        }
+      }
+    },
     opts,
   });
 

@@ -54,6 +54,9 @@ export interface TriggerRecord {
   scopeType: 'project' | 'repo';
   targetRepo: string;
   origin: TriggerOrigin;
+  /** Resolved internal authz subject (the rate-limit key) — distinct from the
+   *  raw platform id in origin.userId. Optional for backward compatibility. */
+  requesterId?: string;
   createdAtMs: number;
   status: TriggerRecordStatus;
   // Stabilization-watch fields (step 5), set when status → 'watching'.
@@ -203,6 +206,24 @@ export function getRecord(
 
 export function listRecords(io: TriggerStoreIO = defaultTriggerStoreIO): TriggerRecord[] {
   return loadState(io).records;
+}
+
+/**
+ * Count committed trigger records whose `requesterId` (the resolved internal
+ * authz subject) matches `userId` and were created at or after `sinceMs`. Backs
+ * the per-user trigger rate limit (a flood of $-spending runs from one
+ * requester). The record set is small (one per accepted trigger) and the
+ * caller's window bounds relevance; an empty id never matches.
+ */
+export function countUserTriggersSince(
+  userId: string,
+  sinceMs: number,
+  io: TriggerStoreIO = defaultTriggerStoreIO,
+): number {
+  if (userId.length === 0) return 0;
+  return loadState(io).records.filter(
+    (r) => r.requesterId === userId && r.createdAtMs >= sinceMs,
+  ).length;
 }
 
 /** Patch a record's status (used by reporting + the watch). No-op if absent. */
