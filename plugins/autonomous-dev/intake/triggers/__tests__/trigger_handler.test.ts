@@ -5,6 +5,10 @@
  * @module intake/triggers/trigger_handler.test
  */
 
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
 import type { Ownership } from '../../../src/ownership/types';
 import type { IncomingCommand } from '../../adapters/adapter_interface';
 import type { IntakeEventEmitter } from '../../core/intake_router';
@@ -13,19 +17,34 @@ import type { ActivityLogEntry, Repository, RequestEntity } from '../../db/repos
 import { TriggerHandler } from '../trigger_handler';
 import type { TriggerStoreIO } from '../trigger_store';
 
-const OWN: Ownership = {
-  org: 'acme',
-  projects: [
-    { id: 'payments', name: 'Payments', tags: {} },
-    { id: 'solo', name: 'Solo', tags: {} },
-    { id: 'empty', name: 'Empty', tags: {} },
-  ],
-  repos: [
-    { id: 'acme/orders', projectId: 'payments', tags: {} },
-    { id: 'acme/billing', projectId: 'payments', tags: {} },
-    { id: 'acme/only', projectId: 'solo', tags: {} },
-  ],
-};
+// A trigger now writes a real state.json under the target repo's local path
+// (the S6 daemon-discovery bridge, via the non-injected writeStateJson), so the
+// fixture repos need on-disk paths in a temp dir.
+let ROOT: string;
+const repoPath = (id: string): string => path.join(ROOT, id.replace(/\//g, '__'));
+let OWN: Ownership;
+
+beforeAll(() => {
+  ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'trigger-handler-'));
+  OWN = {
+    org: 'acme',
+    projects: [
+      { id: 'payments', name: 'Payments', tags: {} },
+      { id: 'solo', name: 'Solo', tags: {} },
+      { id: 'empty', name: 'Empty', tags: {} },
+    ],
+    repos: [
+      { id: 'acme/orders', projectId: 'payments', tags: {}, path: repoPath('acme/orders') },
+      { id: 'acme/billing', projectId: 'payments', tags: {}, path: repoPath('acme/billing') },
+      { id: 'acme/only', projectId: 'solo', tags: {}, path: repoPath('acme/only') },
+    ],
+  };
+  for (const r of OWN.repos) fs.mkdirSync(r.path as string, { recursive: true });
+});
+
+afterAll(() => {
+  fs.rmSync(ROOT, { recursive: true, force: true });
+});
 
 function makeDb(): { db: Repository; inserted: RequestEntity[]; logs: ActivityLogEntry[] } {
   const inserted: RequestEntity[] = [];
@@ -83,7 +102,8 @@ describe('TriggerHandler.execute', () => {
     const r = await h.execute(cmd(['repo', 'acme/orders', 'fix the flaky retry test']), 'u1');
     expect(r.success).toBe(true);
     expect(inserted).toHaveLength(1);
-    expect(inserted[0].target_repo).toBe('acme/orders');
+    expect(inserted[0].target_repo).toBe(repoPath('acme/orders')); // DB row keys on the local path
+    expect((r.data as { targetRepo?: string }).targetRepo).toBe('acme/orders'); // result shows the id
     expect(inserted[0].status).toBe('queued');
     expect(inserted[0].requester_id).toBe('u1');
     expect(logs[0].event).toBe('trigger_enqueued');
@@ -95,7 +115,7 @@ describe('TriggerHandler.execute', () => {
     const h = new TriggerHandler(db, emitter, () => OWN, allow, { storeIO: makeStore() });
     const r = await h.execute(cmd(['project', 'solo', 'add a metrics endpoint please']), 'u1');
     expect(r.success).toBe(true);
-    expect(inserted[0].target_repo).toBe('acme/only');
+    expect(inserted[0].target_repo).toBe(repoPath('acme/only'));
     expect(scopeOf(r.data)).toBe('project:solo');
   });
 
@@ -200,6 +220,45 @@ describe('TriggerHandler.execute', () => {
     const state = JSON.parse(raw) as { seen: Record<string, number>; records: unknown[] };
     expect(state.seen['msg-9']).toBeDefined();
     expect(state.records).toHaveLength(1);
+  });
+
+  it('writes a discoverable state.json under the repo path (S6 daemon bridge)', async () => {
+    const { db } = makeDb();
+    const h = new TriggerHandler(db, emitter, () => OWN, allow, { storeIO: makeStore() });
+    const r = await h.execute(cmd(['repo', 'acme/orders', 'fix the flaky retry test']), 'u1');
+    expect(r.success).toBe(true);
+    const reqId = (r.data as { requestId: string }).requestId;
+    const stateFile = path.join(
+      repoPath('acme/orders'),
+      '.autonomous-dev',
+      'requests',
+      reqId,
+      'state.json',
+    );
+    // WITHOUT this file the daemon's select_request() never sees the request.
+    expect(fs.existsSync(stateFile)).toBe(true);
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8')) as {
+      status: string;
+      id: string;
+      target_repo: string;
+    };
+    expect(state.status).toBe('queued');
+    expect(state.id).toBe(reqId); // the writer emits the request id as `id`
+    expect(state.target_repo).toBe(repoPath('acme/orders'));
+  });
+
+  it('refuses a trigger when the target repo has no local checkout (S6 guard)', async () => {
+    const own: Ownership = {
+      org: 'acme',
+      projects: [{ id: 'solo', name: 'Solo', tags: {} }],
+      repos: [{ id: 'acme/nolocal', projectId: 'solo', tags: {} }], // no path → not runnable
+    };
+    const { db, inserted } = makeDb();
+    const h = new TriggerHandler(db, emitter, () => own, allow, { storeIO: makeStore() });
+    const r = await h.execute(cmd(['repo', 'acme/nolocal', 'a perfectly good task here']), 'u1');
+    expect(r.success).toBe(false);
+    expect(r.errorCode).toBe('REPO_NOT_RUNNABLE');
+    expect(inserted).toHaveLength(0); // guarded before the DB insert — no orphan row
   });
 
   it('builds an authz context surfacing the repo for a repo scope', () => {
