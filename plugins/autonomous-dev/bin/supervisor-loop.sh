@@ -3718,6 +3718,26 @@ handle_phase_failure() {
         echo "$event" >> "$events_file"
 
         log_info "Request ${request_id} marked as failed due to retry exhaustion"
+
+        # Best-effort auto-file a GitHub issue for the failure (opt-in via
+        # AUTODEV_FAILURE_ISSUES=1). Backgrounded + `|| true` so it can never
+        # block or break the loop; the CLI verb dedups by fingerprint and never
+        # throws. The repo slug is resolved from the request path via ownership;
+        # AUTODEV_SYSTEM_ISSUE_REPO (optional) is the fallback for unresolvable
+        # repos. Triggered requests are already covered by the watch-tick.
+        if [[ "${AUTODEV_FAILURE_ISSUES:-0}" == "1" ]]; then
+            local fail_repo_path="${state_file%%/.autonomous-dev/requests/*}"
+            local fail_phase
+            fail_phase=$(jq -r '.current_phase // ""' "$state_file" 2>/dev/null || echo "")
+            ( autonomous-dev triggers file-failure-issue \
+                --repo-path "$fail_repo_path" \
+                --request "$request_id" \
+                --class pipeline-failed \
+                --phase "$fail_phase" \
+                --detail "max retries exceeded" \
+                --system-repo "${AUTODEV_SYSTEM_ISSUE_REPO:-}" \
+                >/dev/null 2>&1 || true ) &
+        fi
     else
         log_info "Request ${request_id} escalation_count ${escalation_count} < ${MAX_RETRIES_PER_PHASE}, not marking as failed"
     fi
