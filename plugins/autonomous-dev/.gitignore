@@ -11,3 +11,4 @@ tests/standards/precision-report.json
 .autonomous-dev/baselines/
 .autonomous-dev/fingerprints/
 intake/adapters/cli_adapter.js
+bin/triggers-serve.js

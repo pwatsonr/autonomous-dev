@@ -941,7 +941,15 @@ export async function initRouter(): Promise<IntakeRouterLike> {
   /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports */
 
   const dbPath = defaultDbPath();
-  const migrationsDir = path.resolve(__dirname, '..', 'db', 'migrations');
+  // #603: when this module is bundled into a different directory (e.g.
+  // bin/triggers-serve.js for the listener), __dirname no longer points at
+  // intake/adapters, so `../db/migrations` resolves wrong. Prefer the stable
+  // plugin-root anchor the launcher exports; fall back to __dirname for
+  // unbundled/test runs where the env var isn't set.
+  const pluginRoot = process.env.AUTONOMOUS_DEV_PLUGIN_DIR;
+  const migrationsDir = pluginRoot
+    ? path.join(pluginRoot, 'intake', 'db', 'migrations')
+    : path.resolve(__dirname, '..', 'db', 'migrations');
   const { db } = initializeDatabase(dbPath, migrationsDir);
   const repo = new Repository(db);
 

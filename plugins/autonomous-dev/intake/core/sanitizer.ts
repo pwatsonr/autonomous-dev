@@ -293,9 +293,17 @@ export function sanitize(text: string, rules: InjectionRule[]): SanitizationResu
  * it is correct whether sanitizer runs from source (ts-jest, `intake/core`) or
  * bundled into `intake/adapters/cli_adapter.js` — both sit one level under
  * `intake/`, so `../config` lands on the same file.
+ *
+ * #603: when bundled into `bin/triggers-serve.js` (the listener), `__dirname`
+ * is `bin/`, so `../config` resolves wrong and the injection filter silently
+ * fails to load. Prefer the stable plugin-root anchor the launcher exports;
+ * fall back to `__dirname` for unbundled/test runs.
  */
 export function defaultInjectionRulesPath(): string {
-  return path.resolve(__dirname, '..', 'config', 'injection-rules.yaml');
+  const pluginRoot = process.env.AUTONOMOUS_DEV_PLUGIN_DIR;
+  return pluginRoot
+    ? path.join(pluginRoot, 'intake', 'config', 'injection-rules.yaml')
+    : path.resolve(__dirname, '..', 'config', 'injection-rules.yaml');
 }
 
 /**
