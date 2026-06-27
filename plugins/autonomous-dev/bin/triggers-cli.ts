@@ -197,15 +197,33 @@ async function fileFailureIssueCmd(argv: string[]): Promise<number> {
  * rather than a child of this short-lived dispatcher.
  */
 function serveCmd(argv: string[]): never {
-  const servePath = path.join(__dirname, 'triggers-serve.ts');
-  // Replace the current process image with `bun run triggers-serve.ts …`.
-  // execFileSync inherits stdio and blocks; on a clean child exit we mirror its
-  // code. (We use execFileSync rather than spawn so SIGTERM/SIGINT to this PID
-  // is delivered to bun, which forwards it to the serve process's handlers.)
+  // serve loads the DB (better-sqlite3), which Bun cannot load (#603), so it
+  // must run under Node. The launcher normally intercepts `triggers serve` and
+  // execs Node directly; this path covers direct invocation
+  // (`bun run triggers-cli.ts serve`): build the Node-target bundle if
+  // missing/stale, then run it under Node with the plugin-root anchor set so
+  // the bundled migrations path resolves correctly.
   // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   const { execFileSync } = require('child_process') as typeof import('child_process');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const fs = require('fs') as typeof import('fs');
+  const pluginDir = path.resolve(__dirname, '..');
+  const serveTs = path.join(__dirname, 'triggers-serve.ts');
+  const serveJs = path.join(__dirname, 'triggers-serve.js');
   try {
-    execFileSync('bun', ['run', servePath, ...argv], { stdio: 'inherit' });
+    if (
+      !fs.existsSync(serveJs) ||
+      fs.statSync(serveTs).mtimeMs > fs.statSync(serveJs).mtimeMs
+    ) {
+      execFileSync('bun', ['run', 'build:triggers-serve'], {
+        stdio: 'inherit',
+        cwd: pluginDir,
+      });
+    }
+    execFileSync('node', [serveJs, ...argv], {
+      stdio: 'inherit',
+      env: { ...process.env, AUTONOMOUS_DEV_PLUGIN_DIR: pluginDir },
+    });
     process.exit(0);
   } catch (err) {
     const code = (err as { status?: number }).status;

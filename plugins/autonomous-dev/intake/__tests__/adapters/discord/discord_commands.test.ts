@@ -142,11 +142,11 @@ describe('Discord Slash Command Payload (SPEC-008-3-05, Task 14)', () => {
     const options = getSubcommandOptions('submit');
     expect(options).toHaveLength(4);
 
-    // description: required, STRING, max_length 10000
+    // description: required, STRING, max_length 6000 (Discord's option cap; #603)
     const desc = options.find((o) => o.name === 'description')!;
     expect(desc.required).toBe(true);
     expect(desc.type).toBe(3); // STRING
-    expect(desc.max_length).toBe(10000);
+    expect(desc.max_length).toBe(6000);
 
     // priority: optional, STRING, 3 choices
     const prio = options.find((o) => o.name === 'priority')!;

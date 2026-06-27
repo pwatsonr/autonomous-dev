@@ -28,6 +28,11 @@ set -euo pipefail
 PLUGIN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PLUGIN_BIN_DIR="${PLUGIN_DIR}/bin"
 
+# Stable plugin-root anchor for Node subprocesses (#603). Bundled CLI/serve code
+# (e.g. bin/triggers-serve.js) can't rely on __dirname to locate
+# intake/db/migrations, so resolve resource paths from this instead.
+export AUTONOMOUS_DEV_PLUGIN_DIR="${PLUGIN_DIR}"
+
 # Source shared utilities (logging, etc.) if available
 DAEMON_HOME="${HOME}/.autonomous-dev"
 KILL_SWITCH_FILE="${DAEMON_HOME}/kill-switch.flag"
@@ -1114,6 +1119,27 @@ case "${COMMAND}" in
         if ! command -v bun >/dev/null 2>&1; then
             echo "ERROR: 'triggers' subcommand requires bun on PATH" >&2
             exit 127
+        fi
+        # `triggers serve` loads the DB (better-sqlite3), which Bun cannot load
+        # (#603). Build the Node-target bundle (if missing/stale) and exec it
+        # under Node directly, so launchd supervises a single Node PID that
+        # receives SIGTERM/SIGINT — rather than a bun->node child that would
+        # orphan when the bun parent is signalled.
+        if [[ "${1:-}" == "serve" ]]; then
+            serve_ts="${PLUGIN_BIN_DIR}/triggers-serve.ts"
+            serve_js="${PLUGIN_BIN_DIR}/triggers-serve.js"
+            if [[ ! -f "$serve_js" || "$serve_ts" -nt "$serve_js" ]]; then
+                if ! (cd "$PLUGIN_DIR" && bun run build:triggers-serve) >&2; then
+                    echo "ERROR: failed to build triggers-serve (bun run build:triggers-serve)" >&2
+                    exit 2
+                fi
+            fi
+            if ! command -v node >/dev/null 2>&1; then
+                echo "ERROR: 'triggers serve' requires node on PATH" >&2
+                exit 127
+            fi
+            shift  # drop 'serve'; pass any remaining args through
+            exec node "$serve_js" "$@"
         fi
         exec bun run "${PLUGIN_BIN_DIR}/triggers-cli.ts" "$@"
         ;;

@@ -231,12 +231,12 @@ describe('Slash Command Payload (SPEC-008-3-01, Task 2)', () => {
       expect(options).toHaveLength(4);
     });
 
-    test('description is required, string type, max_length 10000', () => {
+    test('description is required, string type, max_length 6000', () => {
       const options = getSubcommandOptions('submit');
       const desc = options.find((o) => o.name === 'description')!;
       expect(desc.required).toBe(true);
       expect(desc.type).toBe(3); // STRING
-      expect(desc.max_length).toBe(10000);
+      expect(desc.max_length).toBe(6000);
     });
 
     test('priority is optional, string type, 3 choices', () => {
