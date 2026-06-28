@@ -1238,18 +1238,62 @@ repo_has_deploy_target() {
 # should_use_review_chain(phase: string) -> 0|1
 #   FLAG-GATED routing predicate for the reviewer-chain gate (#561/#568).
 #   Returns 0 (use the chain) ONLY when AUTONOMOUS_DEV_REVIEW_CHAINS=1 AND the
-#   phase is `code_review` — the MINIMAL first increment. Every other phase, and
-#   the flag in any state other than exactly "1", returns 1 so that
-#   dispatch_phase_session takes its byte-identical single-agent path.
+#   phase is `code_review` OR `spec_review`. Every other phase, and the flag in
+#   any state other than exactly "1", returns 1 so that dispatch_phase_session
+#   takes its byte-identical single-agent path.
 #
 #   SAFETY: with the flag unset or 0 (the default) this ALWAYS returns 1; the
 #   only way to reach 0 is an explicit opt-in via the env var on the code_review
-#   phase. The other *_review phases (prd/tdd/plan/spec) and the
-#   PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) are intentionally
-#   DEFERRED — they are separable and have no consumer yet.
+#   or spec_review phase. The remaining *_review phases (prd/tdd/plan) are
+#   intentionally DEFERRED — they are separable and have no consumer yet. The
+#   PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) IS wired — see
+#   emit_pre_author_hook() below.
 should_use_review_chain() {
     local phase="${1:-}"
-    [[ "${AUTONOMOUS_DEV_REVIEW_CHAINS:-0}" == "1" && "${phase}" == "code_review" ]]
+    [[ "${AUTONOMOUS_DEV_REVIEW_CHAINS:-0}" == "1" && ( "${phase}" == "code_review" || "${phase}" == "spec_review" ) ]]
+}
+
+# emit_pre_author_hook(request_id, project, phase) -> 0 (always)
+#   Best-effort emission of the plan-pre-author / spec-pre-author hook points
+#   (#561 item 1 / #568 part 2). Fires every plugin hook registered for the
+#   point via bin/hooks-emit.ts; a deliberate NO-OP when none are registered.
+#   The mechanism is wired and ready for future consumers — today nothing
+#   registers for these points, so the common outcome is `{ran:0}`.
+#
+#   CHEAPNESS GUARD: before paying bun's startup cost (incurred on EVERY plan
+#   and spec phase otherwise), a cheap glob checks the plugins root for ANY
+#   `*/hooks.json`. With no plugin manifests on disk (the default) the
+#   subprocess is skipped entirely. The root mirrors the hooks-cli loader:
+#   AUTONOMOUS_DEV_PLUGINS_ROOT, else $HOME/.claude/plugins.
+#
+#   SAFETY: stdout/stderr -> daemon log; the `|| true` plus the CLI's own
+#   best-effort exit-0 contract guarantee a failure here can NEVER block plan
+#   or spec authoring. Non-plan/spec phases short-circuit to a no-op.
+emit_pre_author_hook() {
+    local request_id="${1:-}"
+    local project="${2:-}"
+    local phase="${3:-}"
+
+    local point=""
+    case "${phase}" in
+        plan) point="plan-pre-author" ;;
+        spec) point="spec-pre-author" ;;
+        *)    return 0 ;;
+    esac
+
+    # Cheapness guard: skip the bun subprocess unless at least one plugin
+    # manifest exists under the plugins root the hooks-cli loader scans.
+    local plugins_root="${AUTONOMOUS_DEV_PLUGINS_ROOT:-${HOME}/.claude/plugins}"
+    if ! compgen -G "${plugins_root}/*/hooks.json" > /dev/null 2>&1; then
+        return 0
+    fi
+
+    log_info "Emitting ${point} hook for ${request_id} (phase=${phase})"
+    bun run "${PLUGIN_DIR}/bin/hooks-emit.ts" emit "${point}" \
+        --request-id "${request_id}" \
+        --repo "${project}" \
+        --phase "${phase}" >> "${LOG_FILE}" 2>&1 || true
+    return 0
 }
 
 # run_review_gate_phase(request_id, project, state_file, phase) -> "code|cost|file"
@@ -1430,16 +1474,24 @@ dispatch_phase_session() {
     local req_dir="${project}/.autonomous-dev/requests/${request_id}"
     cp "${state_file}" "${req_dir}/checkpoint.json"
 
+    # ── Pre-author hook emission (#561 item 1 / #568 part 2, best-effort) ─────
+    # Fire the plan-pre-author / spec-pre-author hook points so plugins can
+    # observe (and, in future, enrich) plan/spec authoring. NO-OP today (no
+    # registered consumers); guarded for cost and fully non-blocking. Runs
+    # AFTER session_active/checkpoint bookkeeping and BEFORE the review-chain
+    # branch so a no-op emission never perturbs either path.
+    emit_pre_author_hook "${request_id}" "${project}" "${phase}"
+
     # ── Reviewer-chain gate (#561/#568, FLAG-GATED, default OFF) ──────────────
-    # When AUTONOMOUS_DEV_REVIEW_CHAINS=1 AND phase==code_review, route this
-    # review through the multi-reviewer chain CLI instead of the single
-    # hardcoded `quality-reviewer` agent resolved above. This is the MINIMAL
-    # first increment: ONLY code_review is wired; the other *_review phases and
-    # the PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) are DEFERRED.
+    # When AUTONOMOUS_DEV_REVIEW_CHAINS=1 AND phase is code_review OR spec_review,
+    # route this review through the multi-reviewer chain CLI instead of the
+    # single hardcoded agent resolved above. code_review + spec_review are wired;
+    # the remaining *_review phases (prd/tdd/plan) and the
+    # PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) are DEFERRED.
     # SAFETY: with the flag unset/0 (the default) should_use_review_chain is
     # false, this branch is skipped, and the single-agent spawn path below runs
     # byte-for-byte as before. The session_active/dispatched_phase bookkeeping
-    # set above already applies, so advance_phase reads phase-result-code_review.
+    # set above already applies, so advance_phase reads phase-result-<phase>.
     if should_use_review_chain "${phase}"; then
         local rg_out
         rg_out=$(run_review_gate_phase "${request_id}" "${project}" "${state_file}" "${phase}")

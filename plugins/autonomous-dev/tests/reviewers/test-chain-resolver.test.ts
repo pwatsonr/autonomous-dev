@@ -71,6 +71,26 @@ describe('chain-resolver', () => {
       expect(names).toContain('ux-ui-reviewer');
       expect(names).toContain('accessibility-reviewer');
     });
+
+    it('#561/#568: feature.spec_review leads with the blocking doc-reviewer, then frontend specialists', async () => {
+      const repo = trackedRepo();
+      const chain = await resolveChain(repo, 'feature', 'spec_review');
+      const names = chain.map((e) => e.name);
+      // doc-reviewer is FIRST and is a blocking built-in (satisfies built-in-min).
+      expect(names[0]).toBe('doc-reviewer');
+      expect(chain[0].type).toBe('built-in');
+      expect(chain[0].blocking).toBe(true);
+      // Frontend specialists still present, after doc-reviewer.
+      expect(names.slice(1)).toEqual(['ux-ui-reviewer', 'accessibility-reviewer']);
+    });
+
+    it('#561/#568: bug.spec_review resolves to a single blocking doc-reviewer', async () => {
+      const repo = trackedRepo();
+      const chain = await resolveChain(repo, 'bug', 'spec_review');
+      expect(chain.map((e) => e.name)).toEqual(['doc-reviewer']);
+      expect(chain[0].type).toBe('built-in');
+      expect(chain[0].blocking).toBe(true);
+    });
   });
 
   describe('repo override precedence', () => {

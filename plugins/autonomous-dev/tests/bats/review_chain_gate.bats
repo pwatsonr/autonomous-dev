@@ -2,13 +2,14 @@
 ###############################################################################
 # review_chain_gate.bats - FLAG-GATED reviewer-chain wiring (#561/#568)
 #
-# Covers the MINIMAL first increment that routes ONLY the `code_review` phase
-# through the reviewer-chain CLI (bin/review-gate.ts) behind the default-OFF
-# env flag AUTONOMOUS_DEV_REVIEW_CHAINS.
+# Covers routing of the `code_review` and `spec_review` phases through the
+# reviewer-chain CLI (bin/review-gate.ts) behind the default-OFF env flag
+# AUTONOMOUS_DEV_REVIEW_CHAINS.
 #
 # What is exercised here:
 #   - should_use_review_chain(): the routing predicate. Proves flag OFF (the
-#     default) NEVER routes to the chain, and that ONLY code_review is wired.
+#     default) NEVER routes to the chain, and that code_review + spec_review are
+#     the only wired phases.
 #   - run_review_gate_phase(): GateDecision -> phase-result translation, with a
 #     mocked `bun`/review-gate.ts so NO real Claude calls happen:
 #       * APPROVE          -> status:"pass"
@@ -104,13 +105,19 @@ SHIM
     [ "$status" -eq 0 ]
 }
 
-@test "should_use_review_chain: flag=1 but spec_review -> false (only code_review wired)" {
+@test "should_use_review_chain: flag=1 + spec_review -> true (#561/#568 spec_review wired)" {
     export AUTONOMOUS_DEV_REVIEW_CHAINS=1
+    run should_use_review_chain "spec_review"
+    [ "$status" -eq 0 ]
+}
+
+@test "should_use_review_chain: flag UNSET -> false for spec_review (default safety)" {
+    unset AUTONOMOUS_DEV_REVIEW_CHAINS
     run should_use_review_chain "spec_review"
     [ "$status" -ne 0 ]
 }
 
-@test "should_use_review_chain: flag=1 but other review phases -> false" {
+@test "should_use_review_chain: flag=1 but other review phases -> false (only code_review + spec_review wired)" {
     export AUTONOMOUS_DEV_REVIEW_CHAINS=1
     for ph in prd_review tdd_review plan_review code integration; do
         run should_use_review_chain "${ph}"
