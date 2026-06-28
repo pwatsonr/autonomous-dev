@@ -1238,18 +1238,18 @@ repo_has_deploy_target() {
 # should_use_review_chain(phase: string) -> 0|1
 #   FLAG-GATED routing predicate for the reviewer-chain gate (#561/#568).
 #   Returns 0 (use the chain) ONLY when AUTONOMOUS_DEV_REVIEW_CHAINS=1 AND the
-#   phase is `code_review` — the MINIMAL first increment. Every other phase, and
-#   the flag in any state other than exactly "1", returns 1 so that
-#   dispatch_phase_session takes its byte-identical single-agent path.
+#   phase is `code_review` OR `spec_review`. Every other phase, and the flag in
+#   any state other than exactly "1", returns 1 so that dispatch_phase_session
+#   takes its byte-identical single-agent path.
 #
 #   SAFETY: with the flag unset or 0 (the default) this ALWAYS returns 1; the
 #   only way to reach 0 is an explicit opt-in via the env var on the code_review
-#   phase. The other *_review phases (prd/tdd/plan/spec) and the
+#   or spec_review phase. The remaining *_review phases (prd/tdd/plan) and the
 #   PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) are intentionally
 #   DEFERRED — they are separable and have no consumer yet.
 should_use_review_chain() {
     local phase="${1:-}"
-    [[ "${AUTONOMOUS_DEV_REVIEW_CHAINS:-0}" == "1" && "${phase}" == "code_review" ]]
+    [[ "${AUTONOMOUS_DEV_REVIEW_CHAINS:-0}" == "1" && ( "${phase}" == "code_review" || "${phase}" == "spec_review" ) ]]
 }
 
 # run_review_gate_phase(request_id, project, state_file, phase) -> "code|cost|file"
@@ -1431,15 +1431,15 @@ dispatch_phase_session() {
     cp "${state_file}" "${req_dir}/checkpoint.json"
 
     # ── Reviewer-chain gate (#561/#568, FLAG-GATED, default OFF) ──────────────
-    # When AUTONOMOUS_DEV_REVIEW_CHAINS=1 AND phase==code_review, route this
-    # review through the multi-reviewer chain CLI instead of the single
-    # hardcoded `quality-reviewer` agent resolved above. This is the MINIMAL
-    # first increment: ONLY code_review is wired; the other *_review phases and
-    # the PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) are DEFERRED.
+    # When AUTONOMOUS_DEV_REVIEW_CHAINS=1 AND phase is code_review OR spec_review,
+    # route this review through the multi-reviewer chain CLI instead of the
+    # single hardcoded agent resolved above. code_review + spec_review are wired;
+    # the remaining *_review phases (prd/tdd/plan) and the
+    # PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) are DEFERRED.
     # SAFETY: with the flag unset/0 (the default) should_use_review_chain is
     # false, this branch is skipped, and the single-agent spawn path below runs
     # byte-for-byte as before. The session_active/dispatched_phase bookkeeping
-    # set above already applies, so advance_phase reads phase-result-code_review.
+    # set above already applies, so advance_phase reads phase-result-<phase>.
     if should_use_review_chain "${phase}"; then
         local rg_out
         rg_out=$(run_review_gate_phase "${request_id}" "${project}" "${state_file}" "${phase}")
