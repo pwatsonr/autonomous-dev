@@ -1132,6 +1132,85 @@ resolve_agent() {
 }
 
 ###############################################################################
+# Scoped Runtime Context (ONBOARD #597 / #598)
+###############################################################################
+# At run time, a request whose target repo resolves (via ownership) to a
+# repoId/projectId can have scoped MEMORY, a scoped AGENT, and promoted scoped
+# SKILLS. These helpers consume that context best-effort. They are ADDITIVE and
+# SAFE: a repo with no scoped artifacts (the common case) yields empty output
+# and the caller keeps its default agent/prompt byte-for-byte.
+
+# resolve_scope_context(project, phase, default_agent) -> string
+#   Echoes the scope-context.ts JSON for the repo, or empty string when scope
+#   resolution is unavailable/empty/invalid. Never fails the caller: a missing
+#   bun, missing helper, or any non-JSON output collapses to "no scope".
+resolve_scope_context() {
+    local project="${1:-}" phase="${2:-}" default_agent="${3:-}"
+    [[ -z "${project}" ]] && return 0
+    # bun is the runtime for the TS helper (mirrors agent-cli.ts). If it is not
+    # on the daemon PATH, skip scope enrichment — the default path is unchanged.
+    command -v bun >/dev/null 2>&1 || return 0
+    local helper="${PLUGIN_DIR}/bin/scope-context.ts"
+    [[ -f "${helper}" ]] || return 0
+
+    local out
+    out=$(bun run "${helper}" \
+            --repo "${project}" \
+            --phase "${phase}" \
+            --default-agent "${default_agent}" 2>/dev/null || echo "")
+
+    # Only emit when the output is valid JSON AND the repo actually resolved to
+    # a scope (scoped=true). Anything else => no scope (fallback).
+    if [[ -n "${out}" ]] && echo "${out}" | jq empty 2>/dev/null; then
+        local scoped
+        scoped=$(echo "${out}" | jq -r '.scoped // false' 2>/dev/null || echo "false")
+        if [[ "${scoped}" == "true" ]]; then
+            echo "${out}"
+        fi
+    fi
+}
+
+# build_scope_prompt_appendix(scope_json) -> string
+#   Renders the scoped memory + skill file paths into a prompt appendix the
+#   phase session can read. Empty when there is no memory and no skill to surface.
+build_scope_prompt_appendix() {
+    local scope_json="${1:-}"
+    [[ -z "${scope_json}" ]] && return 0
+
+    local mem skills
+    mem=$(echo "${scope_json}" | jq -r '(.memoryPaths // [])[]' 2>/dev/null || echo "")
+    skills=$(echo "${scope_json}" | jq -r '(.skillPaths // [])[]' 2>/dev/null || echo "")
+    [[ -z "${mem}" && -z "${skills}" ]] && return 0
+
+    local appendix="── Scoped knowledge for this repository (ONBOARD) ──
+Operator-curated context applies to this repo/project. Read and apply it."
+
+    if [[ -n "${mem}" ]]; then
+        appendix="${appendix}
+
+Scoped memory (general → specific — read all layers):"
+        local p
+        while IFS= read -r p; do
+            [[ -n "${p}" ]] && appendix="${appendix}
+  - ${p}"
+        done <<< "${mem}"
+    fi
+
+    if [[ -n "${skills}" ]]; then
+        appendix="${appendix}
+
+Promoted skills available for this run (most-specific scope wins):"
+        local s
+        while IFS= read -r s; do
+            [[ -n "${s}" ]] && appendix="${appendix}
+  - ${s}"
+        done <<< "${skills}"
+    fi
+
+    echo "${appendix}"
+}
+
+###############################################################################
 # Phase Session Dispatch (TASK-009, TASK-026)
 ###############################################################################
 
@@ -1256,6 +1335,39 @@ dispatch_phase_session() {
     # Resolve prompt using supervisor-loop.sh's rich version (includes code-phase instructions)
     local prompt_override
     prompt_override=$(resolve_phase_prompt "${phase}" "${request_id}" "${project}")
+
+    # ── ONBOARD #597/#598: scoped runtime context (best-effort, additive) ──
+    # If the target repo resolves (via ownership) to a repoId/projectId, enrich
+    # this session with the scoped AGENT (override of the default), scoped
+    # MEMORY, and promoted scoped SKILLS. Reset the add-dir env each dispatch so
+    # a prior request's scope can never leak into this one. When the repo has no
+    # scope (the common case), scope_json is empty and nothing below changes —
+    # the agent, prompt, and claude flags are byte-identical to the default path.
+    export AUTONOMOUS_DEV_SCOPE_ADD_DIRS=""
+    local scope_json
+    scope_json=$(resolve_scope_context "${project}" "${phase}" "${agent}")
+    if [[ -n "${scope_json}" ]]; then
+        local scoped_agent
+        scoped_agent=$(echo "${scope_json}" | jq -r '.agent // empty' 2>/dev/null || echo "")
+        if [[ -n "${scoped_agent}" && "${scoped_agent}" != "${agent}" ]]; then
+            log_info "Scoped agent override for ${request_id}/${phase}: ${agent} -> ${scoped_agent}"
+            agent="${scoped_agent}"
+        fi
+
+        local scope_appendix
+        scope_appendix=$(build_scope_prompt_appendix "${scope_json}")
+        if [[ -n "${scope_appendix}" ]]; then
+            prompt_override="${prompt_override}
+
+${scope_appendix}"
+        fi
+
+        # Colon-separated dirs the session needs read access to. spawn-session.sh
+        # turns each existing entry into an extra --add-dir.
+        local scope_add_dirs
+        scope_add_dirs=$(echo "${scope_json}" | jq -r '(.addDirs // [])[]' 2>/dev/null | tr '\n' ':' || echo "")
+        export AUTONOMOUS_DEV_SCOPE_ADD_DIRS="${scope_add_dirs}"
+    fi
 
     # Use a subshell with explicit error handling. Wrap in `timeout`/`gtimeout`
     # when available; otherwise run directly (no wall-clock cap — see
