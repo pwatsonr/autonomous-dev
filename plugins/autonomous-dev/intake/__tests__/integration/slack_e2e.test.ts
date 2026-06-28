@@ -155,7 +155,7 @@ function setupTestContext(authConfig: AuthConfig): TestContext {
   // Identity resolver
   const slackUserWebClient = createMockSlackUserWebClient();
   const identityResolver = new SlackIdentityResolver(
-    repo,
+    authz,
     slackUserWebClient as unknown as import('../../adapters/slack/slack_identity').SlackWebClient,
   );
 

@@ -125,7 +125,10 @@ export class IntakeRouter {
     if (!userId) {
       return {
         success: false,
-        error: 'Unable to resolve user identity',
+        error:
+          'User identity not found in the authorization config — add this ' +
+          'Discord/Slack user to intake-auth.yaml (identities.discord_id / ' +
+          'identities.slack_id) with a role.',
         errorCode: 'AUTHZ_DENIED',
       };
     }

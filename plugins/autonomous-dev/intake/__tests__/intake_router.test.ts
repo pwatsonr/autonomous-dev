@@ -232,7 +232,7 @@ describe('IntakeRouter', () => {
 
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('AUTHZ_DENIED');
-      expect(result.error).toContain('Unable to resolve user identity');
+      expect(result.error).toContain('User identity not found in the authorization config');
     });
   });
 

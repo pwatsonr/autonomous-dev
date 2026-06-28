@@ -67,34 +67,69 @@ export function validateRequestId(
 let allowedRepos: string[] | null = null;
 
 /**
- * Load the allowlist from `AUTONOMOUS_DEV_ALLOWED_REPOS` if not already
- * initialized. Each entry is realpath-normalized once at load time. Empty
- * env var ⇒ empty allowlist (deny all).
+ * Realpath-normalize a list of repo paths. Blank entries are skipped and
+ * entries that don't resolve are dropped (the per-call check in
+ * {@link buildRequestPath} still guards them). We deliberately do NOT throw
+ * here so a single bad entry doesn't break the whole intake layer at load
+ * time.
  */
-function ensureAllowlistLoaded(): string[] {
-  if (allowedRepos !== null) return allowedRepos;
-
-  const raw = process.env.AUTONOMOUS_DEV_ALLOWED_REPOS;
-  if (!raw || raw.trim() === '') {
-    allowedRepos = [];
-    return allowedRepos;
-  }
-
+function normalizeRepoList(entries: string[]): string[] {
   const out: string[] = [];
-  for (const entry of raw.split(':')) {
+  for (const entry of entries) {
     const trimmed = entry.trim();
     if (trimmed === '') continue;
     try {
       out.push(fs.realpathSync(trimmed));
     } catch {
-      // Skip entries that don't resolve. Operators see the warning at the
-      // first attempted submission to a missing repo (the per-call check
-      // catches it). We deliberately do NOT throw here so a single bad
-      // env entry doesn't break the whole intake layer at import time.
+      // Skip entries that don't resolve.
     }
   }
-  allowedRepos = out;
   return out;
+}
+
+/**
+ * Best-effort read of `.repositories.allowlist` from the daemon config file
+ * at `$HOME/.claude/autonomous-dev.json`. Returns `[]` on any error (missing
+ * file, bad JSON, missing/non-array key) so the intake layer never crashes on
+ * a malformed or absent config. HOME is read from `process.env.HOME` so tests
+ * can point it at a temp dir.
+ */
+function loadConfigAllowlist(): string[] {
+  try {
+    const home = process.env.HOME;
+    if (!home) return [];
+    const configPath = path.join(home, '.claude', 'autonomous-dev.json');
+    const raw = fs.readFileSync(configPath, 'utf8');
+    const parsed = JSON.parse(raw) as {
+      repositories?: { allowlist?: unknown };
+    };
+    const list = parsed?.repositories?.allowlist;
+    if (!Array.isArray(list)) return [];
+    return list.filter((x): x is string => typeof x === 'string');
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Load the allowlist if not already initialized. The daemon config file is the
+ * single source of truth: `.repositories.allowlist` from
+ * `$HOME/.claude/autonomous-dev.json`. The `AUTONOMOUS_DEV_ALLOWED_REPOS` env
+ * var (colon-separated absolute paths), when set and non-empty, overrides the
+ * config — retained for tests and edge cases. Each entry is realpath-
+ * normalized once at load time.
+ */
+function ensureAllowlistLoaded(): string[] {
+  if (allowedRepos !== null) return allowedRepos;
+
+  const raw = process.env.AUTONOMOUS_DEV_ALLOWED_REPOS;
+  if (raw && raw.trim() !== '') {
+    allowedRepos = normalizeRepoList(raw.split(':'));
+    return allowedRepos;
+  }
+
+  allowedRepos = normalizeRepoList(loadConfigAllowlist());
+  return allowedRepos;
 }
 
 /**

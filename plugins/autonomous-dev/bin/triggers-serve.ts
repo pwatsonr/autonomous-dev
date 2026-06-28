@@ -177,7 +177,7 @@ async function startDiscord(
       },
     },
   };
-  const identityResolver = new DiscordIdentityResolver(shared.repo, guildStub);
+  const identityResolver = new DiscordIdentityResolver(shared.authz, guildStub);
   const formatter = new DiscordFormatter();
   // Every handler's local `IntakeRouter` interface is structurally `{ route() }`
   // — identical to IntakeRouterLike — so the router passes directly, no cast.
@@ -237,7 +237,7 @@ async function startSlack(
   const slackClient = new SlackClient();
   const web = slackClient.getClient();
 
-  const identityResolver = new SlackIdentityResolver(shared.repo, web);
+  const identityResolver = new SlackIdentityResolver(shared.authz, web);
   const formatter = new SlackFormatter();
 
   // Router structurally satisfies each handler's local `{ route() }` interface,
