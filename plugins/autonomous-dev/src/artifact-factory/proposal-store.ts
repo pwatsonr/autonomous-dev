@@ -75,6 +75,22 @@ export function proposalsPath(io: ArtifactStoreIO = defaultArtifactStoreIO): str
   return path.join(io.homedir(), '.autonomous-dev', 'artifacts', 'proposals.json');
 }
 
+/**
+ * Rolling cap on a proposal's audit `history` (issue #591). Repeated re-propose of a
+ * meta_rejected proposal appends ~2-3 entries per cycle with no bound; keep only the
+ * most recent N so the store can't grow without limit. Oldest entries drop first.
+ */
+export const HISTORY_CAP = 50;
+
+function capHistory(history: ProposalHistoryEntry[]): ProposalHistoryEntry[] {
+  return history.length > HISTORY_CAP ? history.slice(history.length - HISTORY_CAP) : history;
+}
+
+/** Make a timestamp safe as a filename segment (NTFS rejects `:`); issue #591 Windows backup. */
+function safeFilenameTimestamp(ts: string): string {
+  return ts.replace(/[:]/g, '-');
+}
+
 export function proposalId(kind: ArtifactKind, scope: ArtifactScope, name: string): string {
   return `${kind}::${scope}::${name}`;
 }
@@ -91,7 +107,7 @@ export function loadProposals(io: ArtifactStoreIO = defaultArtifactStoreIO): Art
   if (Array.isArray(parsed)) return parsed as ArtifactProposal[];
   // Corrupt or wrong-shaped store — PRESERVE it (don't let the next save silently wipe it).
   try {
-    io.writeFile(`${proposalsPath(io)}.corrupt-${io.now()}`, raw);
+    io.writeFile(`${proposalsPath(io)}.corrupt-${safeFilenameTimestamp(io.now())}`, raw);
   } catch {
     /* best-effort */
   }
@@ -110,9 +126,11 @@ export function upsertProposal(p: ArtifactProposal, io: ArtifactStoreIO = defaul
   if (idx >= 0) {
     const prior = ps[idx];
     // Preserve the prior history + any prior operator tool override (monotonic audit; B5).
-    stored = { ...p, history: [...prior.history, ...p.history], toolOverride: p.toolOverride ?? prior.toolOverride };
+    // History is capped to the most recent HISTORY_CAP entries (issue #591 — bounded growth).
+    stored = { ...p, history: capHistory([...prior.history, ...p.history]), toolOverride: p.toolOverride ?? prior.toolOverride };
     ps[idx] = stored;
   } else {
+    stored = { ...p, history: capHistory(p.history) };
     ps.push(stored);
   }
   saveProposals(ps, io);
@@ -157,6 +175,7 @@ export function setStatus(
   }
   p.status = status;
   p.history.push({ at: io.now(), event, detail });
+  p.history = capHistory(p.history); // bounded growth (issue #591)
   saveProposals(ps, io);
   return p;
 }

@@ -23,7 +23,9 @@ import { linkOrg, registerRepos, isOrgLogin } from '../src/ownership/commands';
 import { ingestOrg, enqueueAmbiguityQuestions } from '../src/ingest/orchestrator';
 import { createGhOrgClient } from '../src/ingest/adapters';
 import { signalsFromMemory } from '../src/ingest/inference';
+import type { RepoSignals } from '../src/ingest/inference';
 import { loadKnownShas, saveKnownShas, nextKnownShas } from '../src/ingest/shas';
+import { loadSignalsSidecar } from '../src/ingest/signals-sidecar';
 import { readScopeMemory } from '../src/memory/store';
 import { listQuestions, answerQuestion } from '../src/ingest/questions';
 import { readNeo4jCreds } from '../src/graph/secrets';
@@ -70,6 +72,15 @@ function homeDir(): string {
 
 function ingestHome(): string {
   return path.join(homeDir(), '.autonomous-dev', 'ingest');
+}
+
+/**
+ * Per-repo inference signals (#588): PREFER the structured sidecar written at
+ * extraction time, FALL BACK to re-parsing the `ownership` memory markdown when
+ * the sidecar is missing/corrupt — so older ingests with no sidecar still infer.
+ */
+function repoSignals(repoId: string): RepoSignals {
+  return loadSignalsSidecar(repoId) ?? signalsFromMemory(repoId, readScopeMemory(`repo:${repoId}`));
 }
 
 async function main(argv: string[]): Promise<number> {
@@ -140,7 +151,7 @@ async function main(argv: string[]): Promise<number> {
       process.stdout.write('No ingested repos. Run: autonomous-dev org ingest first.\n');
       return 0;
     }
-    const signals = own.repos.map((r) => signalsFromMemory(r.id, readScopeMemory(`repo:${r.id}`)));
+    const signals = own.repos.map((r) => repoSignals(r.id));
     // PRODUCER: a repo whose signals place it in 2+ candidate projects becomes an
     // answerable blocking question (feeds the queue the CONSUMER already drains).
     const askedIds = enqueueAmbiguityQuestions(signals);
@@ -179,7 +190,7 @@ async function main(argv: string[]): Promise<number> {
       process.stdout.write('Neo4j not configured (~/.autonomous-dev/secrets/neo4j.json absent) — graph layer skipped.\n');
       return 0;
     }
-    const signals = own.repos.map((r) => signalsFromMemory(r.id, readScopeMemory(`repo:${r.id}`)));
+    const signals = own.repos.map((r) => repoSignals(r.id));
     process.stdout.write(`Syncing graph for org "${own.org}" → ${gc.httpUrl}…\n`);
     const res = await syncGraph(gc.client, own.org, own, signals);
     if (res.ok) {
