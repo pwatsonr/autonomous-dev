@@ -129,3 +129,71 @@ describe('buildRequestPath', () => {
     expect(fs.existsSync(path.dirname(a))).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Allowlist config fallback ($HOME/.claude/autonomous-dev.json)
+// ---------------------------------------------------------------------------
+
+describe('allowlist config fallback', () => {
+  let repo: string;
+  let homeDir: string;
+  let originalHome: string | undefined;
+  let originalEnvAllowed: string | undefined;
+
+  beforeEach(() => {
+    repo = mkRepo();
+
+    // Build a fake HOME containing .claude/autonomous-dev.json with the repo
+    // in repositories.allowlist.
+    homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'autonomous-dev-home-'));
+    const claudeDir = path.join(homeDir, '.claude');
+    fs.mkdirSync(claudeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(claudeDir, 'autonomous-dev.json'),
+      JSON.stringify({ repositories: { allowlist: [repo] } }),
+    );
+
+    originalHome = process.env.HOME;
+    originalEnvAllowed = process.env.AUTONOMOUS_DEV_ALLOWED_REPOS;
+
+    // The env override MUST be unset so the loader falls through to the config.
+    delete process.env.AUTONOMOUS_DEV_ALLOWED_REPOS;
+    process.env.HOME = homeDir;
+
+    // Reset the module allowlist cache so the next call re-loads from config.
+    setAllowedRepositoriesForTest(null);
+  });
+
+  afterEach(() => {
+    // Restore HOME.
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+    // Restore / delete the env override.
+    if (originalEnvAllowed === undefined) {
+      delete process.env.AUTONOMOUS_DEV_ALLOWED_REPOS;
+    } else {
+      process.env.AUTONOMOUS_DEV_ALLOWED_REPOS = originalEnvAllowed;
+    }
+    // Reset cache the same way the other tests do.
+    setAllowedRepositoriesForTest(null);
+    rmRepo(repo);
+    rmRepo(homeDir);
+  });
+
+  test('loads the allowlist from the daemon config when env is unset', () => {
+    // Repo is in the config allowlist → accepted.
+    const out = buildRequestPath(repo, 'REQ-000001');
+    expect(out).toBe(path.join(repo, '.autonomous-dev', 'requests', 'REQ-000001'));
+
+    // A repo NOT in the config allowlist → rejected.
+    const outside = mkRepo();
+    try {
+      expect(() => buildRequestPath(outside, 'REQ-000001')).toThrow(SecurityError);
+    } finally {
+      rmRepo(outside);
+    }
+  });
+});

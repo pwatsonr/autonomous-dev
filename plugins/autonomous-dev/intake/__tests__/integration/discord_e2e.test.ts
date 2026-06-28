@@ -180,8 +180,8 @@ function setupTestContext(
     },
   };
 
-  // Real DiscordIdentityResolver
-  const identityResolver = new DiscordIdentityResolver(repo, mockGuild);
+  // Real DiscordIdentityResolver (resolves via AuthzEngine YAML)
+  const identityResolver = new DiscordIdentityResolver(authz, mockGuild);
 
   // Real DiscordFormatter
   const formatter = new DiscordFormatter();

@@ -13,7 +13,7 @@
  * @module slack_identity
  */
 
-import type { Repository } from '../../db/repository';
+import type { AuthzEngine } from '../../authz/authz_engine';
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -90,26 +90,30 @@ export class SlackIdentityResolver {
   private readonly CACHE_TTL = 3600_000; // 1 hour
 
   constructor(
-    private db: Repository,
+    private authz: AuthzEngine,
     private web: SlackWebClient,
   ) {}
 
   /**
    * Resolve a Slack user ID to an internal identity.
    *
+   * Resolution is driven by the AuthzEngine YAML config (`intake-auth.yaml`,
+   * `identities.slack_id`) — the single source of identity truth. The DB
+   * `user_identities` table is no longer consulted on this path.
+   *
    * @param slackUserId - The Slack user ID (e.g., "U01ABCDEF23").
    * @returns The internal user ID mapped to this Slack account.
    * @throws {AuthorizationError} When the Slack user has no provisioned mapping.
    */
   async resolve(slackUserId: string): Promise<string> {
-    const user = this.db.getUserByPlatformId('slack', slackUserId);
-    if (!user) {
+    const internalId = this.authz.resolveUserId('slack_id', slackUserId);
+    if (!internalId) {
       throw new AuthorizationError(
         `Slack user ${slackUserId} is not provisioned. ` +
-          'Slack users must be added to intake-auth.yaml by an administrator.',
+          'Add them to intake-auth.yaml (identities.slack_id) with a role.',
       );
     }
-    return user.internal_id;
+    return internalId;
   }
 
   /**

@@ -10,7 +10,7 @@
  * @module discord_identity
  */
 
-import type { Repository, UserIdentity } from '../../db/repository';
+import type { AuthzEngine } from '../../authz/authz_engine';
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -67,26 +67,30 @@ export interface GuildLike {
  */
 export class DiscordIdentityResolver {
   constructor(
-    private db: Repository,
+    private authz: AuthzEngine,
     private guild: GuildLike,
   ) {}
 
   /**
    * Resolve a Discord user ID to an internal identity.
    *
+   * Resolution is driven by the AuthzEngine YAML config (`intake-auth.yaml`,
+   * `identities.discord_id`) — the single source of identity truth. The DB
+   * `user_identities` table is no longer consulted on this path.
+   *
    * @param discordUserId - The Discord snowflake user ID.
    * @returns The internal user ID mapped to this Discord account.
    * @throws {AuthorizationError} When the Discord user has no provisioned mapping.
    */
   async resolve(discordUserId: string): Promise<string> {
-    const user = this.db.getUserByPlatformId('discord', discordUserId);
-    if (!user) {
+    const internalId = this.authz.resolveUserId('discord_id', discordUserId);
+    if (!internalId) {
       throw new AuthorizationError(
         `Discord user ${discordUserId} is not provisioned. ` +
-          'Discord users must be added to intake-auth.yaml by an administrator.',
+          'Add them to intake-auth.yaml (identities.discord_id) with a role.',
       );
     }
-    return user.internal_id;
+    return internalId;
   }
 
   /**
