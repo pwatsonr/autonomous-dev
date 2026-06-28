@@ -319,6 +319,24 @@ spawn_session_typed() {
     export AUDIT_LOG_PATH="${audit_log_file}"
     export AUDIT_PHASE="${target_phase}"
 
+    # ── ONBOARD #597/#598: scoped read dirs ──
+    # The supervisor exports AUTONOMOUS_DEV_SCOPE_ADD_DIRS (colon-separated) with
+    # the directories holding the run's scoped memory + promoted skills. They
+    # live under ${HOME}/.autonomous-dev, outside the project/req_dir already
+    # granted, so the session needs an explicit --add-dir per existing entry.
+    # Unset/empty (the common, unscoped case) => no extra flags, byte-identical
+    # to the default invocation.
+    local -a scope_dir_flags=()
+    if [[ -n "${AUTONOMOUS_DEV_SCOPE_ADD_DIRS:-}" ]]; then
+        local _old_ifs="${IFS}"
+        IFS=':'
+        local _scope_dir
+        for _scope_dir in ${AUTONOMOUS_DEV_SCOPE_ADD_DIRS}; do
+            [[ -n "${_scope_dir}" && -d "${_scope_dir}" ]] && scope_dir_flags+=(--add-dir "${_scope_dir}")
+        done
+        IFS="${_old_ifs}"
+    fi
+
     if [[ "${req_type}" == "infra" && "${target_phase}" != *"_review" ]]; then
         local gates="${ENHANCED_GATES_CSV:-${DEFAULT_ENHANCED_GATES}}"
         env "ENHANCED_GATES=${gates}" \
@@ -329,6 +347,7 @@ spawn_session_typed() {
             --agent "${agent}" \
             --add-dir "${req_dir}" \
             --add-dir "${project}" \
+            ${scope_dir_flags[@]+"${scope_dir_flags[@]}"} \
             --permission-mode bypassPermissions \
             --allowedTools "${agent_tools}" \
             --max-budget-usd "${phase_budget}" \
@@ -341,6 +360,7 @@ spawn_session_typed() {
             --agent "${agent}" \
             --add-dir "${req_dir}" \
             --add-dir "${project}" \
+            ${scope_dir_flags[@]+"${scope_dir_flags[@]}"} \
             --permission-mode bypassPermissions \
             --allowedTools "${agent_tools}" \
             --max-budget-usd "${phase_budget}" \
