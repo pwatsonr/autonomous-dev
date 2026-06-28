@@ -121,6 +121,55 @@ function rationaleFor(members: RepoSignals[]): { text: string; confidence: numbe
   };
 }
 
+/** A repo whose signals place it in 2+ distinct candidate projects. */
+export interface AmbiguousMembership {
+  repoId: string;
+  /** The distinct candidate project ids it could belong to (sorted, length ≥ 2). */
+  candidateProjectIds: string[];
+}
+
+/**
+ * Detect project-membership AMBIGUITY — pure. A repo is ambiguous when its
+ * STRONG signals (a shared owner, a shared name prefix) place it in 2+ candidate
+ * groupings that derive to *different* project ids. Such a repo is exactly the
+ * bridge that union-find would collapse into one project; surfacing it lets a
+ * human decide instead. The first concrete producer for the blocking-question
+ * queue (#587 AC3 / #588). Returns at most one entry per repo, sorted by id.
+ */
+export function findAmbiguousMemberships(repos: RepoSignals[]): AmbiguousMembership[] {
+  const byId = new Map(repos.map((r) => [r.repoId, r]));
+  // Candidate grouping keys: each shared owner token, each shared name prefix.
+  const groupMembers = new Map<string, string[]>();
+  const push = (key: string, repoId: string): void => {
+    const arr = groupMembers.get(key) ?? [];
+    if (!arr.includes(repoId)) arr.push(repoId);
+    groupMembers.set(key, arr);
+  };
+  for (const r of repos) {
+    for (const o of new Set(r.owners)) push(`owner:${o.toLowerCase()}`, r.repoId);
+    const p = prefixOf(r);
+    if (p) push(`prefix:${p}`, r.repoId);
+  }
+
+  // For each repo, the set of DISTINCT project ids its candidate groups derive to.
+  const candidates = new Map<string, Set<string>>();
+  for (const memberIds of groupMembers.values()) {
+    if (memberIds.length < 2) continue; // a lone-member key is not a candidate project
+    const members = memberIds.map((id) => byId.get(id)).filter((m): m is RepoSignals => !!m);
+    const pid = deriveProjectId(members);
+    for (const id of memberIds) {
+      if (!candidates.has(id)) candidates.set(id, new Set());
+      candidates.get(id)!.add(pid);
+    }
+  }
+
+  const out: AmbiguousMembership[] = [];
+  for (const [repoId, ids] of candidates) {
+    if (ids.size >= 2) out.push({ repoId, candidateProjectIds: [...ids].sort() });
+  }
+  return out.sort((a, b) => a.repoId.localeCompare(b.repoId));
+}
+
 /** Infer candidate projects (proposals) from per-repo signals. Pure. */
 export function inferProjects(repos: RepoSignals[]): ProposedProject[] {
   const parent = new Map<string, string>();
