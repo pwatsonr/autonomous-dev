@@ -145,7 +145,7 @@ export function buildCancelConfirmationBlocks(requestId: string): SlackBlock[] {
  * Build the submit pipeline request modal for `views.open`.
  *
  * Contains 3 input blocks:
- * - Description (required, multiline, max 10000 chars)
+ * - Description (required, multiline, max 3000 chars — Slack input limit)
  * - Target Repository (optional)
  * - Acceptance Criteria (optional, multiline, max 2000 chars)
  *
@@ -176,7 +176,7 @@ export function buildSubmitModal(triggerId: string): SlackModal {
             action_id: 'description',
             multiline: true,
             placeholder: { type: 'plain_text', text: 'Describe the feature or task...' },
-            max_length: 10000,
+            max_length: 3000,
           },
         },
         {

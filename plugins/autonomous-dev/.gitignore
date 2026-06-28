@@ -11,4 +11,5 @@ tests/standards/precision-report.json
 .autonomous-dev/baselines/
 .autonomous-dev/fingerprints/
 intake/adapters/cli_adapter.js
+intake/cli/reconcile_command.js
 bin/triggers-serve.js

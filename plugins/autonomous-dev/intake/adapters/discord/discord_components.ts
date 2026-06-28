@@ -156,7 +156,7 @@ export function buildCancelConfirmation(requestId: string): ActionRow<ButtonComp
  * Build the submit pipeline request modal.
  *
  * Contains 3 fields:
- * - Description (Paragraph, required, max 10000 chars)
+ * - Description (Paragraph, required, max 4000 chars — Discord modal limit)
  * - Target Repository (Short, optional)
  * - Acceptance Criteria (Paragraph, optional, max 2000 chars)
  *
@@ -177,7 +177,7 @@ export function buildSubmitModal(): ModalPayload {
             style: TextInputStyle.Paragraph,
             placeholder: 'Describe the feature or task...',
             required: true,
-            max_length: 10000,
+            max_length: 4000,
           },
         ],
       },

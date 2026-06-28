@@ -219,8 +219,8 @@ describe('Slack Components (SPEC-008-4-03, Tasks 7 & 9)', () => {
       expect(modal.trigger_id).toBe('trigger-abc-456');
     });
 
-    // Test 12/15: description block (required, multiline, max 10000)
-    test('description block is required, multiline, max_length 10000', () => {
+    // Test 12/15: description block (required, multiline, max 3000 — Slack limit)
+    test('description block is required, multiline, max_length 3000', () => {
       const modal = buildSubmitModal('trigger-123');
       const blocks = modal.view.blocks as unknown as InputBlock[];
       const descBlock = blocks.find((b) => b.block_id === 'description_block')!;
@@ -230,7 +230,7 @@ describe('Slack Components (SPEC-008-4-03, Tasks 7 & 9)', () => {
       expect(descBlock.optional).toBeUndefined(); // required by default (not optional)
       expect(descBlock.element.action_id).toBe('description');
       expect(descBlock.element.multiline).toBe(true);
-      expect(descBlock.element.max_length).toBe(10000);
+      expect(descBlock.element.max_length).toBe(3000);
     });
 
     // Test 12/15: repo block (optional)

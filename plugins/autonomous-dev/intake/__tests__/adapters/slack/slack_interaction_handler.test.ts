@@ -344,7 +344,9 @@ describe('SlackInteractionHandler (SPEC-008-4-03, Task 8)', () => {
       });
       expect(router.lastCommand!.rawText).toBe('Build a new authentication service');
       expect(router.lastCommand!.source.channelType).toBe('slack');
-      expect(router.lastCommand!.source.userId).toBe('user-contributor');
+      // The router re-resolves the RAW slack id, so the routed command carries
+      // the raw platform id, not the pre-resolved internal subject.
+      expect(router.lastCommand!.source.userId).toBe('slack-user-789');
     });
 
     test('submit_modal with only description (optional fields empty)', async () => {

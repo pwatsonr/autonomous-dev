@@ -19,6 +19,7 @@
     "test:kind": "RUN_KIND_TESTS=1 jest tests/integration/test-cred-proxy-scope.test.ts --runInBand",
     "lint:no-tbd-shas": "bash ../../scripts/lint/no-tbd-shas.sh",
     "build:cli": "bun build intake/adapters/cli_adapter.ts --outfile=intake/adapters/cli_adapter.js --target=node --external better-sqlite3 --external \"@aws-sdk/*\" --external \"@azure/*\" --external \"@google-cloud/*\" --external \"@kubernetes/*\" --external \"@slack/*\" --external discord.js --external express",
+    "build:reconcile": "bun build intake/cli/reconcile_command.ts --outfile=intake/cli/reconcile_command.js --target=node --external better-sqlite3 --external \"@aws-sdk/*\" --external \"@azure/*\" --external \"@google-cloud/*\" --external \"@kubernetes/*\" --external \"@slack/*\" --external discord.js --external express",
     "build:record-metric": "bun build bin/record-metric.ts --outfile=bin/lib/record-metric.js --target=node --external better-sqlite3",
     "build:triggers-serve": "bun build bin/triggers-serve.ts --outfile=bin/triggers-serve.js --target=node --external better-sqlite3 --external \"@aws-sdk/*\" --external \"@azure/*\" --external \"@google-cloud/*\" --external \"@kubernetes/*\" --external \"@slack/*\" --external discord.js --external express"
   },

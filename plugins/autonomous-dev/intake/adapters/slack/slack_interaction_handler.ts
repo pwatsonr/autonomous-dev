@@ -263,7 +263,9 @@ export class SlackInteractionHandler {
         args: ['CONFIRM'],
         flags: {},
         rawText: 'kill CONFIRM',
-        source: { channelType: 'slack', userId, timestamp: new Date() },
+        // Router re-resolves the RAW slack id; the direct authorize above
+        // already used the resolved `userId`.
+        source: { channelType: 'slack', userId: payload.user.id, timestamp: new Date() },
       });
       await this.postToResponseUrl(responseUrl, result);
     } else if (actionId === 'kill_cancel') {
@@ -275,7 +277,8 @@ export class SlackInteractionHandler {
         args: [requestId, 'CONFIRM'],
         flags: {},
         rawText: `cancel ${requestId} CONFIRM`,
-        source: { channelType: 'slack', userId, timestamp: new Date() },
+        // Router re-resolves the RAW slack id to the internal authz subject.
+        source: { channelType: 'slack', userId: payload.user.id, timestamp: new Date() },
       });
       await this.postToResponseUrl(responseUrl, result);
     } else if (actionId.startsWith('cancel_cancel_')) {
@@ -300,9 +303,9 @@ export class SlackInteractionHandler {
       return;
     }
 
-    let userId: string;
+    // Fail-fast provisioned check; the router re-resolves the RAW slack id.
     try {
-      userId = await this.identityResolver.resolve(payload.user.id);
+      await this.identityResolver.resolve(payload.user.id);
     } catch (error) {
       logger.error('Failed to resolve user identity for modal submission', {
         slackUserId: payload.user.id,
@@ -326,7 +329,7 @@ export class SlackInteractionHandler {
       rawText: description,
       source: {
         channelType: 'slack',
-        userId,
+        userId: payload.user.id,
         timestamp: new Date(),
       },
     };

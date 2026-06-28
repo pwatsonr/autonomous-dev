@@ -376,11 +376,21 @@ validate_reconcile_out() {
 # ---------------------------------------------------------------------------
 exec_node_reconcile_cli() {
     local cli_path="${PLUGIN_DIR}/intake/cli/reconcile_command.js"
+    local cli_src="${PLUGIN_DIR}/intake/cli/reconcile_command.ts"
 
-    if [[ ! -f "$cli_path" ]]; then
-        echo "ERROR: reconcile CLI not found at $cli_path. Run plugin install or rebuild." >&2
-        exit 2
+    # Build the reconcile CLI if missing or source is newer (mirrors exec_node_cli).
+    if [[ ! -f "$cli_path" || ( -f "$cli_src" && "$cli_src" -nt "$cli_path" ) ]]; then
+        if ! command -v bun >/dev/null 2>&1; then
+            echo "ERROR: bun command not found. Install bun to build the reconcile CLI." >&2
+            exit 2
+        fi
+        echo "Building reconcile CLI..." >&2
+        if ! (cd "$PLUGIN_DIR" && bun run build:reconcile) >/dev/null 2>&1; then
+            echo "ERROR: failed to build the reconcile CLI (bun run build:reconcile)" >&2
+            exit 2
+        fi
     fi
+
     if ! command -v node >/dev/null 2>&1; then
         echo "ERROR: node command not found. Install Node.js 18+ to use reconcile." >&2
         exit 2

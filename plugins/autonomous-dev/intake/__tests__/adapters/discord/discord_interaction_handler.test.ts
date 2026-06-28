@@ -178,7 +178,9 @@ describe('ComponentInteractionHandler (SPEC-008-3-05, Task 14)', () => {
     expect(router.lastCommand!.commandName).toBe('cancel');
     expect(router.lastCommand!.args).toEqual(['REQ-000042']);
     expect(router.lastCommand!.source.channelType).toBe('discord');
-    expect(router.lastCommand!.source.userId).toBe('user-contributor');
+    // The router re-resolves the RAW discord id, so the routed command carries
+    // the raw platform id, not the pre-resolved internal subject.
+    expect(router.lastCommand!.source.userId).toBe('discord-user-123');
 
     // Verify message updated
     expect(interaction.update).toHaveBeenCalledWith({
@@ -220,7 +222,9 @@ describe('ComponentInteractionHandler (SPEC-008-3-05, Task 14)', () => {
     });
     expect(router.lastCommand!.rawText).toBe('Build a new feature for user profiles');
     expect(router.lastCommand!.source.channelType).toBe('discord');
-    expect(router.lastCommand!.source.userId).toBe('user-contributor');
+    // The router re-resolves the RAW discord id (raw platform id, not the
+    // pre-resolved internal subject).
+    expect(router.lastCommand!.source.userId).toBe('discord-user-123');
     expect(router.lastCommand!.source.platformChannelId).toBe('channel-456');
 
     // Verify editReply with created request ID
