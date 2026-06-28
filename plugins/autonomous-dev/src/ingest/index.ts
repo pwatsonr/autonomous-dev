@@ -7,3 +7,4 @@ export * from './orchestrator';
 export * from './questions';
 export * from './inference';
 export * from './adapters';
+export * from './signals-sidecar';

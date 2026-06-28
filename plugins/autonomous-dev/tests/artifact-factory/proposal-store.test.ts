@@ -6,6 +6,7 @@ import {
   proposalId,
   loadProposals,
   proposalsPath,
+  HISTORY_CAP,
 } from '../../src/artifact-factory/proposal-store';
 import type { ArtifactProposal, ArtifactStoreIO } from '../../src/artifact-factory/proposal-store';
 import type { GeneratedArtifact } from '../../src/artifact-factory/types';
@@ -134,6 +135,46 @@ function test_history_merge(): void {
   console.log('PASS: test_history_merge');
 }
 
+// #591: history is capped to a rolling window (oldest entries drop, never unbounded)
+function test_history_capped(): void {
+  const io = fakeIO();
+  const p = proposal('meta_rejected');
+  // seed with more than the cap; the merge on upsert must trim to the most recent HISTORY_CAP
+  p.history = Array.from({ length: HISTORY_CAP + 20 }, (_, i) => ({ at: `seed${i}`, event: `e${i}` }));
+  upsertProposal(p, io);
+  const got = getProposal('skill::repo:acme/api::vault-access', io)!;
+  assert(got.history.length === HISTORY_CAP, `history capped at ${HISTORY_CAP}, got ${got.history.length}`);
+  // newest preserved, oldest dropped
+  assert(got.history[got.history.length - 1].event === `e${HISTORY_CAP + 19}`, 'newest entry preserved');
+  assert(!got.history.some((h) => h.event === 'e0'), 'oldest entry dropped');
+
+  // setStatus also enforces the cap as entries accrue
+  const id = 'skill::repo:acme/api::vault-access';
+  setStatus(id, 'rejected', 'rejected', io);
+  const after = getProposal(id, io)!;
+  assert(after.history.length === HISTORY_CAP, 'setStatus keeps history at the cap');
+  assert(after.history[after.history.length - 1].event === 'rejected', 'latest event is the newest');
+  console.log('PASS: test_history_capped');
+}
+
+// #591: the corrupt-backup filename must not contain `:` (invalid on NTFS)
+function test_corrupt_backup_filename_windows_safe(): void {
+  const io = fakeIO();
+  // ISO-like timestamp with colons, as the real default IO produces
+  let called = false;
+  io.now = () => {
+    called = true;
+    return '2026-06-28T12:34:56.789Z';
+  };
+  io.files[proposalsPath(io)] = 'not json {';
+  loadProposals(io);
+  const corruptKey = Object.keys(io.files).find((k) => k.includes('.corrupt-'));
+  assert(called && !!corruptKey, 'corrupt backup written');
+  assert(!corruptKey!.includes(':'), `backup filename has no ":" (got ${corruptKey})`);
+  assert(corruptKey!.includes('2026-06-28T12-34-56'), 'colons replaced with dashes in timestamp');
+  console.log('PASS: test_corrupt_backup_filename_windows_safe');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -146,4 +187,6 @@ describe('artifact-factory/proposal-store', () => {
   it('test_corrupt_preserve', test_corrupt_preserve);
   it('test_illegal_transition', test_illegal_transition);
   it('test_history_merge', test_history_merge);
+  it('test_history_capped', test_history_capped);
+  it('test_corrupt_backup_filename_windows_safe', test_corrupt_backup_filename_windows_safe);
 });

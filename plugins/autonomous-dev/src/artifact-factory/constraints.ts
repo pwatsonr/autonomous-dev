@@ -31,14 +31,48 @@ export const READONLY_TOOLS: ReadonlySet<string> = new Set(['Read', 'Glob', 'Gre
 const NAME_RE = /^[a-z0-9][a-z0-9-]*$/;
 const SCOPE_ID_RE = /^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$/i;
 
+/**
+ * Windows reserved device names — invalid as a file stem on NTFS even though they
+ * pass NAME_RE. The artifact name becomes `<name>.md` on disk, so `con` → `con.md`
+ * would still resolve to the CON device on Windows. POSIX-safe today, but rejecting
+ * here keeps the scoped store portable. (Issue #591 — filename safety.)
+ */
+const WINDOWS_RESERVED_NAMES: ReadonlySet<string> = new Set([
+  'con', 'prn', 'aux', 'nul',
+  'com1', 'com2', 'com3', 'com4', 'com5', 'com6', 'com7', 'com8', 'com9',
+  'lpt1', 'lpt2', 'lpt3', 'lpt4', 'lpt5', 'lpt6', 'lpt7', 'lpt8', 'lpt9',
+]);
+
+/**
+ * Cyrillic/Greek lookalikes that NFKC does NOT fold — fold them to their Latin
+ * equivalent so a homoglyph-spoofed injection/secret can't slip past the patterns.
+ * (Issue #591 — injection homoglyph coverage.)
+ */
+const HOMOGLYPHS: Record<string, string> = {
+  // Cyrillic lowercase
+  'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x',
+  'і': 'i', 'ј': 'j', 'ѕ': 's', 'ԁ': 'd', 'һ': 'h', 'ӏ': 'l', 'ԝ': 'w', 'ԛ': 'q',
+  // Cyrillic uppercase
+  'А': 'A', 'В': 'B', 'Е': 'E', 'К': 'K', 'М': 'M', 'Н': 'H', 'О': 'O', 'Р': 'P',
+  'С': 'C', 'Т': 'T', 'Х': 'X', 'У': 'Y', 'І': 'I', 'Ј': 'J', 'Ѕ': 'S',
+  // Greek lowercase
+  'ο': 'o', 'α': 'a', 'ρ': 'p', 'ν': 'v', 'ι': 'i', 'κ': 'k', 'τ': 't', 'υ': 'u', 'χ': 'x', 'ε': 'e',
+  // Greek uppercase
+  'Α': 'A', 'Β': 'B', 'Ε': 'E', 'Ζ': 'Z', 'Η': 'H', 'Ι': 'I', 'Κ': 'K', 'Μ': 'M',
+  'Ν': 'N', 'Ο': 'O', 'Ρ': 'P', 'Τ': 'T', 'Υ': 'Y', 'Χ': 'X',
+};
+const HOMOGLYPH_RE = new RegExp(`[${Object.keys(HOMOGLYPHS).join('')}]`, 'g');
+
 /** A scope id safe to use as a filesystem path segment (mirrors memory/store isSafeScope). */
 export function isSafeScopeId(id: string): boolean {
   return SCOPE_ID_RE.test(id) && !id.includes('..') && !id.includes('//');
 }
 
-/** Strip zero-width/soft-hyphen + NFKC-fold lookalikes so evasions don't slip past the patterns. */
+/** Strip zero-width/soft-hyphen, fold Cyrillic/Greek homoglyphs, then NFKC so evasions don't slip past the patterns. */
 function normalizeForScan(s: string): string {
-  return s.replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g, '').normalize('NFKC');
+  const stripped = s.replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g, '');
+  const folded = stripped.replace(HOMOGLYPH_RE, (ch) => HOMOGLYPHS[ch] ?? ch);
+  return folded.normalize('NFKC');
 }
 
 const SECRET_PATTERNS: { rule: string; re: RegExp }[] = [
@@ -50,6 +84,10 @@ const SECRET_PATTERNS: { rule: string; re: RegExp }[] = [
   { rule: 'google_api_key', re: /\bAIza[0-9A-Za-z_-]{30,}\b/ },
   { rule: 'sk_token', re: /\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\b/ }, // OpenAI / Anthropic
   { rule: 'stripe_key', re: /\b[srp]k_(?:live|test)_[A-Za-z0-9]{20,}\b/ },
+  { rule: 'twilio_sid', re: /\bAC[0-9a-fA-F]{32}\b/ }, // Twilio Account SID
+  { rule: 'gcp_service_account', re: /"type"\s*:\s*"service_account"/ }, // GCP service-account JSON
+  // DSN / connection URI carrying inline `user:password@host` credentials.
+  { rule: 'dsn_credentials', re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s:@/]+@[^\s/]/i },
 ];
 
 const INJECTION_PATTERNS: { rule: string; re: RegExp }[] = [
@@ -103,9 +141,11 @@ export function enforceArtifactConstraints(
     v.push({ rule: 'schema', field: 'body', detail: 'body must not start with a "---" delimiter line' });
   }
 
-  // (e) name safety — kebab, no traversal
+  // (e) name safety — kebab, no traversal, no Windows reserved device name
   if (a.name && (!NAME_RE.test(a.name) || a.name.includes('..'))) {
     v.push({ rule: 'name_safety', field: 'name', detail: `name "${a.name}" must be kebab [a-z0-9-] with no ".."` });
+  } else if (a.name && WINDOWS_RESERVED_NAMES.has(a.name)) {
+    v.push({ rule: 'name_safety', field: 'name', detail: `name "${a.name}" is a reserved device name (invalid as a file stem on Windows)` });
   }
 
   // (d) scope sanity (safe id) + existence

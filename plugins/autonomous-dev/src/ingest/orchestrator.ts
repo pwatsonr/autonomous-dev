@@ -18,27 +18,41 @@ import type { MemoryStoreIO } from '../memory/store';
 import { defaultExtractors } from './extractors';
 import { isRepoBlocked, enqueueQuestion, loadQuestions, defaultQuestionIO } from './questions';
 import type { QuestionStoreIO } from './questions';
-import { findAmbiguousMemberships } from './inference';
+import { findAmbiguousMemberships, signalsFromMemory } from './inference';
 import type { RepoSignals } from './inference';
+import { writeSignalsSidecar, defaultSignalsIO } from './signals-sidecar';
+import type { SignalsSidecarIO } from './signals-sidecar';
 
-/** Ingest ONE repo (read-only): run extractors, write per-repo memory. */
+/** Ingest ONE repo (read-only): run extractors, write per-repo memory + signals sidecar. */
 export function ingestRepo(
   repo: RepoSource,
   extractors: Extractor[] = defaultExtractors,
   io: MemoryStoreIO = defaultMemoryIO,
+  signalsIO: SignalsSidecarIO = defaultSignalsIO,
 ): RepoIngestResult {
   const topicsWritten: string[] = [];
   const errors: { topic: string; error: string }[] = [];
+  const produced: { topic: string; content: string }[] = [];
   for (const ex of extractors) {
     try {
       const doc = ex.extract(repo);
       if (doc) {
         writeMemoryDoc(`repo:${repo.meta.id}`, doc.topic, doc.content, io);
         topicsWritten.push(doc.topic);
+        produced.push(doc);
       }
     } catch (err) {
       errors.push({ topic: ex.topic, error: err instanceof Error ? err.message : String(err) });
     }
+  }
+  // Decoupling sidecar (#588): write the structured signals derived from THIS
+  // crawl's docs so inference/graph can consume facts instead of re-parsing the
+  // markdown. Best-effort — a sidecar IO failure never aborts the crawl, and
+  // inference still falls back to signalsFromMemory.
+  try {
+    writeSignalsSidecar(repo.meta.id, signalsFromMemory(repo.meta.id, produced), signalsIO);
+  } catch {
+    /* best-effort: missing sidecar => inference falls back to the markdown parse */
   }
   return { repoId: repo.meta.id, headSha: repo.meta.headSha, topicsWritten, errors };
 }
@@ -49,6 +63,8 @@ export interface IngestOptions {
   extractors?: Extractor[];
   /** Predicate: a repo awaiting a human decision is skipped. Defaults to the question queue. */
   isBlocked?: (repoId: string) => boolean;
+  /** Injected IO for the per-repo structured-signals sidecar (#588). */
+  signalsIO?: SignalsSidecarIO;
 }
 
 /**
@@ -83,7 +99,7 @@ export async function ingestOrg(
     }
     try {
       const repo = await client.openRepo(meta);
-      repos.push(ingestRepo(repo, extractors, io));
+      repos.push(ingestRepo(repo, extractors, io, opts.signalsIO ?? defaultSignalsIO));
     } catch (err) {
       // Isolate per-repo failures (clone error, permission, disk) — keep crawling.
       repos.push({

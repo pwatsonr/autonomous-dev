@@ -1235,6 +1235,113 @@ repo_has_deploy_target() {
     return 1
 }
 
+# should_use_review_chain(phase: string) -> 0|1
+#   FLAG-GATED routing predicate for the reviewer-chain gate (#561/#568).
+#   Returns 0 (use the chain) ONLY when AUTONOMOUS_DEV_REVIEW_CHAINS=1 AND the
+#   phase is `code_review` — the MINIMAL first increment. Every other phase, and
+#   the flag in any state other than exactly "1", returns 1 so that
+#   dispatch_phase_session takes its byte-identical single-agent path.
+#
+#   SAFETY: with the flag unset or 0 (the default) this ALWAYS returns 1; the
+#   only way to reach 0 is an explicit opt-in via the env var on the code_review
+#   phase. The other *_review phases (prd/tdd/plan/spec) and the
+#   PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) are intentionally
+#   DEFERRED — they are separable and have no consumer yet.
+should_use_review_chain() {
+    local phase="${1:-}"
+    [[ "${AUTONOMOUS_DEV_REVIEW_CHAINS:-0}" == "1" && "${phase}" == "code_review" ]]
+}
+
+# run_review_gate_phase(request_id, project, state_file, phase) -> "code|cost|file"
+#   Routes a review phase through the multi-reviewer chain CLI
+#   (bin/review-gate.ts) instead of the single hardcoded agent, then writes
+#   phase-result-<phase>.json so the EXISTING advance_phase() consumes it
+#   unchanged. Only reached when should_use_review_chain() is true.
+#
+#   GateDecision contract (verified against review-gate-orchestrator.ts):
+#     stdout = JSON with `.outcome` ∈ {APPROVE, REQUEST_CHANGES} (+ .reason,
+#     .results, .warnings, ...). Mapping to phase-result.status:
+#       APPROVE          -> pass
+#       REQUEST_CHANGES  -> fail
+#       anything else    -> error
+#
+#   FAIL-CLOSED: on a non-zero CLI exit, non-JSON stdout, a missing `.outcome`,
+#   or a result-write failure, a SYNTHESIZED `error` phase-result is written
+#   (via spawn-session.sh's write_synthesized_phase_result). advance_phase()
+#   treats `error` like `fail` for a *_review phase, so the request loops back
+#   to its author phase and retries rather than hanging.
+run_review_gate_phase() {
+    local request_id="${1:-}" project="${2:-}" state_file="${3:-}" phase="${4:-}"
+    local req_dir="${project}/.autonomous-dev/requests/${request_id}"
+    local result_file="${req_dir}/phase-result-${phase}.json"
+
+    local timestamp output_file
+    timestamp=$(date +%s)
+    output_file="${req_dir}/session-${timestamp}.txt"
+
+    # Request type drives chain selection (mirrors resolve_request_type's default).
+    local request_type
+    request_type=$(jq -r '.type // "feature"' "${state_file}" 2>/dev/null || echo "feature")
+
+    log_info "Reviewer-chain gate ENABLED for ${request_id}/${phase} (AUTONOMOUS_DEV_REVIEW_CHAINS=1); request_type=${request_type}"
+
+    # Invoke the chain CLI. stdout is the GateDecision JSON; stderr (diagnostics)
+    # is captured into the session log. The gate name mirrors the phase name.
+    local gate_json exit_code
+    gate_json=$(bun run "${PLUGIN_DIR}/bin/review-gate.ts" \
+        --repo "${project}" \
+        --request-type "${request_type}" \
+        --gate "${phase}" \
+        --request-id "${request_id}" 2>"${output_file}")
+    exit_code=$?
+
+    if [[ ${exit_code} -ne 0 ]]; then
+        log_warn "review-gate CLI exited ${exit_code} for ${request_id}/${phase}; synthesizing error result"
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'error' 'REVIEW_GATE_CLI_NONZERO' '${exit_code}' '${phase}'"
+        echo "${exit_code}|0|${output_file}"
+        return 0
+    fi
+
+    local outcome
+    outcome=$(printf '%s' "${gate_json}" | jq -r '.outcome // empty' 2>/dev/null || echo "")
+    if [[ -z "${outcome}" ]]; then
+        log_warn "review-gate CLI produced no parseable .outcome for ${request_id}/${phase}; synthesizing error result"
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'error' 'REVIEW_GATE_BAD_JSON' '0' '${phase}'"
+        echo "1|0|${output_file}"
+        return 0
+    fi
+
+    local status
+    case "${outcome}" in
+        APPROVE)         status="pass" ;;
+        REQUEST_CHANGES) status="fail" ;;
+        *)               status="error" ;;
+    esac
+
+    # Persist the FULL GateDecision as the phase-result (so advance_phase + the
+    # portal/telemetry see the real reviewer verdicts), augmenting it with the
+    # status/phase/feedback fields the pipeline expects.
+    local ts tmp
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    tmp="${result_file}.tmp.$$"
+    if printf '%s' "${gate_json}" | jq \
+        --arg s "${status}" --arg p "${phase}" --arg ts "${ts}" \
+        '. + {status: $s, phase: $p, feedback: (.reason // ""), review_chain: true, completed_at: $ts}' \
+        > "${tmp}" 2>/dev/null && [[ -s "${tmp}" ]]; then
+        mv "${tmp}" "${result_file}"
+    else
+        rm -f "${tmp}" 2>/dev/null || true
+        log_warn "review-gate result write failed for ${request_id}/${phase}; synthesizing error result"
+        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'error' 'REVIEW_GATE_RESULT_WRITE_FAILED' '0' '${phase}'"
+        echo "1|0|${output_file}"
+        return 0
+    fi
+
+    log_info "Reviewer-chain gate ${request_id}/${phase}: outcome=${outcome} -> status=${status}"
+    echo "0|0|${output_file}"
+    return 0
+}
+
 # dispatch_phase_session(request_id: string, project: string) -> string
 #   Validates request, resolves agent for current phase, and dispatches session
 #   via spawn_session_typed with 30-minute timeout. Handles errors gracefully.
@@ -1322,6 +1429,30 @@ dispatch_phase_session() {
     # Checkpoint
     local req_dir="${project}/.autonomous-dev/requests/${request_id}"
     cp "${state_file}" "${req_dir}/checkpoint.json"
+
+    # ── Reviewer-chain gate (#561/#568, FLAG-GATED, default OFF) ──────────────
+    # When AUTONOMOUS_DEV_REVIEW_CHAINS=1 AND phase==code_review, route this
+    # review through the multi-reviewer chain CLI instead of the single
+    # hardcoded `quality-reviewer` agent resolved above. This is the MINIMAL
+    # first increment: ONLY code_review is wired; the other *_review phases and
+    # the PlanPreAuthor/SpecPreAuthor hook emission (#568 part 2) are DEFERRED.
+    # SAFETY: with the flag unset/0 (the default) should_use_review_chain is
+    # false, this branch is skipped, and the single-agent spawn path below runs
+    # byte-for-byte as before. The session_active/dispatched_phase bookkeeping
+    # set above already applies, so advance_phase reads phase-result-code_review.
+    if should_use_review_chain "${phase}"; then
+        local rg_out
+        rg_out=$(run_review_gate_phase "${request_id}" "${project}" "${state_file}" "${phase}")
+        # Clear the session-active flag (mirrors the single-agent path's teardown).
+        local rg_tmp="${state_file}.tmp.$$"
+        if jq '.current_phase_metadata.session_active = false' "${state_file}" > "${rg_tmp}" 2>/dev/null; then
+            mv "${rg_tmp}" "${state_file}"
+        else
+            rm -f "${rg_tmp}" 2>/dev/null || true
+        fi
+        echo "${rg_out}"
+        return 0
+    fi
 
     # Prepare output file for session
     local timestamp
