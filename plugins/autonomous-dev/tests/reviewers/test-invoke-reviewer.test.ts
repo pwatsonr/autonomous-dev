@@ -2,7 +2,8 @@
  * Unit tests for the concrete dispatcher in intake/reviewers/invoke-reviewer.ts.
  *
  * Locks the contract from createClaudeDispatcher():
- *   - Builds the command with `--print --agent <name> --input-json <json>`.
+ *   - Builds the command with `--print --agent <name> --add-dir <repo> <prompt>`
+ *     (positional prompt; NO `--input-json` flag — that was the #611 bug).
  *   - Well-formed stdout JSON `{ score, verdict }` → resolves the verdict.
  *   - JSON embedded in surrounding text → still parsed correctly (last
  *     balanced `{…}` wins).
@@ -54,7 +55,7 @@ function mockSpawn(code: number, stdout: string, stderr = ''): SpawnFn {
 
 describe('createClaudeDispatcher', () => {
   describe('command construction', () => {
-    it('invokes claude with --print --agent <name> --input-json <payload>', async () => {
+    it('invokes claude with --print --add-dir <repo> --agent <name> <prompt>', async () => {
       const spawnMock = mockSpawn(0, JSON.stringify({ score: 85, verdict: 'APPROVE' }));
       const dispatch = createClaudeDispatcher({ spawn: spawnMock });
       const entry = makeEntry('code-reviewer');
@@ -66,12 +67,73 @@ describe('createClaudeDispatcher', () => {
       const [cmd, args] = (spawnMock as jest.Mock).mock.calls[0] as [string, string[], object];
       expect(cmd).toBe('claude');
       expect(args[0]).toBe('--print');
-      expect(args[1]).toBe('--agent');
-      expect(args[2]).toBe('code-reviewer');
-      expect(args[3]).toBe('--input-json');
-      // The fourth argument is the JSON payload — verify it contains the entry name.
-      const payload = JSON.parse(args[4] as string) as { entry: ReviewerEntry };
-      expect(payload.entry.name).toBe('code-reviewer');
+      // --add-dir is VARIADIC, so it must precede --agent (which terminates it);
+      // otherwise it would swallow the positional prompt as a second directory.
+      expect(args[1]).toBe('--add-dir');
+      expect(args[2]).toBe(context.repoPath);
+      expect(args[3]).toBe('--agent');
+      expect(args[4]).toBe('code-reviewer');
+      // There must be NO invalid --input-json flag anywhere in the argv.
+      expect(args).not.toContain('--input-json');
+      // The prompt is the LAST (positional) argument.
+      expect(args).toHaveLength(6);
+      // A per-reviewer wall-clock cap is passed so a hung reviewer can't stall the gate.
+      const opts = (spawnMock as jest.Mock).mock.calls[0][2] as { timeoutMs?: number };
+      expect(typeof opts.timeoutMs).toBe('number');
+      expect(opts.timeoutMs as number).toBeGreaterThan(0);
+    });
+
+    it('passes a positional prompt that names the change set and demands the verdict JSON', async () => {
+      const spawnMock = mockSpawn(0, JSON.stringify({ score: 85, verdict: 'APPROVE' }));
+      const dispatch = createClaudeDispatcher({ spawn: spawnMock });
+      const entry = makeEntry('code-reviewer');
+      const context = makeContext();
+
+      await dispatch(entry, context);
+
+      const [, args] = (spawnMock as jest.Mock).mock.calls[0] as [string, string[], object];
+      const prompt = args[args.length - 1];
+      // Identifies the change to review.
+      expect(prompt).toContain('code-reviewer');
+      expect(prompt).toContain(context.repoPath);
+      expect(prompt).toContain('src/foo.ts');
+      // Instructs the exact verdict JSON shape that extractJsonVerdict parses.
+      expect(prompt).toContain('"score"');
+      expect(prompt).toContain('"verdict"');
+      expect(prompt).toContain('APPROVE');
+      expect(prompt).toContain('REQUEST_CHANGES');
+    });
+
+    it('inherits the parent environment so PATH and Anthropic creds survive', async () => {
+      const spawnMock = mockSpawn(0, JSON.stringify({ score: 85, verdict: 'APPROVE' }));
+      const dispatch = createClaudeDispatcher({ spawn: spawnMock });
+
+      await dispatch(makeEntry(), makeContext());
+
+      const [, , opts] = (spawnMock as jest.Mock).mock.calls[0] as [
+        string,
+        string[],
+        { env: NodeJS.ProcessEnv },
+      ];
+      // Not the stripped `{}` of the old bug — the full process env is forwarded.
+      expect(opts.env).toBe(process.env);
+    });
+
+    it('parses a verdict from a mock reviewer emitting {score,verdict,findings}', async () => {
+      const stdout = JSON.stringify({
+        score: 91,
+        verdict: 'APPROVE',
+        findings: [{ severity: 'info', file: 'src/foo.ts', line: 1, message: 'looks good' }],
+      });
+      const dispatch = createClaudeDispatcher({ spawn: mockSpawn(0, stdout) });
+
+      const result = await dispatch(makeEntry(), makeContext());
+
+      expect(result.score).toBe(91);
+      expect(result.verdict).toBe('APPROVE');
+      expect(result.findings).toEqual([
+        { severity: 'info', file: 'src/foo.ts', line: 1, message: 'looks good' },
+      ]);
     });
 
     it('uses the provided cwd option', async () => {
@@ -201,7 +263,7 @@ describe('getRegisteredReviewerNames', () => {
   it('returns a non-empty array including the six built-in reviewer names', () => {
     const names = getRegisteredReviewerNames();
     expect(Array.isArray(names)).toBe(true);
-    expect(names).toContain('code-reviewer');
+    expect(names).toContain('quality-reviewer');
     expect(names).toContain('security-reviewer');
     expect(names).toContain('qa-edge-case-reviewer');
     expect(names).toContain('ux-ui-reviewer');
