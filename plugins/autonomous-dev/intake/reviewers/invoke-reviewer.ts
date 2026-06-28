@@ -14,7 +14,10 @@
  *     that enumerate the registry).
  *
  * Command built per reviewer:
- *   `claude --print --agent <reviewerName> --input-json <contextJSON>`
+ *   `claude --print --agent <reviewerName> --add-dir <repoPath> <prompt>`
+ *   The prompt is POSITIONAL (the `claude` CLI has no `--input-json` flag);
+ *   it instructs the agent to emit the verdict JSON described below. The
+ *   subprocess inherits `process.env` so PATH + Anthropic credentials survive.
  *
  * Output parsing:
  *   The dispatcher expects Claude to emit a JSON object with the shape
@@ -57,18 +60,28 @@ import type { InvokeReviewerFn } from './runner';
 export type SpawnFn = (
   cmd: string,
   args: string[],
-  opts: { cwd?: string; env?: NodeJS.ProcessEnv },
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
 ) => Promise<{ code: number; stdout: string; stderr: string }>;
+
+/**
+ * Per-reviewer subprocess wall-clock cap (ms). Bounds a single `claude`
+ * reviewer invocation so one slow/hung reviewer cannot stall the whole gate
+ * up to the daemon's outer phase timeout. On expiry the child is SIGKILLed
+ * and the run resolves as a non-zero (timed-out) exit → ERROR verdict.
+ */
+const REVIEWER_TIMEOUT_MS = 300_000;
 
 /**
  * Default SpawnFn backed by `child_process.spawn`. Buffers stdout/stderr
  * and resolves when the process exits. A non-zero exit code still resolves
- * (not rejects) so the caller controls error handling semantics.
+ * (not rejects) so the caller controls error handling semantics. When
+ * `opts.timeoutMs` is set, the child is SIGKILLed on expiry and the run
+ * resolves with a non-zero (124) code.
  */
 function realSpawn(
   cmd: string,
   args: string[],
-  opts: { cwd?: string; env?: NodeJS.ProcessEnv },
+  opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const child = nodeSpawn(cmd, args, {
@@ -79,12 +92,35 @@ function realSpawn(
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const done = (r: { code: number; stdout: string; stderr: string }): void => {
+      if (settled) return;
+      settled = true;
+      if (timer !== undefined) clearTimeout(timer);
+      resolve(r);
+    };
+
+    if (opts.timeoutMs !== undefined && opts.timeoutMs > 0) {
+      timer = setTimeout(() => {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // child already exited — nothing to kill.
+        }
+        done({
+          code: 124,
+          stdout: Buffer.concat(stdoutChunks).toString('utf8'),
+          stderr: `reviewer subprocess timed out after ${opts.timeoutMs}ms`,
+        });
+      }, opts.timeoutMs);
+    }
 
     child.stdout.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
     child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
     child.on('close', (code) => {
-      resolve({
+      done({
         code: code ?? 1,
         stdout: Buffer.concat(stdoutChunks).toString('utf8'),
         stderr: Buffer.concat(stderrChunks).toString('utf8'),
@@ -92,7 +128,7 @@ function realSpawn(
     });
 
     child.on('error', (err) => {
-      resolve({
+      done({
         code: 1,
         stdout: '',
         stderr: err.message,
@@ -167,6 +203,53 @@ function extractJsonVerdict(text: string): ReviewerOutput | null {
 }
 
 // ---------------------------------------------------------------------------
+// Prompt construction
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the positional prompt handed to `claude --print --agent <name>`.
+ *
+ * The reviewer agents' own system prompts emit a markdown review and a
+ * `phase-result` envelope (`{status, phase, feedback, findings}`) — a shape
+ * the dispatcher's `extractJsonVerdict` does NOT understand. So the caller
+ * must instruct the agent to additionally print a single machine-readable
+ * verdict JSON object as the LAST thing on stdout, matching exactly what
+ * `extractJsonVerdict` scans for: `{ score, verdict, findings }`.
+ *
+ * The prompt also tells the agent which change to review (repo path +
+ * changed file list) so it can Read/Grep the relevant files via `--add-dir`.
+ */
+function buildReviewerPrompt(entry: ReviewerEntry, context: ChangeSetContext): string {
+  const fileList =
+    context.changedFiles.length > 0
+      ? context.changedFiles.map((f) => `  - ${f}`).join('\n')
+      : '  (no changed files were reported)';
+
+  return [
+    `You are running as the "${entry.name}" reviewer for the "${context.gate}" gate.`,
+    `Review the following change set in the repository rooted at ${context.repoPath}.`,
+    '',
+    `Request ID: ${context.requestId}`,
+    `Request type: ${context.requestType}`,
+    `Changed files:`,
+    fileList,
+    '',
+    'Read the changed files (and any related files you need) from the repository to perform your review.',
+    '',
+    'When finished, output ONLY a single JSON object as the LAST thing you print,',
+    'on its own line, with EXACTLY this shape and nothing after it:',
+    '',
+    '{"score": <integer 0-100>, "verdict": "APPROVE" | "REQUEST_CHANGES", "findings": [ { "severity": "blocking|warn|info", "file": "<path>", "line": <number>, "message": "<one sentence>" } ]}',
+    '',
+    'Rules for the JSON verdict:',
+    `- "score" is your overall quality score from 0 to 100 (a passing review is >= ${entry.threshold}).`,
+    '- "verdict" MUST be exactly "APPROVE" or "REQUEST_CHANGES" (map any BLOCK decision to "REQUEST_CHANGES").',
+    '- "findings" is an array; use [] when you have no findings.',
+    '- Do NOT wrap the JSON in markdown code fences. Do NOT print anything after the JSON object.',
+  ].join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -190,8 +273,8 @@ export interface CreateClaudeDispatcherOpts {
  * shelling out to Claude with `--print --agent <name>`.
  *
  * The returned function:
- *   1. Serialises `{ entry, context }` as `--input-json <json>`.
- *   2. Calls `spawn("claude", ["--print", "--agent", name, "--input-json", json], opts)`.
+ *   1. Builds a positional review prompt from `entry` + `context`.
+ *   2. Calls `spawn("claude", ["--print", "--agent", name, "--add-dir", repoPath, prompt], { cwd, env: process.env })`.
  *   3. Throws on non-zero exit.
  *   4. Scans stdout for the last balanced JSON object matching
  *      `{ score, verdict, findings? }`.
@@ -207,13 +290,26 @@ export function createClaudeDispatcher(opts: CreateClaudeDispatcherOpts = {}): I
     entry: ReviewerEntry,
     context: ChangeSetContext,
   ): Promise<{ score: number; verdict: 'APPROVE' | 'REQUEST_CHANGES'; findings?: object }> => {
-    const inputPayload = JSON.stringify({ entry, context });
+    const prompt = buildReviewerPrompt(entry, context);
 
-    const result = await spawnFn(
-      'claude',
-      ['--print', '--agent', entry.name, '--input-json', inputPayload],
-      { cwd, env: {} },
-    );
+    // `claude [options] [prompt]` — the prompt is POSITIONAL and must be the
+    // last argument. There is no `--input-json` flag (the previous bug).
+    // `--add-dir` grants the read-only reviewer access to the repo under
+    // review. CRITICAL ORDERING: `--add-dir` is VARIADIC (`<directories...>`),
+    // so it MUST be followed by another option (here `--agent`) to terminate
+    // it — otherwise commander swallows the positional prompt as a second
+    // directory and claude aborts with "Input must be provided ...".
+    const args = ['--print', '--add-dir', context.repoPath, '--agent', entry.name, prompt];
+
+    // Inherit the parent environment so the `claude` subprocess keeps PATH and
+    // the Anthropic credentials it needs to run. Passing `env: {}` here (the
+    // old bug) stripped both, so the reviewer could not authenticate even with
+    // a valid argv.
+    const result = await spawnFn('claude', args, {
+      cwd,
+      env: process.env,
+      timeoutMs: REVIEWER_TIMEOUT_MS,
+    });
 
     if (result.code !== 0) {
       throw new Error(
@@ -241,7 +337,7 @@ export function createClaudeDispatcher(opts: CreateClaudeDispatcherOpts = {}): I
  * Used by callers that enumerate the registry (e.g., validation tooling).
  */
 const KNOWN_REVIEWER_NAMES: string[] = [
-  'code-reviewer',
+  'quality-reviewer',
   'security-reviewer',
   'qa-edge-case-reviewer',
   'ux-ui-reviewer',

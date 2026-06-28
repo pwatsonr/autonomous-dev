@@ -52,7 +52,7 @@ describe('chain-resolver', () => {
       // The default chain has 7 reviewers (matches config_defaults/reviewer-chains.json,
       // including the standards-meta-reviewer added for governance path-filter triggers).
       expect(chain).toHaveLength(7);
-      expect(chain[0].name).toBe('code-reviewer');
+      expect(chain[0].name).toBe('quality-reviewer');
       expect(chain[5].name).toBe('rule-set-enforcement-reviewer');
     });
 
