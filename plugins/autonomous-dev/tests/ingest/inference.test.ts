@@ -1,4 +1,10 @@
-import { inferProjects, namePrefixOf, parseOwners, signalsFromMemory } from '../../src/ingest/inference';
+import {
+  inferProjects,
+  namePrefixOf,
+  parseOwners,
+  signalsFromMemory,
+  findAmbiguousMemberships,
+} from '../../src/ingest/inference';
 import type { RepoSignals } from '../../src/ingest/inference';
 
 /**
@@ -103,6 +109,32 @@ function test_infer_from_memory_end_to_end(): void {
   console.log('PASS: test_infer_from_memory_end_to_end');
 }
 
+function test_ambiguity_detects_bridge_repo(): void {
+  // o/c shares owner @team/pay with o/a AND name prefix "web" with o/web-ui —
+  // two DIFFERENT candidate projects => o/c is ambiguous; the others are not.
+  const repos: RepoSignals[] = [
+    { repoId: 'o/a', owners: ['@team/pay'], deps: [] },
+    { repoId: 'o/c', owners: ['@team/pay'], deps: [], namePrefix: 'web' },
+    { repoId: 'o/web-ui', owners: [], deps: [], namePrefix: 'web' },
+  ];
+  const amb = findAmbiguousMemberships(repos);
+  assert(amb.length === 1 && amb[0].repoId === 'o/c', 'only the bridge repo is ambiguous');
+  assert(amb[0].candidateProjectIds.join(',') === 'team-pay,web', `2 sorted candidate ids, got ${amb[0].candidateProjectIds.join(',')}`);
+  console.log('PASS: test_ambiguity_detects_bridge_repo');
+}
+
+function test_ambiguity_none_when_single_project(): void {
+  // a clean single-owner project and a clean single-prefix project => no ambiguity.
+  const repos: RepoSignals[] = [
+    { repoId: 'acme/orders', owners: ['@acme/payments'], deps: [] },
+    { repoId: 'acme/billing', owners: ['@acme/payments'], deps: [] },
+    { repoId: 'acme/payments-api', owners: [], deps: [] },
+    { repoId: 'acme/payments-web', owners: [], deps: [] },
+  ];
+  assert(findAmbiguousMemberships(repos).length === 0, 'unambiguous repos produce no questions');
+  console.log('PASS: test_ambiguity_none_when_single_project');
+}
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(`Assertion failed: ${message}`);
@@ -118,4 +150,6 @@ describe('ingest/inference (project inference)', () => {
   it('test_parse_owners', test_parse_owners);
   it('test_signals_from_memory', test_signals_from_memory);
   it('test_infer_from_memory_end_to_end', test_infer_from_memory_end_to_end);
+  it('test_ambiguity_detects_bridge_repo', test_ambiguity_detects_bridge_repo);
+  it('test_ambiguity_none_when_single_project', test_ambiguity_none_when_single_project);
 });

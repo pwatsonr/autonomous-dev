@@ -20,9 +20,10 @@ import * as path from 'path';
 
 import { readOwnership, writeOwnership } from '../src/ownership/store';
 import { linkOrg, registerRepos, isOrgLogin } from '../src/ownership/commands';
-import { ingestOrg } from '../src/ingest/orchestrator';
+import { ingestOrg, enqueueAmbiguityQuestions } from '../src/ingest/orchestrator';
 import { createGhOrgClient } from '../src/ingest/adapters';
 import { signalsFromMemory } from '../src/ingest/inference';
+import { loadKnownShas, saveKnownShas, nextKnownShas } from '../src/ingest/shas';
 import { readScopeMemory } from '../src/memory/store';
 import { listQuestions, answerQuestion } from '../src/ingest/questions';
 import { readNeo4jCreds } from '../src/graph/secrets';
@@ -32,7 +33,7 @@ import { inferProjectsWithGraph } from '../src/graph/inference';
 
 const USAGE = `Usage:
   autonomous-dev org link <org>            Link a GitHub org
-  autonomous-dev org ingest [org]          Read-only crawl of the org into scoped memory
+  autonomous-dev org ingest [org] [--full] Read-only crawl of the org into scoped memory (--full ignores saved shas)
   autonomous-dev project infer             Propose project groupings (graph-enriched if Neo4j is up)
   autonomous-dev graph sync                Upsert the org/project/repo/owner graph into Neo4j
   autonomous-dev graph status              Show Neo4j connectivity + node counts
@@ -104,9 +105,17 @@ async function main(argv: string[]): Promise<number> {
     fs.rmSync(scratchDir, { recursive: true, force: true });
     fs.mkdirSync(scratchDir, { recursive: true });
 
-    process.stdout.write(`Ingesting org "${org}" (read-only)…\n`);
+    // Incremental crawl: load the persisted repoId->headSha map so unchanged
+    // repos are skipped, unless --full forces a full re-crawl.
+    const full = rest.includes('--full');
+    const known = full ? {} : loadKnownShas();
+
+    process.stdout.write(`Ingesting org "${org}" (read-only${full ? ', full re-crawl' : ', incremental'})…\n`);
     const client = createGhOrgClient({ scratchDir });
-    const result = await ingestOrg(org, client);
+    const result = await ingestOrg(org, client, undefined, { knownShas: known });
+
+    // Persist the updated head shas for next run's incremental skip (atomic, 0600).
+    saveKnownShas(nextKnownShas(known, result));
 
     const ingestedIds = result.repos.map((r) => r.repoId);
     const { ownership, message } = registerRepos(readOwnership(), ingestedIds);
@@ -132,6 +141,14 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     const signals = own.repos.map((r) => signalsFromMemory(r.id, readScopeMemory(`repo:${r.id}`)));
+    // PRODUCER: a repo whose signals place it in 2+ candidate projects becomes an
+    // answerable blocking question (feeds the queue the CONSUMER already drains).
+    const askedIds = enqueueAmbiguityQuestions(signals);
+    if (askedIds.length) {
+      process.stdout.write(
+        `Enqueued ${askedIds.length} blocking question(s) for ambiguous repo(s); resolve with: autonomous-dev questions list\n`,
+      );
+    }
     const gc = graphClient();
     const { proposals, source } = await inferProjectsWithGraph(gc?.client, signals);
     process.stdout.write(`(inference source: ${source}${source === 'file' && gc ? ' — Neo4j unreachable, fell back' : ''})\n`);

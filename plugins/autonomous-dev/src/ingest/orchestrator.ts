@@ -16,7 +16,10 @@ import type {
 import { writeMemoryDoc, defaultMemoryIO } from '../memory/store';
 import type { MemoryStoreIO } from '../memory/store';
 import { defaultExtractors } from './extractors';
-import { isRepoBlocked } from './questions';
+import { isRepoBlocked, enqueueQuestion, loadQuestions, defaultQuestionIO } from './questions';
+import type { QuestionStoreIO } from './questions';
+import { findAmbiguousMemberships } from './inference';
+import type { RepoSignals } from './inference';
 
 /** Ingest ONE repo (read-only): run extractors, write per-repo memory. */
 export function ingestRepo(
@@ -92,4 +95,47 @@ export async function ingestOrg(
     }
   }
   return { org, repos, skipped };
+}
+
+/**
+ * Question-queue PRODUCER (#587 AC3 / #588). Turns project-membership AMBIGUITY
+ * into answerable blocking questions: a repo whose signals place it in 2+
+ * candidate projects gets ONE question (id `ambiguity:<repoId>`) offering those
+ * candidate project ids as the options. This is what finally feeds the queue +
+ * portal/CLI that already exist (the CONSUMER skips `isRepoBlocked` repos).
+ *
+ * Idempotent — an existing question for the repo (pending OR already answered)
+ * is never re-enqueued, so a human's answer is never clobbered. Best-effort —
+ * never throws; a single malformed question never aborts the batch. Returns the
+ * ids actually enqueued this call.
+ */
+export function enqueueAmbiguityQuestions(
+  signals: RepoSignals[],
+  io: QuestionStoreIO = defaultQuestionIO,
+): string[] {
+  const enqueued: string[] = [];
+  try {
+    const existing = new Set(loadQuestions(io).map((q) => q.id));
+    for (const a of findAmbiguousMemberships(signals)) {
+      const id = `ambiguity:${a.repoId}`;
+      if (existing.has(id)) continue; // dedupe — don't double-enqueue or clobber an answer
+      try {
+        enqueueQuestion(
+          {
+            id,
+            repoId: a.repoId,
+            question: `Repo "${a.repoId}" matches multiple candidate projects (${a.candidateProjectIds.join(', ')}). Which does it belong to?`,
+            options: a.candidateProjectIds,
+          },
+          io,
+        );
+        enqueued.push(id);
+      } catch {
+        // best-effort: skip a single malformed question, keep producing the rest
+      }
+    }
+  } catch {
+    // never throw from a producer
+  }
+  return enqueued;
 }
