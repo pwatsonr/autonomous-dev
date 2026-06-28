@@ -862,10 +862,11 @@ export class DiscordAdapter implements IntakeAdapter {
       // Step 2: Extract the subcommand (args/flags are computed per-command below).
       const subcommand = interaction.options.getSubcommand();
 
-      // Step 3: Resolve identity
-      let userId: string;
+      // Step 3: Fail-fast provisioned check. The IntakeRouter re-resolves the
+      // RAW platform id (snowflake) to the internal authz subject, so we must
+      // NOT keep the resolved id here — `source.userId` carries the raw id.
       try {
-        userId = await this.identityResolver.resolve(interaction.user.id);
+        await this.identityResolver.resolve(interaction.user.id);
       } catch (error) {
         if (error instanceof AuthorizationError) {
           await interaction.editReply({ content: `Error: ${error.message}` });
@@ -886,7 +887,7 @@ export class DiscordAdapter implements IntakeAdapter {
           scopeId: interaction.options.getString('id', true),
           task: interaction.options.getString('task', true),
           channelType: 'discord',
-          userId,
+          userId: interaction.user.id,
           channelId: interaction.channelId ?? undefined,
           messageId: interaction.id,
           rawText: interaction.toString(),
@@ -899,7 +900,7 @@ export class DiscordAdapter implements IntakeAdapter {
           rawText: interaction.toString(),
           source: {
             channelType: 'discord',
-            userId,
+            userId: interaction.user.id,
             platformChannelId: interaction.channelId,
             timestamp: new Date(),
           },

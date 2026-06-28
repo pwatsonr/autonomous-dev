@@ -30,7 +30,8 @@ export interface TriggerCommandInput {
   scopeId: string;
   task: string;
   channelType: ChannelType;
-  /** Internal/resolved user id (authz subject). */
+  /** Raw platform user id (snowflake / slack id); the router resolves it to
+   *  the internal authz subject. */
   userId: string;
   /** Platform channel id (for reporting back to origin). */
   channelId?: string;

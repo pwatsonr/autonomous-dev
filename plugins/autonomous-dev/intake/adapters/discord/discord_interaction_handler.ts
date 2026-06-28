@@ -105,7 +105,9 @@ export class ComponentInteractionHandler {
       args: ['CONFIRM'],
       flags: {},
       rawText: 'kill CONFIRM',
-      source: { channelType: 'discord', userId, timestamp: new Date() },
+      // Router re-resolves the RAW discord id; the direct authorize above
+      // already used the resolved `userId`.
+      source: { channelType: 'discord', userId: interaction.user.id, timestamp: new Date() },
     });
 
     await interaction.update({
@@ -131,14 +133,15 @@ export class ComponentInteractionHandler {
     interaction: MessageComponentInteraction,
     requestId: string,
   ): Promise<void> {
-    const userId = await this.identityResolver.resolve(interaction.user.id);
+    // Fail-fast provisioned check; the router re-resolves the RAW discord id.
+    await this.identityResolver.resolve(interaction.user.id);
 
     const result = await this.router.route({
       commandName: 'cancel',
       args: [requestId],
       flags: {},
       rawText: `cancel ${requestId}`,
-      source: { channelType: 'discord', userId, timestamp: new Date() },
+      source: { channelType: 'discord', userId: interaction.user.id, timestamp: new Date() },
     });
 
     await interaction.update({
@@ -171,7 +174,8 @@ export class ComponentInteractionHandler {
 
     await interaction.deferReply();
 
-    const userId = await this.identityResolver.resolve(interaction.user.id);
+    // Fail-fast provisioned check; the router re-resolves the RAW discord id.
+    await this.identityResolver.resolve(interaction.user.id);
     const command: IncomingCommand = {
       commandName: 'submit',
       args: [description],
@@ -182,7 +186,7 @@ export class ComponentInteractionHandler {
       rawText: description,
       source: {
         channelType: 'discord',
-        userId,
+        userId: interaction.user.id,
         platformChannelId: interaction.channelId,
         timestamp: new Date(),
       },

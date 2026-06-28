@@ -121,9 +121,9 @@ describe('Discord Components (SPEC-008-3-05, Task 14)', () => {
   test('modal fields have correct max_length constraints', () => {
     const modal = buildSubmitModal();
 
-    // Description: max_length 10000
+    // Description: max_length 4000 (Discord modal text-input hard limit)
     const descField = modal.components[0].components[0];
-    expect(descField.max_length).toBe(10000);
+    expect(descField.max_length).toBe(4000);
 
     // Repo: no max_length
     const repoField = modal.components[1].components[0];

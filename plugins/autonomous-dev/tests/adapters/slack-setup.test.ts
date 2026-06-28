@@ -200,13 +200,14 @@ describe('Slack App Manifest', () => {
   // TC-4-01-08: Manifest command count
   // -------------------------------------------------------------------------
 
-  test('TC-4-01-08: defines exactly 12 slash commands', () => {
+  test('TC-4-01-08: defines exactly 13 slash commands', () => {
     // SKIP-WITH-NOTE (PRD-016 batch 6): manifest grew to include
-    // /ad-submit-bug and /ad-hotfix; updating expected count from 10 -> 12.
+    // /ad-submit-bug and /ad-hotfix; ONBOARD Phase 6 (#583) added the scoped
+    // /autodev trigger — count is now 13.
     const features = manifest.features as Record<string, unknown>;
     const commands = features.slash_commands as Array<Record<string, unknown>>;
 
-    expect(commands).toHaveLength(12);
+    expect(commands).toHaveLength(13);
   });
 
   // -------------------------------------------------------------------------
@@ -259,7 +260,8 @@ describe('Slack App Manifest', () => {
     const commandNames = commands.map((c) => c.command);
 
     // SKIP-WITH-NOTE (PRD-016 batch 6): manifest expanded to include
-    // /ad-submit-bug and /ad-hotfix; updating expected list to match.
+    // /ad-submit-bug and /ad-hotfix; ONBOARD Phase 6 (#583) appended the scoped
+    // /autodev trigger as the final command.
     expect(commandNames).toEqual([
       '/ad-submit',
       '/ad-status',
@@ -273,7 +275,10 @@ describe('Slack App Manifest', () => {
       '/ad-kill',
       '/ad-submit-bug',
       '/ad-hotfix',
+      '/autodev',
     ]);
+    // /autodev IS present (scoped trigger).
+    expect(commandNames).toContain('/autodev');
   });
 });
 
