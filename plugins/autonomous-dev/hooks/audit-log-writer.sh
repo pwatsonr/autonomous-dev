@@ -82,16 +82,26 @@ cwd="${PWD}"
 ts="$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")"
 phase="${AUDIT_PHASE:-unknown}"
 
+# REQ-000052: capture tool_use_id when the SDK includes it.
+# The finalizer (PostToolUse) uses this id to merge exit_code / output_tail
+# into the correct PreToolUse row rather than appending a duplicate.
+tool_use_id="$(printf '%s' "${event_json}" | jq -r '.tool_use_id // empty' 2>/dev/null || true)"
+
 # Compose the JSONL row. Use jq -c for compact single-line output and
 # proper escaping. The `output_tail` field is included as null because
-# PreToolUse fires before execution; PostToolUse would fill it in a
-# future iteration (out of scope for Phase A — see file header).
+# PreToolUse fires before execution; PostToolUse will fill it in via the
+# audit-log-finalizer.sh companion hook (REQ-000052).
+# source changes from "sdk_hook" to "sdk_hook_pre" to distinguish
+# PreToolUse rows from PostToolUse-appended rows ("sdk_hook_post") and
+# merged rows ("sdk_hook_pre+sdk_hook_post"). Readers match by command,
+# not by source, so this is non-breaking.
 row="$(jq -nc \
     --arg ts "${ts}" \
     --arg phase "${phase}" \
     --arg command "${command_str}" \
     --arg first_token "${first_token}" \
     --arg cwd "${cwd}" \
+    --arg tool_use_id "${tool_use_id}" \
     '{
         ts: $ts,
         phase: $phase,
@@ -101,14 +111,23 @@ row="$(jq -nc \
         exit_code: null,
         duration_ms: null,
         output_tail: null,
-        source: "sdk_hook"
-    }' 2>/dev/null)"
+        source: "sdk_hook_pre"
+    } + (if $tool_use_id == "" then {} else {tool_use_id: $tool_use_id} end)' 2>/dev/null)"
 
 if [[ -z "${row}" ]]; then
     exit 0
 fi
 
-# Append. Suppress errors — observability must not break the pipeline.
-printf '%s\n' "${row}" >> "${log_path}" 2>/dev/null || true
+# Append with optional flock for write safety when multiple concurrent hooks
+# could race (REQ-000052 TASK-010). Fail-open: if flock is absent or times
+# out, fall back to the direct append.
+if command -v flock >/dev/null 2>&1; then
+    (
+        flock -w 1 9 || true
+        printf '%s\n' "${row}" >&9
+    ) 9>> "${log_path}" 2>/dev/null || true
+else
+    printf '%s\n' "${row}" >> "${log_path}" 2>/dev/null || true
+fi
 
 exit 0

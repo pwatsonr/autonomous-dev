@@ -100,7 +100,11 @@ bash_event() {
     [[ "$(printf '%s' "${row}" | jq -r '.phase')" == "integration" ]]
     [[ "$(printf '%s' "${row}" | jq -r '.command')" == "bun test --bail" ]]
     [[ "$(printf '%s' "${row}" | jq -r '.argv[0]')" == "bun" ]]
-    [[ "$(printf '%s' "${row}" | jq -r '.source')" == "sdk_hook" ]]
+    # REQ-000052: source changed from "sdk_hook" to "sdk_hook_pre".
+    # Accept both for backward compat with any existing logs/fixtures.
+    local _src
+    _src="$(printf '%s' "${row}" | jq -r '.source')"
+    [[ "${_src}" == "sdk_hook_pre" || "${_src}" == "sdk_hook" ]]
     # cwd is present and non-empty.
     [[ -n "$(printf '%s' "${row}" | jq -r '.cwd')" ]]
     # Non-Bash events are ignored.

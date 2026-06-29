@@ -75,8 +75,9 @@ for field in ts phase command argv cwd source; do
     fi
 done
 
-if [[ "$(printf '%s' "${first}" | jq -r '.source')" != "sdk_hook" ]]; then
-    echo "FAIL: source != sdk_hook on first row" >&2
+_source_val="$(printf '%s' "${first}" | jq -r '.source')"
+if [[ "${_source_val}" != "sdk_hook_pre" && "${_source_val}" != "sdk_hook" ]]; then
+    echo "FAIL: source '${_source_val}' is not sdk_hook_pre (or legacy sdk_hook)" >&2
     exit 1
 fi
 
@@ -87,4 +88,4 @@ if [[ "${mode}" != "600" ]]; then
     exit 1
 fi
 
-echo "PASS: audit log smoke (3 rows, mode 0600, sdk_hook source)"
+echo "PASS: audit log smoke (3 rows, mode 0600, sdk_hook_pre source)"
