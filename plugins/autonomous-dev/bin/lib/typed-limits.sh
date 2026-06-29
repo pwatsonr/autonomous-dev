@@ -23,6 +23,28 @@
 _TYPED_LIMITS_DEFAULT_TIMEOUT=14400  # seconds = 4 hours
 _TYPED_LIMITS_DEFAULT_RETRIES=3
 
+# Hard-coded per-phase dispatch timeout defaults (REQ-000051).
+# Used when no per-request, per-phase config, global config, or env-var
+# override is present. Note: EFFECTIVE_CONFIG (not AUTONOMOUS_DEV_CONFIG)
+# is the merged defaults+user config set by supervisor-loop.sh at startup.
+declare -A _TYPED_LIMITS_DISPATCH_DEFAULTS_BY_PHASE
+_TYPED_LIMITS_DISPATCH_DEFAULTS_BY_PHASE=(
+    [intake]=600
+    [prd]=3600
+    [tdd]=3600
+    [plan]=3600
+    [spec]=5400
+    [prd_review]=1800
+    [tdd_review]=1800
+    [plan_review]=1800
+    [spec_review]=1800
+    [code_review]=1800
+    [code]=10800
+    [integration]=7200
+    [deploy]=1800
+    [monitor]=1200
+)
+
 # resolve_phase_timeout(state_file: string, phase: string) -> int
 #   Returns the timeout in seconds for the given phase on the given state.
 #   Lookup order:
@@ -92,4 +114,134 @@ resolve_max_retries() {
 resolve_request_type() {
     local state_file="$1"
     jq -r '.type // "feature"' "${state_file}" 2>/dev/null || echo "feature"
+}
+
+# coerce_timeout_to_seconds(value: string) -> int (stdout) | exit 1
+#   Converts a timeout string to integer seconds.
+#   Accepts: bare integers (interpreted as seconds), or an integer followed
+#   by exactly one lowercase suffix character: s, m, or h.
+#   Leading/trailing whitespace, empty string, uppercase suffixes, floats,
+#   and composite strings (e.g. "30m30s") are rejected (exit 1).
+#   Returns: integer seconds on stdout, exit 0 on success.
+coerce_timeout_to_seconds() {
+    local value="$1"
+    # Reject empty string
+    if [[ -z "${value}" ]]; then
+        return 1
+    fi
+    # Reject negative numbers
+    if [[ "${value}" =~ ^- ]]; then
+        return 1
+    fi
+    # Match valid pattern: digits optionally followed by exactly one s/m/h suffix
+    if [[ "${value}" =~ ^([0-9]+)([smh])?$ ]]; then
+        local num="${BASH_REMATCH[1]}"
+        local suffix="${BASH_REMATCH[2]:-}"
+        local seconds
+        case "${suffix}" in
+            s|"") seconds="${num}" ;;
+            m)    seconds=$(( num * 60 )) ;;
+            h)    seconds=$(( num * 3600 )) ;;
+        esac
+        printf '%s\n' "${seconds}"
+        return 0
+    fi
+    return 1
+}
+
+# resolve_dispatch_timeout(state_file: string, phase: string) -> int (stdout)
+#   Returns the dispatch timeout in seconds for the given phase.
+#   Never returns empty; always exits 0. Precedence (highest wins):
+#     1. per-request  .type_config.dispatchTimeouts[phase] in state.json
+#     2. per-phase    .daemon.dispatch_timeout_by_phase[phase] in $EFFECTIVE_CONFIG
+#     3. global       .daemon.dispatch_timeout_seconds in $EFFECTIVE_CONFIG
+#     4. env var      $DISPATCH_TIMEOUT (coerced via coerce_timeout_to_seconds)
+#     5. hard-coded   _TYPED_LIMITS_DISPATCH_DEFAULTS_BY_PHASE[phase] or 1800
+#   Note: EFFECTIVE_CONFIG is the merged defaults+user config (set by
+#   supervisor-loop.sh::resolve_effective_config). When absent (e.g. unit
+#   tests), layers 2 and 3 are skipped silently.
+resolve_dispatch_timeout() {
+    local state_file="$1"
+    local phase="$2"
+    local value=""
+
+    # Layer 1: per-request override
+    value=$(jq -r --arg p "${phase}" \
+        '.type_config.dispatchTimeouts[$p] // empty' \
+        "${state_file}" 2>/dev/null || true)
+    if [[ -n "${value}" && "${value}" != "null" ]]; then
+        printf '%s\n' "${value}"
+        return 0
+    fi
+
+    # Layer 2: per-phase config (EFFECTIVE_CONFIG only; not AUTONOMOUS_DEV_CONFIG)
+    if [[ -n "${EFFECTIVE_CONFIG:-}" && -f "${EFFECTIVE_CONFIG}" ]]; then
+        value=$(jq -r --arg p "${phase}" \
+            '.daemon.dispatch_timeout_by_phase[$p] // empty' \
+            "${EFFECTIVE_CONFIG}" 2>/dev/null || true)
+        if [[ -n "${value}" && "${value}" != "null" ]]; then
+            printf '%s\n' "${value}"
+            return 0
+        fi
+
+        # Layer 3: global config
+        value=$(jq -r '.daemon.dispatch_timeout_seconds // empty' \
+            "${EFFECTIVE_CONFIG}" 2>/dev/null || true)
+        if [[ -n "${value}" && "${value}" != "null" ]]; then
+            printf '%s\n' "${value}"
+            return 0
+        fi
+    fi
+
+    # Layer 4: DISPATCH_TIMEOUT env var (coerced)
+    if [[ -n "${DISPATCH_TIMEOUT:-}" ]]; then
+        local coerced
+        coerced=$(coerce_timeout_to_seconds "${DISPATCH_TIMEOUT}" 2>/dev/null || true)
+        if [[ -n "${coerced}" ]]; then
+            printf '%s\n' "${coerced}"
+            return 0
+        else
+            # Non-empty but rejected: warn once; fall through to default
+            printf 'typed-limits: DISPATCH_TIMEOUT="%s" is malformed; ignoring\n' \
+                "${DISPATCH_TIMEOUT}" >&2 || true
+        fi
+    fi
+
+    # Layer 5: hard-coded phase default or fallback 1800
+    local default_secs="${_TYPED_LIMITS_DISPATCH_DEFAULTS_BY_PHASE[${phase}]:-1800}"
+    printf '%s\n' "${default_secs}"
+    return 0
+}
+
+# resolve_max_soft_timeout_reentries(state_file: string) -> int (stdout)
+#   Returns the maximum number of soft timeout reentries allowed before
+#   promoting to a hard timeout. Precedence:
+#     1. per-request .type_config.maxSoftTimeoutReentries in state.json
+#     2. config      .daemon.max_soft_timeout_reentries in $EFFECTIVE_CONFIG
+#     3. hard-coded  5
+resolve_max_soft_timeout_reentries() {
+    local state_file="$1"
+    local value=""
+
+    # Layer 1: per-request override
+    value=$(jq -r '.type_config.maxSoftTimeoutReentries // empty' \
+        "${state_file}" 2>/dev/null || true)
+    if [[ -n "${value}" && "${value}" != "null" ]]; then
+        printf '%s\n' "${value}"
+        return 0
+    fi
+
+    # Layer 2: config
+    if [[ -n "${EFFECTIVE_CONFIG:-}" && -f "${EFFECTIVE_CONFIG}" ]]; then
+        value=$(jq -r '.daemon.max_soft_timeout_reentries // empty' \
+            "${EFFECTIVE_CONFIG}" 2>/dev/null || true)
+        if [[ -n "${value}" && "${value}" != "null" ]]; then
+            printf '%s\n' "${value}"
+            return 0
+        fi
+    fi
+
+    # Layer 3: hard-coded default
+    printf '%s\n' "5"
+    return 0
 }

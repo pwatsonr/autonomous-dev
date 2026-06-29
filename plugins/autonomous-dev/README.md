@@ -1030,6 +1030,80 @@ Notifications can go to the CLI, Discord, Slack, or a log file. Batching groups 
 
 The observation cycle runs on a cron schedule (default: every 4 hours). Anomaly detection uses z-score analysis against a 14-day baseline. Governance prevents fix-revert oscillation with cooldown periods and effectiveness comparisons.
 
+#### Per-Phase Dispatch Timeouts (REQ-000051)
+
+Each pipeline phase gets its own wall-clock budget before the daemon considers the Claude session timed out. The defaults ship in `config/defaults.json` under `daemon.dispatch_timeout_by_phase` and are deliberately large for author/implementation phases (`code` = 3 hours, `integration` = 2 hours) and smaller for lightweight review and intake phases.
+
+**Override in `~/.claude/autonomous-dev.json`:**
+
+```json
+{
+  "daemon": {
+    "dispatch_timeout_by_phase": {
+      "code": 14400,
+      "spec": 7200,
+      "integration": 10800
+    }
+  }
+}
+```
+
+Values are **integer seconds**. Omit a phase to inherit the built-in default. You may also set a single global fallback with `daemon.dispatch_timeout_seconds` (used for any phase not listed in `dispatch_timeout_by_phase`).
+
+**Override via environment variable (back-compat):**
+
+```bash
+export DISPATCH_TIMEOUT=2h   # suffix: s, m, or h — or bare integer seconds
+```
+
+The env var applies to all phases and is lower-priority than both config layers. Setting `DISPATCH_TIMEOUT=30m` in your shell still works exactly as before.
+
+**Precedence (highest → lowest):**
+
+1. `state.json .type_config.dispatchTimeouts[phase]` — per-request override (set by the intake layer for specialised request types)
+2. `~/.claude/autonomous-dev.json .daemon.dispatch_timeout_by_phase[phase]`
+3. `~/.claude/autonomous-dev.json .daemon.dispatch_timeout_seconds`
+4. `$DISPATCH_TIMEOUT` environment variable
+5. Built-in phase defaults (see table below)
+
+**Built-in defaults:**
+
+| Phase | Seconds | Human readable |
+|---|---:|---|
+| `intake` | 600 | 10 min |
+| `prd` | 3600 | 1 h |
+| `tdd` | 3600 | 1 h |
+| `plan` | 3600 | 1 h |
+| `spec` | 5400 | 1.5 h |
+| `code` | 10800 | 3 h |
+| `integration` | 7200 | 2 h |
+| `prd_review` | 1800 | 30 min |
+| `tdd_review` | 1800 | 30 min |
+| `plan_review` | 1800 | 30 min |
+| `spec_review` | 1800 | 30 min |
+| `code_review` | 1800 | 30 min |
+| `deploy` | 1800 | 30 min |
+| `monitor` | 1200 | 20 min |
+| *(any other)* | 1800 | 30 min |
+
+**Progress-aware timeout (soft timeout):**
+
+When a phase session times out but the working tree has advanced (new commits, new files, modified tracked files), the daemon treats it as a **soft timeout** rather than a hard failure:
+
+- `retry_count` is **not** incremented — the session is re-dispatched cleanly.
+- `current_phase_metadata.soft_timeout_count` is incremented so you can observe re-entries in `state.json`.
+- A `session_soft_timeout` event is appended to `events.jsonl` with pre/post HEAD and dirty-file counts.
+
+Once the soft-timeout count reaches `daemon.max_soft_timeout_reentries` (default `5`), the daemon **promotes** the timeout to a hard failure (increments `retry_count`, emits a `soft_timeout_promoted_to_hard` alert). Override the ceiling:
+
+```json
+{
+  "daemon": {
+    "max_soft_timeout_reentries": 3
+  }
+}
+```
+
 ---
 
 ## Usage Examples

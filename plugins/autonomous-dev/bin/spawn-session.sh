@@ -41,10 +41,20 @@ if [[ -f "${LIB_DIR}/phase-helpers.sh" ]]; then
     source "${LIB_DIR}/phase-helpers.sh"
 fi
 
-# write_synthesized_phase_result(path, status, error, exit_code, phase) -> void
+# write_synthesized_phase_result(path, status, error_msg, exit_code, phase) -> void
 #   Writes a synthesized phase-result.json when the agent didn't create one.
 #   Used as fallback in spawn_session_typed() and by dispatch_phase_session()
 #   timeout handling.
+#
+#   Canonical reason codes for the error_msg argument:
+#     WALL_CLOCK_TIMEOUT              — session timed out with no working-tree progress
+#     WALL_CLOCK_TIMEOUT_WITH_PROGRESS — session timed out but working tree advanced
+#                                        (soft timeout; re-dispatched by supervisor)
+#     AGENT_EXITED_NONZERO            — spawn-session.sh exited nonzero without result
+#     REVIEW_GATE_CLI_NONZERO         — review-gate CLI returned a nonzero exit
+#     REVIEW_GATE_BAD_JSON            — review-gate returned non-JSON output
+#     REVIEW_GATE_RESULT_WRITE_FAILED — writing the gate result file failed
+#   New reason codes SHOULD be added to this list when introduced.
 write_synthesized_phase_result() {
     local path="$1" status="$2" error_msg="$3" exit_code="${4:-0}" phase="${5:-}"
     local tmp="${path}.tmp.$$"

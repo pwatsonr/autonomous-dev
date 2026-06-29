@@ -1386,9 +1386,227 @@ run_review_gate_phase() {
     return 0
 }
 
+###############################################################################
+# Dispatch Timeout Helpers (REQ-000051)
+###############################################################################
+
+# snapshot_working_tree(project: string) -> string (stdout)
+#   Returns a compact snapshot of the working tree state for progress detection.
+#   For non-git paths: prints literal "non-git" and exits 0.
+#   For git repos: prints "<HEAD-sha>|<dirty-file-count>" and exits 0.
+#   The dirty count includes untracked files (default git status --porcelain
+#   behavior). Uses 2>/dev/null so that an empty repo or racy git state
+#   never causes an error.
+snapshot_working_tree() {
+    local project="${1:-}"
+    if [[ -z "${project}" || ! -d "${project}/.git" ]]; then
+        printf 'non-git\n'
+        return 0
+    fi
+    local head dirty
+    head=$(git -C "${project}" rev-parse HEAD 2>/dev/null || true)
+    dirty=$(git -C "${project}" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    printf '%s|%s\n' "${head}" "${dirty}"
+}
+
+# working_tree_advanced(pre: string, post: string) -> int (exit code)
+#   Returns 0 (true) iff all of:
+#     1. pre and post are both non-empty.
+#     2. Neither is the literal sentinel "non-git".
+#     3. pre != post (string comparison).
+#   Returns 1 (false) otherwise. Prints nothing to stdout/stderr.
+working_tree_advanced() {
+    local pre="${1:-}" post="${2:-}"
+    if [[ -z "${pre}" || -z "${post}" ]]; then
+        return 1
+    fi
+    if [[ "${pre}" == "non-git" || "${post}" == "non-git" ]]; then
+        return 1
+    fi
+    if [[ "${pre}" == "${post}" ]]; then
+        return 1
+    fi
+    return 0
+}
+
+# emit_soft_timeout_promotion_alert(request_id, phase, soft_timeout_count) -> void
+#   Appends a soft_timeout_promoted_to_hard event to events.jsonl and fires
+#   emit_alert so the operator is notified via the alerts directory.
+emit_soft_timeout_promotion_alert() {
+    local request_id="$1"
+    local phase="$2"
+    local soft_timeout_count="$3"
+    local project="${4:-${CURRENT_PROJECT:-}}"
+
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Best-effort: if we can locate the events file, append the event.
+    # We accept project as optional 4th arg or fall back to env; if neither
+    # is available skip the file append without error.
+    local events_file=""
+    if [[ -n "${project}" ]]; then
+        events_file="${project}/.autonomous-dev/requests/${request_id}/events.jsonl"
+    fi
+
+    if [[ -n "${events_file}" && -d "$(dirname "${events_file}")" ]]; then
+        local event
+        event=$(jq -n \
+            --arg ts "${ts}" \
+            --arg req "${request_id}" \
+            --arg phase "${phase}" \
+            --argjson stc "${soft_timeout_count}" \
+            '{
+                timestamp: $ts,
+                type: "soft_timeout_promoted_to_hard",
+                request_id: $req,
+                details: {
+                    phase: $phase,
+                    soft_timeout_count: $stc
+                }
+            }')
+        echo "${event}" >> "${events_file}"
+    fi
+
+    emit_alert "soft_timeout_promoted_to_hard" \
+        "Request ${request_id} promoted soft-timeout to hard after ${soft_timeout_count} productive timeouts in phase '${phase}'"
+}
+
+# record_soft_timeout(
+#   request_id: string,
+#   project: path,
+#   phase: string,
+#   pre_tree: string,
+#   post_tree: string,
+#   timeout_seconds: int
+# ) -> int (exit 0 always)
+#   Atomically increments soft_timeout_count in state.json, sets
+#   session_active=false, records last_error, and appends a
+#   session_soft_timeout event to events.jsonl.
+#   Does NOT touch retry_count, escalation_count, next_retry_after, or status.
+#   On write failure: logs via log_warn and returns 0 (never cascades to hard).
+record_soft_timeout() {
+    local request_id="$1"
+    local project="$2"
+    local phase="$3"
+    local pre_tree="$4"
+    local post_tree="$5"
+    local timeout_seconds="$6"
+
+    local req_dir="${project}/.autonomous-dev/requests/${request_id}"
+    local state_file="${req_dir}/state.json"
+    local events_file="${req_dir}/events.jsonl"
+
+    local ts
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+    # Parse pre/post tree snapshots into head+dirty_count parts.
+    # For the "non-git" sentinel, both head and dirty_count are null.
+    local pre_head pre_dirty post_head post_dirty
+    if [[ "${pre_tree}" == "non-git" ]]; then
+        pre_head="null"; pre_dirty="null"
+    else
+        pre_head="${pre_tree%%|*}"
+        pre_dirty="${pre_tree##*|}"
+        # Ensure dirty is numeric; default null if not
+        [[ "${pre_dirty}" =~ ^[0-9]+$ ]] || pre_dirty="null"
+    fi
+    if [[ "${post_tree}" == "non-git" ]]; then
+        post_head="null"; post_dirty="null"
+    else
+        post_head="${post_tree%%|*}"
+        post_dirty="${post_tree##*|}"
+        [[ "${post_dirty}" =~ ^[0-9]+$ ]] || post_dirty="null"
+    fi
+
+    # Atomic state.json update — mirror the tmp+mv idiom used elsewhere.
+    local tmp="${state_file}.tmp.$$"
+    local new_soft_count
+    if jq \
+        --arg ts "${ts}" \
+        --arg secs "${timeout_seconds}" \
+        '
+        .current_phase_metadata.soft_timeout_count =
+            ((.current_phase_metadata.soft_timeout_count // 0) + 1) |
+        .current_phase_metadata.last_session_completed_at = $ts |
+        .current_phase_metadata.session_active = false |
+        .current_phase_metadata.last_error =
+            ("Soft timeout after " + $secs + "s (progress detected)") |
+        .current_phase_metadata.last_error_at = $ts |
+        .updated_at = $ts
+        ' "${state_file}" > "${tmp}" 2>/dev/null; then
+        mv "${tmp}" "${state_file}"
+    else
+        rm -f "${tmp}" 2>/dev/null || true
+        log_warn "record_soft_timeout: failed to update state.json for ${request_id}"
+        return 0
+    fi
+
+    # Read the new count for the event
+    new_soft_count=$(jq -r '.current_phase_metadata.soft_timeout_count // 1' \
+        "${state_file}" 2>/dev/null || echo "1")
+
+    # Append session_soft_timeout event — mirror the pattern used at
+    # update_request_state (L2358-L2372): build with jq -n, echo >> file.
+    local pre_head_json post_head_json pre_dirty_json post_dirty_json
+    if [[ "${pre_head}" == "null" ]]; then
+        pre_head_json="null"
+    else
+        pre_head_json=$(jq -n --arg v "${pre_head}" '$v')
+    fi
+    if [[ "${post_head}" == "null" ]]; then
+        post_head_json="null"
+    else
+        post_head_json=$(jq -n --arg v "${post_head}" '$v')
+    fi
+    if [[ "${pre_dirty}" == "null" ]]; then
+        pre_dirty_json="null"
+    else
+        pre_dirty_json="${pre_dirty}"
+    fi
+    if [[ "${post_dirty}" == "null" ]]; then
+        post_dirty_json="null"
+    else
+        post_dirty_json="${post_dirty}"
+    fi
+
+    local event
+    event=$(jq -n \
+        --arg ts "${ts}" \
+        --arg req "${request_id}" \
+        --arg phase "${phase}" \
+        --argjson secs "${timeout_seconds}" \
+        --argjson pre_head "${pre_head_json}" \
+        --argjson post_head "${post_head_json}" \
+        --argjson pre_dirty "${pre_dirty_json}" \
+        --argjson post_dirty "${post_dirty_json}" \
+        --argjson stc "${new_soft_count}" \
+        '{
+            timestamp: $ts,
+            type: "session_soft_timeout",
+            request_id: $req,
+            details: {
+                phase: $phase,
+                timeout_seconds: $secs,
+                pre_head: $pre_head,
+                post_head: $post_head,
+                pre_dirty_count: $pre_dirty,
+                post_dirty_count: $post_dirty,
+                soft_timeout_count: $stc
+            }
+        }') || {
+        log_warn "record_soft_timeout: failed to build event JSON for ${request_id}"
+        return 0
+    }
+    echo "${event}" >> "${events_file}" || {
+        log_warn "record_soft_timeout: failed to append events.jsonl for ${request_id}"
+    }
+    return 0
+}
+
 # dispatch_phase_session(request_id: string, project: string) -> string
 #   Validates request, resolves agent for current phase, and dispatches session
-#   via spawn_session_typed with 30-minute timeout. Handles errors gracefully.
+#   via spawn_session_typed with per-phase timeout. Handles errors gracefully.
 #
 # Arguments:
 #   $1 -- request_id: The request ID to process.
@@ -1513,7 +1731,8 @@ dispatch_phase_session() {
 
     # Invoke spawn_session_typed with timeout
     local exit_code session_cost=0
-    local timeout_duration="${DISPATCH_TIMEOUT:-30m}"
+    local timeout_seconds
+    timeout_seconds=$(resolve_dispatch_timeout "${state_file}" "${phase}")
 
     # Resolve prompt using supervisor-loop.sh's rich version (includes code-phase instructions)
     local prompt_override
@@ -1552,6 +1771,10 @@ ${scope_appendix}"
         export AUTONOMOUS_DEV_SCOPE_ADD_DIRS="${scope_add_dirs}"
     fi
 
+    # Snapshot working tree before session for progress detection (REQ-000051).
+    local pre_tree
+    pre_tree=$(snapshot_working_tree "${project}")
+
     # Use a subshell with explicit error handling. Wrap in `timeout`/`gtimeout`
     # when available; otherwise run directly (no wall-clock cap — see
     # resolve_timeout_bin). Exit 124 is the GNU-timeout "timed out" code.
@@ -1560,7 +1783,7 @@ ${scope_appendix}"
     (
         set -euo pipefail
         if [[ -n "${timeout_bin}" ]]; then
-            "${timeout_bin}" --kill-after=10s "${timeout_duration}" \
+            "${timeout_bin}" --kill-after=10s "${timeout_seconds}" \
                 bash "${PLUGIN_DIR}/bin/spawn-session.sh" \
                      "${state_file}" "${phase}" "${agent}" \
                      "${prompt_override}" \
@@ -1574,14 +1797,46 @@ ${scope_appendix}"
     )
     exit_code=$?
 
+    # Snapshot working tree after session for progress detection (REQ-000051).
+    local post_tree
+    post_tree=$(snapshot_working_tree "${project}")
+
     # Handle timeout case
     if [[ ${exit_code} -eq 124 ]]; then
-        log_warn "Phase session timed out for ${request_id}/${phase} after ${timeout_duration}"
-
-        # Synthesize fail result using shared helper
         local result_file="${req_dir}/phase-result-${phase}.json"
-        # Use the shared write_synthesized_phase_result from spawn-session.sh
-        bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'WALL_CLOCK_TIMEOUT' '124' '${phase}'"
+        if working_tree_advanced "${pre_tree}" "${post_tree}"; then
+            # Soft timeout: session timed out but working tree advanced.
+            # Check whether the soft-timeout ceiling has been reached.
+            local max_soft cur_soft
+            max_soft=$(resolve_max_soft_timeout_reentries "${state_file}")
+            cur_soft=$(jq -r '.current_phase_metadata.soft_timeout_count // 0' \
+                "${state_file}" 2>/dev/null || echo "0")
+            if (( cur_soft + 1 >= max_soft )); then
+                log_warn "Phase ${request_id}/${phase} soft-timeout ceiling reached (${max_soft}); promoting to hard timeout"
+                bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; \
+                    write_synthesized_phase_result '${result_file}' 'fail' \
+                    'WALL_CLOCK_TIMEOUT' '124' '${phase}'"
+                emit_soft_timeout_promotion_alert \
+                    "${request_id}" "${phase}" "${cur_soft}" "${project}"
+                # exit_code stays 124 → existing hard-fail path runs unchanged
+            else
+                log_warn "Phase ${request_id}/${phase} timed out after ${timeout_seconds}s WITH progress; soft-timeout $((cur_soft + 1))/${max_soft}"
+                bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; \
+                    write_synthesized_phase_result '${result_file}' 'fail' \
+                    'WALL_CLOCK_TIMEOUT_WITH_PROGRESS' '124' '${phase}'"
+                record_soft_timeout "${request_id}" "${project}" "${phase}" \
+                    "${pre_tree}" "${post_tree}" "${timeout_seconds}"
+                exit_code=125  # sentinel: soft timeout; caller MUST NOT run the hard error path
+                # ADR-004: 125 is assigned only here, never returned from spawn-session,
+                # so a real exit-125 from the agent is impossible by construction.
+            fi
+        else
+            log_warn "Phase ${request_id}/${phase} timed out after ${timeout_seconds}s WITHOUT progress"
+            local result_file="${req_dir}/phase-result-${phase}.json"
+            bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; \
+                write_synthesized_phase_result '${result_file}' 'fail' \
+                'WALL_CLOCK_TIMEOUT' '124' '${phase}'"
+        fi
     else
         # Extract session cost from claude JSON output if available
         if [[ -f "${output_file}" ]]; then
@@ -1589,9 +1844,10 @@ ${scope_appendix}"
         fi
     fi
 
-    # Belt-and-suspenders: synthesize fail result for ANY nonzero exit if no phase-result exists
+    # Belt-and-suspenders: synthesize fail result for ANY nonzero exit if no phase-result exists.
+    # Exclude 124 (already handled above) and 125 (soft-timeout sentinel; result already written).
     local result_file="${req_dir}/phase-result-${phase}.json"
-    if [[ ${exit_code} -ne 0 && ${exit_code} -ne 124 && ! -f "${result_file}" ]]; then
+    if [[ ${exit_code} -ne 0 && ${exit_code} -ne 124 && ${exit_code} -ne 125 && ! -f "${result_file}" ]]; then
         log_warn "spawn-session.sh exited ${exit_code} without creating phase-result; synthesizing fail result"
         bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}' '${phase}'"
     fi
@@ -2374,6 +2630,23 @@ update_request_state() {
         log_info "State updated: request=${request_id} outcome=success cost=${session_cost}"
     else
         # --- Error Path ---
+
+        # Sentinel-125: soft timeout with progress (REQ-000051 / ADR-004).
+        # record_soft_timeout() already mutated state.json and appended
+        # events.jsonl. All we need here is to accrue the session cost so
+        # the per-request and daily/monthly budgets stay accurate.
+        if [[ "${exit_code:-0}" -eq 125 ]]; then
+            local tmp_soft="${state_file}.tmp"
+            jq \
+                --arg cost "${session_cost}" \
+                '.cost_accrued_usd = ((.cost_accrued_usd // 0) + ($cost | tonumber))' \
+                "${state_file}" > "${tmp_soft}" 2>/dev/null \
+                && mv "${tmp_soft}" "${state_file}" \
+                || rm -f "${tmp_soft}" 2>/dev/null || true
+            log_info "State updated: request=${request_id} outcome=soft_timeout"
+            return 0
+        fi
+
         # Increment retry_count and record last_error
         local tmp="${state_file}.tmp"
         echo "${current_state}" | jq \
@@ -3426,6 +3699,7 @@ record_phase_history() {
             turns_used: 0,
             cost_usd: 0,
             retry_count: 0,
+            soft_timeout_count: 0,
             exit_reason: "completed"
           }]
         end) |
@@ -3440,6 +3714,7 @@ record_phase_history() {
             turns_used: 0,
             cost_usd: 0,
             retry_count: 0,
+            soft_timeout_count: 0,
             exit_reason: null
           }]
         else . end)
@@ -3593,7 +3868,8 @@ advance_phase() {
                         .status = $status |
                         .updated_at = $ts |
                         .current_phase_metadata.gate_entered_at = $ts |
-                        .current_phase_metadata.dispatched_phase = null' \
+                        .current_phase_metadata.dispatched_phase = null |
+                        .current_phase_metadata.soft_timeout_count = 0' \
                        "$state_file" > "$tmp"
                 else
                     jq --arg phase "$next_phase" \
@@ -3602,7 +3878,8 @@ advance_phase() {
                        '.current_phase = $phase |
                         .status = $status |
                         .updated_at = $ts |
-                        .current_phase_metadata.dispatched_phase = null' \
+                        .current_phase_metadata.dispatched_phase = null |
+                        .current_phase_metadata.soft_timeout_count = 0' \
                        "$state_file" > "$tmp"
                 fi
                 mv "$tmp" "$state_file"
@@ -4943,6 +5220,15 @@ fi
 # shellcheck source=bin/lib/phase-helpers.sh
 if [[ -f "${LIB_DIR}/phase-helpers.sh" ]]; then
     source "${LIB_DIR}/phase-helpers.sh"
+fi
+
+# Source typed-limits helpers (resolve_dispatch_timeout, coerce_timeout_to_seconds,
+# resolve_max_soft_timeout_reentries, and existing resolve_max_retries / resolve_phase_timeout).
+# Sourced here so dispatch_phase_session can call resolve_dispatch_timeout without
+# conditionally re-sourcing inside the function body.
+# shellcheck source=bin/lib/typed-limits.sh
+if [[ -f "${LIB_DIR}/typed-limits.sh" ]]; then
+    source "${LIB_DIR}/typed-limits.sh"
 fi
 
 # Rate-limit detection + exponential-backoff state machine (PRD-025 FR-025-12).
