@@ -2,12 +2,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://autonomous-dev/schemas/reviewer-chains-v1.json",
   "title": "Reviewer Chains v1",
-  "description": "Declarative reviewer-chain wiring per request type and gate (TDD-020 §6, SPEC-020-2-01).",
+  "description": "Declarative reviewer-chain wiring per request type and gate (TDD-020 §6, SPEC-020-2-01). Extended by SPEC-REQ-000050 to add configurable timeouts.",
   "type": "object",
   "required": ["version", "request_types"],
   "additionalProperties": false,
   "properties": {
     "version": { "const": 1 },
+    "defaults": {
+      "$ref": "#/$defs/ChainDefaults",
+      "description": "Top-level default timeout applied to all reviewers unless overridden by gate_defaults or per-entry timeout_ms. (SPEC-REQ-000050)"
+    },
     "request_types": {
       "type": "object",
       "description": "Map of request type (feature|bug|infra|refactor|hotfix) to a per-gate reviewer chain.",
@@ -18,11 +22,48 @@
     }
   },
   "$defs": {
-    "RequestType": {
+    "ChainDefaults": {
       "type": "object",
-      "description": "Map of gate name (e.g., code_review, pre_merge, post_deploy) to an ordered reviewer entry list. Gate names are open (^[a-z_]+$) so future gates do not require a schema bump.",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 3600000,
+          "description": "Default subprocess wall-clock cap in milliseconds for all reviewers. Overridden by gate_defaults and per-entry timeout_ms."
+        }
+      }
+    },
+    "GateDefaultsMap": {
+      "type": "object",
+      "description": "Per-gate timeout overrides. Each key is a gate name; the value is an object with optional timeout_ms.",
       "patternProperties": {
         "^[a-z_]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "timeout_ms": {
+              "type": "integer",
+              "minimum": 30000,
+              "maximum": 3600000,
+              "description": "Subprocess wall-clock cap in milliseconds for all reviewers in this gate."
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestType": {
+      "type": "object",
+      "description": "Map of gate name (e.g., code_review, pre_merge, post_deploy) to an ordered reviewer entry list. Gate names match ^[a-z_]+$ (excluding the reserved key gate_defaults). gate_defaults is a sibling key for per-gate timeout overrides. (SPEC-REQ-000050: lookahead pattern used because gate_defaults matches ^[a-z_]+$ — the exclusion is necessary to prevent the patternProperties schema from treating gate_defaults as a ReviewerEntry array. Ajv 8+ supports ECMAScript-style negative lookaheads.)",
+      "properties": {
+        "gate_defaults": {
+          "$ref": "#/$defs/GateDefaultsMap",
+          "description": "Per-gate timeout overrides. Sibling of gate arrays; NOT a gate chain itself."
+        }
+      },
+      "patternProperties": {
+        "^(?!gate_defaults$)[a-z_]+$": {
           "type": "array",
           "items": { "$ref": "#/$defs/ReviewerEntry" }
         }
@@ -76,6 +117,12 @@
           "type": "boolean",
           "default": true,
           "description": "If false, the resolver filters this entry out before scheduling. Operator workaround for trusted private forks."
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 3600000,
+          "description": "Per-reviewer subprocess wall-clock cap in milliseconds. See SPEC-REQ-000050. Overrides gate_defaults and defaults.timeout_ms for this reviewer only."
         }
       }
     }
@@ -83,8 +130,13 @@
   "examples": [
     {
       "version": 1,
+      "defaults": { "timeout_ms": 900000 },
       "request_types": {
         "feature": {
+          "gate_defaults": {
+            "code_review": { "timeout_ms": 1200000 },
+            "spec_review": { "timeout_ms": 1200000 }
+          },
           "code_review": [
             { "name": "code-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
             { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 85 },

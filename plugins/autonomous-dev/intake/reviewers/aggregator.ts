@@ -56,11 +56,27 @@ export class ScoreAggregator {
     // entry — operator-customized chains with zero built-ins skip the rule.
     const chainHasBuiltIns = chain.some((e) => e.type === 'built-in');
     if (chainHasBuiltIns && builtInCompleted === 0) {
+      // SPEC-REQ-000050: refine the reason string for the common case of a
+      // single-reviewer gate (e.g., spec_review with only doc-reviewer) that
+      // timed out or produced unparseable output, so operators get an
+      // actionable message instead of the generic "no built-in reviewer completed".
+      let reason = 'no built-in reviewer completed';
+      if (chain.length === 1) {
+        const r = results[0];
+        if (r && r.blocking === true && r.verdict === 'ERROR') {
+          const msg = r.error_message ?? 'unknown error';
+          if (msg.startsWith("reviewer '") && msg.includes('timed out after')) {
+            reason = `built-in reviewer ${r.reviewer_name} timed out: ${msg}`;
+          } else {
+            reason = `sole blocking reviewer ${r.reviewer_name} errored: ${msg}`;
+          }
+        }
+      }
       return {
         gate: metadata.gate,
         request_id: metadata.request_id,
         outcome: 'REQUEST_CHANGES',
-        reason: 'no built-in reviewer completed',
+        reason,
         per_reviewer: results,
         warnings,
         built_in_count_completed: 0,

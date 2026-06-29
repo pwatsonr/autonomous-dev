@@ -46,6 +46,15 @@ export type ReviewerTrigger = 'frontend';
  *     trigger does not match the current change set.
  *   - `enabled`: optional — defaults to true. The chain resolver filters
  *     out entries with `enabled: false` before returning.
+ *   - `timeout_ms`: optional in config; the chain resolver guarantees a
+ *     populated, clamped value on every entry it returns. Resolution
+ *     precedence (highest first):
+ *       1. entry.timeout_ms in the chain config
+ *       2. request_types[<type>].gate_defaults?.[<gate>].timeout_ms
+ *       3. config.defaults?.timeout_ms
+ *       4. process.env.REVIEWER_TIMEOUT_MS (integer)
+ *       5. Built-in default: 900_000 (15 min)
+ *     Clamped to [30_000, 3_600_000].
  */
 export interface ReviewerEntry {
   name: string;
@@ -54,19 +63,46 @@ export interface ReviewerEntry {
   threshold: number;
   trigger?: ReviewerTrigger;
   enabled?: boolean;
+  timeout_ms?: number;
+}
+
+/**
+ * Top-level chain defaults applied to all reviewers unless overridden
+ * at a finer-grained level. (SPEC-REQ-000050)
+ */
+export interface ChainDefaults {
+  /** Default subprocess timeout for all reviewers (ms). */
+  timeout_ms?: number;
+}
+
+/**
+ * Per-gate defaults that override the top-level `ChainDefaults` for a
+ * specific gate. (SPEC-REQ-000050)
+ */
+export interface GateDefaults {
+  timeout_ms?: number;
 }
 
 /**
  * Top-level chain config file shape (matches `reviewer-chains-v1.json`).
  *   - `version`: literal `1`. Future revisions ship a new schema file.
+ *   - `defaults`: optional top-level timeout defaults. (SPEC-REQ-000050)
  *   - `request_types`: keyed by canonical request type
  *     (`feature|bug|infra|refactor|hotfix`); each value is a per-gate
  *     map (`code_review`, `pre_merge`, `post_deploy`, ...) to a
- *     declaration-ordered ReviewerEntry list.
+ *     declaration-ordered ReviewerEntry list. The optional `gate_defaults`
+ *     sibling key inside each request-type block is config-only — the
+ *     resolver MUST exclude it from gate-chain iteration.
  */
 export interface ChainConfig {
   version: 1;
-  request_types: Record<string, Record<string, ReviewerEntry[]>>;
+  defaults?: ChainDefaults;
+  request_types: Record<
+    string,
+    Record<string, ReviewerEntry[]> & {
+      gate_defaults?: Record<string, GateDefaults>;
+    }
+  >;
 }
 
 /**
@@ -113,6 +149,11 @@ export interface ScheduledExecution {
  *     when available; absent on errors or if the reviewer omits it.
  *   - `duration_ms` is wall-clock invocation time, captured even on
  *     error paths.
+ *   - `raw_output` is populated IFF `verdict === 'ERROR'` AND the
+ *     underlying cause was a parse failure (i.e., the dispatcher threw a
+ *     `ReviewerParseError`). Truncated to 8192 UTF-8 characters with the
+ *     suffix " … [truncated]" when the input exceeded the cap.
+ *     (SPEC-REQ-000050)
  */
 export type ReviewerVerdict = 'APPROVE' | 'REQUEST_CHANGES' | 'ERROR';
 
@@ -126,6 +167,7 @@ export interface ReviewerResult {
   duration_ms: number;
   error_message?: string;
   findings?: object;
+  raw_output?: string;
 }
 
 /** Final outcome of a gate (no `ERROR` — that is captured per-reviewer). */
