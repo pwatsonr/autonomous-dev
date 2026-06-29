@@ -1,7 +1,12 @@
 {
   "version": 1,
+  "defaults": { "timeout_ms": 900000 },
   "request_types": {
     "feature": {
+      "gate_defaults": {
+        "code_review": { "timeout_ms": 1200000 },
+        "spec_review": { "timeout_ms": 1200000 }
+      },
       "code_review": [
         { "name": "quality-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
         { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 85 },
@@ -24,6 +29,10 @@
       ]
     },
     "bug": {
+      "gate_defaults": {
+        "code_review": { "timeout_ms": 1200000 },
+        "spec_review": { "timeout_ms": 1200000 }
+      },
       "code_review": [
         { "name": "quality-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
         { "name": "qa-edge-case-reviewer", "type": "specialist", "blocking": true, "threshold": 85 },
@@ -41,6 +50,10 @@
       ]
     },
     "infra": {
+      "gate_defaults": {
+        "code_review": { "timeout_ms": 1200000 },
+        "spec_review": { "timeout_ms": 1200000 }
+      },
       "code_review": [
         { "name": "quality-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },
         { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 95 },
@@ -58,6 +71,10 @@
       ]
     },
     "refactor": {
+      "gate_defaults": {
+        "code_review": { "timeout_ms": 1200000 },
+        "spec_review": { "timeout_ms": 1200000 }
+      },
       "code_review": [
         { "name": "quality-reviewer", "type": "built-in", "blocking": true, "threshold": 85 },
         { "name": "qa-edge-case-reviewer", "type": "specialist", "blocking": false, "threshold": 75 },
@@ -75,6 +92,10 @@
       ]
     },
     "hotfix": {
+      "gate_defaults": {
+        "code_review": { "timeout_ms": 1200000 },
+        "spec_review": { "timeout_ms": 1200000 }
+      },
       "code_review": [
         { "name": "quality-reviewer", "type": "built-in", "blocking": true, "threshold": 75 },
         { "name": "security-reviewer", "type": "built-in", "blocking": true, "threshold": 80 },

@@ -28,6 +28,34 @@ import { join, resolve } from 'node:path';
 
 import type { ChainConfig, ReviewerEntry } from './types';
 
+// ---------------------------------------------------------------------------
+// Telemetry (fire-and-forget, imported lazily to avoid circular deps)
+// ---------------------------------------------------------------------------
+
+/** Emit a telemetry event from the resolver. Never throws. */
+function safeEmitResolverEvent(payload: Record<string, unknown>): void {
+  try {
+    // Use the module-level telemetry emitter from telemetry.ts when
+    // available. We import it dynamically to avoid a circular dependency
+    // (telemetry.ts → types.ts; chain-resolver.ts → types.ts is fine, but
+    // chain-resolver.ts → telemetry.ts → chain-resolver.ts would not be).
+    // In tests, the import resolves to the same module instance, so mocks
+    // installed via setReviewerMetricsClient apply here too.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getReviewerMetricsClient } = require('./telemetry') as {
+      getReviewerMetricsClient: () => { emit?: (ch: string, p: unknown) => void } | undefined;
+    };
+    const client = getReviewerMetricsClient();
+    if (client?.emit) {
+      void Promise.resolve(client.emit('reviewer.chain_resolver', payload)).catch(() => {
+        // Swallow: telemetry must not affect resolver output.
+      });
+    }
+  } catch {
+    // Swallow: telemetry must not affect resolver output.
+  }
+}
+
 /**
  * Typed exception thrown by the resolver on unrecoverable config errors.
  * The CLI (`chains validate` in SPEC-020-2-04) catches this to render
@@ -112,9 +140,73 @@ export async function loadChainConfig(repoPath: string): Promise<ChainConfig> {
   return loadConfigFile(defaultsPath);
 }
 
+// ---------------------------------------------------------------------------
+// Timeout constants (mirrored from invoke-reviewer.ts to avoid a circular import)
+// ---------------------------------------------------------------------------
+
+const RESOLVER_TIMEOUT_MIN = 30_000;
+const RESOLVER_TIMEOUT_MAX = 3_600_000;
+const RESOLVER_TIMEOUT_DEFAULT = 900_000;
+
+/**
+ * Parse an environment-variable integer string. Returns the integer when
+ * the string is a non-empty, finite integer; otherwise returns undefined.
+ * Note: `Number.parseInt('500000ms', 10)` returns 500000 — lenient JS
+ * behaviour is accepted intentionally (mirrors resolveReviewerTimeoutMs).
+ */
+function parseEnvInt(s: string | undefined): number | undefined {
+  if (s === undefined || s === '') return undefined;
+  const n = Number.parseInt(s, 10);
+  return Number.isFinite(n) && Number.isInteger(n) ? n : undefined;
+}
+
+/**
+ * Resolve the effective timeout for a single entry, applying the full
+ * four-level precedence chain:
+ *   1. entry.timeout_ms
+ *   2. gate_defaults[gate].timeout_ms
+ *   3. config.defaults.timeout_ms
+ *   4. process.env.REVIEWER_TIMEOUT_MS
+ *   5. Built-in default 900_000
+ * Result is clamped to [30_000, 3_600_000]. When the raw candidate was
+ * outside the range, a telemetry event is emitted.
+ */
+function resolveEntryTimeout(
+  entry: ReviewerEntry,
+  gateDefaultTimeout: number | undefined,
+  configDefaultTimeout: number | undefined,
+  envTimeout: number | undefined,
+  entryName: string,
+): number {
+  const candidate: number =
+    entry.timeout_ms ??
+    gateDefaultTimeout ??
+    configDefaultTimeout ??
+    envTimeout ??
+    RESOLVER_TIMEOUT_DEFAULT;
+
+  // Guard against NaN before Math.trunc.
+  const safe = Number.isFinite(candidate) ? Math.trunc(candidate) : RESOLVER_TIMEOUT_DEFAULT;
+  const clamped = Math.min(RESOLVER_TIMEOUT_MAX, Math.max(RESOLVER_TIMEOUT_MIN, safe));
+
+  if (clamped !== safe) {
+    safeEmitResolverEvent({
+      event: 'reviewer.timeout_clamped',
+      reviewer: entryName,
+      from_ms: candidate,
+      to_ms: clamped,
+    });
+  }
+
+  return clamped;
+}
+
 /**
  * Resolve the reviewer chain for `<requestType>.<gate>`. See module
  * docstring for the full resolution order.
+ *
+ * Postcondition (SPEC-REQ-000050): every returned entry has a populated,
+ * clamped `timeout_ms: number` in [30_000, 3_600_000].
  *
  * @param repoPath    Absolute path to the repo root.
  * @param requestType Canonical request type (`feature|bug|infra|refactor|hotfix`).
@@ -139,12 +231,33 @@ export async function resolveChain(
     }
   }
 
+  // gate_defaults is a sibling of gate arrays — NOT a chain entry.
+  // Read it by key before iterating the gate array.
+  const gateDefaultTimeout = typeBlock.gate_defaults?.[gate]?.timeout_ms;
+  const configDefaultTimeout = config.defaults?.timeout_ms;
+  const envTimeout = parseEnvInt(process.env.REVIEWER_TIMEOUT_MS);
+
+  // Read the gate by string key and verify it is an array.
+  // This defends against naively iterating typeBlock's values, which would
+  // accidentally treat gate_defaults (an object, not an array) as a chain.
   const gateChain = typeBlock[gate];
-  if (gateChain === undefined) {
+  if (gateChain === undefined || !Array.isArray(gateChain)) {
     return [];
   }
 
-  // Filter disabled entries here (in the resolver) so debug output
-  // (e.g., `chains show`) reflects what will actually run.
-  return gateChain.filter((entry) => entry.enabled !== false);
+  const out: ReviewerEntry[] = [];
+  for (const entry of gateChain) {
+    if (entry.enabled === false) continue;
+
+    const timeout_ms = resolveEntryTimeout(
+      entry,
+      gateDefaultTimeout,
+      configDefaultTimeout,
+      envTimeout,
+      entry.name,
+    );
+
+    out.push({ ...entry, timeout_ms });
+  }
+  return out;
 }

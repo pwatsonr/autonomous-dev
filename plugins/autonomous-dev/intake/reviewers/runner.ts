@@ -23,6 +23,7 @@
 
 import { performance } from 'node:perf_hooks';
 
+import { ReviewerParseError } from './invoke-reviewer';
 import type {
   ChangeSetContext,
   ReviewerEntry,
@@ -128,7 +129,7 @@ export class ReviewerRunner {
       return result;
     } catch (err) {
       const duration_ms = performance.now() - start;
-      const result: ReviewerResult = {
+      const base: ReviewerResult = {
         reviewer_name: entry.name,
         reviewer_type: entry.type,
         blocking: entry.blocking,
@@ -138,8 +139,15 @@ export class ReviewerRunner {
         duration_ms,
         error_message: (err as Error)?.message ?? String(err),
       };
-      this.safeEmit(result, context);
-      return result;
+      // Populate raw_output on parse errors so downstream consumers can
+      // inspect the raw subprocess output without re-running the reviewer.
+      // ReviewerTimeoutError already carries timeout_ms in its message;
+      // no extra field copy needed there.
+      if (err instanceof ReviewerParseError) {
+        base.raw_output = err.raw_output;
+      }
+      this.safeEmit(base, context);
+      return base;
     }
   }
 
