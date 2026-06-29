@@ -34,6 +34,12 @@
 #                              Disabled in unit tests where the daemon
 #                              cannot actually shell out.
 #   VERIFICATION_REEXEC_TIMEOUT_S  Default 300 (per TDD-041 §D-03).
+#   VERIFICATION_ARTIFACT_FALLBACK   0|1 (default 1) — when 1, a substantive
+#                                    presence-miss is rescued if a fresh,
+#                                    ecosystem-matched, content-validated
+#                                    test/build artifact is present. See
+#                                    docs/operator-notes/verification-artifact-fallback.md
+#                                    and lib/verification/artifact-proof.sh.
 #
 # Public functions (source this file, then call):
 #
@@ -42,6 +48,8 @@
 #                                   -> stdout JSON: {exit_code, output_tail}
 #   verify_envelope REQ_DIR PHASE [MODE]
 #                                   -> writes ${req_dir}/verification-report.jsonl
+#                                      (new verdict: verified_by_artifact when a
+#                                      presence-miss is rescued by artifact proof)
 #                                   -> prints a one-line calibration summary
 #                                      to stderr:
 #                                        verification_summary: phase=X verified=N would_have_failed=M
@@ -62,6 +70,9 @@ __VERIFIER_DIR__="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${__VERIFIER_DIR__}/comparator.sh"
 # shellcheck source=lib/verification/audit-log-reader.sh
 source "${__VERIFIER_DIR__}/audit-log-reader.sh"
+# shellcheck source=lib/verification/artifact-proof.sh
+# REQ-000052 / #617: artifact-as-proof fallback — fail open if missing.
+. "${__VERIFIER_DIR__}/artifact-proof.sh" 2>/dev/null || true
 
 # ─────────────────────────────────────────────────────────────────────────
 # Classification — ADR-041-02, TDD-041 §D-02.
@@ -565,6 +576,21 @@ verify_envelope() {
                 presence_check="fail"
                 verdict="would_have_failed"
                 reason="command_not_in_audit_log"
+                # REQ-000052 / #617: artifact-as-proof rescue for substantive
+                # presence misses. When VERIFICATION_ARTIFACT_FALLBACK=1 (the
+                # default), attempt to find a fresh, ecosystem-matched,
+                # content-validated test/build artifact that proves the command
+                # actually ran. Guard the call so a missing/broken artifact-
+                # proof library never aborts the verifier.
+                if declare -F verification_artifact_proof_for >/dev/null 2>&1; then
+                    local _art_proof=""
+                    _art_proof="$(verification_artifact_proof_for \
+                        "${req_dir}" "${row}" "${phase}" 2>/dev/null || true)"
+                    if [[ -n "${_art_proof}" ]]; then
+                        verdict="verified_by_artifact"
+                        reason="artifact_proof=${_art_proof}"
+                    fi
+                fi
             fi
         fi
 
@@ -661,16 +687,17 @@ verify_envelope() {
         # (below) can treat substantive vs auxiliary failures differently.
         local role
         role="$(command_role "${cmd}")"
-        if [[ "${verdict}" == "verified" ]]; then
+        if [[ "${verdict}" == "verified" || "${verdict}" == "verified_by_artifact" ]]; then
             verified=$((verified + 1))
             # A substantive command that actually verified (presence for a
-            # non_idempotent action, or a clean re-exec for an idempotent one)
-            # is ground truth that the phase did real work. Unclassifiable
-            # prose claims are presence-skipped, never real verification — so
-            # they do not count here.
+            # non_idempotent action, or a clean re-exec for an idempotent one,
+            # or an artifact-proof rescue for a presence miss) is ground truth
+            # that the phase did real work. Unclassifiable prose claims are
+            # presence-skipped, never real verification — so they do not count here.
             if [[ "${role}" == "substantive" \
                   && ( "${classification}" == "idempotent" \
-                       || "${classification}" == "non_idempotent" ) ]]; then
+                       || "${classification}" == "non_idempotent" \
+                       || "${verdict}" == "verified_by_artifact" ) ]]; then
                 substantive_verified=$((substantive_verified + 1))
             fi
         else
@@ -679,6 +706,55 @@ verify_envelope() {
                 substantive_failures=$((substantive_failures + 1))
             else
                 auxiliary_failures=$((auxiliary_failures + 1))
+            fi
+        fi
+
+        # Build artifact_proof JSON object when the verdict is verified_by_artifact.
+        # Parse the proof descriptor: kind:path(|key=value)*.
+        local _proof_json=""
+        if [[ "${verdict}" == "verified_by_artifact" ]]; then
+            # reason is "artifact_proof=<descriptor>"; strip the prefix.
+            local _descriptor="${reason#artifact_proof=}"
+            # Parse kind:path from the descriptor.
+            local _proof_kind="" _proof_path="" _proof_rest=""
+            _proof_kind="${_descriptor%%:*}"
+            _proof_rest="${_descriptor#*:}"
+            _proof_path="${_proof_rest%%|*}"
+            # Parse extra key=value pairs from the remaining descriptor fields.
+            local _extra_tests="" _extra_failures="" _extra_errors="" _extra_mtime=""
+            local _field
+            IFS='|' read -ra _fields <<< "${_proof_rest}"
+            for _field in "${_fields[@]}"; do
+                case "${_field}" in
+                    tests=*)    _extra_tests="${_field#tests=}" ;;
+                    failures=*) _extra_failures="${_field#failures=}" ;;
+                    errors=*)   _extra_errors="${_field#errors=}" ;;
+                    mtime=*)    _extra_mtime="${_field#mtime=}" ;;
+                esac
+            done
+            # Convert mtime epoch to ISO8601 UTC.
+            local _mtime_iso=""
+            if [[ -n "${_extra_mtime}" ]]; then
+                _mtime_iso="$(date -u -d "@${_extra_mtime}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
+                    || date -u -r "${_extra_mtime}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
+                    || true)"
+            fi
+            if [[ -z "${_mtime_iso}" ]]; then
+                _mtime_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            fi
+            if [[ -n "${_proof_kind}" && -n "${_proof_path}" ]]; then
+                _proof_json="$(jq -nc \
+                    --arg kind "${_proof_kind}" \
+                    --arg path "${_proof_path}" \
+                    --arg tests "${_extra_tests}" \
+                    --arg failures "${_extra_failures}" \
+                    --arg errors "${_extra_errors}" \
+                    --arg mtime "${_mtime_iso}" \
+                    '{kind: $kind, path: $path, mtime: $mtime}
+                     + (if $tests    != "" then {tests:    ($tests    | tonumber)} else {} end)
+                     + (if $failures != "" then {failures: ($failures | tonumber)} else {} end)
+                     + (if $errors   != "" then {errors:   ($errors   | tonumber)} else {} end)
+                    ' 2>/dev/null || true)"
             fi
         fi
 
@@ -696,6 +772,7 @@ verify_envelope() {
             --arg rx "${reexec_check}" \
             --arg verd "${verdict}" \
             --arg reason "${reason}" \
+            --arg proof_json "${_proof_json}" \
             '{
                 ts: $ts,
                 phase: $phase,
@@ -710,7 +787,9 @@ verify_envelope() {
                 },
                 verdict: $verd,
                 reason: $reason
-            }' >> "${report}" 2>/dev/null || true
+            }
+            + (if $proof_json == "" then {} else {artifact_proof: ($proof_json | fromjson)} end)
+            ' >> "${report}" 2>/dev/null || true
     done
 
     # ── #521: ground-truth-first refusal decision ──

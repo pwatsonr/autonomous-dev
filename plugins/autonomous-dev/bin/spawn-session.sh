@@ -284,25 +284,56 @@ spawn_session_typed() {
                     hook_script="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/audit-log-writer.sh"
                 fi
                 if [[ -x "${hook_script}" ]]; then
-                    # Build a per-session settings JSON registering a
-                    # PreToolUse hook for the Bash tool that runs our
-                    # audit-log-writer. The hook receives the SDK event
-                    # on stdin and reads AUDIT_LOG_PATH / AUDIT_PHASE
-                    # from the environment we export below.
+                    # REQ-000052: also resolve the PostToolUse finalizer hook.
+                    local finalizer_script="${LIB_DIR}/../hooks/audit-log-finalizer.sh"
+                    if [[ ! -x "${finalizer_script}" ]]; then
+                        finalizer_script="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/audit-log-finalizer.sh"
+                    fi
+
+                    # Build a per-session settings JSON registering both
+                    # PreToolUse (audit-log-writer) and PostToolUse (audit-log-
+                    # finalizer, only when the script is present and executable)
+                    # hooks for the Bash tool. Both receive the SDK event on
+                    # stdin and read AUDIT_LOG_PATH / AUDIT_PHASE from the
+                    # environment exported below. If the finalizer is absent,
+                    # we emit PreToolUse-only settings (no failure).
                     audit_settings_file="$(mktemp -t advsetup.XXXXXX 2>/dev/null || echo "")"
                     if [[ -n "${audit_settings_file}" ]]; then
-                        jq -n --arg cmd "${hook_script}" '{
-                            hooks: {
-                                PreToolUse: [
-                                    {
-                                        matcher: "Bash",
-                                        hooks: [
-                                            { type: "command", command: $cmd }
-                                        ]
-                                    }
-                                ]
-                            }
-                        }' > "${audit_settings_file}" 2>/dev/null || audit_settings_file=""
+                        if [[ -x "${finalizer_script}" ]]; then
+                            jq -n --arg pre "${hook_script}" --arg post "${finalizer_script}" '{
+                                hooks: {
+                                    PreToolUse: [
+                                        {
+                                            matcher: "Bash",
+                                            hooks: [
+                                                { type: "command", command: $pre }
+                                            ]
+                                        }
+                                    ],
+                                    PostToolUse: [
+                                        {
+                                            matcher: "Bash",
+                                            hooks: [
+                                                { type: "command", command: $post }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }' > "${audit_settings_file}" 2>/dev/null || audit_settings_file=""
+                        else
+                            jq -n --arg cmd "${hook_script}" '{
+                                hooks: {
+                                    PreToolUse: [
+                                        {
+                                            matcher: "Bash",
+                                            hooks: [
+                                                { type: "command", command: $cmd }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }' > "${audit_settings_file}" 2>/dev/null || audit_settings_file=""
+                        fi
                     fi
                 fi
             fi
