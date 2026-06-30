@@ -27,6 +27,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import type { ChainConfig, ReviewerEntry } from './types';
+import {
+  TIMEOUT_DEFAULT as RESOLVER_TIMEOUT_DEFAULT,
+  TIMEOUT_MAX     as RESOLVER_TIMEOUT_MAX,
+  TIMEOUT_MIN     as RESOLVER_TIMEOUT_MIN,
+  clampTimeoutMs,
+  parseTimeoutEnvInt as parseEnvInt,
+} from './timeout';
 
 // ---------------------------------------------------------------------------
 // Telemetry (fire-and-forget, imported lazily to avoid circular deps)
@@ -140,26 +147,6 @@ export async function loadChainConfig(repoPath: string): Promise<ChainConfig> {
   return loadConfigFile(defaultsPath);
 }
 
-// ---------------------------------------------------------------------------
-// Timeout constants (mirrored from invoke-reviewer.ts to avoid a circular import)
-// ---------------------------------------------------------------------------
-
-const RESOLVER_TIMEOUT_MIN = 30_000;
-const RESOLVER_TIMEOUT_MAX = 3_600_000;
-const RESOLVER_TIMEOUT_DEFAULT = 900_000;
-
-/**
- * Parse an environment-variable integer string. Returns the integer when
- * the string is a non-empty, finite integer; otherwise returns undefined.
- * Note: `Number.parseInt('500000ms', 10)` returns 500000 — lenient JS
- * behaviour is accepted intentionally (mirrors resolveReviewerTimeoutMs).
- */
-function parseEnvInt(s: string | undefined): number | undefined {
-  if (s === undefined || s === '') return undefined;
-  const n = Number.parseInt(s, 10);
-  return Number.isFinite(n) && Number.isInteger(n) ? n : undefined;
-}
-
 /**
  * Resolve the effective timeout for a single entry, applying the full
  * four-level precedence chain:
@@ -185,9 +172,10 @@ function resolveEntryTimeout(
     envTimeout ??
     RESOLVER_TIMEOUT_DEFAULT;
 
-  // Guard against NaN before Math.trunc.
+  // Reproduce `safe` locally so the telemetry comparison is identical to the
+  // pre-extraction behaviour: `clamped !== safe` -> emit clamp event.
   const safe = Number.isFinite(candidate) ? Math.trunc(candidate) : RESOLVER_TIMEOUT_DEFAULT;
-  const clamped = Math.min(RESOLVER_TIMEOUT_MAX, Math.max(RESOLVER_TIMEOUT_MIN, safe));
+  const clamped = clampTimeoutMs(candidate);
 
   if (clamped !== safe) {
     safeEmitResolverEvent({

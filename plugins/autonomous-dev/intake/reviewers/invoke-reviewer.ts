@@ -48,6 +48,12 @@ import { spawn as nodeSpawn } from 'node:child_process';
 
 import type { ChangeSetContext, ReviewerEntry } from './types';
 import type { InvokeReviewerFn } from './runner';
+import {
+  TIMEOUT_DEFAULT,
+  TIMEOUT_MAX,
+  TIMEOUT_MIN,
+  clampTimeoutMs,
+} from './timeout';
 
 // ---------------------------------------------------------------------------
 // SpawnFn — injectable subprocess abstraction
@@ -456,10 +462,6 @@ export function parseReviewerOutput(stdout: string): ParsedVerdict | ParseFailur
 // resolveReviewerTimeoutMs — pure timeout resolver (SPEC-REQ-000050)
 // ---------------------------------------------------------------------------
 
-const TIMEOUT_MIN = 30_000;
-const TIMEOUT_MAX = 3_600_000;
-const TIMEOUT_DEFAULT = 900_000;
-
 /**
  * Pure resolver for the effective per-invocation timeout. Never throws.
  * Always returns a finite integer in [30_000, 3_600_000].
@@ -513,9 +515,8 @@ export function resolveReviewerTimeoutMs(
     candidate = TIMEOUT_DEFAULT;
   }
 
-  // Clamp to [30_000, 3_600_000]. Guard against NaN (Math.trunc(NaN) === NaN).
-  const safe = Number.isFinite(candidate) ? Math.trunc(candidate) : TIMEOUT_DEFAULT;
-  return Math.min(TIMEOUT_MAX, Math.max(TIMEOUT_MIN, safe));
+  // Clamp to [TIMEOUT_MIN, TIMEOUT_MAX]; NaN-safe via clampTimeoutMs.
+  return clampTimeoutMs(candidate);
 }
 
 // ---------------------------------------------------------------------------
