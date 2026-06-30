@@ -70,10 +70,25 @@ if [[ "$1 $2" == "pr view" ]]; then
             ;;
         *)
             # Default: mergeability query (state,mergeable,mergeStateStatus).
+            # GH_PR_VIEW_JSON_SECOND: if set, returned on the 2nd+ call to
+            # this branch — lets T24 simulate a different post-rebase response.
+            if [[ -n "${GH_PR_VIEW_JSON_SECOND:-}" ]]; then
+                _cnt_f="${GH_CALL_LOG%.log}-view-cnt.txt"
+                _cnt=$(( $(cat "${_cnt_f}" 2>/dev/null || echo 0) + 1 ))
+                printf '%d' "${_cnt}" > "${_cnt_f}"
+                if [[ "${_cnt}" -gt 1 ]]; then
+                    printf '%s' "${GH_PR_VIEW_JSON_SECOND}"
+                    exit 0
+                fi
+            fi
             printf '%s' "${GH_PR_VIEW_JSON:-}"
             exit 0
             ;;
     esac
+elif [[ "$1 $2" == "pr checks" ]]; then
+    # _evaluate_merge_checks calls this; driven by GH_PR_CHECKS_JSON.
+    printf '%s' "${GH_PR_CHECKS_JSON:-}"
+    exit 0
 elif [[ "$1 $2" == "pr merge" ]]; then
     exit "${GH_MERGE_RC:-0}"
 elif [[ "$1 $2" == "pr update-branch" ]]; then
@@ -530,4 +545,92 @@ gh_update_branch_was_called() {
     post_attempts=$(jq -r '.current_phase_metadata.rebase_attempts // -1' \
         "$TEST_REQ_DIR/state.json")
     [ "$post_attempts" -eq 0 ]
+}
+
+# ===========================================================================
+# T24 — REQ-000054 TASK-007: synthetic readiness composes with G1 rebase
+#
+# Flow (single tick):
+#   Gate 0b: initial view BLOCKED -> synthetic readiness runs -> markdown
+#            allowlisted -> ok, synthetic_ignored_csv="markdown"
+#   G1:      BEHIND -> rebase succeeds -> post-rebase re-read returns CLEAN
+#            -> strict post-rebase CLEAN check passes
+#   G2:      no overlap
+#   G3:      no dup
+#   G4:      rebase_attempts=1 -> reverify passes (default REVERIFY_RC=0)
+#   Merge:   reason contains "synthetic-readiness, ignored=[markdown]"
+#            rebase_attempts reset to 0
+# ===========================================================================
+
+@test "T24: synthetic readiness composes with G1 rebase -> merged with synthetic-readiness reason" {
+    write_config "{\"trust\":{\"per_repo_overrides\":{\"$TEST_PROJECT\":3}}}"
+    # Set synthetic-readiness globals directly (load_config is not called here).
+    MERGE_GATE_NON_BLOCKING_CHECKS='["markdown"]'
+    MERGE_GATE_SKIP_BASELINE_RED='false'
+    seed_merge_request "https://github.com/o/r/pull/777"
+
+    # Initial view: BLOCKED + MERGEABLE -> triggers synthetic-readiness gate.
+    export GH_PR_VIEW_JSON='{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"BLOCKED"}'
+    # Post-rebase re-read: CLEAN (2nd+ default pr view call returns this).
+    export GH_PR_VIEW_JSON_SECOND='{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN"}'
+    # All checks allowlisted: markdown FAILURE passes synthetic readiness.
+    export GH_PR_CHECKS_JSON='[{"name":"markdown","state":"FAILURE","bucket":"fail"},{"name":"test","state":"SUCCESS","bucket":"pass"}]'
+    # G1: BEHIND -> triggers rebase.
+    export G1_RC=1
+    export GH_UPDATE_BRANCH_RC=0
+    # G2: no overlap (default INFLIGHT_FILES/THIS_PR_FILES empty).
+    # G3: no dup (default DUP_RC=1).
+    # G4: will fire (rebase_attempts=1); reverify passes (default REVERIFY_RC=0).
+
+    run run_merge_gate
+    [ "$status" -eq 0 ]
+    [ "$(last_merge_decision)" = "merged" ]
+    [ "$(merge_decision_count)" -eq 1 ]
+    gh_merge_was_called
+    ! grep -q -- '--admin' "$GH_CALL_LOG"
+    ! grep -q -- '--force' "$GH_CALL_LOG"
+    # Reason must reflect synthetic-readiness (not plain CLEAN path).
+    jq -e 'select(.event=="merge_decision") | select(.reason | contains("synthetic-readiness, ignored=[markdown]"))' \
+        "$TEST_REQ_DIR/events.jsonl" > /dev/null
+    # rebase_attempts is reset to 0 after the merge.
+    local post_attempts
+    post_attempts=$(jq -r '.current_phase_metadata.rebase_attempts // -1' \
+        "$TEST_REQ_DIR/state.json")
+    [ "$post_attempts" -eq 0 ]
+}
+
+# ===========================================================================
+# T25 — REQ-000054 TASK-007: synthetic readiness still respects G3 dup-patch gate
+#
+# Even after synthetic-readiness passes (Gate 0b ok), G3 fires and blocks
+# the merge when duplicate patches are detected.  This verifies that the
+# synthetic-readiness short-circuit does NOT bypass the downstream G1-G4 gates.
+# ===========================================================================
+
+@test "T25: synthetic readiness still respects G3 duplicate-patch gate -> skip_duplicate" {
+    write_config "{\"trust\":{\"per_repo_overrides\":{\"$TEST_PROJECT\":3}}}"
+    MERGE_GATE_NON_BLOCKING_CHECKS='["markdown"]'
+    MERGE_GATE_SKIP_BASELINE_RED='false'
+    seed_merge_request "https://github.com/o/r/pull/777"
+
+    # View: BLOCKED + MERGEABLE -> synthetic readiness fires.
+    export GH_PR_VIEW_JSON='{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"BLOCKED"}'
+    # All checks allowlisted -> synthetic readiness passes, synthetic_ignored_csv set.
+    export GH_PR_CHECKS_JSON='[{"name":"markdown","state":"FAILURE","bucket":"fail"}]'
+    # G1: up-to-date (default G1_RC=0).
+    # G2: no overlap (default INFLIGHT_FILES/THIS_PR_FILES empty).
+    # G3: duplicate work detected -> should still block the merge.
+    export DUP_RC=0
+    export DUP_SHAS="abc1234"
+
+    run run_merge_gate
+    [ "$status" -eq 0 ]
+    [ "$(last_merge_decision)" = "skip_duplicate" ]
+    [ "$(merge_decision_count)" -eq 1 ]
+    ! gh_merge_was_called
+    # Reason must reference the duplicate SHA.
+    jq -e 'select(.event=="merge_decision") | select(.decision=="skip_duplicate")
+           | select(.reason | test("abc1234"))' \
+        "$TEST_REQ_DIR/events.jsonl" > /dev/null
+    [ "$(jq -r '.merge_status' "$TEST_REQ_DIR/state.json")" = "pr_ready_for_human" ]
 }

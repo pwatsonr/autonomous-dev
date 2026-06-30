@@ -763,6 +763,10 @@ load_config() {
     MAX_RETRIES_PER_PHASE=$(jq -r '.daemon.max_retries_per_phase // 3' "${EFFECTIVE_CONFIG}")
     # Issue #501: bound on comment-driven code-phase re-entries (loop guard).
     MAX_PR_COMMENT_REENTRIES=$(jq -r '.daemon.max_pr_comment_reentries // 3' "${EFFECTIVE_CONFIG}")
+    # REQ-000054: merge-gate synthetic-readiness + comment author filter.
+    MERGE_GATE_NON_BLOCKING_CHECKS=$(jq -c '.daemon.merge_gate_non_blocking_checks // []' "${EFFECTIVE_CONFIG}")
+    MERGE_GATE_SKIP_BASELINE_RED=$(jq -r '.daemon.merge_gate_skip_baseline_red // false' "${EFFECTIVE_CONFIG}")
+    PR_COMMENT_NON_ACTIONABLE_AUTHORS=$(jq -c '.daemon.pr_comment_non_actionable_authors // []' "${EFFECTIVE_CONFIG}")
     LOG_MAX_SIZE_MB=$(jq -r '.daemon.log_max_size_mb // 50' "${EFFECTIVE_CONFIG}")
     LOG_RETENTION_DAYS=$(jq -r '.daemon.log_retention_days // 7' "${EFFECTIVE_CONFIG}")
     # Cost caps and concurrency live under `.governance` in config_defaults.json.
@@ -3446,6 +3450,94 @@ maybe_merge_integration_pr() {
         fi
     }
 
+    # _baseline_red_checks(project, pr_url) -> stdout: JSON array of check names
+    #   Returns the names of checks that are already failing on the base branch HEAD.
+    #   Used when MERGE_GATE_SKIP_BASELINE_RED=true to widen the ignorable set.
+    #   Best-effort: always exits 0; returns '[]' on any error.
+    _baseline_red_checks() {
+        local _brc_project="$1" _brc_pr_url="$2"
+        local _brc_base
+        _brc_base=$( (cd "${_brc_project}" 2>/dev/null && gh pr view "${_brc_pr_url}" \
+                        --json baseRefName --jq '.baseRefName' \
+                        </dev/null 2>/dev/null) || echo "")
+        if [[ -z "${_brc_base}" ]]; then
+            echo "[]"
+            return 0
+        fi
+        local _brc_result
+        _brc_result=$( (cd "${_brc_project}" 2>/dev/null && gh api \
+                          "repos/{owner}/{repo}/commits/${_brc_base}/check-runs" \
+                          --jq '[ .check_runs[] | select(.conclusion == "failure") | .name ]' \
+                          </dev/null 2>/dev/null) || echo "")
+        if [[ -z "${_brc_result}" ]] || ! echo "${_brc_result}" | jq empty 2>/dev/null; then
+            echo "[]"
+            return 0
+        fi
+        echo "${_brc_result}"
+        return 0
+    }
+
+    # _evaluate_merge_checks(project, pr_url)
+    #   stdout: "verdict|ignored_csv|blocking_csv" (always exits 0; fields separated by '|')
+    #   verdict ∈ {ok, not_ok, unreadable}
+    #   ignored_csv  = comma-separated names of failing checks that were ignored
+    #                  (allowlisted OR baseline-red when opt-in is on).
+    #   blocking_csv = comma-separated names of failing checks that block the merge.
+    #                  Empty when verdict is ok or unreadable.
+    #   A check is failing iff (.bucket//"")=="fail" OR .state∈{FAILURE,FAIL,ERROR,CANCELLED,TIMED_OUT}.
+    #   A check is pending iff .state∈{IN_PROGRESS,QUEUED,PENDING}.
+    #   verdict=ok iff zero non-ignorable failures AND zero pending checks.
+    _evaluate_merge_checks() {
+        local _emc_project="$1" _emc_pr_url="$2"
+
+        # Best-effort baseline-red widening (only when opted in).
+        local _emc_baseline="[]"
+        if [[ "${MERGE_GATE_SKIP_BASELINE_RED:-false}" == "true" ]]; then
+            _emc_baseline=$(_baseline_red_checks "${_emc_project}" "${_emc_pr_url}")
+        fi
+
+        # Fetch all check statuses for this PR.
+        local _emc_checks_json
+        _emc_checks_json=$( (cd "${_emc_project}" 2>/dev/null && gh pr checks "${_emc_pr_url}" \
+                               --json name,state,bucket </dev/null 2>/dev/null) || echo "")
+
+        if [[ -z "${_emc_checks_json}" ]] || ! echo "${_emc_checks_json}" | jq empty 2>/dev/null; then
+            printf 'unreadable||'
+            return 0
+        fi
+
+        local _emc_result
+        _emc_result=$(echo "${_emc_checks_json}" | jq -r \
+            --argjson allowlist "${MERGE_GATE_NON_BLOCKING_CHECKS:-[]}" \
+            --argjson baseline "${_emc_baseline}" \
+            '
+            def is_failing:
+                ((.bucket // "") == "fail") or
+                ((.state // "") | IN("FAILURE","FAIL","ERROR","CANCELLED","TIMED_OUT"));
+            def is_pending:
+                (.state // "") | IN("IN_PROGRESS","QUEUED","PENDING");
+            def is_ignorable:
+                .name as $n |
+                any($allowlist[]; . == $n) or
+                any($baseline[]; . == $n);
+            ([ .[] | select(is_failing and is_ignorable)         | .name ] | join(",")) as $ignored |
+            ([ .[] | select(is_failing and (is_ignorable | not)) | .name ] | join(",")) as $blocking |
+            ([ .[] | select(is_pending) ] | length) as $n_pending |
+            if (($blocking == "") and ($n_pending == 0)) then
+                "ok|\($ignored)|"
+            else
+                "not_ok|\($ignored)|\($blocking)"
+            end
+            ' 2>/dev/null || true)
+
+        if [[ -z "${_emc_result}" ]]; then
+            printf 'unreadable||'
+        else
+            printf '%s' "${_emc_result}"
+        fi
+        return 0
+    }
+
     # No PR URL recorded -> nothing to merge. Not a failure (the change may not
     # have produced a PR), but record it so the trail is complete.
     if [[ -z "${pr_url}" ]]; then
@@ -3501,12 +3593,50 @@ maybe_merge_integration_pr() {
         return 0
     fi
 
-    # The hard safety gate: only MERGEABLE + CLEAN. Anything else (CONFLICTING,
-    # BLOCKED, UNKNOWN, DIRTY, DRAFT, BEHIND, ...) is left for a human.
-    if [[ "${pr_mergeable}" != "MERGEABLE" || "${pr_mergestate}" != "CLEAN" ]]; then
-        _mark_pr_ready_for_human "PR ready for human merge (not mergeable: mergeable=${pr_mergeable}, mergeStateStatus=${pr_mergestate})"
-        _record_merge_decision "skip_not_mergeable" "mergeable=${pr_mergeable} mergeStateStatus=${pr_mergestate} (need MERGEABLE+CLEAN)"
+    # Gate 0a: MERGEABLE required. CONFLICTING / UNKNOWN / DRAFT etc. are left for humans.
+    # This must short-circuit BEFORE _evaluate_merge_checks (§2.7 invariant).
+    if [[ "${pr_mergeable}" != "MERGEABLE" ]]; then
+        _mark_pr_ready_for_human "PR ready for human merge (not mergeable: mergeable=${pr_mergeable})"
+        _record_merge_decision "skip_not_mergeable" \
+            "mergeable=${pr_mergeable} (need MERGEABLE)"
         return 0
+    fi
+
+    # Gate 0b: mergeStateStatus must be CLEAN — OR synthetic readiness must pass.
+    # When the allowlist is empty AND baseline-red is off, behaviour is identical
+    # to the old hard gate (fail closed). Otherwise, call _evaluate_merge_checks
+    # to partition checks and decide whether to allow a BLOCKED / DIRTY state.
+    local synthetic_ignored_csv=""
+
+    if [[ "${pr_mergestate}" != "CLEAN" ]]; then
+        local allow_len
+        allow_len=$(echo "${MERGE_GATE_NON_BLOCKING_CHECKS:-[]}" | jq 'length' 2>/dev/null || echo "0")
+        if [[ "${allow_len:-0}" -eq 0 && "${MERGE_GATE_SKIP_BASELINE_RED:-false}" != "true" ]]; then
+            # Synthetic readiness explicitly disabled — behave like the old hard gate.
+            _mark_pr_ready_for_human "PR ready for human merge (not mergeable: mergeable=${pr_mergeable}, mergeStateStatus=${pr_mergestate})"
+            _record_merge_decision "skip_not_mergeable" \
+                "mergeable=${pr_mergeable} mergeStateStatus=${pr_mergestate} (need CLEAN; synthetic-readiness disabled)"
+            return 0
+        fi
+
+        local eval_out verdict ignored_csv blocking_csv
+        eval_out=$(_evaluate_merge_checks "${project}" "${pr_url}")
+        IFS='|' read -r verdict ignored_csv blocking_csv <<< "${eval_out}"
+
+        if [[ "${verdict}" == "unreadable" ]]; then
+            _mark_pr_ready_for_human "PR ready for human merge (gh pr checks unreadable)"
+            _record_merge_decision "skip_status_unreadable" \
+                "gh pr checks returned no/invalid JSON — left open"
+            return 0
+        fi
+        if [[ "${verdict}" != "ok" ]]; then
+            _mark_pr_ready_for_human "PR ready for human merge (real checks failing: ${blocking_csv})"
+            _record_merge_decision "skip_not_mergeable" \
+                "mergeStateStatus=${pr_mergestate}; blocking checks=${blocking_csv}; ignored=${ignored_csv}"
+            return 0
+        fi
+        synthetic_ignored_csv="${ignored_csv}"
+        log_info "maybe_merge_integration_pr ${request_id}: synthetic-readiness pass; ignored checks=[${ignored_csv}]"
     fi
 
     # =========================================================================
@@ -3678,7 +3808,11 @@ maybe_merge_integration_pr() {
         else
             rm -f "${tmp}" 2>/dev/null || true
         fi
-        _record_merge_decision "merged" "auto-merged at trust L3 (--squash, no --admin); PR was OPEN+MERGEABLE+CLEAN" "true"
+        local merge_reason="auto-merged at trust L3 (--squash, no --admin); PR was OPEN+MERGEABLE+CLEAN"
+        if [[ -n "${synthetic_ignored_csv}" ]]; then
+            merge_reason="auto-merged at trust L3 (--squash, no --admin); synthetic-readiness, ignored=[${synthetic_ignored_csv}]"
+        fi
+        _record_merge_decision "merged" "${merge_reason}" "true"
     else
         _mark_pr_ready_for_human "PR ready for human merge (auto-merge failed rc=${merge_rc}; branch protection respected)"
         _record_merge_decision "merge_failed" "gh pr merge --squash failed rc=${merge_rc}: ${merge_out}"
@@ -3755,11 +3889,18 @@ read_pr_comment_payload() {
     local pr_state
     pr_state=$(echo "${view_json}" | jq -r '.state // ""' 2>/dev/null || echo "")
 
-    # Inline review-thread comments (best-effort; empty on any failure).
+    # Inline review-thread comments scoped to this PR (best-effort; empty on any failure).
+    # Extract PR number from URL so we fetch only this PR's thread comments, not repo-wide.
+    local pr_number
+    pr_number=$(echo "${pr_url}" | sed -nE 's#.*/pull/([0-9]+).*#\1#p')
     local api_json
-    api_json=$( (cd "${project}" 2>/dev/null && gh api \
-                    "repos/{owner}/{repo}/pulls/comments" --paginate \
-                    < /dev/null 2>/dev/null) || echo "")
+    if [[ -z "${pr_number}" ]]; then
+        api_json="[]"
+    else
+        api_json=$( (cd "${project}" 2>/dev/null && gh api \
+                        "repos/{owner}/{repo}/pulls/${pr_number}/comments" --paginate \
+                        < /dev/null 2>/dev/null) || echo "")
+    fi
     echo "${api_json}" | jq empty 2>/dev/null || api_json="[]"
 
     # Normalize + merge both sources into a single comments[] array. Each entry
@@ -3798,8 +3939,15 @@ read_pr_comment_payload() {
 
 # pr_comment_new_ids(payload_json, seen_file) -> echoes newline-separated ids
 #   Given the normalized payload and the seen-marker file, returns the IDs of
-#   comments that have NOT yet been addressed. The seen file's .addressed_ids[]
-#   is the source of truth; anything not in it is new.
+#   comments that have NOT yet been addressed AND are from actionable authors.
+#   The seen file's .addressed_ids[] is the source of truth; anything already
+#   there is dropped first. Then non-actionable authors are filtered:
+#   - Self-comments (author.login == PR_AUTHOR_LOGIN) are excluded when
+#     PR_AUTHOR_LOGIN is set and non-empty.
+#   - Comments from authors matching any substring in
+#     PR_COMMENT_NON_ACTIONABLE_AUTHORS (case-insensitive contains) are excluded.
+#   _pr_comment_mark_addressed still records ALL visible IDs regardless of
+#   author — this only affects the count of actionable new comments.
 pr_comment_new_ids() {
     local payload_json="$1" seen_file="$2"
     local seen_ids="[]"
@@ -3808,7 +3956,20 @@ pr_comment_new_ids() {
     fi
     echo "${payload_json}" | jq -r \
         --argjson seen "${seen_ids}" \
-        '[ (.comments // [])[] | .id ] - $seen | .[]' 2>/dev/null || true
+        --argjson nonact "${PR_COMMENT_NON_ACTIONABLE_AUTHORS:-[]}" \
+        --arg author "${PR_AUTHOR_LOGIN:-}" \
+        '
+        def is_non_actionable($login):
+            (($author != "") and ($login == $author))
+            or any($nonact[]; . as $n
+                              | ($n | ascii_downcase) as $needle
+                              | (($login // "") | ascii_downcase) | contains($needle));
+        [ (.comments // [])[]
+          | select((.id as $i | ($seen | index($i)) | not))
+          | select(is_non_actionable(.author) | not)
+          | .id
+        ] | .[]
+        ' 2>/dev/null || true
 }
 
 # reenter_pr_comment_requests() -> void
@@ -3871,6 +4032,10 @@ maybe_reenter_for_pr_comments() {
     local seen_file
     seen_file=$(pr_comment_seen_file "${project}" "${request_id}")
 
+    # Ensure PR_AUTHOR_LOGIN is always unset on return so it never leaks into
+    # sibling functions in the long-running daemon (REQ-000054 §2.6).
+    trap 'unset PR_AUTHOR_LOGIN' RETURN
+
     local pr_url
     pr_url=$(read_request_pr_url "${project}" "${request_id}")
     [[ -n "${pr_url}" ]] || return 0   # no PR -> nothing to address
@@ -3888,6 +4053,15 @@ maybe_reenter_for_pr_comments() {
     # Empty payload = could not read PR (gh failed / no JSON). Skip silently;
     # the next scan retries. Do NOT treat as "no comments".
     [[ -n "${payload}" ]] || return 0
+
+    # Capture the PR author so pr_comment_new_ids can filter self-comments.
+    # Failure is non-fatal: self-filter is simply disabled for this tick.
+    local pr_author
+    pr_author=$( (cd "${project}" 2>/dev/null && gh pr view "${pr_url}" \
+                    --json author --jq '.author.login' \
+                    < /dev/null 2>/dev/null) || echo "")
+    PR_AUTHOR_LOGIN="${pr_author}"
+    export PR_AUTHOR_LOGIN
 
     local pr_state
     pr_state=$(echo "${payload}" | jq -r '.state // ""' 2>/dev/null || echo "")
