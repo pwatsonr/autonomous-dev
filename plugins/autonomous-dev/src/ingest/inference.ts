@@ -36,7 +36,9 @@ export interface ProposedProject {
 export function parseOwners(text: string): string[] {
   const set = new Set<string>();
   const withoutComments = text.replace(/^\s*#.*$/gm, '');
-  for (const m of withoutComments.matchAll(/(?<![a-z0-9._%+-])@[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?/gi)) {
+  for (const m of withoutComments.matchAll(
+    /(?<![a-z0-9._%+-])@[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?/gi,
+  )) {
     set.add(m[0].toLowerCase());
   }
   return [...set].sort();
@@ -80,7 +82,8 @@ function linked(a: RepoSignals, b: RepoSignals): boolean {
 
 function commonOwner(members: RepoSignals[]): string | undefined {
   const counts = new Map<string, number>();
-  for (const m of members) for (const o of new Set(m.owners)) counts.set(o, (counts.get(o) ?? 0) + 1);
+  for (const m of members)
+    for (const o of new Set(m.owners)) counts.set(o, (counts.get(o) ?? 0) + 1);
   for (const [o, c] of counts) if (c === members.length) return o;
   return undefined;
 }
@@ -95,11 +98,7 @@ function deriveProjectId(members: RepoSignals[]): string {
   if (prefix) return prefix;
   const owner = commonOwner(members);
   if (owner) return owner.replace(/^@/, '').replace(/\//g, '-').toLowerCase();
-  return (
-    members
-      .map((m) => m.repoId.split('/').pop() ?? m.repoId)
-      .sort()[0] ?? 'project'
-  );
+  return members.map((m) => m.repoId.split('/').pop() ?? m.repoId).sort()[0] ?? 'project';
 }
 
 function rationaleFor(members: RepoSignals[]): { text: string; confidence: number } {
@@ -208,7 +207,12 @@ export function inferProjects(repos: RepoSignals[]): ProposedProject[] {
     if (repoIds.length < 2) continue; // a lone repo is not a project
     const members = repos.filter((r) => repoIds.includes(r.repoId));
     const { text, confidence } = rationaleFor(members);
-    proposals.push({ id: deriveProjectId(members), repoIds: [...repoIds].sort(), rationale: text, confidence });
+    proposals.push({
+      id: deriveProjectId(members),
+      repoIds: [...repoIds].sort(),
+      rationale: text,
+      confidence,
+    });
   }
   return proposals.sort((a, b) => a.id.localeCompare(b.id));
 }

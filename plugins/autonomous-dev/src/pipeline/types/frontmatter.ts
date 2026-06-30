@@ -1,13 +1,7 @@
 import { DocumentType } from './document-type';
 
 export type DocumentStatus =
-  | 'draft'
-  | 'in-review'
-  | 'approved'
-  | 'revision-requested'
-  | 'rejected'
-  | 'cancelled'
-  | 'stale';
+  'draft' | 'in-review' | 'approved' | 'revision-requested' | 'rejected' | 'cancelled' | 'stale';
 
 export type ExecutionMode = 'parallel' | 'sequential';
 export type DependencyType = 'blocks' | 'informs';

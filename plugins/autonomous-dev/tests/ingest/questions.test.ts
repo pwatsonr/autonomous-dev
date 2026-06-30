@@ -95,7 +95,10 @@ function test_idempotent_and_robust_store(): void {
 // P1 review: id/repoId are stored TRIMMED so lookups by the trimmed value resolve
 function test_trims_id_and_repo(): void {
   const io = fakeIO();
-  enqueueQuestion({ id: ' q1 ', repoId: ' acme/api ', question: 'which?', options: ['a', 'b'] }, io);
+  enqueueQuestion(
+    { id: ' q1 ', repoId: ' acme/api ', question: 'which?', options: ['a', 'b'] },
+    io,
+  );
   assert(isRepoBlocked('acme/api', io), 'repo blocked under trimmed id');
   const ans = answerQuestion('q1', 'a', io);
   assert(ans.answer === 'a' && ans.status === 'answered', 'answer resolves under trimmed id');

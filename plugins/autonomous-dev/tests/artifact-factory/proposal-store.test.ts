@@ -100,7 +100,10 @@ function test_corrupt_preserve(): void {
   const ps = loadProposals(io);
   assert(ps.length === 0, 'corrupt store loads as empty');
   const corruptKey = Object.keys(io.files).find((k) => k.includes('.corrupt-'));
-  assert(!!corruptKey && io.files[corruptKey].includes('not json'), 'corrupt content preserved to a .corrupt- file');
+  assert(
+    !!corruptKey && io.files[corruptKey].includes('not json'),
+    'corrupt content preserved to a .corrupt- file',
+  );
   console.log('PASS: test_corrupt_preserve');
 }
 
@@ -116,7 +119,10 @@ function test_illegal_transition(): void {
     threw = true;
   }
   assert(threw, 'meta_rejected → promoted is illegal');
-  assert(setStatus(id, 'rejected', 'x', io).status === 'rejected', 'meta_rejected → rejected allowed');
+  assert(
+    setStatus(id, 'rejected', 'x', io).status === 'rejected',
+    'meta_rejected → rejected allowed',
+  );
   console.log('PASS: test_illegal_transition');
 }
 
@@ -140,12 +146,21 @@ function test_history_capped(): void {
   const io = fakeIO();
   const p = proposal('meta_rejected');
   // seed with more than the cap; the merge on upsert must trim to the most recent HISTORY_CAP
-  p.history = Array.from({ length: HISTORY_CAP + 20 }, (_, i) => ({ at: `seed${i}`, event: `e${i}` }));
+  p.history = Array.from({ length: HISTORY_CAP + 20 }, (_, i) => ({
+    at: `seed${i}`,
+    event: `e${i}`,
+  }));
   upsertProposal(p, io);
   const got = getProposal('skill::repo:acme/api::vault-access', io)!;
-  assert(got.history.length === HISTORY_CAP, `history capped at ${HISTORY_CAP}, got ${got.history.length}`);
+  assert(
+    got.history.length === HISTORY_CAP,
+    `history capped at ${HISTORY_CAP}, got ${got.history.length}`,
+  );
   // newest preserved, oldest dropped
-  assert(got.history[got.history.length - 1].event === `e${HISTORY_CAP + 19}`, 'newest entry preserved');
+  assert(
+    got.history[got.history.length - 1].event === `e${HISTORY_CAP + 19}`,
+    'newest entry preserved',
+  );
   assert(!got.history.some((h) => h.event === 'e0'), 'oldest entry dropped');
 
   // setStatus also enforces the cap as entries accrue
@@ -153,7 +168,10 @@ function test_history_capped(): void {
   setStatus(id, 'rejected', 'rejected', io);
   const after = getProposal(id, io)!;
   assert(after.history.length === HISTORY_CAP, 'setStatus keeps history at the cap');
-  assert(after.history[after.history.length - 1].event === 'rejected', 'latest event is the newest');
+  assert(
+    after.history[after.history.length - 1].event === 'rejected',
+    'latest event is the newest',
+  );
   console.log('PASS: test_history_capped');
 }
 

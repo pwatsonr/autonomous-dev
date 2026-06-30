@@ -55,12 +55,10 @@ function captureMain(
   };
 
   const fakeRouter: IntakeRouter = {
-    route: jest.fn(
-      async (_cmd: IncomingCommand): Promise<CommandResult> => ({
-        success: true,
-        data: { ok: true },
-      }),
-    ),
+    route: jest.fn(async (_cmd: IncomingCommand): Promise<CommandResult> => ({
+      success: true,
+      data: { ok: true },
+    })),
     ...(routerOverride as IntakeRouter | undefined),
   } as IntakeRouter;
 

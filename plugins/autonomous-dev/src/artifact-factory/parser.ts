@@ -24,7 +24,9 @@ export function isArtifactScope(s: unknown): s is ArtifactScope {
   const kind = s.slice(0, idx);
   const id = s.slice(idx + 1);
   // id must be a safe path segment (no `:`, traversal, etc.) — mirrors memory/store isSafeScope.
-  return (kind === 'project' || kind === 'repo') && /^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$/i.test(id);
+  return (
+    (kind === 'project' || kind === 'repo') && /^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$/i.test(id)
+  );
 }
 
 /** Serialize an artifact to a scoped skill `.md` (frontmatter + body). */
@@ -76,18 +78,31 @@ function asString(v: unknown): string | undefined {
 export function parseArtifact(content: string): ArtifactParseResult {
   const extracted = extractFrontmatter(content);
   if (!extracted) {
-    return { success: false, errors: [{ message: 'No YAML frontmatter found (need opening + closing ---).' }] };
+    return {
+      success: false,
+      errors: [{ message: 'No YAML frontmatter found (need opening + closing ---).' }],
+    };
   }
 
   let raw: Record<string, unknown>;
   try {
     const loaded = yaml.safeLoad(extracted.yaml);
-    if (loaded === null || loaded === undefined || typeof loaded !== 'object' || Array.isArray(loaded)) {
+    if (
+      loaded === null ||
+      loaded === undefined ||
+      typeof loaded !== 'object' ||
+      Array.isArray(loaded)
+    ) {
       return { success: false, errors: [{ message: 'Frontmatter is not a YAML mapping.' }] };
     }
     raw = loaded as Record<string, unknown>;
   } catch (err) {
-    return { success: false, errors: [{ message: `YAML parse error: ${err instanceof Error ? err.message : String(err)}` }] };
+    return {
+      success: false,
+      errors: [
+        { message: `YAML parse error: ${err instanceof Error ? err.message : String(err)}` },
+      ],
+    };
   }
 
   const errors: { message: string; field?: string }[] = [];
@@ -96,20 +111,30 @@ export function parseArtifact(content: string): ArtifactParseResult {
   if (!name) errors.push({ message: 'Missing or non-string "name".', field: 'name' });
 
   const description = asString(raw.description)?.trim();
-  if (!description) errors.push({ message: 'Missing or non-string "description".', field: 'description' });
+  if (!description)
+    errors.push({ message: 'Missing or non-string "description".', field: 'description' });
 
   const kindRaw = raw.kind ?? 'skill'; // default skill
   if (!ARTIFACT_KINDS.has(kindRaw as ArtifactKind)) {
-    errors.push({ message: `Invalid "kind": ${JSON.stringify(raw.kind)} (expected skill|command).`, field: 'kind' });
+    errors.push({
+      message: `Invalid "kind": ${JSON.stringify(raw.kind)} (expected skill|command).`,
+      field: 'kind',
+    });
   }
 
   if (!isArtifactScope(raw.scope)) {
-    errors.push({ message: `Invalid "scope": ${JSON.stringify(raw.scope)} (expected global|project:<id>|repo:<id>).`, field: 'scope' });
+    errors.push({
+      message: `Invalid "scope": ${JSON.stringify(raw.scope)} (expected global|project:<id>|repo:<id>).`,
+      field: 'scope',
+    });
   }
 
   // managed: strict boolean (a present-but-non-bool must error, not default — mirrors the agent parser).
   if (typeof raw.managed !== 'boolean') {
-    errors.push({ message: `Invalid "managed": ${JSON.stringify(raw.managed)} (expected true or false).`, field: 'managed' });
+    errors.push({
+      message: `Invalid "managed": ${JSON.stringify(raw.managed)} (expected true or false).`,
+      field: 'managed',
+    });
   }
 
   // allowed-tools: array of strings (default []).
@@ -118,7 +143,10 @@ export function parseArtifact(content: string): ArtifactParseResult {
   if (Array.isArray(toolsRaw) && toolsRaw.every((t) => typeof t === 'string')) {
     allowedTools = toolsRaw as string[];
   } else {
-    errors.push({ message: 'Invalid "allowed-tools" (expected a list of strings).', field: 'allowed-tools' });
+    errors.push({
+      message: 'Invalid "allowed-tools" (expected a list of strings).',
+      field: 'allowed-tools',
+    });
   }
 
   if (errors.length > 0) return { success: false, errors };

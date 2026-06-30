@@ -53,8 +53,14 @@ function test_build_statements(): void {
 function test_values_are_parameters_not_interpolated(): void {
   // a hostile repo id must NEVER appear in the Cypher text — only in parameters
   const evil = 'acme/x"}) DETACH DELETE n //';
-  const own: Ownership = { org: 'acme', projects: [], repos: [{ id: evil, projectId: null, tags: {} }] };
-  const stmts = buildGraphStatements('acme', own, [{ repoId: evil, owners: ['@evil"}) //'], deps: [] }]);
+  const own: Ownership = {
+    org: 'acme',
+    projects: [],
+    repos: [{ id: evil, projectId: null, tags: {} }],
+  };
+  const stmts = buildGraphStatements('acme', own, [
+    { repoId: evil, owners: ['@evil"}) //'], deps: [] },
+  ]);
   for (const s of stmts) {
     assert(!s.statement.includes('DETACH DELETE'), 'hostile id never interpolated into Cypher');
   }
@@ -101,9 +107,16 @@ async function test_chunk_size_guard(): Promise<void> {
 
 function test_no_orphan_project(): void {
   // M1: a repo whose projectId points at a non-existent project must NOT emit IN_PROJECT
-  const own: Ownership = { org: 'acme', projects: [], repos: [{ id: 'acme/x', projectId: 'ghost', tags: {} }] };
+  const own: Ownership = {
+    org: 'acme',
+    projects: [],
+    repos: [{ id: 'acme/x', projectId: 'ghost', tags: {} }],
+  };
   const stmts = buildGraphStatements('acme', own, []);
-  assert(!stmts.some((s) => s.statement.includes('IN_PROJECT')), 'dangling projectId → no orphan Project / IN_PROJECT');
+  assert(
+    !stmts.some((s) => s.statement.includes('IN_PROJECT')),
+    'dangling projectId → no orphan Project / IN_PROJECT',
+  );
   console.log('PASS: test_no_orphan_project');
 }
 

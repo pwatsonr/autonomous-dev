@@ -19,7 +19,14 @@ function own(repos: Record<string, string | null>): Ownership {
 }
 
 function opp(name: string, repoId: string): Opportunity {
-  return { id: `skill:${name}:${repoId}`, kind: 'skill', repoId, suggestedName: name, title: name, evidence: 'ev' };
+  return {
+    id: `skill:${name}:${repoId}`,
+    kind: 'skill',
+    repoId,
+    suggestedName: name,
+    title: name,
+    evidence: 'ev',
+  };
 }
 
 function test_single_repo_repo_scope(): void {
@@ -32,12 +39,23 @@ function test_single_repo_repo_scope(): void {
 }
 
 function test_three_in_project_project_scope(): void {
-  const o = own({ 'acme/orders': 'payments', 'acme/billing': 'payments', 'acme/ledger': 'payments' });
+  const o = own({
+    'acme/orders': 'payments',
+    'acme/billing': 'payments',
+    'acme/ledger': 'payments',
+  });
   const props = decideScopes(
-    [opp('vault-access', 'acme/orders'), opp('vault-access', 'acme/billing'), opp('vault-access', 'acme/ledger')],
+    [
+      opp('vault-access', 'acme/orders'),
+      opp('vault-access', 'acme/billing'),
+      opp('vault-access', 'acme/ledger'),
+    ],
     o,
   );
-  assert(props.length === 1 && props[0].scope === 'project:payments', `project scope, got ${props[0].scope}`);
+  assert(
+    props.length === 1 && props[0].scope === 'project:payments',
+    `project scope, got ${props[0].scope}`,
+  );
   assert(props[0].confidence >= 0.8, 'high confidence at ≥K');
   assert(props[0].repoIds.length === 3, 'all three members');
   console.log('PASS: test_three_in_project_project_scope');
@@ -45,7 +63,10 @@ function test_three_in_project_project_scope(): void {
 
 function test_two_in_project_below_k(): void {
   const o = own({ 'acme/orders': 'payments', 'acme/billing': 'payments' });
-  const props = decideScopes([opp('vault-access', 'acme/orders'), opp('vault-access', 'acme/billing')], o);
+  const props = decideScopes(
+    [opp('vault-access', 'acme/orders'), opp('vault-access', 'acme/billing')],
+    o,
+  );
   assert(props[0].scope === 'project:payments', 'still project scope');
   assert(props[0].confidence < 0.7, 'lower confidence below K=3');
   assert(props[0].rationale.includes('below K'), 'rationale notes below-K');
@@ -54,7 +75,10 @@ function test_two_in_project_below_k(): void {
 
 function test_across_projects_global(): void {
   const o = own({ 'acme/orders': 'payments', 'acme/site': 'web' });
-  const props = decideScopes([opp('vault-access', 'acme/orders'), opp('vault-access', 'acme/site')], o);
+  const props = decideScopes(
+    [opp('vault-access', 'acme/orders'), opp('vault-access', 'acme/site')],
+    o,
+  );
   assert(props[0].scope === 'global', `global across projects, got ${props[0].scope}`);
   console.log('PASS: test_across_projects_global');
 }
@@ -69,7 +93,11 @@ function test_standalone_repos_global(): void {
 function test_grouping_and_normalization(): void {
   const o = own({ 'acme/orders': 'payments' });
   const props = decideScopes(
-    [opp('vault-access', 'acme/orders'), opp('run-tests', 'acme/orders'), opp('Vault-Access', 'acme/orders')],
+    [
+      opp('vault-access', 'acme/orders'),
+      opp('run-tests', 'acme/orders'),
+      opp('Vault-Access', 'acme/orders'),
+    ],
     o,
   );
   // 'vault-access' + 'Vault-Access' aggregate (normalized); run-tests separate → 2 proposals

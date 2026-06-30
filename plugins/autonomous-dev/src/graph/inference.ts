@@ -21,7 +21,9 @@ function extractRows(results: unknown[]): unknown[][] {
 }
 
 function asStrings(v: unknown): string[] {
-  return Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined).map((x) => String(x)) : [];
+  return Array.isArray(v)
+    ? v.filter((x) => x !== null && x !== undefined).map((x) => String(x))
+    : [];
 }
 
 /** Read every repo's owners + deps from the graph as RepoSignals, or undefined on failure. */

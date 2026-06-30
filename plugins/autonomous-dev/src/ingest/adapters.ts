@@ -63,7 +63,11 @@ export const defaultFs: FsLike = {
 };
 
 /** A read-only RepoSource backed by a (shallow-cloned) directory. */
-export function filesystemRepoSource(meta: RepoMeta, rootDir: string, fsLike: FsLike = defaultFs): RepoSource {
+export function filesystemRepoSource(
+  meta: RepoMeta,
+  rootDir: string,
+  fsLike: FsLike = defaultFs,
+): RepoSource {
   return {
     meta,
     readFile: (rel) => fsLike.readFile(path.join(rootDir, rel)),
@@ -106,7 +110,7 @@ export function createGhOrgClient(opts: {
         if (after) args.push('-f', `after=${after}`);
         const { stdout, code } = runner.run('gh', args);
         if (code !== 0) throw new Error(`gh api graphql failed for org "${org}" (exit ${code})`);
-        const conn = (JSON.parse(stdout).data.organization.repositories) as {
+        const conn = JSON.parse(stdout).data.organization.repositories as {
           nodes: RepoNode[];
           pageInfo: { hasNextPage: boolean; endCursor: string };
         };

@@ -34,8 +34,14 @@ function test_enqueues_on_ambiguity(): void {
   assert(ids.length === 1 && ids[0] === 'ambiguity:o/c', 'one question for the bridge repo');
   const qs = loadQuestions(io);
   assert(qs.length === 1, 'persisted exactly one question');
-  assert(qs[0].repoId === 'o/c' && qs[0].status === 'pending', 'question targets o/c and is pending');
-  assert(qs[0].options.join(',') === 'team-pay,web', `options are the candidate project ids, got ${qs[0].options.join(',')}`);
+  assert(
+    qs[0].repoId === 'o/c' && qs[0].status === 'pending',
+    'question targets o/c and is pending',
+  );
+  assert(
+    qs[0].options.join(',') === 'team-pay,web',
+    `options are the candidate project ids, got ${qs[0].options.join(',')}`,
+  );
   // CONSUMER contract: the repo is now BLOCKED until answered.
   assert(isRepoBlocked('o/c', io), 'producer output blocks the repo');
   console.log('PASS: test_enqueues_on_ambiguity');

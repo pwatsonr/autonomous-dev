@@ -13,18 +13,11 @@ import type { ReviewerEntry, ReviewerResult } from '../../intake/reviewers/types
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeBuiltInEntry(
-  name = 'doc-reviewer',
-  blocking = true,
-): ReviewerEntry {
+function makeBuiltInEntry(name = 'doc-reviewer', blocking = true): ReviewerEntry {
   return { name, type: 'built-in', blocking, threshold: 80 };
 }
 
-function makeErrorResult(
-  name: string,
-  error_message: string,
-  blocking = true,
-): ReviewerResult {
+function makeErrorResult(name: string, error_message: string, blocking = true): ReviewerResult {
   return {
     reviewer_name: name,
     reviewer_type: 'built-in',
@@ -37,11 +30,7 @@ function makeErrorResult(
   };
 }
 
-function makeApproveResult(
-  name: string,
-  score = 85,
-  blocking = true,
-): ReviewerResult {
+function makeApproveResult(name: string, score = 85, blocking = true): ReviewerResult {
   return {
     reviewer_name: name,
     reviewer_type: 'built-in',
@@ -64,10 +53,7 @@ describe('ScoreAggregator — refined reason strings (SPEC-REQ-000050)', () => {
   it('AG-01: single blocking built-in times out → reason includes "timed out"', () => {
     const chain: ReviewerEntry[] = [makeBuiltInEntry('doc-reviewer')];
     const results: ReviewerResult[] = [
-      makeErrorResult(
-        'doc-reviewer',
-        "reviewer 'doc-reviewer' timed out after 1200000ms",
-      ),
+      makeErrorResult('doc-reviewer', "reviewer 'doc-reviewer' timed out after 1200000ms"),
     ];
     const verdict = aggregator.aggregate(results, chain, meta);
     expect(verdict.outcome).toBe('REQUEST_CHANGES');
@@ -89,10 +75,7 @@ describe('ScoreAggregator — refined reason strings (SPEC-REQ-000050)', () => {
   });
 
   it('AG-03: multi-reviewer chain, both ERROR → original "no built-in reviewer completed" string', () => {
-    const chain: ReviewerEntry[] = [
-      makeBuiltInEntry('reviewer-a'),
-      makeBuiltInEntry('reviewer-b'),
-    ];
+    const chain: ReviewerEntry[] = [makeBuiltInEntry('reviewer-a'), makeBuiltInEntry('reviewer-b')];
     const results: ReviewerResult[] = [
       makeErrorResult('reviewer-a', 'boom'),
       makeErrorResult('reviewer-b', 'boom'),
@@ -103,10 +86,7 @@ describe('ScoreAggregator — refined reason strings (SPEC-REQ-000050)', () => {
   });
 
   it('AG-04: multi-reviewer chain, one ERROR and one APPROVE → falls through to Rule 2', () => {
-    const chain: ReviewerEntry[] = [
-      makeBuiltInEntry('reviewer-a'),
-      makeBuiltInEntry('reviewer-b'),
-    ];
+    const chain: ReviewerEntry[] = [makeBuiltInEntry('reviewer-a'), makeBuiltInEntry('reviewer-b')];
     // reviewer-a errored, reviewer-b approved (so builtInCompleted = 1 → Rule 1 skipped)
     const results: ReviewerResult[] = [
       makeErrorResult('reviewer-a', 'boom'),
@@ -124,7 +104,9 @@ describe('ScoreAggregator — refined reason strings (SPEC-REQ-000050)', () => {
     const timeout_results: ReviewerResult[] = [
       makeErrorResult('doc-reviewer', "reviewer 'doc-reviewer' timed out after 1200000ms"),
     ];
-    expect(aggregator.aggregate(timeout_results, timeout_chain, meta).outcome).toBe('REQUEST_CHANGES');
+    expect(aggregator.aggregate(timeout_results, timeout_chain, meta).outcome).toBe(
+      'REQUEST_CHANGES',
+    );
 
     const parse_chain: ReviewerEntry[] = [makeBuiltInEntry('doc-reviewer')];
     const parse_results: ReviewerResult[] = [
@@ -132,10 +114,7 @@ describe('ScoreAggregator — refined reason strings (SPEC-REQ-000050)', () => {
     ];
     expect(aggregator.aggregate(parse_results, parse_chain, meta).outcome).toBe('REQUEST_CHANGES');
 
-    const multi_chain: ReviewerEntry[] = [
-      makeBuiltInEntry('a'),
-      makeBuiltInEntry('b'),
-    ];
+    const multi_chain: ReviewerEntry[] = [makeBuiltInEntry('a'), makeBuiltInEntry('b')];
     const multi_results: ReviewerResult[] = [
       makeErrorResult('a', 'boom'),
       makeErrorResult('b', 'boom'),

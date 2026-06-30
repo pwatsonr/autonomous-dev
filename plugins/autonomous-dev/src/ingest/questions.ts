@@ -30,7 +30,8 @@ export interface QuestionStoreIO {
 
 export const defaultQuestionIO: QuestionStoreIO = {
   homedir: () => resolveAbsoluteHome(),
-  readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
+  readFile: (filePath) =>
+    fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined,
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.tmp.${process.pid}`;
@@ -70,7 +71,13 @@ export function enqueueQuestion(
   if (q.options.length === 0) throw new Error('Question needs at least one option.');
   const qs = loadQuestions(io);
   // Store the TRIMMED id/repoId so lookups (answerQuestion / isRepoBlocked) resolve.
-  const question: Question = { id, repoId, question: q.question, options: q.options, status: 'pending' };
+  const question: Question = {
+    id,
+    repoId,
+    question: q.question,
+    options: q.options,
+    status: 'pending',
+  };
   const idx = qs.findIndex((x) => x.id === id);
   if (idx >= 0) qs[idx] = question;
   else qs.push(question);

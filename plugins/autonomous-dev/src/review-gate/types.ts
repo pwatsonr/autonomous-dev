@@ -26,11 +26,7 @@ export const DOCUMENT_TYPES: readonly DocumentType[] = [
 
 /** Trust level governing how much human approval is required. */
 export type TrustLevel =
-  | 'full_auto'
-  | 'approve_roots'
-  | 'approve_phase_1'
-  | 'approve_all'
-  | 'human_only';
+  'full_auto' | 'approve_roots' | 'approve_phase_1' | 'approve_all' | 'human_only';
 
 /** Valid TrustLevel values for runtime validation. */
 export const TRUST_LEVELS: readonly TrustLevel[] = [

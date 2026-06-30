@@ -32,10 +32,7 @@ import type { AgentProposal } from '../improvement/types';
 
 /** Lifecycle status of a canary validation period. */
 export type CanaryStatus =
-  | 'active'
-  | 'completed_positive'
-  | 'completed_negative'
-  | 'terminated_regression';
+  'active' | 'completed_positive' | 'completed_negative' | 'terminated_regression';
 
 /** A single comparison recorded during the canary period. */
 export interface CanaryComparison {

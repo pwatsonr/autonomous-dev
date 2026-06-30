@@ -32,6 +32,11 @@ export type {
 } from './telemetry';
 export { invokeReviewer, getRegisteredReviewerNames } from './invoke-reviewer';
 
+// SPEC-REQ-000053: Re-export timeout constants so external callers
+// (eval runner, tests) need not know the timeout.ts module exists.
+export { TIMEOUT_DEFAULT, TIMEOUT_MAX, TIMEOUT_MIN } from './timeout';
+export { clampTimeoutMs, parseTimeoutEnvInt } from './timeout';
+
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 

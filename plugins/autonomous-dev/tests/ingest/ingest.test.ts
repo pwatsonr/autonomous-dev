@@ -104,9 +104,15 @@ async function test_ingest_org_incremental(): Promise<void> {
     openRepo: async (m) => sources[m.id],
   };
   // o/stale is already up-to-date at sha s1 (mixed-case key must still match the lowercased id)
-  const res = await ingestOrg('o', client, io, { knownShas: { 'O/Stale': 's1' }, isBlocked: () => false });
+  const res = await ingestOrg('o', client, io, {
+    knownShas: { 'O/Stale': 's1' },
+    isBlocked: () => false,
+  });
   assert(res.repos.length === 1 && res.repos[0].repoId === 'o/new', 'only the new repo ingested');
-  assert(res.skipped.includes('o/stale') && res.skipped.includes('o/archived'), 'stale + archived skipped');
+  assert(
+    res.skipped.includes('o/stale') && res.skipped.includes('o/archived'),
+    'stale + archived skipped',
+  );
   console.log('PASS: test_ingest_org_incremental');
 }
 
@@ -126,9 +132,15 @@ async function test_ingest_org_isolates_repo_failures(): Promise<void> {
   const res = await ingestOrg('o', client, io, { isBlocked: () => false });
   assert(res.repos.length === 2, 'both repos recorded (one as a failure)');
   const bad = res.repos.find((r) => r.repoId === 'o/bad');
-  assert(!!bad && bad.errors.some((e) => e.topic === 'openRepo'), 'failed repo isolated with error');
+  assert(
+    !!bad && bad.errors.some((e) => e.topic === 'openRepo'),
+    'failed repo isolated with error',
+  );
   const good = res.repos.find((r) => r.repoId === 'o/good');
-  assert(!!good && good.topicsWritten.includes('overview'), 'good repo still ingested after the failure');
+  assert(
+    !!good && good.topicsWritten.includes('overview'),
+    'good repo still ingested after the failure',
+  );
   console.log('PASS: test_ingest_org_isolates_repo_failures');
 }
 
@@ -140,7 +152,10 @@ async function test_ingest_org_skips_blocked(): Promise<void> {
     openRepo: async (m) => fakeRepo(m, { 'README.md': 'hi' }),
   };
   const res = await ingestOrg('o', client, io, { isBlocked: (id) => id === 'o/blocked' });
-  assert(res.repos.length === 0 && res.skipped.includes('o/blocked'), 'blocked repo skipped, not ingested');
+  assert(
+    res.repos.length === 0 && res.skipped.includes('o/blocked'),
+    'blocked repo skipped, not ingested',
+  );
   console.log('PASS: test_ingest_org_skips_blocked');
 }
 

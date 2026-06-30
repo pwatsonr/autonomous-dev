@@ -49,7 +49,10 @@ const SECRET_SKILL = [
   'Use password = hunter2hunter2 to authenticate.',
 ].join('\n');
 
-function fakeRuntime(skillMd: string, verdict = '{"verdict":"approve","findings":[]}'): ArtifactRuntime {
+function fakeRuntime(
+  skillMd: string,
+  verdict = '{"verdict":"approve","findings":[]}',
+): ArtifactRuntime {
   return {
     async generate(prompt) {
       // the meta-review prompt ends with this marker; everything else is a generation call
@@ -131,7 +134,10 @@ async function test_constraint_rejects_secret(): Promise<void> {
   });
   const p = res.proposals[0];
   assert(p.status === 'meta_rejected', 'secret body → meta_rejected by the constraints gate');
-  assert((p.constraintViolations ?? []).some((v) => v.rule.startsWith('secret:')), 'records the secret violation');
+  assert(
+    (p.constraintViolations ?? []).some((v) => v.rule.startsWith('secret:')),
+    'records the secret violation',
+  );
   console.log('PASS: test_constraint_rejects_secret');
 }
 
@@ -140,7 +146,10 @@ async function test_review_rejects(): Promise<void> {
   const res = await proposeArtifacts({
     repoIds: ['acme/api'],
     ownership: OWN,
-    runtime: fakeRuntime(CLEAN_SKILL, '{"verdict":"block","findings":[{"severity":"blocking","message":"nope"}]}'),
+    runtime: fakeRuntime(
+      CLEAN_SKILL,
+      '{"verdict":"block","findings":[{"severity":"blocking","message":"nope"}]}',
+    ),
     memIO: memWithVault(),
     storeIO,
   });
@@ -150,12 +159,24 @@ async function test_review_rejects(): Promise<void> {
 
 async function test_promote_writes_scoped_store(): Promise<void> {
   const storeIO = fakeStoreIO();
-  await proposeArtifacts({ repoIds: ['acme/api'], ownership: OWN, runtime: fakeRuntime(CLEAN_SKILL), memIO: memWithVault(), storeIO });
+  await proposeArtifacts({
+    repoIds: ['acme/api'],
+    ownership: OWN,
+    runtime: fakeRuntime(CLEAN_SKILL),
+    memIO: memWithVault(),
+    storeIO,
+  });
 
   const { path: target, proposal } = promoteProposal(VAULT_ID, { ownership: OWN, storeIO });
   assert(proposal.status === 'promoted', 'status promoted');
-  assert(target === '/home/test/.autonomous-dev/artifacts/repo/acme/api/skills/vault-access.md', `scoped path, got ${target}`);
-  assert((storeIO.files[target] ?? '').includes('name: vault-access'), 'skill written to scoped store');
+  assert(
+    target === '/home/test/.autonomous-dev/artifacts/repo/acme/api/skills/vault-access.md',
+    `scoped path, got ${target}`,
+  );
+  assert(
+    (storeIO.files[target] ?? '').includes('name: vault-access'),
+    'skill written to scoped store',
+  );
   // not promotable twice
   let threw = false;
   try {
@@ -172,7 +193,10 @@ async function test_promote_requires_meta_approved(): Promise<void> {
   await proposeArtifacts({
     repoIds: ['acme/api'],
     ownership: OWN,
-    runtime: fakeRuntime(CLEAN_SKILL, '{"verdict":"block","findings":[{"severity":"blocking","message":"x"}]}'),
+    runtime: fakeRuntime(
+      CLEAN_SKILL,
+      '{"verdict":"block","findings":[{"severity":"blocking","message":"x"}]}',
+    ),
     memIO: memWithVault(),
     storeIO,
   });
@@ -188,8 +212,18 @@ async function test_promote_requires_meta_approved(): Promise<void> {
 
 async function test_tool_override_on_promote(): Promise<void> {
   const storeIO = fakeStoreIO();
-  await proposeArtifacts({ repoIds: ['acme/api'], ownership: OWN, runtime: fakeRuntime(CLEAN_SKILL), memIO: memWithVault(), storeIO });
-  const { path: target } = promoteProposal(VAULT_ID, { ownership: OWN, storeIO, toolOverride: ['Bash'] });
+  await proposeArtifacts({
+    repoIds: ['acme/api'],
+    ownership: OWN,
+    runtime: fakeRuntime(CLEAN_SKILL),
+    memIO: memWithVault(),
+    storeIO,
+  });
+  const { path: target } = promoteProposal(VAULT_ID, {
+    ownership: OWN,
+    storeIO,
+    toolOverride: ['Bash'],
+  });
   const written = storeIO.files[target] ?? '';
   assert(written.includes('Bash'), 'operator-authorized Bash written into the promoted skill');
   // B5 regression guard: history must NOT be doubled — prior (generated+meta_approved) + promoted = 3.
@@ -201,7 +235,13 @@ async function test_tool_override_on_promote(): Promise<void> {
 
 async function test_reject(): Promise<void> {
   const storeIO = fakeStoreIO();
-  await proposeArtifacts({ repoIds: ['acme/api'], ownership: OWN, runtime: fakeRuntime(CLEAN_SKILL), memIO: memWithVault(), storeIO });
+  await proposeArtifacts({
+    repoIds: ['acme/api'],
+    ownership: OWN,
+    runtime: fakeRuntime(CLEAN_SKILL),
+    memIO: memWithVault(),
+    storeIO,
+  });
   const p = rejectProposal(VAULT_ID, storeIO);
   assert(p.status === 'rejected', 'operator reject → rejected');
   console.log('PASS: test_reject');
@@ -217,7 +257,15 @@ async function test_promote_requires_verdict(): Promise<void> {
       name: 'vault-access',
       scope: 'repo:acme/api',
       status: 'meta_approved',
-      artifact: { kind: 'skill', name: 'vault-access', scope: 'repo:acme/api', description: 'd', managed: true, allowedTools: ['Read'], body: '# ok' },
+      artifact: {
+        kind: 'skill',
+        name: 'vault-access',
+        scope: 'repo:acme/api',
+        description: 'd',
+        managed: true,
+        allowedTools: ['Read'],
+        body: '# ok',
+      },
       evidence: [],
       rationale: '',
       confidence: 0.9,
@@ -252,7 +300,10 @@ async function test_detection_errors_surfaced(): Promise<void> {
     storeIO: fakeStoreIO(),
     detectors: [boom],
   });
-  assert(res.detectionErrors.length === 1 && res.detectionErrors[0].detector === 'boom', 'detector error surfaced (FR-A4)');
+  assert(
+    res.detectionErrors.length === 1 && res.detectionErrors[0].detector === 'boom',
+    'detector error surfaced (FR-A4)',
+  );
   console.log('PASS: test_detection_errors_surfaced');
 }
 
@@ -277,9 +328,22 @@ async function test_multi_repo_grounding(): Promise<void> {
       return CLEAN_SKILL;
     },
   };
-  const res = await proposeArtifacts({ repoIds: ['acme/a', 'acme/b'], ownership: own, runtime: capturing, memIO, storeIO: fakeStoreIO(), k: 2 });
-  assert(res.proposals.some((p) => p.scope === 'project:pay'), 'aggregated to project scope');
-  assert(capturedGen.includes('MARKER_A') && capturedGen.includes('MARKER_B'), 'generation grounded in BOTH repos memory');
+  const res = await proposeArtifacts({
+    repoIds: ['acme/a', 'acme/b'],
+    ownership: own,
+    runtime: capturing,
+    memIO,
+    storeIO: fakeStoreIO(),
+    k: 2,
+  });
+  assert(
+    res.proposals.some((p) => p.scope === 'project:pay'),
+    'aggregated to project scope',
+  );
+  assert(
+    capturedGen.includes('MARKER_A') && capturedGen.includes('MARKER_B'),
+    'generation grounded in BOTH repos memory',
+  );
   console.log('PASS: test_multi_repo_grounding');
 }
 

@@ -20,12 +20,7 @@
  * - error_rate:           Sustained error rate above configured threshold
  */
 export type ErrorType =
-  | 'crash'
-  | 'exception'
-  | 'timeout'
-  | 'degraded_performance'
-  | 'data_inconsistency'
-  | 'error_rate';
+  'crash' | 'exception' | 'timeout' | 'degraded_performance' | 'data_inconsistency' | 'error_rate';
 
 // ---------------------------------------------------------------------------
 // Candidate observation

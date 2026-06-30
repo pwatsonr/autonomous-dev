@@ -18,7 +18,13 @@ function sampleRaw(): Record<string, unknown> {
       { id: 'identity', name: 'Identity' },
     ],
     repos: [
-      { id: 'acme/api', path: '/work/api', remote: 'github.com/acme/api', projectId: 'payments', tags: { tier: 'critical' } },
+      {
+        id: 'acme/api',
+        path: '/work/api',
+        remote: 'github.com/acme/api',
+        projectId: 'payments',
+        tags: { tier: 'critical' },
+      },
       { id: 'acme/web', path: '/work/web', projectId: 'identity', tags: {} },
       { id: 'acme/tools', projectId: null },
     ],
@@ -60,7 +66,10 @@ function test_valid_tree_and_resolution(): void {
 function test_dangling_project_membership_dropped(): void {
   const raw = {
     projects: [{ id: 'real', name: 'Real' }],
-    repos: [{ id: 'r1', projectId: 'ghost' }, { id: 'r2', projectId: 'real' }],
+    repos: [
+      { id: 'r1', projectId: 'ghost' },
+      { id: 'r2', projectId: 'real' },
+    ],
   };
   const o = loadOwnershipConfig(raw);
   assert(projectForRepo(o, 'r1') === null, 'ghost membership dropped to null');
@@ -80,12 +89,21 @@ function test_repo_id_for_path(): void {
 // O5 — flexible grouping tags: arbitrary keys preserved, vocabulary not constrained (AC4)
 function test_flexible_tags_preserved(): void {
   const raw = {
-    projects: [{ id: 'p', name: 'P', tags: { team: 'a', domain: 'b', 'product-line': 'c', 'business-unit': 'd' } }],
+    projects: [
+      {
+        id: 'p',
+        name: 'P',
+        tags: { team: 'a', domain: 'b', 'product-line': 'c', 'business-unit': 'd' },
+      },
+    ],
     repos: [{ id: 'r', projectId: 'p', tags: { 'arbitrary-key': 'v', numeric: 7 } }],
   };
   const o = loadOwnershipConfig(raw);
   const t = o.projects[0].tags;
-  assert(t.team === 'a' && t.domain === 'b' && t['product-line'] === 'c' && t['business-unit'] === 'd', 'all project tag keys preserved');
+  assert(
+    t.team === 'a' && t.domain === 'b' && t['product-line'] === 'c' && t['business-unit'] === 'd',
+    'all project tag keys preserved',
+  );
   assert(o.repos[0].tags['arbitrary-key'] === 'v', 'arbitrary repo tag key preserved');
   assert(o.repos[0].tags.numeric === '7', 'non-string tag value coerced to string');
   console.log('PASS: test_flexible_tags_preserved');

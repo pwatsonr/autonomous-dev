@@ -49,6 +49,7 @@ paths = [
   '''.*/tests/safety/.*''',
   '''.*/tests/adapters/.*''',
   '''.*/tests/integration/.*''',
+  '''.*/tests/artifact-factory/.*''',
   '''.*/__tests__/adapters/.*''',
   '''docs/.*''',
   '''.*\.example$''',

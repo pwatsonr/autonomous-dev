@@ -9,7 +9,13 @@
  * nothing throws out of `run`, so callers degrade gracefully (FR-D3).
  */
 
-import type { GraphClient, GraphStatement, GraphRunResult, GraphTransport, Neo4jCreds } from './types';
+import type {
+  GraphClient,
+  GraphStatement,
+  GraphRunResult,
+  GraphTransport,
+  Neo4jCreds,
+} from './types';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 
@@ -18,7 +24,12 @@ export const fetchTransport: GraphTransport = async (req) => {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), DEFAULT_TIMEOUT_MS);
   try {
-    const r = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, signal: ctl.signal });
+    const r = await fetch(req.url, {
+      method: req.method,
+      headers: req.headers,
+      body: req.body,
+      signal: ctl.signal,
+    });
     return { status: r.status, text: await r.text() };
   } finally {
     clearTimeout(timer);
@@ -43,7 +54,10 @@ function errorFromBody(text: string): string | undefined {
 }
 
 /** Create an HTTP-API-backed GraphClient. */
-export function httpGraphClient(creds: Neo4jCreds, transport: GraphTransport = fetchTransport): GraphClient {
+export function httpGraphClient(
+  creds: Neo4jCreds,
+  transport: GraphTransport = fetchTransport,
+): GraphClient {
   const url = `${creds.httpUrl.replace(/\/+$/, '')}/db/neo4j/tx/commit`;
   const headers = {
     'Content-Type': 'application/json',
@@ -56,7 +70,10 @@ export function httpGraphClient(creds: Neo4jCreds, transport: GraphTransport = f
     try {
       res = await transport({ url, method: 'POST', headers, body: JSON.stringify({ statements }) });
     } catch (err) {
-      return { ok: false, error: `transport error: ${err instanceof Error ? err.message : String(err)}` };
+      return {
+        ok: false,
+        error: `transport error: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
     if (res.status < 200 || res.status >= 300) {
       return { ok: false, error: errorFromBody(res.text) ?? `HTTP ${res.status}` };
@@ -74,7 +91,11 @@ export function httpGraphClient(creds: Neo4jCreds, transport: GraphTransport = f
     }
     const body = parsed as { results?: unknown[]; errors?: { message?: string }[] };
     if (Array.isArray(body.errors) && body.errors.length > 0) {
-      return { ok: false, error: body.errors.map((e) => e.message ?? 'error').join('; '), results: body.results };
+      return {
+        ok: false,
+        error: body.errors.map((e) => e.message ?? 'error').join('; '),
+        results: body.results,
+      };
     }
     return { ok: true, results: body.results };
   }

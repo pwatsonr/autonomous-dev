@@ -22,7 +22,8 @@ export interface ShaStoreIO {
 
 export const defaultShaIO: ShaStoreIO = {
   homedir: () => resolveAbsoluteHome(),
-  readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
+  readFile: (filePath) =>
+    fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined,
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.tmp.${process.pid}`;

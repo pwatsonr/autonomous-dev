@@ -12,7 +12,12 @@ import type { RepoSignals } from '../../src/ingest/inference';
 function rowsClient(rows: unknown[][], ok = true): GraphClient {
   return {
     async run() {
-      return ok ? { ok: true, results: [{ columns: ['repo', 'owners', 'deps'], data: rows.map((row) => ({ row })) }] } : { ok: false, error: 'down' };
+      return ok
+        ? {
+            ok: true,
+            results: [{ columns: ['repo', 'owners', 'deps'], data: rows.map((row) => ({ row })) }],
+          }
+        : { ok: false, error: 'down' };
     },
     async verifyConnectivity() {
       return ok;
@@ -44,17 +49,26 @@ async function test_infers_from_graph(): Promise<void> {
   ]);
   const res = await inferProjectsWithGraph(client, []);
   assert(res.source === 'graph', 'used the graph');
-  assert(res.proposals.length === 1 && res.proposals[0].repoIds.length === 2, 'grouped the shared-owner pair from the graph');
+  assert(
+    res.proposals.length === 1 && res.proposals[0].repoIds.length === 2,
+    'grouped the shared-owner pair from the graph',
+  );
   console.log('PASS: test_infers_from_graph');
 }
 
 async function test_falls_back_to_file(): Promise<void> {
   // no client → file
   const noClient = await inferProjectsWithGraph(undefined, FILE_SIGNALS);
-  assert(noClient.source === 'file' && noClient.proposals.length === 1, 'no client → file inference');
+  assert(
+    noClient.source === 'file' && noClient.proposals.length === 1,
+    'no client → file inference',
+  );
   // client errors → file
   const downClient = await inferProjectsWithGraph(rowsClient([], false), FILE_SIGNALS);
-  assert(downClient.source === 'file' && downClient.proposals.length === 1, 'graph down → file inference');
+  assert(
+    downClient.source === 'file' && downClient.proposals.length === 1,
+    'graph down → file inference',
+  );
   console.log('PASS: test_falls_back_to_file');
 }
 
@@ -62,7 +76,10 @@ async function test_empty_graph_uses_graph_source(): Promise<void> {
   // M2: Neo4j up but EMPTY (no repos) → source 'graph' (don't mask "you forgot to run graph sync")
   const empty = rowsClient([]);
   const res = await inferProjectsWithGraph(empty, FILE_SIGNALS);
-  assert(res.source === 'graph' && res.proposals.length === 0, 'empty graph → graph source, not file fallback');
+  assert(
+    res.source === 'graph' && res.proposals.length === 0,
+    'empty graph → graph source, not file fallback',
+  );
   console.log('PASS: test_empty_graph_uses_graph_source');
 }
 

@@ -28,7 +28,10 @@ function test_infer_by_shared_owner(): void {
   assert(props.length === 1, 'one proposal');
   assert(props[0].repoIds.join(',') === 'acme/billing,acme/orders', 'both grouped (sorted)');
   assert(props[0].rationale.includes('@acme/payments'), 'rationale cites the owner');
-  assert(props[0].confidence >= 0.7, `confidence raised by the strong signal, got ${props[0].confidence}`);
+  assert(
+    props[0].confidence >= 0.7,
+    `confidence raised by the strong signal, got ${props[0].confidence}`,
+  );
   console.log('PASS: test_infer_by_shared_owner');
 }
 
@@ -75,9 +78,15 @@ function test_parse_owners(): void {
   assert(parseOwners('no owners here').length === 0, 'no false positives on plain text');
   // email-form owners (GitHub CODEOWNERS supports them) must NOT yield a bogus @domain owner
   const withEmail = parseOwners('* alice@acme.com bob@acme.com @real/team');
-  assert(withEmail.join(',') === '@real/team', `emails ignored, only real handles: got ${withEmail.join(',')}`);
+  assert(
+    withEmail.join(',') === '@real/team',
+    `emails ignored, only real handles: got ${withEmail.join(',')}`,
+  );
   // commented-out owners are stripped
-  assert(parseOwners('# was @old-team\n* @new-team').join(',') === '@new-team', 'comment owners stripped');
+  assert(
+    parseOwners('# was @old-team\n* @new-team').join(',') === '@new-team',
+    'comment owners stripped',
+  );
   console.log('PASS: test_parse_owners');
 }
 
@@ -91,7 +100,10 @@ function test_signals_from_memory(): void {
   assert(s.owners.join(',') === '@acme/payments', 'owners parsed from ownership doc');
   assert(s.deps.length === 0, 'deps empty (weak signal, future enrichment)');
   // a repo with no ownership doc => no owners, still a valid signal
-  assert(signalsFromMemory('acme/lonely', []).owners.length === 0, 'missing ownership doc => no owners');
+  assert(
+    signalsFromMemory('acme/lonely', []).owners.length === 0,
+    'missing ownership doc => no owners',
+  );
   console.log('PASS: test_signals_from_memory');
 }
 
@@ -105,7 +117,10 @@ function test_infer_from_memory_end_to_end(): void {
   const signals = Object.keys(mem).map((id) => signalsFromMemory(id, mem[id]));
   const props = inferProjects(signals);
   assert(props.length === 1, 'one proposal (orders+billing); website is lone');
-  assert(props[0].repoIds.join(',') === 'acme/billing,acme/orders', 'grouped the shared-owner pair');
+  assert(
+    props[0].repoIds.join(',') === 'acme/billing,acme/orders',
+    'grouped the shared-owner pair',
+  );
   console.log('PASS: test_infer_from_memory_end_to_end');
 }
 
@@ -119,7 +134,10 @@ function test_ambiguity_detects_bridge_repo(): void {
   ];
   const amb = findAmbiguousMemberships(repos);
   assert(amb.length === 1 && amb[0].repoId === 'o/c', 'only the bridge repo is ambiguous');
-  assert(amb[0].candidateProjectIds.join(',') === 'team-pay,web', `2 sorted candidate ids, got ${amb[0].candidateProjectIds.join(',')}`);
+  assert(
+    amb[0].candidateProjectIds.join(',') === 'team-pay,web',
+    `2 sorted candidate ids, got ${amb[0].candidateProjectIds.join(',')}`,
+  );
   console.log('PASS: test_ambiguity_detects_bridge_repo');
 }
 

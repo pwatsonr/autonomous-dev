@@ -38,11 +38,7 @@ export interface ConfidenceScore {
  * Possible dedup actions from the deduplication engine.
  */
 export type DeduplicationAction =
-  | 'related_to_promoted'
-  | 'new'
-  | 'auto_dismiss'
-  | 'merge_intra_run'
-  | 'update_inter_run';
+  'related_to_promoted' | 'new' | 'auto_dismiss' | 'merge_intra_run' | 'update_inter_run';
 
 /**
  * Result from the deduplication engine used as input to confidence scoring.

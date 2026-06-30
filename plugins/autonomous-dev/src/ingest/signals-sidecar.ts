@@ -36,7 +36,8 @@ export interface SignalsSidecarIO {
 
 export const defaultSignalsIO: SignalsSidecarIO = {
   homedir: () => resolveAbsoluteHome(),
-  readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
+  readFile: (filePath) =>
+    fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined,
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.tmp.${process.pid}`;
@@ -58,7 +59,10 @@ export function signalsDir(io: SignalsSidecarIO = defaultSignalsIO): string {
  * the canonical `repoId` is stored INSIDE the JSON, not derived from the name.
  */
 export function sidecarFileName(repoId: string): string {
-  const base = repoId.toLowerCase().replace(/[^a-z0-9._-]+/g, '_').replace(/^\.+/, '_');
+  const base = repoId
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '_')
+    .replace(/^\.+/, '_');
   return `${base || 'repo'}.json`;
 }
 

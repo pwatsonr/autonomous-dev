@@ -78,18 +78,16 @@ function createMockRoutingEngine(route?: Partial<ResolvedRoute>) {
 
 function createMockChainManager() {
   return {
-    startChain: jest.fn(
-      (msg: EscalationMessage, route: ResolvedRoute): ChainState => ({
-        escalationId: msg.escalation_id,
-        requestId: msg.request_id,
-        status: 'primary_dispatched',
-        primaryTarget: route.primary,
-        secondaryTarget: route.secondary,
-        primaryDispatchedAt: new Date(),
-        timeoutBehavior: route.timeoutBehavior,
-        timeoutMinutes: route.timeoutMinutes,
-      }),
-    ),
+    startChain: jest.fn((msg: EscalationMessage, route: ResolvedRoute): ChainState => ({
+      escalationId: msg.escalation_id,
+      requestId: msg.request_id,
+      status: 'primary_dispatched',
+      primaryTarget: route.primary,
+      secondaryTarget: route.secondary,
+      primaryDispatchedAt: new Date(),
+      timeoutBehavior: route.timeoutBehavior,
+      timeoutMinutes: route.timeoutMinutes,
+    })),
     cancelChain: jest.fn(),
     cancelAllPendingForRequest: jest.fn(),
     cancelAllPending: jest.fn(),

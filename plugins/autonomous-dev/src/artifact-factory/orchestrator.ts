@@ -60,7 +60,8 @@ export async function proposeArtifacts(opts: ProposeOptions): Promise<ProposeRes
   for (const id of opts.repoIds) {
     const d = detectOpportunities(id, memIO, opts.detectors);
     allOpps.push(...d.opportunities);
-    for (const e of d.errors) detectionErrors.push({ repoId: id, detector: e.detector, error: e.error });
+    for (const e of d.errors)
+      detectionErrors.push({ repoId: id, detector: e.detector, error: e.error });
   }
   const scoped = decideScopes(allOpps, opts.ownership, opts.k);
 
@@ -71,7 +72,11 @@ export async function proposeArtifacts(opts: ProposeOptions): Promise<ProposeRes
     // Never silently overwrite an already-promoted proposal (B5 — preserves the audit + on-disk skill).
     const existing = getProposal(proposalId(sp.kind, sp.scope, sp.suggestedName), storeIO);
     if (existing && existing.status === 'promoted') {
-      skipped.push({ suggestedName: sp.suggestedName, scope: sp.scope, reason: 'already promoted (re-propose skipped)' });
+      skipped.push({
+        suggestedName: sp.suggestedName,
+        scope: sp.scope,
+        reason: 'already promoted (re-propose skipped)',
+      });
       continue;
     }
     // Ground generation in ALL member repos' memory (B4), bounded so the prompt stays sane.
@@ -90,7 +95,11 @@ export async function proposeArtifacts(opts: ProposeOptions): Promise<ProposeRes
       opts.runtime,
     );
     if (!gen.artifact) {
-      skipped.push({ suggestedName: sp.suggestedName, scope: sp.scope, reason: gen.errors.join('; ') || 'generation failed' });
+      skipped.push({
+        suggestedName: sp.suggestedName,
+        scope: sp.scope,
+        reason: gen.errors.join('; ') || 'generation failed',
+      });
       continue;
     }
 
@@ -113,7 +122,11 @@ export async function proposeArtifacts(opts: ProposeOptions): Promise<ProposeRes
     if (violations.length > 0) {
       base.status = 'meta_rejected';
       base.constraintViolations = violations;
-      base.history.push({ at: storeIO.now(), event: 'constraint_rejected', detail: violations.map((v) => v.rule).join(', ') });
+      base.history.push({
+        at: storeIO.now(),
+        event: 'constraint_rejected',
+        detail: violations.map((v) => v.rule).join(', '),
+      });
       proposals.push(upsertProposal(base, storeIO));
       continue;
     }
@@ -124,7 +137,11 @@ export async function proposeArtifacts(opts: ProposeOptions): Promise<ProposeRes
     });
     base.metaReview = { verdict: review.verdict, findings: review.findings };
     base.status = review.verdict === 'approved' ? 'meta_approved' : 'meta_rejected';
-    base.history.push({ at: storeIO.now(), event: `meta_${review.verdict}`, detail: review.findings.map((f) => `${f.severity}:${f.message}`).join('; ') });
+    base.history.push({
+      at: storeIO.now(),
+      event: `meta_${review.verdict}`,
+      detail: review.findings.map((f) => `${f.severity}:${f.message}`).join('; '),
+    });
     proposals.push(upsertProposal(base, storeIO));
   }
 
@@ -140,7 +157,14 @@ export function artifactScopeDir(scope: ArtifactScope): string {
 
 /** Absolute path where a promoted skill lands. */
 export function artifactPath(io: ArtifactStoreIO, scope: ArtifactScope, name: string): string {
-  return path.join(io.homedir(), '.autonomous-dev', 'artifacts', artifactScopeDir(scope), 'skills', `${name}.md`);
+  return path.join(
+    io.homedir(),
+    '.autonomous-dev',
+    'artifacts',
+    artifactScopeDir(scope),
+    'skills',
+    `${name}.md`,
+  );
 }
 
 export interface PromoteOptions {
@@ -161,12 +185,20 @@ export function promoteProposal(id: string, opts: PromoteOptions = {}): PromoteR
   if (!p) throw new Error(`Unknown proposal "${id}".`);
   // Require the FULL approved state, not just the status flag (defends against a hand-edited
   // proposals.json that flips status without a real meta-review / despite constraint violations).
-  if (p.status !== 'meta_approved' || p.metaReview?.verdict !== 'approved' || (p.constraintViolations?.length ?? 0) > 0) {
-    throw new Error(`Proposal "${id}" is not promotable (status: ${p.status}, verdict: ${p.metaReview?.verdict ?? 'none'}).`);
+  if (
+    p.status !== 'meta_approved' ||
+    p.metaReview?.verdict !== 'approved' ||
+    (p.constraintViolations?.length ?? 0) > 0
+  ) {
+    throw new Error(
+      `Proposal "${id}" is not promotable (status: ${p.status}, verdict: ${p.metaReview?.verdict ?? 'none'}).`,
+    );
   }
   // The on-disk target uses p.scope; the constraint re-check uses p.artifact.scope — they must agree.
   if (p.scope !== p.artifact.scope) {
-    throw new Error(`Proposal "${id}" scope/artifact-scope mismatch (${p.scope} vs ${p.artifact.scope}).`);
+    throw new Error(
+      `Proposal "${id}" scope/artifact-scope mismatch (${p.scope} vs ${p.artifact.scope}).`,
+    );
   }
 
   // The promoted skill GETS the operator-authorized tools (override widens its surface).
@@ -187,27 +219,38 @@ export function promoteProposal(id: string, opts: PromoteOptions = {}): PromoteR
   const target = artifactPath(storeIO, p.scope, p.name);
   // R1 containment: the resolved path MUST stay under the artifacts root.
   const root = path.join(storeIO.homedir(), '.autonomous-dev', 'artifacts');
-  if (path.resolve(target) !== target || !path.resolve(target).startsWith(path.resolve(root) + path.sep)) {
+  if (
+    path.resolve(target) !== target ||
+    !path.resolve(target).startsWith(path.resolve(root) + path.sep)
+  ) {
     throw new Error(`Refusing to write outside the artifact store: ${target}`);
   }
   const serialized = serializeArtifact(finalArtifact);
   // AC5: the promoted file must be re-parseable (guards against a serializer edge case).
   const reparse = parseArtifact(serialized);
   if (!reparse.success) {
-    throw new Error(`Refusing to promote "${id}": serialized skill is not re-parseable (${reparse.errors.map((e) => e.message).join('; ')}).`);
+    throw new Error(
+      `Refusing to promote "${id}": serialized skill is not re-parseable (${reparse.errors.map((e) => e.message).join('; ')}).`,
+    );
   }
   storeIO.writeFile(target, serialized);
   if (opts.toolOverride && opts.toolOverride.length > 0) {
     // upsertProposal re-merges prior history from disk; pass history:[] so the loaded
     // copy's history isn't doubled (it is preserved by the merge against disk).
-    upsertProposal({ ...p, toolOverride: opts.toolOverride, artifact: finalArtifact, history: [] }, storeIO);
+    upsertProposal(
+      { ...p, toolOverride: opts.toolOverride, artifact: finalArtifact, history: [] },
+      storeIO,
+    );
   }
   const promoted = setStatus(id, 'promoted', 'promoted', storeIO, `wrote ${target}`);
   return { path: target, proposal: promoted };
 }
 
 /** Human `artifact reject`: terminally dismiss a parked proposal. */
-export function rejectProposal(id: string, storeIO: ArtifactStoreIO = defaultArtifactStoreIO): ArtifactProposal {
+export function rejectProposal(
+  id: string,
+  storeIO: ArtifactStoreIO = defaultArtifactStoreIO,
+): ArtifactProposal {
   const p = getProposal(id, storeIO);
   if (!p) throw new Error(`Unknown proposal "${id}".`);
   if (p.status === 'promoted') throw new Error(`Proposal "${id}" already promoted.`);

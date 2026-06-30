@@ -335,7 +335,10 @@ function test_parse_managed_stringy_not_inverted(): void {
     ].join('\n');
     const r = parseAgentString(content);
     assert(r.success === true, `expected success for managed: ${val}`);
-    assert(r.agent!.managed === false, `managed: ${val} must parse to false, got ${r.agent!.managed}`);
+    assert(
+      r.agent!.managed === false,
+      `managed: ${val} must parse to false, got ${r.agent!.managed}`,
+    );
   }
   console.log('PASS: test_parse_managed_stringy_not_inverted');
 }

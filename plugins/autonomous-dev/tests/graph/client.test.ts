@@ -14,7 +14,10 @@ function reader(content: string | undefined): SecretsReader {
   return { read: () => content };
 }
 
-function okTransport(captured: { req?: Parameters<GraphTransport>[0] }, body = '{"results":[{"columns":["ok"],"data":[{"row":[1]}]}]}'): GraphTransport {
+function okTransport(
+  captured: { req?: Parameters<GraphTransport>[0] },
+  body = '{"results":[{"columns":["ok"],"data":[{"row":[1]}]}]}',
+): GraphTransport {
   return async (req) => {
     captured.req = req;
     return { status: 200, text: body };
@@ -22,7 +25,10 @@ function okTransport(captured: { req?: Parameters<GraphTransport>[0] }, body = '
 }
 
 function test_bolt_to_http(): void {
-  assert(boltToHttp('bolt://neo4j.pwatson.space:7687') === 'http://neo4j.pwatson.space:7474', 'bolt→http');
+  assert(
+    boltToHttp('bolt://neo4j.pwatson.space:7687') === 'http://neo4j.pwatson.space:7474',
+    'bolt→http',
+  );
   assert(boltToHttp('neo4j+s://host') === 'http://host:7474', 'neo4j+s→http');
   assert(boltToHttp('bolt+ssc://h:7687') === 'http://h:7474', 'bolt+ssc→http');
   assert(boltToHttp('bolt://h/db') === 'http://h:7474', 'bolt with path');
@@ -32,14 +38,29 @@ function test_bolt_to_http(): void {
 }
 
 function test_read_creds(): void {
-  const ok = readNeo4jCreds(reader('{"uri":"bolt://h:7687","user":"neo4j","password":"p"}'), '/home/test');
-  assert(!!ok && ok.httpUrl === 'http://h:7474' && ok.user === 'neo4j' && ok.password === 'p', 'valid creds parsed');
+  const ok = readNeo4jCreds(
+    reader('{"uri":"bolt://h:7687","user":"neo4j","password":"p"}'),
+    '/home/test',
+  );
+  assert(
+    !!ok && ok.httpUrl === 'http://h:7474' && ok.user === 'neo4j' && ok.password === 'p',
+    'valid creds parsed',
+  );
   assert(readNeo4jCreds(reader(undefined), '/home/test') === undefined, 'missing file → undefined');
   assert(readNeo4jCreds(reader('not json'), '/home/test') === undefined, 'malformed → undefined');
-  assert(readNeo4jCreds(reader('{"uri":"bolt://h"}'), '/home/test') === undefined, 'missing user/password → undefined');
+  assert(
+    readNeo4jCreds(reader('{"uri":"bolt://h"}'), '/home/test') === undefined,
+    'missing user/password → undefined',
+  );
   // an EMPTY httpUrl override must not win — falls back to the bolt-derived URL (H3)
-  const override = readNeo4jCreds(reader('{"uri":"bolt://h:7687","user":"u","password":"p","httpUrl":""}'), '/home/test');
-  assert(!!override && override.httpUrl === 'http://h:7474', 'empty httpUrl override falls back to bolt-derived');
+  const override = readNeo4jCreds(
+    reader('{"uri":"bolt://h:7687","user":"u","password":"p","httpUrl":""}'),
+    '/home/test',
+  );
+  assert(
+    !!override && override.httpUrl === 'http://h:7474',
+    'empty httpUrl override falls back to bolt-derived',
+  );
   console.log('PASS: test_read_creds');
 }
 
@@ -57,7 +78,10 @@ async function test_run_success(): Promise<void> {
 
 async function test_run_failures(): Promise<void> {
   // neo4j errors array → ok:false
-  const errClient = httpGraphClient(CREDS, async () => ({ status: 200, text: '{"results":[],"errors":[{"message":"Neo.ClientError.Statement.SyntaxError"}]}' }));
+  const errClient = httpGraphClient(CREDS, async () => ({
+    status: 200,
+    text: '{"results":[],"errors":[{"message":"Neo.ClientError.Statement.SyntaxError"}]}',
+  }));
   const e = await errClient.run([{ statement: 'BAD' }]);
   assert(!e.ok && (e.error ?? '').includes('SyntaxError'), 'neo4j error surfaced');
 
@@ -79,17 +103,53 @@ async function test_run_malformed_responses(): Promise<void> {
   // B1: a `null` body must NOT throw — graceful ok:false
   const nullClient = httpGraphClient(CREDS, async () => ({ status: 200, text: 'null' }));
   const n = await nullClient.run([{ statement: 'X' }]);
-  assert(!n.ok && (n.error ?? '').includes('unexpected response shape'), 'null body → ok:false (no throw)');
+  assert(
+    !n.ok && (n.error ?? '').includes('unexpected response shape'),
+    'null body → ok:false (no throw)',
+  );
   // M3: array / primitive body → ok:false (not silent success)
-  assert(!(await httpGraphClient(CREDS, async () => ({ status: 200, text: '[]' })).run([{ statement: 'X' }])).ok, 'array body → ok:false');
-  assert(!(await httpGraphClient(CREDS, async () => ({ status: 200, text: 'true' })).run([{ statement: 'X' }])).ok, 'primitive body → ok:false');
-  assert(!(await httpGraphClient(CREDS, async () => ({ status: 200, text: '' })).run([{ statement: 'X' }])).ok, 'empty body → ok:false');
+  assert(
+    !(
+      await httpGraphClient(CREDS, async () => ({ status: 200, text: '[]' })).run([
+        { statement: 'X' },
+      ])
+    ).ok,
+    'array body → ok:false',
+  );
+  assert(
+    !(
+      await httpGraphClient(CREDS, async () => ({ status: 200, text: 'true' })).run([
+        { statement: 'X' },
+      ])
+    ).ok,
+    'primitive body → ok:false',
+  );
+  assert(
+    !(
+      await httpGraphClient(CREDS, async () => ({ status: 200, text: '' })).run([
+        { statement: 'X' },
+      ])
+    ).ok,
+    'empty body → ok:false',
+  );
   // H4: non-2xx with a JSON error body surfaces the message
-  const e500 = httpGraphClient(CREDS, async () => ({ status: 500, text: '{"errors":[{"message":"Service unavailable"}]}' }));
+  const e500 = httpGraphClient(CREDS, async () => ({
+    status: 500,
+    text: '{"errors":[{"message":"Service unavailable"}]}',
+  }));
   const r5 = await e500.run([{ statement: 'X' }]);
-  assert(!r5.ok && (r5.error ?? '').includes('Service unavailable'), '500 JSON error message surfaced');
+  assert(
+    !r5.ok && (r5.error ?? '').includes('Service unavailable'),
+    '500 JSON error message surfaced',
+  );
   // M4: verifyConnectivity is false on a 200 garbage body (a stray proxy 200 isn't Neo4j)
-  assert((await httpGraphClient(CREDS, async () => ({ status: 200, text: 'true' })).verifyConnectivity()) === false, 'verify false on garbage 200');
+  assert(
+    (await httpGraphClient(CREDS, async () => ({
+      status: 200,
+      text: 'true',
+    })).verifyConnectivity()) === false,
+    'verify false on garbage 200',
+  );
   console.log('PASS: test_run_malformed_responses');
 }
 

@@ -14,7 +14,9 @@ export function resolveAbsoluteHome(): string {
   if (h && path.isAbsolute(h)) return h;
   const fallback = os.homedir();
   if (!path.isAbsolute(fallback)) {
-    throw new Error('Cannot resolve an absolute home directory ($HOME unset/relative and os.homedir() non-absolute).');
+    throw new Error(
+      'Cannot resolve an absolute home directory ($HOME unset/relative and os.homedir() non-absolute).',
+    );
   }
   return fallback;
 }

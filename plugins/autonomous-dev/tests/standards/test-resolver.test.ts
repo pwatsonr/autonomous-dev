@@ -41,7 +41,13 @@ function resolveStandards(
   requestOverrides: Rule[],
   projectRules: Rule[] = [],
 ) {
-  return resolveStandardsImpl({ defaultRules, orgRules, projectRules, repoRules, requestOverrides });
+  return resolveStandardsImpl({
+    defaultRules,
+    orgRules,
+    projectRules,
+    repoRules,
+    requestOverrides,
+  });
 }
 
 // ---------------------------------------------------------------------------

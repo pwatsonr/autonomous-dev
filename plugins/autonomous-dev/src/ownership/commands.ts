@@ -87,7 +87,9 @@ export function addProject(
 export function linkOrg(own: Ownership, org: string): CommandResult {
   const login = org.trim();
   if (!isOrgLogin(login)) {
-    throw new Error(`Invalid org login "${login}"; 1–39 GitHub login chars ([a-z0-9-], no leading/trailing dash).`);
+    throw new Error(
+      `Invalid org login "${login}"; 1–39 GitHub login chars ([a-z0-9-], no leading/trailing dash).`,
+    );
   }
   return { ownership: { ...own, org: login }, message: `Linked org "${login}".` };
 }
@@ -127,7 +129,9 @@ export function assignRepo(
   const repoId = opts.repoId.trim();
   const projectId = opts.projectId.trim();
   if (!isSafeRepoId(repoId)) {
-    throw new Error(`Invalid repo id "${repoId}"; use lowercase [a-z0-9/._-] (e.g. owner/name), no "..".`);
+    throw new Error(
+      `Invalid repo id "${repoId}"; use lowercase [a-z0-9/._-] (e.g. owner/name), no "..".`,
+    );
   }
   if (!own.projects.some((p) => p.id === projectId)) {
     throw new Error(

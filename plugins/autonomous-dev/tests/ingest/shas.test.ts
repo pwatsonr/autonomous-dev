@@ -72,7 +72,12 @@ function test_next_skips_open_failures(): void {
     skipped: [],
     repos: [
       { repoId: 'o/good', headSha: 'g1', topicsWritten: ['overview'], errors: [] },
-      { repoId: 'o/bad', headSha: 'b1', topicsWritten: [], errors: [{ topic: 'openRepo', error: 'clone failed' }] },
+      {
+        repoId: 'o/bad',
+        headSha: 'b1',
+        topicsWritten: [],
+        errors: [{ topic: 'openRepo', error: 'clone failed' }],
+      },
     ],
   };
   const next = nextKnownShas({}, result);
@@ -115,7 +120,10 @@ async function test_incremental_across_runs_and_full_force(): Promise<void> {
   // Run 2: nothing changed upstream => both skipped (the whole point of #588).
   const r2 = await crawl(client, fakeMemoryIO(), shaIO);
   assert(r2.ingested.length === 0, 'run 2 ingests nothing (all unchanged)');
-  assert(r2.skipped.includes('o/one') && r2.skipped.includes('o/two'), 'run 2 skips both via persisted shas');
+  assert(
+    r2.skipped.includes('o/one') && r2.skipped.includes('o/two'),
+    'run 2 skips both via persisted shas',
+  );
 
   // Run 3: one repo's HEAD moved => only that repo re-ingests.
   metas[1] = { id: 'o/two', defaultBranch: 'main', headSha: 'h2b' };

@@ -1,10 +1,5 @@
 import { scopesForContext, scopeDir } from '../../src/memory/resolver';
-import {
-  readScopeMemory,
-  writeMemoryDoc,
-  resolveMemory,
-  memoryRoot,
-} from '../../src/memory/store';
+import { readScopeMemory, writeMemoryDoc, resolveMemory, memoryRoot } from '../../src/memory/store';
 import type { MemoryStoreIO } from '../../src/memory/store';
 
 /**
@@ -36,7 +31,10 @@ function fakeIO(): MemoryStoreIO & { files: Record<string, string> } {
 }
 
 function test_scopes_for_context(): void {
-  assert(JSON.stringify(scopesForContext({})) === JSON.stringify(['global']), 'empty => global only');
+  assert(
+    JSON.stringify(scopesForContext({})) === JSON.stringify(['global']),
+    'empty => global only',
+  );
   assert(
     JSON.stringify(scopesForContext({ orgId: 'o', projectId: 'p', repoId: 'r' })) ===
       JSON.stringify(['global', 'org:o', 'project:p', 'repo:r']),
@@ -95,7 +93,8 @@ function test_resolve_memory_layers(): void {
   const resolved = resolveMemory({ orgId: 'acme', projectId: 'payments', repoId: 'acme/api' }, io);
   assert(resolved.layers.length === 4, 'four layers');
   assert(
-    resolved.layers.map((l) => l.scope).join(',') === 'global,org:acme,project:payments,repo:acme/api',
+    resolved.layers.map((l) => l.scope).join(',') ===
+      'global,org:acme,project:payments,repo:acme/api',
     'layers general->specific',
   );
   assert(resolved.layers[0].docs[0].content === 'G', 'global layer doc');
@@ -103,14 +102,23 @@ function test_resolve_memory_layers(): void {
 
   // empty context => just the global layer
   const justGlobal = resolveMemory({}, io);
-  assert(justGlobal.layers.length === 1 && justGlobal.layers[0].scope === 'global', 'empty ctx => global only');
+  assert(
+    justGlobal.layers.length === 1 && justGlobal.layers[0].scope === 'global',
+    'empty ctx => global only',
+  );
   console.log('PASS: test_resolve_memory_layers');
 }
 
 // P1 review: a traversal-shaped scope id must never write/read outside the memory root
 function test_scope_id_traversal_guard(): void {
   const io = fakeIO();
-  for (const bad of ['repo:../../etc/passwd', 'repo:a/../b', 'repo:a//b', 'project:..', 'foo:bar']) {
+  for (const bad of [
+    'repo:../../etc/passwd',
+    'repo:a/../b',
+    'repo:a//b',
+    'project:..',
+    'foo:bar',
+  ]) {
     let threw = false;
     try {
       writeMemoryDoc(bad as Parameters<typeof writeMemoryDoc>[0], 'overview', 'x', io);
@@ -119,10 +127,15 @@ function test_scope_id_traversal_guard(): void {
     }
     assert(threw, `writeMemoryDoc refuses unsafe scope "${bad}"`);
     // read skips (returns []) rather than crashing resolution
-    assert(readScopeMemory(bad as Parameters<typeof readScopeMemory>[0], io).length === 0, `read skips unsafe scope "${bad}"`);
+    assert(
+      readScopeMemory(bad as Parameters<typeof readScopeMemory>[0], io).length === 0,
+      `read skips unsafe scope "${bad}"`,
+    );
   }
   // nothing escaped the memory root
-  const escaped = Object.keys(io.files).some((p) => !p.startsWith(memoryRoot(io)) || p.includes('..'));
+  const escaped = Object.keys(io.files).some(
+    (p) => !p.startsWith(memoryRoot(io)) || p.includes('..'),
+  );
   assert(!escaped, 'no file written outside the memory root');
   console.log('PASS: test_scope_id_traversal_guard');
 }

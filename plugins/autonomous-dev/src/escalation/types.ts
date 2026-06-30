@@ -14,12 +14,7 @@
 
 /** The 6 escalation categories that classify every pipeline failure. */
 export type EscalationType =
-  | 'product'
-  | 'technical'
-  | 'infrastructure'
-  | 'security'
-  | 'cost'
-  | 'quality';
+  'product' | 'technical' | 'infrastructure' | 'security' | 'cost' | 'quality';
 
 /** How urgently a human must respond to the escalation. */
 export type EscalationUrgency = 'immediate' | 'soon' | 'informational';

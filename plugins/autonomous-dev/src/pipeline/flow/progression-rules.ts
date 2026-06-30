@@ -2,10 +2,7 @@ import { DocumentType, getDepth } from '../types/document-type';
 import { PipelineState, DocumentState } from './pipeline-state';
 
 export type ProgressionViolation =
-  | 'SKIP_VIOLATION'
-  | 'GATE_VIOLATION'
-  | 'DEPENDENCY_NOT_MET'
-  | 'PHASE_INCOMPLETE';
+  'SKIP_VIOLATION' | 'GATE_VIOLATION' | 'DEPENDENCY_NOT_MET' | 'PHASE_INCOMPLETE';
 
 export class ProgressionError extends Error {
   constructor(
