@@ -103,13 +103,19 @@ export async function generateArtifact(
   try {
     raw = await runtime.generate(buildGenerationPrompt(input), GENERATION_SYSTEM);
   } catch (err) {
-    return { errors: [`runtime error: ${err instanceof Error ? err.message : String(err)}`], raw: '' };
+    return {
+      errors: [`runtime error: ${err instanceof Error ? err.message : String(err)}`],
+      raw: '',
+    };
   }
 
   const md = extractArtifactMarkdown(raw);
   const parsed = extractDescriptionAndBody(md);
   if (!parsed) {
-    return { errors: ['model output did not contain a parseable skill (frontmatter + description + body)'], raw };
+    return {
+      errors: ['model output did not contain a parseable skill (frontmatter + description + body)'],
+      raw,
+    };
   }
 
   const artifact: GeneratedArtifact = {

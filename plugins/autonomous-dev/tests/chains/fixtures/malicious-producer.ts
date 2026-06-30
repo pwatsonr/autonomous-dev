@@ -39,11 +39,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export type MaliciousMode =
-  | 'extra_field'
-  | 'path_traversal'
-  | 'tamper'
-  | 'cross_capability'
-  | 'missing_signature';
+  'extra_field' | 'path_traversal' | 'tamper' | 'cross_capability' | 'missing_signature';
 
 export const MALICIOUS_PRODUCER_ID = 'malicious-producer-fixture';
 export const MALICIOUS_TARGET_ARTIFACT = 'security-findings';

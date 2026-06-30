@@ -63,7 +63,10 @@ function test_round_trip(): void {
     deps: ['left-pad'],
     namePrefix: 'payments',
   };
-  assert(loadSignalsSidecar('acme/payments-api', io) === undefined, 'missing sidecar reads undefined');
+  assert(
+    loadSignalsSidecar('acme/payments-api', io) === undefined,
+    'missing sidecar reads undefined',
+  );
   writeSignalsSidecar('acme/payments-api', signals, io);
   const loaded = loadSignalsSidecar('acme/payments-api', io);
   assert(!!loaded, 'sidecar loads after write');
@@ -71,7 +74,10 @@ function test_round_trip(): void {
   assert(loaded!.owners.join(',') === '@acme/payments', 'owners round-trip');
   assert(loaded!.deps.join(',') === 'left-pad', 'deps round-trip');
   assert(loaded!.namePrefix === 'payments', 'namePrefix round-trips');
-  assert(typeof io.files[sidecarPath('acme/payments-api', io)] === 'string', 'written to canonical path');
+  assert(
+    typeof io.files[sidecarPath('acme/payments-api', io)] === 'string',
+    'written to canonical path',
+  );
   console.log('PASS: test_round_trip');
 }
 
@@ -83,7 +89,10 @@ function test_filename_is_flat_and_traversal_safe(): void {
   assert(!sidecarFileName('../../etc/passwd').startsWith('.'), 'leading dots neutralised');
   // The full path always stays under the signals dir.
   assert(sidecarPath('acme/payments').startsWith(signalsDir()), 'path stays under signals dir');
-  assert(sidecarPath('../../etc/passwd').startsWith(signalsDir()), 'hostile id stays under signals dir');
+  assert(
+    sidecarPath('../../etc/passwd').startsWith(signalsDir()),
+    'hostile id stays under signals dir',
+  );
   console.log('PASS: test_filename_is_flat_and_traversal_safe');
 }
 
@@ -97,9 +106,15 @@ function test_corrupt_reads_undefined(): void {
 function test_invalid_shape_reads_undefined(): void {
   const io = fakeSignalsIO();
   // Valid JSON but not a RepoSignals envelope (owners is not a string[]).
-  io.files[sidecarPath('o/b', io)] = JSON.stringify({ version: 1, signals: { repoId: 'o/b', owners: 'nope', deps: [] } });
+  io.files[sidecarPath('o/b', io)] = JSON.stringify({
+    version: 1,
+    signals: { repoId: 'o/b', owners: 'nope', deps: [] },
+  });
   assert(loadSignalsSidecar('o/b', io) === undefined, 'wrong-typed field => undefined (fallback)');
-  io.files[sidecarPath('o/c', io)] = JSON.stringify({ version: 1, signals: { owners: [], deps: [] } });
+  io.files[sidecarPath('o/c', io)] = JSON.stringify({
+    version: 1,
+    signals: { owners: [], deps: [] },
+  });
   assert(loadSignalsSidecar('o/c', io) === undefined, 'missing repoId => undefined (fallback)');
   console.log('PASS: test_invalid_shape_reads_undefined');
 }
@@ -107,7 +122,11 @@ function test_invalid_shape_reads_undefined(): void {
 function test_tolerates_bare_signals_object(): void {
   const io = fakeSignalsIO();
   // A bare RepoSignals (no version envelope) is still accepted.
-  io.files[sidecarPath('o/d', io)] = JSON.stringify({ repoId: 'o/d', owners: ['@o/team'], deps: [] });
+  io.files[sidecarPath('o/d', io)] = JSON.stringify({
+    repoId: 'o/d',
+    owners: ['@o/team'],
+    deps: [],
+  });
   const loaded = loadSignalsSidecar('o/d', io);
   assert(!!loaded && loaded!.owners.join(',') === '@o/team', 'bare RepoSignals object accepted');
   console.log('PASS: test_tolerates_bare_signals_object');
@@ -121,17 +140,27 @@ function test_inference_prefers_sidecar_else_markdown(): void {
 
   // No sidecar => falls back to the markdown parse.
   const fromMarkdown = repoSignals('acme/repo', markdownDocs, io);
-  assert(fromMarkdown.owners.join(',') === '@acme/from-markdown', 'absent sidecar => markdown parse');
+  assert(
+    fromMarkdown.owners.join(',') === '@acme/from-markdown',
+    'absent sidecar => markdown parse',
+  );
 
   // Sidecar present => preferred over markdown (distinct owner proves the source).
-  writeSignalsSidecar('acme/repo', { repoId: 'acme/repo', owners: ['@acme/from-sidecar'], deps: [] }, io);
+  writeSignalsSidecar(
+    'acme/repo',
+    { repoId: 'acme/repo', owners: ['@acme/from-sidecar'], deps: [] },
+    io,
+  );
   const fromSidecar = repoSignals('acme/repo', markdownDocs, io);
   assert(fromSidecar.owners.join(',') === '@acme/from-sidecar', 'present sidecar => preferred');
 
   // Corrupt sidecar => falls back to markdown again.
   io.files[sidecarPath('acme/repo', io)] = 'not json';
   const fallback = repoSignals('acme/repo', markdownDocs, io);
-  assert(fallback.owners.join(',') === '@acme/from-markdown', 'corrupt sidecar => markdown fallback');
+  assert(
+    fallback.owners.join(',') === '@acme/from-markdown',
+    'corrupt sidecar => markdown fallback',
+  );
   console.log('PASS: test_inference_prefers_sidecar_else_markdown');
 }
 

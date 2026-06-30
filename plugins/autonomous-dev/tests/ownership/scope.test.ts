@@ -46,7 +46,10 @@ function test_eligibility(): void {
     scopeEligible('project:payments', { repoId: 'acme/api', projectId: 'payments' }) === true,
     'project match',
   );
-  assert(scopeEligible('project:payments', { projectId: 'identity' }) === false, 'project mismatch');
+  assert(
+    scopeEligible('project:payments', { projectId: 'identity' }) === false,
+    'project mismatch',
+  );
   // malformed scope is never eligible
   assert(scopeEligible('garbage' as ArtifactScope, { repoId: 'r' }) === false, 'malformed inert');
   console.log('PASS: test_eligibility');

@@ -20,13 +20,18 @@ function unique(xs: string[]): string[] {
 }
 
 /** Build the idempotent MERGE statements (pure; all crawled values parameterized). */
-export function buildGraphStatements(org: string, ownership: Ownership, signals: RepoSignals[]): GraphStatement[] {
+export function buildGraphStatements(
+  org: string,
+  ownership: Ownership,
+  signals: RepoSignals[],
+): GraphStatement[] {
   const stmts: GraphStatement[] = [{ statement: 'MERGE (o:Org {id:$org})', parameters: { org } }];
   const knownProjects = new Set(ownership.projects.map((p) => p.id));
 
   for (const p of ownership.projects) {
     stmts.push({
-      statement: 'MERGE (o:Org {id:$org}) MERGE (p:Project {id:$pid}) SET p.name=$name MERGE (p)-[:IN_ORG]->(o)',
+      statement:
+        'MERGE (o:Org {id:$org}) MERGE (p:Project {id:$pid}) SET p.name=$name MERGE (p)-[:IN_ORG]->(o)',
       parameters: { org, pid: p.id, name: p.name },
     });
   }
@@ -40,7 +45,8 @@ export function buildGraphStatements(org: string, ownership: Ownership, signals:
     // Only link to a KNOWN project — never MERGE an orphan Project node for a dangling projectId.
     if (r.projectId && knownProjects.has(r.projectId)) {
       stmts.push({
-        statement: 'MERGE (r:Repo {id:$rid}) MERGE (p:Project {id:$pid}) MERGE (r)-[:IN_PROJECT]->(p)',
+        statement:
+          'MERGE (r:Repo {id:$rid}) MERGE (p:Project {id:$pid}) MERGE (r)-[:IN_PROJECT]->(p)',
         parameters: { rid: r.id, pid: r.projectId },
       });
     }
@@ -48,13 +54,15 @@ export function buildGraphStatements(org: string, ownership: Ownership, signals:
     if (!sig) continue;
     for (const owner of unique(sig.owners)) {
       stmts.push({
-        statement: 'MERGE (r:Repo {id:$rid}) MERGE (w:Owner {id:$owner}) MERGE (r)-[:OWNED_BY]->(w)',
+        statement:
+          'MERGE (r:Repo {id:$rid}) MERGE (w:Owner {id:$owner}) MERGE (r)-[:OWNED_BY]->(w)',
         parameters: { rid: r.id, owner },
       });
     }
     for (const dep of unique(sig.deps)) {
       stmts.push({
-        statement: 'MERGE (r:Repo {id:$rid}) MERGE (d:Dependency {id:$dep}) MERGE (r)-[:DEPENDS_ON]->(d)',
+        statement:
+          'MERGE (r:Repo {id:$rid}) MERGE (d:Dependency {id:$dep}) MERGE (r)-[:DEPENDS_ON]->(d)',
         parameters: { rid: r.id, dep },
       });
     }
@@ -78,7 +86,13 @@ export async function syncGraph(
   signals: RepoSignals[],
   chunkSize = 200,
 ): Promise<SyncResult> {
-  if (!client) return { ok: false, applied: 0, skipped: true, error: 'Neo4j not configured (graph layer skipped)' };
+  if (!client)
+    return {
+      ok: false,
+      applied: 0,
+      skipped: true,
+      error: 'Neo4j not configured (graph layer skipped)',
+    };
   const cs = chunkSize >= 1 ? Math.floor(chunkSize) : 1; // guard against 0/negative → infinite loop
   const stmts = buildGraphStatements(org, ownership, signals);
   let applied = 0;

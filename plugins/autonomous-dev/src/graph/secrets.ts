@@ -28,7 +28,7 @@ export function neo4jSecretsPath(homedir: string): string {
 /** bolt://host:7687 | neo4j://[::1] → http://host:7474 (HTTP tx API port); '' if no host. */
 export function boltToHttp(uri: string): string {
   const m = uri.match(/^(?:bolt|neo4j)(?:\+s(?:sc)?)?:\/\/(\[[^\]]+\]|[^:/]+)(?::\d+)?/i);
-  const host = (m ? m[1] : uri.replace(/^[a-z+]+:\/\//i, '').split(/[:/]/)[0] ?? '').trim();
+  const host = (m ? m[1] : (uri.replace(/^[a-z+]+:\/\//i, '').split(/[:/]/)[0] ?? '')).trim();
   return host ? `http://${host}:7474` : '';
 }
 
@@ -52,7 +52,8 @@ export function readNeo4jCreds(
   const password = typeof o.password === 'string' ? o.password : undefined;
   if (!uri || !user || !password) return undefined;
   // a NON-EMPTY httpUrl override wins; else derive from the bolt uri. Reject a malformed result.
-  const httpUrl = typeof o.httpUrl === 'string' && o.httpUrl.trim() ? o.httpUrl.trim() : boltToHttp(uri);
+  const httpUrl =
+    typeof o.httpUrl === 'string' && o.httpUrl.trim() ? o.httpUrl.trim() : boltToHttp(uri);
   if (!httpUrl || !/^https?:\/\/[^/\s]+/i.test(httpUrl)) return undefined;
   return { httpUrl, user, password };
 }

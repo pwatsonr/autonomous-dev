@@ -163,8 +163,7 @@ function buildRouter(overrides: Partial<ObservationRouterOptions> = {}): Observa
       if (logs.length > 0) {
         for (const logResult of logs) {
           const aggs = logResult.aggregations as
-            | { error_messages?: Array<{ key: string; doc_count: number }> }
-            | undefined;
+            { error_messages?: Array<{ key: string; doc_count: number }> } | undefined;
           if (aggs?.error_messages) {
             for (const bucket of aggs.error_messages) {
               if (bucket.doc_count > 10) {

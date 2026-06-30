@@ -9,10 +9,7 @@
 import * as path from 'path';
 
 import type { Ownership } from '../../src/ownership/types';
-import {
-  resolveScopeContext,
-  type ScopeContextIO,
-} from '../../src/runner/scope-context';
+import { resolveScopeContext, type ScopeContextIO } from '../../src/runner/scope-context';
 
 const HOME = '/home/test';
 const MEM = path.join(HOME, '.autonomous-dev', 'memory');
@@ -110,8 +107,7 @@ describe('resolveScopeContext', () => {
       phase: 'code',
       defaultAgent: 'code-executor',
       io,
-      agentResolver: (def, ctx) =>
-        ctx.repoId === 'acme/api' ? 'code-executor-acme' : def,
+      agentResolver: (def, ctx) => (ctx.repoId === 'acme/api' ? 'code-executor-acme' : def),
     });
     expect(r.agent).toBe('code-executor-acme');
   });

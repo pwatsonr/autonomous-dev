@@ -19,11 +19,7 @@ import type { ArtifactConstraintViolation } from './constraints';
 import type { ArtifactMetaFinding } from './meta-review';
 
 export type ArtifactProposalStatus =
-  | 'pending_meta_review'
-  | 'meta_approved'
-  | 'meta_rejected'
-  | 'promoted'
-  | 'rejected';
+  'pending_meta_review' | 'meta_approved' | 'meta_rejected' | 'promoted' | 'rejected';
 
 export interface ProposalHistoryEntry {
   at: string;
@@ -61,7 +57,8 @@ export interface ArtifactStoreIO {
 
 export const defaultArtifactStoreIO: ArtifactStoreIO = {
   homedir: () => resolveAbsoluteHome(),
-  readFile: (filePath) => (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined),
+  readFile: (filePath) =>
+    fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : undefined,
   writeFile: (filePath, data) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const tmp = `${filePath}.tmp.${process.pid}`;
@@ -119,7 +116,10 @@ function saveProposals(ps: ArtifactProposal[], io: ArtifactStoreIO): void {
 }
 
 /** Insert or replace a proposal by id (idempotent re-propose; audit history is append-only). */
-export function upsertProposal(p: ArtifactProposal, io: ArtifactStoreIO = defaultArtifactStoreIO): ArtifactProposal {
+export function upsertProposal(
+  p: ArtifactProposal,
+  io: ArtifactStoreIO = defaultArtifactStoreIO,
+): ArtifactProposal {
   const ps = loadProposals(io);
   const idx = ps.findIndex((x) => x.id === p.id);
   let stored = p;
@@ -127,7 +127,11 @@ export function upsertProposal(p: ArtifactProposal, io: ArtifactStoreIO = defaul
     const prior = ps[idx];
     // Preserve the prior history + any prior operator tool override (monotonic audit; B5).
     // History is capped to the most recent HISTORY_CAP entries (issue #591 — bounded growth).
-    stored = { ...p, history: capHistory([...prior.history, ...p.history]), toolOverride: p.toolOverride ?? prior.toolOverride };
+    stored = {
+      ...p,
+      history: capHistory([...prior.history, ...p.history]),
+      toolOverride: p.toolOverride ?? prior.toolOverride,
+    };
     ps[idx] = stored;
   } else {
     stored = { ...p, history: capHistory(p.history) };
@@ -137,7 +141,10 @@ export function upsertProposal(p: ArtifactProposal, io: ArtifactStoreIO = defaul
   return stored;
 }
 
-export function getProposal(id: string, io: ArtifactStoreIO = defaultArtifactStoreIO): ArtifactProposal | undefined {
+export function getProposal(
+  id: string,
+  io: ArtifactStoreIO = defaultArtifactStoreIO,
+): ArtifactProposal | undefined {
   return loadProposals(io).find((p) => p.id === id);
 }
 

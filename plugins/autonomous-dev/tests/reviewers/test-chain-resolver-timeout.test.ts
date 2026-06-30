@@ -46,11 +46,13 @@ afterAll(() => {
 // Base config fixture builder
 // ---------------------------------------------------------------------------
 
-function makeConfig(overrides: {
-  entryTimeout?: number;
-  gateDefaultTimeout?: number;
-  configDefaultTimeout?: number;
-} = {}): object {
+function makeConfig(
+  overrides: {
+    entryTimeout?: number;
+    gateDefaultTimeout?: number;
+    configDefaultTimeout?: number;
+  } = {},
+): object {
   const entry: Record<string, unknown> = {
     name: 'doc-reviewer',
     type: 'built-in',
@@ -105,7 +107,14 @@ describe('resolveChain — timeout resolution (SPEC-REQ-000050)', () => {
 
   it('TR-01: per-entry timeout wins over gate_defaults and defaults', async () => {
     const repo = trackedRepo();
-    writeOverride(repo, makeConfig({ entryTimeout: 600000, gateDefaultTimeout: 1200000, configDefaultTimeout: 900000 }));
+    writeOverride(
+      repo,
+      makeConfig({
+        entryTimeout: 600000,
+        gateDefaultTimeout: 1200000,
+        configDefaultTimeout: 900000,
+      }),
+    );
     const chain = await resolveChain(repo, 'feature', 'code_review');
     expect(chain).toHaveLength(1);
     expect(chain[0].timeout_ms).toBe(600000);

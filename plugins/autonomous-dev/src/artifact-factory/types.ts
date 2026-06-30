@@ -43,4 +43,7 @@ export interface ArtifactParseResult {
   errors: ArtifactParseError[];
 }
 
-export const ARTIFACT_KINDS: ReadonlySet<ArtifactKind> = new Set<ArtifactKind>(['skill', 'command']);
+export const ARTIFACT_KINDS: ReadonlySet<ArtifactKind> = new Set<ArtifactKind>([
+  'skill',
+  'command',
+]);

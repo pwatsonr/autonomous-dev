@@ -44,7 +44,9 @@ const CHECKLIST = [
 
 /** Strip control/zero-width chars + cap length so untrusted evidence can't reshape the prompt. */
 function sanitizeForPrompt(s: string): string {
-  return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u200B-\u200D\u2060\uFEFF]/g, '').slice(0, 2000);
+  return s
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u200B-\u200D\u2060\uFEFF]/g, '')
+    .slice(0, 2000);
 }
 
 /** Build the meta-review user prompt. */
@@ -105,7 +107,12 @@ function extractVerdictObject(txt: string): Record<string, unknown> | undefined 
     if (!candidate) continue;
     try {
       const obj = JSON.parse(candidate);
-      if (obj && typeof obj === 'object' && !Array.isArray(obj) && ('verdict' in obj || 'status' in obj)) {
+      if (
+        obj &&
+        typeof obj === 'object' &&
+        !Array.isArray(obj) &&
+        ('verdict' in obj || 'status' in obj)
+      ) {
         return obj as Record<string, unknown>;
       }
     } catch {
@@ -116,7 +123,9 @@ function extractVerdictObject(txt: string): Record<string, unknown> | undefined 
 }
 
 /** Tolerantly parse a verdict JSON out of arbitrary model text. */
-export function parseVerdict(raw: string): { verdict: 'approved' | 'rejected'; findings: ArtifactMetaFinding[] } | undefined {
+export function parseVerdict(
+  raw: string,
+): { verdict: 'approved' | 'rejected'; findings: ArtifactMetaFinding[] } | undefined {
   let txt = raw.trim();
   const fence = txt.match(/```(?:json)?\s*\n([\s\S]*?)```/);
   if (fence) txt = fence[1].trim();
@@ -124,7 +133,8 @@ export function parseVerdict(raw: string): { verdict: 'approved' | 'rejected'; f
   let o: Record<string, unknown> | undefined;
   try {
     const whole = JSON.parse(txt);
-    if (whole && typeof whole === 'object' && !Array.isArray(whole)) o = whole as Record<string, unknown>;
+    if (whole && typeof whole === 'object' && !Array.isArray(whole))
+      o = whole as Record<string, unknown>;
   } catch {
     /* fall through to scan */
   }
@@ -149,21 +159,34 @@ export async function reviewArtifact(
 ): Promise<ArtifactMetaReview> {
   let raw = '';
   try {
-    raw = await runtime.generate(buildMetaReviewPrompt(artifact, opts.evidence ?? ''), opts.systemPrompt);
+    raw = await runtime.generate(
+      buildMetaReviewPrompt(artifact, opts.evidence ?? ''),
+      opts.systemPrompt,
+    );
   } catch (err) {
     return {
       verdict: 'rejected',
-      findings: [{ severity: 'blocking', message: `meta-review runtime error: ${err instanceof Error ? err.message : String(err)}` }],
+      findings: [
+        {
+          severity: 'blocking',
+          message: `meta-review runtime error: ${err instanceof Error ? err.message : String(err)}`,
+        },
+      ],
       raw: '',
     };
   }
 
   const parsed = parseVerdict(raw);
   if (!parsed) {
-    return { verdict: 'rejected', findings: [{ severity: 'blocking', message: 'meta-review output unparseable (fail-closed)' }], raw };
+    return {
+      verdict: 'rejected',
+      findings: [{ severity: 'blocking', message: 'meta-review output unparseable (fail-closed)' }],
+      raw,
+    };
   }
 
   const hasBlocker = parsed.findings.some((f) => f.severity === 'blocking');
-  const verdict: 'approved' | 'rejected' = parsed.verdict === 'approved' && !hasBlocker ? 'approved' : 'rejected';
+  const verdict: 'approved' | 'rejected' =
+    parsed.verdict === 'approved' && !hasBlocker ? 'approved' : 'rejected';
   return { verdict, findings: parsed.findings, raw };
 }

@@ -33,7 +33,10 @@ export const depsExtractor: Extractor = {
       if (c !== undefined) blocks.push(`### ${m}\n\n\`\`\`\n${c.slice(0, 4000)}\n\`\`\``);
     }
     if (blocks.length === 0) return undefined;
-    return { topic: 'dependencies', content: `# Dependencies — ${repo.meta.id}\n\n${blocks.join('\n\n')}` };
+    return {
+      topic: 'dependencies',
+      content: `# Dependencies — ${repo.meta.id}\n\n${blocks.join('\n\n')}`,
+    };
   },
 };
 
@@ -46,7 +49,10 @@ export const codeownersExtractor: Extractor = {
       repo.readFile('.github/CODEOWNERS') ??
       repo.readFile('docs/CODEOWNERS');
     if (c === undefined || c.trim() === '') return undefined;
-    return { topic: 'ownership', content: `# Ownership — ${repo.meta.id}\n\n\`\`\`\n${c.slice(0, CAP)}\n\`\`\`` };
+    return {
+      topic: 'ownership',
+      content: `# Ownership — ${repo.meta.id}\n\n\`\`\`\n${c.slice(0, CAP)}\n\`\`\``,
+    };
   },
 };
 
@@ -84,8 +90,18 @@ export const buildDeployExtractor: Extractor = {
 export const testConventionsExtractor: Extractor = {
   topic: 'test-conventions',
   extract(repo) {
-    const markers = ['jest.config.js', 'jest.config.cjs', 'pytest.ini', 'tests', 'test', '__tests__', 'spec'];
-    const present = markers.filter((p) => repo.readFile(p) !== undefined || repo.listFiles(p).length > 0);
+    const markers = [
+      'jest.config.js',
+      'jest.config.cjs',
+      'pytest.ini',
+      'tests',
+      'test',
+      '__tests__',
+      'spec',
+    ];
+    const present = markers.filter(
+      (p) => repo.readFile(p) !== undefined || repo.listFiles(p).length > 0,
+    );
     if (present.length === 0) return undefined;
     return {
       topic: 'test-conventions',

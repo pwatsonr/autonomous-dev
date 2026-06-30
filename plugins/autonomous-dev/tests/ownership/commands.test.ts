@@ -97,7 +97,11 @@ function test_assign_repo(): void {
   assert(threw, 'assign to unknown project rejected');
 
   // assign creates the repo entry
-  const r = assignRepo(withProject, { repoId: 'acme/api', projectId: 'payments', path: '/work/api' });
+  const r = assignRepo(withProject, {
+    repoId: 'acme/api',
+    projectId: 'payments',
+    path: '/work/api',
+  });
   assert(r.ownership.repos.length === 1, 'repo created');
   assert(r.ownership.repos[0].projectId === 'payments', 'membership set');
   assert(r.ownership.repos[0].path === '/work/api', 'path set');
@@ -281,7 +285,10 @@ function test_link_org(): void {
 // P1 review: traversal-shaped repo ids must be rejected (assign/tag/enroll throw;
 // registerRepos skips) — defense-in-depth so an id can't escape a path segment.
 function test_repo_id_traversal_rejected(): void {
-  const own = assignRepo(addProject(EMPTY, { id: 'p' }).ownership, { repoId: 'acme/api', projectId: 'p' }).ownership;
+  const own = assignRepo(addProject(EMPTY, { id: 'p' }).ownership, {
+    repoId: 'acme/api',
+    projectId: 'p',
+  }).ownership;
   for (const bad of ['../etc/passwd', 'a/../b', 'a//b', '..']) {
     for (const op of [
       () => assignRepo(own, { repoId: bad, projectId: 'p' }),
@@ -297,7 +304,10 @@ function test_repo_id_traversal_rejected(): void {
       assert(threw, `traversal id "${bad}" rejected`);
     }
     // registerRepos skips (does not throw) malformed ids
-    assert(registerRepos(EMPTY, [bad]).ownership.repos.length === 0, `traversal id "${bad}" not registered`);
+    assert(
+      registerRepos(EMPTY, [bad]).ownership.repos.length === 0,
+      `traversal id "${bad}" not registered`,
+    );
   }
   console.log('PASS: test_repo_id_traversal_rejected');
 }
@@ -334,9 +344,15 @@ function test_auto_improve_gate(): void {
   // a freshly INGESTED repo (registerRepos) is recorded but unenrolled...
   let own = registerRepos(EMPTY, ['acme/api']).ownership;
   assert(mayAutoImproveScope(own, 'global') === true, 'global scope not repo-gated');
-  assert(mayAutoImproveScope(own, 'project:payments') === true, 'project scope not repo-gated (phase 1)');
+  assert(
+    mayAutoImproveScope(own, 'project:payments') === true,
+    'project scope not repo-gated (phase 1)',
+  );
   // ...so a repo-scoped artifact for it may NOT be auto-improved (ingest ≠ enroll).
-  assert(mayAutoImproveScope(own, 'repo:acme/api') === false, 'ingested-but-unenrolled repo is gated OFF');
+  assert(
+    mayAutoImproveScope(own, 'repo:acme/api') === false,
+    'ingested-but-unenrolled repo is gated OFF',
+  );
   assert(mayAutoImproveScope(own, 'repo:unknown/x') === false, 'unknown repo fail-closed');
 
   // after explicit enrollment, the gate opens for that repo only.

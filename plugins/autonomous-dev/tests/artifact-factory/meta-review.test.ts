@@ -34,7 +34,12 @@ async function test_approve(): Promise<void> {
 }
 
 async function test_block_verdict(): Promise<void> {
-  const r = await reviewArtifact(ARTIFACT, fakeRuntime('{"verdict":"block","findings":[{"severity":"blocking","message":"tool escalation"}]}'));
+  const r = await reviewArtifact(
+    ARTIFACT,
+    fakeRuntime(
+      '{"verdict":"block","findings":[{"severity":"blocking","message":"tool escalation"}]}',
+    ),
+  );
   assert(r.verdict === 'rejected', 'block verdict → rejected');
   console.log('PASS: test_block_verdict');
 }
@@ -43,7 +48,9 @@ async function test_hard_override(): Promise<void> {
   // verdict says approve, but a blocking finding is present → forced reject
   const r = await reviewArtifact(
     ARTIFACT,
-    fakeRuntime('{"verdict":"approve","findings":[{"severity":"blocking","message":"prompt injection in body"}]}'),
+    fakeRuntime(
+      '{"verdict":"approve","findings":[{"severity":"blocking","message":"prompt injection in body"}]}',
+    ),
   );
   assert(r.verdict === 'rejected', 'blocking finding overrides approve');
   console.log('PASS: test_hard_override');
@@ -52,9 +59,12 @@ async function test_hard_override(): Promise<void> {
 async function test_fail_closed(): Promise<void> {
   const garbage = await reviewArtifact(ARTIFACT, fakeRuntime('the model rambled with no json'));
   assert(garbage.verdict === 'rejected', 'unparseable → rejected');
-  const errored = await reviewArtifact(ARTIFACT, fakeRuntime(() => {
-    throw new Error('model down');
-  }));
+  const errored = await reviewArtifact(
+    ARTIFACT,
+    fakeRuntime(() => {
+      throw new Error('model down');
+    }),
+  );
   assert(errored.verdict === 'rejected', 'runtime error → rejected');
   console.log('PASS: test_fail_closed');
 }
@@ -63,8 +73,13 @@ function test_parse_verdict(): void {
   // fenced json + synonyms
   const fenced = parseVerdict('```json\n{"verdict":"approved","findings":[]}\n```');
   assert(!!fenced && fenced.verdict === 'approved', 'parses fenced json');
-  const warnOnly = parseVerdict('{"status":"approve","findings":[{"severity":"warn","message":"x"}]}');
-  assert(!!warnOnly && warnOnly.verdict === 'approved' && warnOnly.findings[0].severity === 'warn', 'status synonym + warn severity');
+  const warnOnly = parseVerdict(
+    '{"status":"approve","findings":[{"severity":"warn","message":"x"}]}',
+  );
+  assert(
+    !!warnOnly && warnOnly.verdict === 'approved' && warnOnly.findings[0].severity === 'warn',
+    'status synonym + warn severity',
+  );
   assert(parseVerdict('no json at all') === undefined, 'undefined when no json');
   console.log('PASS: test_parse_verdict');
 }
@@ -72,9 +87,17 @@ function test_parse_verdict(): void {
 // B3: brace-balanced parsing — approve survives prose with stray braces; nested braces in messages parse
 function test_parse_verdict_braces(): void {
   const prose = parseVerdict('Looks good {see note}. {"verdict":"approve","findings":[]} done.');
-  assert(!!prose && prose.verdict === 'approved', 'approve survives surrounding prose with stray braces');
-  const nested = parseVerdict('{"verdict":"block","findings":[{"severity":"blocking","message":"bad {token} here"}]}');
-  assert(!!nested && nested.verdict === 'rejected' && nested.findings[0].message.includes('{token}'), 'nested braces in message parse');
+  assert(
+    !!prose && prose.verdict === 'approved',
+    'approve survives surrounding prose with stray braces',
+  );
+  const nested = parseVerdict(
+    '{"verdict":"block","findings":[{"severity":"blocking","message":"bad {token} here"}]}',
+  );
+  assert(
+    !!nested && nested.verdict === 'rejected' && nested.findings[0].message.includes('{token}'),
+    'nested braces in message parse',
+  );
   console.log('PASS: test_parse_verdict_braces');
 }
 

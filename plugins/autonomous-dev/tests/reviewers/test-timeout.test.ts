@@ -75,10 +75,7 @@ describe('parseTimeoutEnvInt', () => {
 
 describe('timeout.ts structural invariants', () => {
   it('TS11: timeout.ts has no import statements from the reviewer suite', () => {
-    const timeoutPath = path.resolve(
-      __dirname,
-      '../../intake/reviewers/timeout.ts',
-    );
+    const timeoutPath = path.resolve(__dirname, '../../intake/reviewers/timeout.ts');
     const source = fs.readFileSync(timeoutPath, 'utf8');
     // The module MUST have zero `import ... from` statements.
     const importMatches = source.match(/^\s*import .* from /m);

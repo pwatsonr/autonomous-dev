@@ -47,24 +47,26 @@ describe('event-emitter', () => {
     mockAuditLogger = new AuditLogger(dm) as jest.Mocked<AuditLogger>;
 
     // Mock appendEvent to return a properly structured PipelineEvent
-    mockAuditLogger.appendEvent = jest.fn().mockImplementation(
-      async (
-        pipelineId: string,
-        eventType: string,
-        details: Record<string, unknown>,
-        actorId: string,
-        documentId?: string,
-      ): Promise<PipelineEvent> => ({
-        eventId: 'evt-mock-001',
-        pipelineId,
-        timestamp: new Date().toISOString(),
-        eventType,
-        documentId,
-        details,
-        actorId,
-        previousHash: 'mock-hash',
-      }),
-    );
+    mockAuditLogger.appendEvent = jest
+      .fn()
+      .mockImplementation(
+        async (
+          pipelineId: string,
+          eventType: string,
+          details: Record<string, unknown>,
+          actorId: string,
+          documentId?: string,
+        ): Promise<PipelineEvent> => ({
+          eventId: 'evt-mock-001',
+          pipelineId,
+          timestamp: new Date().toISOString(),
+          eventType,
+          documentId,
+          details,
+          actorId,
+          previousHash: 'mock-hash',
+        }),
+      );
 
     emitter = new PipelineEventEmitter(mockAuditLogger);
   });

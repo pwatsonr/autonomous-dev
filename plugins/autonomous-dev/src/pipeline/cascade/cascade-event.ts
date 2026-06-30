@@ -1,11 +1,7 @@
 import { DocumentType } from '../types/document-type';
 
 export type CascadeStatus =
-  | 'initiated'
-  | 'parent_revised'
-  | 'children_re_evaluated'
-  | 'resolved'
-  | 'escalated';
+  'initiated' | 'parent_revised' | 'children_re_evaluated' | 'resolved' | 'escalated';
 
 export interface AffectedDocument {
   documentId: string;

@@ -47,7 +47,8 @@ function oppId(kind: ArtifactKind, suggestedName: string, repoId: string): strin
   return `${kind}:${suggestedName}:${repoId}`;
 }
 
-const VAULT_RE = /\b(vault|hashicorp|sops|sealed[-\s]?secrets|doppler|infisical|akeyless|secrets?[-\s]?manager)\b/i;
+const VAULT_RE =
+  /\b(vault|hashicorp|sops|sealed[-\s]?secrets|doppler|infisical|akeyless|secrets?[-\s]?manager)\b/i;
 
 /** A secrets/vault signal in the deps or build/deploy memory → a vault-access skill. */
 export const vaultDetector: OpportunityDetector = {
@@ -104,7 +105,10 @@ export const domainGlossaryDetector: OpportunityDetector = {
     if (content.trim().length < 600) return [];
     // Require a structural signal — not just length — to cut noise from long prose READMEs.
     const headings = (content.match(/^##\s/gm) ?? []).length;
-    const hasGlossary = /\b(glossary|terminology|domain\s+model|key\s+concepts|ubiquitous\s+language)\b/i.test(content);
+    const hasGlossary =
+      /\b(glossary|terminology|domain\s+model|key\s+concepts|ubiquitous\s+language)\b/i.test(
+        content,
+      );
     if (headings < 2 && !hasGlossary) return [];
     return [
       {

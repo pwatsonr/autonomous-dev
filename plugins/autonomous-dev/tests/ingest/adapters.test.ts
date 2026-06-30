@@ -12,7 +12,9 @@ interface Recorder extends CommandRunner {
   calls: { cmd: string; args: string[] }[];
 }
 
-function recordingRunner(handler: (cmd: string, args: string[]) => { stdout: string; code: number }): Recorder {
+function recordingRunner(
+  handler: (cmd: string, args: string[]) => { stdout: string; code: number },
+): Recorder {
   const calls: { cmd: string; args: string[] }[] = [];
   return {
     calls,
@@ -28,7 +30,11 @@ const PAGE1 = JSON.stringify({
     organization: {
       repositories: {
         nodes: [
-          { nameWithOwner: 'Acme/API', isArchived: false, defaultBranchRef: { name: 'main', target: { oid: 'sha1' } } },
+          {
+            nameWithOwner: 'Acme/API',
+            isArchived: false,
+            defaultBranchRef: { name: 'main', target: { oid: 'sha1' } },
+          },
           { nameWithOwner: 'acme/empty', isArchived: false, defaultBranchRef: null },
         ],
         pageInfo: { hasNextPage: true, endCursor: 'c1' },
@@ -41,7 +47,11 @@ const PAGE2 = JSON.stringify({
     organization: {
       repositories: {
         nodes: [
-          { nameWithOwner: 'acme/old', isArchived: true, defaultBranchRef: { name: 'main', target: { oid: 'sha2' } } },
+          {
+            nameWithOwner: 'acme/old',
+            isArchived: true,
+            defaultBranchRef: { name: 'main', target: { oid: 'sha2' } },
+          },
         ],
         pageInfo: { hasNextPage: false, endCursor: 'c2' },
       },
@@ -59,7 +69,10 @@ async function test_list_repos_parses_and_paginates(): Promise<void> {
   const client = createGhOrgClient({ scratchDir: '/tmp/scratch', runner });
   const metas = await client.listRepos('acme');
   assert(metas.length === 2, `2 repos (empty skipped), got ${metas.length}`);
-  assert(metas[0].id === 'acme/api' && metas[0].headSha === 'sha1', 'id lowercased + sha from page1');
+  assert(
+    metas[0].id === 'acme/api' && metas[0].headSha === 'sha1',
+    'id lowercased + sha from page1',
+  );
   assert(metas[1].id === 'acme/old' && metas[1].archived === true, 'archived repo from page2');
   console.log('PASS: test_list_repos_parses_and_paginates');
 }
@@ -69,11 +82,26 @@ async function test_only_readonly_commands(): Promise<void> {
     if (cmd === 'gh' && args[0] === 'api') return { stdout: PAGE2, code: 0 };
     return { stdout: '', code: 0 }; // clone "succeeds"
   });
-  const client = createGhOrgClient({ scratchDir: '/tmp/scratch', runner, fsLike: { readFile: () => undefined, listFiles: () => [] } });
+  const client = createGhOrgClient({
+    scratchDir: '/tmp/scratch',
+    runner,
+    fsLike: { readFile: () => undefined, listFiles: () => [] },
+  });
   await client.listRepos('acme');
   await client.openRepo({ id: 'acme/old', defaultBranch: 'main', headSha: 'sha2' });
 
-  const forbidden = ['push', 'commit', 'rm', '-X', 'POST', 'PUT', 'PATCH', 'DELETE', 'gh pr', 'gh issue'];
+  const forbidden = [
+    'push',
+    'commit',
+    'rm',
+    '-X',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'gh pr',
+    'gh issue',
+  ];
   for (const { cmd, args } of runner.calls) {
     assert(cmd === 'gh' || cmd === 'git', `only gh/git invoked, saw ${cmd}`);
     const line = `${cmd} ${args.join(' ')}`;
@@ -83,7 +111,10 @@ async function test_only_readonly_commands(): Promise<void> {
   }
   // the clone is shallow + to scratch
   const clone = runner.calls.find((c) => c.args[0] === 'repo' && c.args[1] === 'clone');
-  assert(!!clone && clone.args.includes('--depth') && clone.args.includes('1'), 'clone is shallow (--depth 1)');
+  assert(
+    !!clone && clone.args.includes('--depth') && clone.args.includes('1'),
+    'clone is shallow (--depth 1)',
+  );
   assert(!!clone && clone.args[3].startsWith('/tmp/scratch'), 'clone target is the scratch dir');
   console.log('PASS: test_only_readonly_commands');
 }
@@ -95,9 +126,21 @@ async function test_rejects_unsafe_ids_and_org(): Promise<void> {
       organization: {
         repositories: {
           nodes: [
-            { nameWithOwner: 'acme/ok', isArchived: false, defaultBranchRef: { name: 'main', target: { oid: 's' } } },
-            { nameWithOwner: '../evil', isArchived: false, defaultBranchRef: { name: 'main', target: { oid: 's' } } },
-            { nameWithOwner: 'no-slash', isArchived: false, defaultBranchRef: { name: 'main', target: { oid: 's' } } },
+            {
+              nameWithOwner: 'acme/ok',
+              isArchived: false,
+              defaultBranchRef: { name: 'main', target: { oid: 's' } },
+            },
+            {
+              nameWithOwner: '../evil',
+              isArchived: false,
+              defaultBranchRef: { name: 'main', target: { oid: 's' } },
+            },
+            {
+              nameWithOwner: 'no-slash',
+              isArchived: false,
+              defaultBranchRef: { name: 'main', target: { oid: 's' } },
+            },
           ],
           pageInfo: { hasNextPage: false, endCursor: 'c' },
         },
@@ -138,13 +181,18 @@ function test_filesystem_repo_source(): void {
     readFile: (p) => files[p],
     listFiles: (dir) => {
       const prefix = dir.endsWith('/') ? dir : `${dir}/`;
-      return Object.keys(files).filter((p) => p.startsWith(prefix) && !p.slice(prefix.length).includes('/'));
+      return Object.keys(files).filter(
+        (p) => p.startsWith(prefix) && !p.slice(prefix.length).includes('/'),
+      );
     },
   };
   const meta: RepoMeta = { id: 'o/r', defaultBranch: 'main', headSha: 's' };
   const repo = filesystemRepoSource(meta, '/scratch/o__r', fsLike);
   assert(repo.readFile('README.md') === '# hi', 'readFile relative');
-  assert(repo.listFiles('.github/workflows').includes('.github/workflows/ci.yml'), 'listFiles returns repo-relative');
+  assert(
+    repo.listFiles('.github/workflows').includes('.github/workflows/ci.yml'),
+    'listFiles returns repo-relative',
+  );
   assert(repo.readFile('nope') === undefined, 'missing file => undefined');
   console.log('PASS: test_filesystem_repo_source');
 }

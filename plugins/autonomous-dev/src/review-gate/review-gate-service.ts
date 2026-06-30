@@ -793,10 +793,7 @@ export class ReviewGateService {
       // (and existing test coverage) is that 'changes_requested' flows
       // through; the type is widened here via `as` to preserve that.
       final_outcome: (iterationDecision.outcome ?? approvalDecision.outcome) as
-        | 'approved'
-        | 'rejected'
-        | 'escalated'
-        | 'awaiting_human',
+        'approved' | 'rejected' | 'escalated' | 'awaiting_human',
       final_score: aggregationResult.aggregate_score,
       total_iterations: state.current_iteration,
       review_result: reviewResult,

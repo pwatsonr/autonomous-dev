@@ -6,13 +6,7 @@
  * Best-effort per extractor; incremental (skips repos unchanged by HEAD sha).
  */
 
-import type {
-  OrgClient,
-  Extractor,
-  RepoSource,
-  RepoIngestResult,
-  OrgIngestResult,
-} from './types';
+import type { OrgClient, Extractor, RepoSource, RepoIngestResult, OrgIngestResult } from './types';
 import { writeMemoryDoc, defaultMemoryIO } from '../memory/store';
 import type { MemoryStoreIO } from '../memory/store';
 import { defaultExtractors } from './extractors';

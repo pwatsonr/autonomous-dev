@@ -8,10 +8,7 @@ import { DocumentStorage } from '../storage/document-storage';
 import { VersioningEngine } from '../versioning/versioning-engine';
 
 export type AdvanceAction =
-  | 'submit_for_review'
-  | 'review_completed'
-  | 'decompose'
-  | 'revision_submitted';
+  'submit_for_review' | 'review_completed' | 'decompose' | 'revision_submitted';
 
 export type ReviewOutcome = 'approved' | 'changes_requested' | 'rejected';
 

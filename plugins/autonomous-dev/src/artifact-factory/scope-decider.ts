@@ -42,7 +42,11 @@ function decideOne(
   k: number,
 ): { scope: ArtifactScope; confidence: number; rationale: string } {
   if (repoIds.length === 1) {
-    return { scope: `repo:${repoIds[0]}`, confidence: 0.9, rationale: `Seen only in ${repoIds[0]} → repo scope.` };
+    return {
+      scope: `repo:${repoIds[0]}`,
+      confidence: 0.9,
+      rationale: `Seen only in ${repoIds[0]} → repo scope.`,
+    };
   }
   const projects = repoIds.map((id) => repoProject.get(id) ?? null);
   const distinct = [...new Set(projects)];
@@ -61,9 +65,10 @@ function decideOne(
   return {
     scope: 'global',
     confidence: repoIds.length >= k ? 0.7 : 0.5,
-    rationale: namedProjects.length > 1
-      ? `Recurs across ${namedProjects.length} projects → global scope.`
-      : `Recurs across repos with no single shared project → global scope.`,
+    rationale:
+      namedProjects.length > 1
+        ? `Recurs across ${namedProjects.length} projects → global scope.`
+        : `Recurs across repos with no single shared project → global scope.`,
   };
 }
 

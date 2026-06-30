@@ -101,7 +101,9 @@ export function parseAgentString(content: string): ParsedAgentResult {
     if (v !== undefined && v !== null && asBoolFlag(v) === undefined) {
       return {
         success: false,
-        errors: [{ message: `Invalid ${field}: ${JSON.stringify(v)} (expected true or false)`, field }],
+        errors: [
+          { message: `Invalid ${field}: ${JSON.stringify(v)} (expected true or false)`, field },
+        ],
       };
     }
   }

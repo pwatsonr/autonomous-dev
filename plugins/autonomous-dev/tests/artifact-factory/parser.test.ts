@@ -1,4 +1,8 @@
-import { parseArtifact, serializeArtifact, isArtifactScope } from '../../src/artifact-factory/parser';
+import {
+  parseArtifact,
+  serializeArtifact,
+  isArtifactScope,
+} from '../../src/artifact-factory/parser';
 import type { GeneratedArtifact } from '../../src/artifact-factory/types';
 
 /**
@@ -19,7 +23,10 @@ const SAMPLE: GeneratedArtifact = {
 function test_round_trip(): void {
   const md = serializeArtifact(SAMPLE);
   assert(md.startsWith('---\n'), 'starts with frontmatter delimiter');
-  assert(md.includes('scope: repo:acme/api') || md.includes("scope: 'repo:acme/api'"), 'scope serialized');
+  assert(
+    md.includes('scope: repo:acme/api') || md.includes("scope: 'repo:acme/api'"),
+    'scope serialized',
+  );
   const res = parseArtifact(md);
   assert(res.success && !!res.artifact, `parse succeeds: ${JSON.stringify(res.errors)}`);
   const a = res.artifact!;

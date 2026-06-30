@@ -113,5 +113,4 @@ export type ParseResult =
 
 /** Result of validating a parsed response for actionability. */
 export type ValidationResult =
-  | { valid: true; response: EscalationResponse }
-  | { valid: false; error: ResponseValidationError };
+  { valid: true; response: EscalationResponse } | { valid: false; error: ResponseValidationError };

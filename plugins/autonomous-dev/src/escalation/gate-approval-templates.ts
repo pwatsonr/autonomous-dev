@@ -24,10 +24,7 @@ import type { EscalationOption } from './types';
 
 /** The supported gate approval template types. */
 export type GateTemplateType =
-  | 'prd_approval'
-  | 'code_review'
-  | 'deployment_approval'
-  | 'security_review';
+  'prd_approval' | 'code_review' | 'deployment_approval' | 'security_review';
 
 // ---------------------------------------------------------------------------
 // Custom config type

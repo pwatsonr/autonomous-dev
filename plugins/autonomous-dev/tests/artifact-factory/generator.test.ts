@@ -1,4 +1,8 @@
-import { generateArtifact, extractArtifactMarkdown, buildGenerationPrompt } from '../../src/artifact-factory/generator';
+import {
+  generateArtifact,
+  extractArtifactMarkdown,
+  buildGenerationPrompt,
+} from '../../src/artifact-factory/generator';
 import type { GenerateInput } from '../../src/artifact-factory/generator';
 import type { ArtifactRuntime } from '../../src/artifact-factory/runtime';
 import type { Opportunity } from '../../src/artifact-factory/detectors';
@@ -60,7 +64,10 @@ async function test_forces_security_metadata(): Promise<void> {
   assert(a.name === 'vault-access', `name FORCED to suggestedName, got ${a.name}`);
   assert(a.managed === true, 'managed forced true');
   assert(a.kind === 'skill', 'kind forced skill');
-  assert(a.allowedTools.join(',') === 'Read,Glob,Grep', `tools FORCED read-only, got ${a.allowedTools.join(',')}`);
+  assert(
+    a.allowedTools.join(',') === 'Read,Glob,Grep',
+    `tools FORCED read-only, got ${a.allowedTools.join(',')}`,
+  );
   // model content IS used for description + body
   assert(a.description.includes('vault'), 'description from model');
   assert(a.body.includes('Read secrets'), 'body from model');
@@ -74,10 +81,16 @@ async function test_unparseable_model_output(): Promise<void> {
 }
 
 async function test_runtime_error(): Promise<void> {
-  const res = await generateArtifact(INPUT, fakeRuntime(() => {
-    throw new Error('model down');
-  }));
-  assert(!res.artifact && res.errors.some((e) => e.includes('runtime error')), 'runtime error surfaced');
+  const res = await generateArtifact(
+    INPUT,
+    fakeRuntime(() => {
+      throw new Error('model down');
+    }),
+  );
+  assert(
+    !res.artifact && res.errors.some((e) => e.includes('runtime error')),
+    'runtime error surfaced',
+  );
   console.log('PASS: test_runtime_error');
 }
 

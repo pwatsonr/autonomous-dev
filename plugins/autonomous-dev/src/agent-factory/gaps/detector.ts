@@ -31,12 +31,7 @@ import type { AuditLogger } from '../audit';
 
 /** Lifecycle status of a domain gap record. */
 export type GapStatus =
-  | 'detected'
-  | 'specialist_recommended'
-  | 'proposed'
-  | 'accepted'
-  | 'rejected'
-  | 'deferred';
+  'detected' | 'specialist_recommended' | 'proposed' | 'accepted' | 'rejected' | 'deferred';
 
 /** A single domain gap record written to `data/domain-gaps.jsonl`. */
 export interface GapRecord {
