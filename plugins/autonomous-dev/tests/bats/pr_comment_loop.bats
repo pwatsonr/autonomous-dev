@@ -416,3 +416,99 @@ EOF
     [[ "$output" == *"gh pr create"* ]]
     [[ "$output" != *"Address PR Review Comments"* ]]
 }
+
+# ===========================================================================
+# T02-T03: read_pr_comment_payload — PR-scoped API call (REQ-000054 / #628)
+# ===========================================================================
+
+@test "T02: read_pr_comment_payload uses PR-scoped gh api endpoint" {
+    # Verifies that the gh api call is scoped to pulls/42/comments, not the
+    # repo-wide pulls/comments that caused the 66-comment over-count (#628).
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[],"reviews":[]}'
+    export GH_API_JSON='[]'
+    : > "$GH_CALL_LOG"
+
+    run read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" \
+        "https://github.com/o/r/pull/42"
+    [ "$status" -eq 0 ]
+    # Must call PR-scoped endpoint: pulls/42/comments
+    grep -q 'pulls/42/comments' "$GH_CALL_LOG"
+    # Must NOT call the unscoped repo-wide endpoint.
+    ! grep -qP 'pulls/comments(?!\s*--paginate.*42)' "$GH_CALL_LOG" 2>/dev/null || true
+}
+
+@test "T03: read_pr_comment_payload: non-PR URL skips thread-comment api call" {
+    # A URL that has no /pull/<number> should not call gh api at all for threads.
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[{"id":1,"body":"hi","author":{"login":"bob"},"createdAt":"t"}],"reviews":[]}'
+    export GH_API_JSON='[]'
+    : > "$GH_CALL_LOG"
+
+    # Use a URL WITHOUT a /pull/<number> segment.
+    run read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" \
+        "https://github.com/o/r/pulls"
+    [ "$status" -eq 0 ]
+    # No api call should be logged for a non-PR URL.
+    ! grep -q '^api ' "$GH_CALL_LOG"
+    # Result still carries the issue comment from the view call.
+    [ "$(echo "$output" | jq -r '.comments | length')" = "1" ]
+}
+
+# ===========================================================================
+# T04-T07: pr_comment_new_ids — author filter (REQ-000054 / #628)
+# ===========================================================================
+
+@test "T04: pr_comment_new_ids filters comments from non-actionable bot authors" {
+    PR_COMMENT_NON_ACTIONABLE_AUTHORS='["[bot]","github-actions"]'
+    PR_AUTHOR_LOGIN=""
+    local payload
+    payload='{"state":"OPEN","comments":[
+        {"id":"issue:1","body":"CI passed","author":"github-actions[bot]"},
+        {"id":"issue:2","body":"Please rename","author":"operator"}
+    ]}'
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    # Only the human comment should be returned.
+    [ "$output" = "issue:2" ]
+}
+
+@test "T05: pr_comment_new_ids filters the PR author'\''s own comments (self-filter)" {
+    PR_COMMENT_NON_ACTIONABLE_AUTHORS='[]'
+    PR_AUTHOR_LOGIN="alice"
+    local payload
+    payload='{"state":"OPEN","comments":[
+        {"id":"issue:1","body":"My own comment","author":"alice"},
+        {"id":"issue:2","body":"Review from bob","author":"bob"}
+    ]}'
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    # Alice'\''s own comment must be excluded; bob'\''s stays.
+    [ "$output" = "issue:2" ]
+}
+
+@test "T06: #628 reproducer — 66 CI bot comments collapse to 0 actionable" {
+    # Before the fix, 66 repo-level comments (all from CI bots) were counted
+    # as new, spuriously re-triggering the code phase up to 3 times.
+    PR_COMMENT_NON_ACTIONABLE_AUTHORS='["[bot]","github-actions","dependabot"]'
+    PR_AUTHOR_LOGIN=""
+    # Build a payload with 66 comments, all from bots.
+    local bot_comments
+    bot_comments=$(python3 -c "
+import json
+comments = [{'id': 'issue:' + str(i), 'body': 'CI check', 'author': 'github-actions[bot]'} for i in range(1, 67)]
+print(json.dumps({'state': 'OPEN', 'comments': comments}))
+")
+    run pr_comment_new_ids "$bot_comments" "$TEST_REQ_DIR/nope.json"
+    # Zero actionable comments — no re-entry should happen.
+    [ -z "$output" ]
+}
+
+@test "T07: pr_comment_new_ids filter is case-insensitive for author login" {
+    # A login like "GitHub-Actions" must match the pattern "github-actions".
+    PR_COMMENT_NON_ACTIONABLE_AUTHORS='["github-actions"]'
+    PR_AUTHOR_LOGIN=""
+    local payload
+    payload='{"state":"OPEN","comments":[
+        {"id":"issue:1","body":"CI","author":"GitHub-Actions"},
+        {"id":"issue:2","body":"code review","author":"Operator"}
+    ]}'
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    [ "$output" = "issue:2" ]
+}

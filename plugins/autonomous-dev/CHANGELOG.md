@@ -2,6 +2,26 @@
 
 All notable changes to the autonomous-dev plugin are documented here.
 
+## [Unreleased] — REQ-000054 (2026-06-30)
+
+### Fixed
+
+- **#629 — Permanently-red CI gates block autonomous auto-merge**: `maybe_merge_integration_pr` now supports _synthetic readiness_ — it can approve a BLOCKED merge state if all failing checks are on a configurable allowlist of known-non-blocking checks. Three new config keys are added to `daemon`:
+  - `merge_gate_non_blocking_checks` (default: `["markdown","lychee","visual-regression","scope-enforcement","scope-enforcement/kind"]`): named checks that are allowed to be failing without blocking auto-merge.
+  - `merge_gate_skip_baseline_red` (default: `false`): when `true`, also fetches the base-branch HEAD check-runs and treats any check that was already failing there as non-blocking.
+  - When all _real_ checks pass (or are pending-and-awaiting) and only the allowlisted checks are red, auto-merge proceeds; the `merge_decision.reason` records the synthetic-readiness pass and which checks were ignored.
+  - When synthetic readiness is _disabled_ (empty allowlist + baseline off), the gate behaves identically to the previous hard CLEAN-only logic.
+
+- **#628 — PR comment re-entry counted all 66 repo-level comments as new**: `read_pr_comment_payload` was calling `gh api repos/{owner}/{repo}/pulls/comments` (repo-wide) instead of `gh api repos/{owner}/{repo}/pulls/{pr_number}/comments` (PR-scoped). Fixed by extracting the PR number from the URL and scoping the API call. Additionally, `pr_comment_new_ids` now filters out comments from non-actionable authors (bots, CI, the PR author themselves) via a new `pr_comment_non_actionable_authors` config key and the captured `PR_AUTHOR_LOGIN` variable — ensuring only genuine new human review comments trigger a re-entry.
+
+### Added
+
+- `daemon.merge_gate_non_blocking_checks` config key.
+- `daemon.merge_gate_skip_baseline_red` config key.
+- `daemon.pr_comment_non_actionable_authors` config key.
+- `_evaluate_merge_checks` nested helper in `maybe_merge_integration_pr`: partitions PR checks into ignored / blocking / pending categories.
+- `_baseline_red_checks` nested helper: queries base-branch HEAD for pre-existing failures to widen the allowlist.
+
 ## [Unreleased] — REQ-000053 (2026-06-30)
 
 ### Fixed

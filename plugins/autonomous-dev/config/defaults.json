@@ -12,6 +12,21 @@
     "monthly_cost_cap_usd": 500.00,
     "log_max_size_mb": 50,
     "log_retention_days": 7,
+    "merge_gate_non_blocking_checks": [
+      "markdown",
+      "lychee",
+      "visual-regression",
+      "scope-enforcement",
+      "scope-enforcement/kind"
+    ],
+    "merge_gate_skip_baseline_red": false,
+    "pr_comment_non_actionable_authors": [
+      "[bot]",
+      "github-actions",
+      "dependabot",
+      "renovate",
+      "codecov"
+    ],
     "dispatch_timeout_seconds": 1800,
     "dispatch_timeout_by_phase": {
       "intake": 600,
