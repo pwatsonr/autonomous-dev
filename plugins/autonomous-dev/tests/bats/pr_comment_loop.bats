@@ -512,3 +512,36 @@ print(json.dumps({'state': 'OPEN', 'comments': comments}))
     run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
     [ "$output" = "issue:2" ]
 }
+
+@test "T08: filter respects config override — user array replaces defaults (not union)" {
+    # Verify that a user config with pr_comment_non_actionable_authors=["me-bot"]
+    # REPLACES the shipped defaults array entirely (jq -s '.[0] * .[1]' replace semantics).
+    # After load_config, "github-actions[bot]" (a default entry) must NOT be filtered.
+    cat > "$TEST_WORK_DIR/.claude/autonomous-dev.json" << 'EOF'
+{"daemon": {"pr_comment_non_actionable_authors": ["me-bot"]}}
+EOF
+    # load_config merges defaults with user config; the user array replaces the default.
+    load_config
+
+    # Replace semantics: the array must be exactly ["me-bot"], not unioned with defaults.
+    [ "$(echo "${PR_COMMENT_NON_ACTIONABLE_AUTHORS}" | jq 'length')" -eq 1 ]
+    [ "$(echo "${PR_COMMENT_NON_ACTIONABLE_AUTHORS}" | jq -r '.[0]')" = "me-bot" ]
+
+    # Verify filtering behaviour via pr_comment_new_ids directly:
+    #   me-bot              -> filtered (in the user override list)
+    #   github-actions[bot] -> NOT filtered (no longer in the replaced list)
+    #   operator            -> NOT filtered
+    PR_AUTHOR_LOGIN=""
+    local payload
+    payload='{"state":"OPEN","comments":[
+        {"id":"issue:1","body":"my comment","author":"me-bot"},
+        {"id":"issue:2","body":"CI check","author":"github-actions[bot]"},
+        {"id":"issue:3","body":"code review","author":"operator"}
+    ]}'
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    # Two comments pass through (issue:2 and issue:3); me-bot is filtered.
+    [ "$(echo "$output" | grep -c 'issue:')" -eq 2 ]
+    echo "$output" | grep -qxF "issue:2"
+    echo "$output" | grep -qxF "issue:3"
+    ! echo "$output" | grep -qxF "issue:1"
+}

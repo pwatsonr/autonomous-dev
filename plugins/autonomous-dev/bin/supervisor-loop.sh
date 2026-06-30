@@ -3478,7 +3478,7 @@ maybe_merge_integration_pr() {
     }
 
     # _evaluate_merge_checks(project, pr_url)
-    #   stdout: "verdict<TAB>ignored_csv<TAB>blocking_csv" (always exits 0)
+    #   stdout: "verdict|ignored_csv|blocking_csv" (always exits 0; fields separated by '|')
     #   verdict ∈ {ok, not_ok, unreadable}
     #   ignored_csv  = comma-separated names of failing checks that were ignored
     #                  (allowlisted OR baseline-red when opt-in is on).

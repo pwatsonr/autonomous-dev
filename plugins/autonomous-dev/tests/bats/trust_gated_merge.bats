@@ -441,7 +441,7 @@ _setup_emc_globals() {
     MERGE_GATE_SKIP_BASELINE_RED="${2:-false}"
 }
 
-# Helper: invoke _evaluate_merge_checks and parse the TAB-separated output.
+# Helper: invoke _evaluate_merge_checks and parse the '|'-separated output.
 call_evaluate_merge_checks() {
     write_config "{\"trust\":{\"per_repo_overrides\":{\"$TEST_PROJECT\":3}}}"
     seed_merge_request "https://github.com/o/r/pull/42"
