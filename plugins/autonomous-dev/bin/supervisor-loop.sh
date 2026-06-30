@@ -3140,30 +3140,251 @@ read_request_pr_url() {
         ' "${result_code}" 2>/dev/null || echo ""
 }
 
+# ===========================================================================
+# Merge-gate helpers (REQ-000053): G1-G4 gates for order-aware auto-merge.
+# All helpers are pure (read-only) except where noted. None are exported.
+# ===========================================================================
+
+# _pr_branch_up_to_date(project, pr_url) -> rc
+#   Inputs : project (path), pr_url (string).
+#   Returns: 0 when the PR branch IS up-to-date with origin/<base>;
+#            1 when behind;
+#            2 when status could not be determined (treat as "unknown").
+#   Reads  : `gh pr view --json baseRefName,headRefName,headRefOid`
+#            and `git merge-base --is-ancestor` for ancestor check.
+#   Side effects: none (read-only against gh + local refs).
+_pr_branch_up_to_date() {
+    local project="$1" pr_url="$2"
+    local refs_json base_ref head_oid
+    refs_json=$( (cd "${project}" 2>/dev/null && \
+        gh pr view "${pr_url}" \
+            --json baseRefName,headRefName,headRefOid \
+            < /dev/null 2>/dev/null) || echo "")
+    if [[ -z "${refs_json}" ]] || ! echo "${refs_json}" | jq empty 2>/dev/null; then
+        return 2
+    fi
+    base_ref=$(echo "${refs_json}" | jq -r '.baseRefName // ""' 2>/dev/null || echo "")
+    head_oid=$(echo "${refs_json}" | jq -r '.headRefOid // ""' 2>/dev/null || echo "")
+    if [[ -z "${base_ref}" || -z "${head_oid}" ]]; then
+        return 2
+    fi
+    # Fetch latest base ref so we have an up-to-date local pointer.
+    (cd "${project}" 2>/dev/null && \
+        git fetch --quiet origin "${base_ref}" 2>/dev/null) || true
+    # rc=0 from merge-base means head_oid IS a descendant of origin/<base>
+    # (i.e., origin/<base> is an ancestor of head_oid -> up-to-date).
+    if (cd "${project}" 2>/dev/null && \
+        git merge-base --is-ancestor "origin/${base_ref}" "${head_oid}" 2>/dev/null); then
+        return 0   # up-to-date
+    else
+        return 1   # behind
+    fi
+}
+
+# _attempt_rebase_pr(project, pr_url) -> rc; stdout = stderr captured on failure
+#   Runs `gh pr update-branch <pr_url>` (GitHub's server-side update).
+#   NEVER uses --admin / --force / --rebase.
+#   Stderr is captured and echoed to stdout on failure for inclusion in
+#   the merge_decision `reason` field.
+#   Side effects: mutates the PR branch on GitHub (server-side merge of base
+#                 into head). No local repo mutation.
+_attempt_rebase_pr() {
+    local project="$1" pr_url="$2"
+    local stderr_out rc=0
+    stderr_out=$( (cd "${project}" 2>/dev/null && \
+        gh pr update-branch "${pr_url}" < /dev/null 2>&1 >/dev/null) ) || rc=$?
+    if [[ ${rc} -ne 0 ]]; then
+        echo "${stderr_out}"
+    fi
+    return ${rc}
+}
+
+# _list_inflight_pr_files(project, exclude_request_id) -> stdout = TSV rows
+#   For every directory matching <project>/.autonomous-dev/requests/REQ-*
+#   where state.json: .status == "running" AND .merge_status != "merged" AND
+#   a phase-result-code.json with a github_pr artifact exists AND
+#   request_id != exclude_request_id — emit one line per touched file:
+#       <req_id>\t<dispatched_at>\t<pr_url>\t<file_path>
+#   Side effects: none.
+_list_inflight_pr_files() {
+    local project="$1" exclude_id="$2"
+    local req_dir req_id state_file code_file
+    for req_dir in "${project}/.autonomous-dev/requests/REQ-"*/; do
+        req_id=$(basename "${req_dir}")
+        [[ "${req_id}" == "${exclude_id}" ]] && continue
+        state_file="${req_dir}state.json"
+        code_file="${req_dir}phase-result-code.json"
+        [[ -f "${state_file}" && -f "${code_file}" ]] || continue
+        # Check status == "running" and merge_status != "merged"
+        local st ms
+        st=$(jq -r '.status // ""' "${state_file}" 2>/dev/null || echo "")
+        ms=$(jq -r '.merge_status // ""' "${state_file}" 2>/dev/null || echo "")
+        [[ "${st}" == "running" ]] || continue
+        [[ "${ms}" == "merged" ]] && continue
+        # Extract github_pr URL.
+        local pr_url dispatched_at
+        pr_url=$(jq -r '
+            ([.artifacts[]? | select((.kind // "") == "github_pr")]
+             | .[0] // {}) as $a
+            | ($a.url // $a.path // "")
+            ' "${code_file}" 2>/dev/null || echo "")
+        [[ -n "${pr_url}" ]] || continue
+        dispatched_at=$(jq -r '.current_phase_metadata.dispatched_at // ""' \
+            "${state_file}" 2>/dev/null || echo "")
+        # Fetch files from this PR and emit TSV rows.
+        local file_path
+        while IFS= read -r file_path; do
+            [[ -n "${file_path}" ]] || continue
+            printf '%s\t%s\t%s\t%s\n' \
+                "${req_id}" "${dispatched_at}" "${pr_url}" "${file_path}"
+        done < <( (cd "${project}" 2>/dev/null && \
+            gh pr view "${pr_url}" --json files \
+                --jq '.files[].path' < /dev/null 2>/dev/null) || \
+            { log_warn "_list_inflight_pr_files: gh pr view failed for ${pr_url} (${req_id}) — skipping"; echo ""; })
+    done
+    return 0
+}
+
+# _this_pr_files(project, pr_url) -> stdout = NL list of file paths
+#   `gh pr view <pr_url> --json files --jq '.files[].path'`.
+#   Side effects: none. rc=0 even on gh failure (empty output = unknown).
+_this_pr_files() {
+    local project="$1" pr_url="$2"
+    (cd "${project}" 2>/dev/null && \
+        gh pr view "${pr_url}" --json files \
+            --jq '.files[].path' < /dev/null 2>/dev/null) || true
+    return 0
+}
+
+# _pr_has_duplicate_patches(project, pr_url) -> rc; stdout = NL of dup SHAs
+#   Compute patch-id for each commit on the PR and compare against commits
+#   merged into base since the PR branched. Any match -> duplicate.
+#   rc=0: duplicate found; stdout lists duplicated PR-side commit SHAs.
+#   rc=1: no duplicates.
+#   rc=2: could not compute (git patch-id unavailable or refs missing).
+#   Side effects: none (read-only against local refs).
+_pr_has_duplicate_patches() {
+    local project="$1" pr_url="$2"
+    # Require git patch-id.
+    if ! command -v git >/dev/null 2>&1; then
+        return 2
+    fi
+    # Fetch PR refs info.
+    local refs_json base_ref head_oid
+    refs_json=$( (cd "${project}" 2>/dev/null && \
+        gh pr view "${pr_url}" \
+            --json baseRefName,headRefName,headRefOid \
+            < /dev/null 2>/dev/null) || echo "")
+    if [[ -z "${refs_json}" ]] || ! echo "${refs_json}" | jq empty 2>/dev/null; then
+        return 2
+    fi
+    base_ref=$(echo "${refs_json}" | jq -r '.baseRefName // ""' 2>/dev/null || echo "")
+    head_oid=$(echo "${refs_json}" | jq -r '.headRefOid // ""' 2>/dev/null || echo "")
+    [[ -n "${base_ref}" && -n "${head_oid}" ]] || return 2
+    # Compute the merge-base between head and base.
+    local merge_base
+    merge_base=$( (cd "${project}" 2>/dev/null && \
+        git merge-base "origin/${base_ref}" "${head_oid}" 2>/dev/null) || echo "")
+    [[ -n "${merge_base}" ]] || return 2
+    # Build patch-ids for commits on the PR (head since merge-base).
+    local pr_patch_ids
+    pr_patch_ids=$( (cd "${project}" 2>/dev/null && \
+        git log --format="%H" "${merge_base}..${head_oid}" 2>/dev/null | \
+        while IFS= read -r sha; do
+            git show "${sha}" 2>/dev/null | git patch-id 2>/dev/null || true
+        done) || echo "")
+    # Build patch-ids for commits merged into base since merge-base.
+    local base_patch_ids
+    base_patch_ids=$( (cd "${project}" 2>/dev/null && \
+        git log --format="%H" "${merge_base}..origin/${base_ref}" 2>/dev/null | \
+        while IFS= read -r sha; do
+            git show "${sha}" 2>/dev/null | git patch-id 2>/dev/null || true
+        done) || echo "")
+    # Find overlapping patch-ids; emit duplicated PR-side SHAs.
+    local found_dup=1
+    while IFS=' ' read -r pid pr_sha; do
+        [[ -n "${pid}" ]] || continue
+        if echo "${base_patch_ids}" | grep -qF "${pid}"; then
+            echo "${pr_sha}"
+            found_dup=0
+        fi
+    done < <(echo "${pr_patch_ids}")
+    return ${found_dup}
+}
+
+# _reverify_pr_after_rebase(project, request_id) -> rc
+#   Re-dispatch the integration phase agent against the rebased head.
+#   Sets state.current_phase_metadata.reverify_after_rebase = true.
+#   Reads the resulting phase-result-integration.json: rc=0 iff .status=="pass".
+#   Side effects: mutates state.json (sets flag); may write
+#                 phase-result-integration.json (re-dispatch result).
+#   IMPORTANT: reuses the existing dispatch_phase chain (ADR-005).
+_reverify_pr_after_rebase() {
+    local project="$1" request_id="$2"
+    local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
+    local result_file="${project}/.autonomous-dev/requests/${request_id}/phase-result-integration.json"
+    [[ -f "${state_file}" ]] || return 2
+    # Set the reverify flag in state.json (tmp -> mv idiom).
+    local tmp="${state_file}.reverify.$$"
+    if jq '.current_phase_metadata.reverify_after_rebase = true' \
+           "${state_file}" > "${tmp}" 2>/dev/null; then
+        mv "${tmp}" "${state_file}"
+    else
+        rm -f "${tmp}" 2>/dev/null || true
+    fi
+    # Re-dispatch the integration phase via the existing mechanism.
+    local rc=0
+    dispatch_phase "${request_id}" "integration" "${project}" || rc=$?
+    if [[ ${rc} -ne 0 ]]; then
+        return 2
+    fi
+    # Read the result.
+    [[ -f "${result_file}" ]] || return 2
+    local result_status
+    result_status=$(jq -r '.status // "fail"' "${result_file}" 2>/dev/null || echo "fail")
+    if [[ "${result_status}" == "pass" ]]; then
+        return 0
+    fi
+    return 1
+}
+
 # maybe_merge_integration_pr(request_id, project, state_file, events_file, ts) -> 0
-#   Trust-gated merge decision, invoked from advance_phase() when the
-#   `integration` phase PASSES verification (#487). Records an audit line and a
-#   merge_decision event on EVERY path (merge, skip-below-L3, skip-not-mergeable,
-#   skip-already-merged, skip-no-pr) including the effective trust level + reason.
+#   Trust-gated, ORDER-AWARE merge decision (REQ-000053 — resolves #623, #626).
+#   Invoked from advance_phase() when the `integration` phase PASSES. Records a
+#   merge_decision event on EVERY path including the effective trust level + reason.
 #
 #   SAFETY (this auto-merges to the default branch — read carefully):
 #     * Only effective trust L3 (==3) may auto-merge. Any lower level leaves the
 #       PR OPEN and marks the request "PR ready for human merge".
 #     * A merge is attempted ONLY when `gh pr view` reports the PR is
 #       state==OPEN AND mergeable==MERGEABLE AND mergeStateStatus==CLEAN. Any
-#       other combination (CONFLICTING, BLOCKED by required checks/reviews,
-#       UNKNOWN, DRAFT, etc.) is skipped — the daemon never forces a merge.
+#       other combination is skipped — the daemon never forces a merge.
 #     * Idempotent: an already-MERGED (or non-OPEN) PR is never re-merged.
 #     * `gh pr merge --squash` only. NEVER --admin / --force — branch protection
 #       is respected. If protection blocks the merge, gh fails and we record the
 #       failure rather than bypassing it.
+#     * NEW (REQ-000053): before merging, four gates run in order:
+#         G1 (rebase)     — require up-to-date base; attempt `gh pr update-branch`
+#                           when behind. Tracks rebase_attempts (cap 2).
+#                           Decisions: skip_rebase_failed, skip_rebase_loop_exhausted.
+#         G2 (serialize)  — defer if another in-flight PR touches overlapping files
+#                           and is ahead in the queue. Bypassed for type=hotfix.
+#                           Decision: skip_serialized.
+#         G3 (duplicate)  — detect patch-id matches with already-merged commits.
+#                           Best-effort (skipped if git patch-id unavailable).
+#                           Decision: skip_duplicate.
+#         G4 (re-verify)  — re-dispatch integration phase on the rebased head
+#                           (only when G1 performed a rebase). Uses existing
+#                           dispatch_phase chain; never inlines tsc/bun test.
+#                           Decision: skip_reverify_failed.
+#       All new skips route through _mark_pr_ready_for_human (operator dashboard).
 #
 #   This function never aborts advance_phase: it returns 0 on every path. A
 #   merge that fails the `gh` call is logged as an error and the PR is left open
 #   (the request still reaches `done`); it is never retried with elevated flags.
 #
-#   The actual git/gh work is delegated to `gh`; tests stub `gh` on PATH so this
-#   performs no real merges and never touches GitHub.
+#   The actual git/gh work is delegated to `gh`; tests stub `gh` and `git` on
+#   PATH so this performs no real merges and never touches GitHub.
 maybe_merge_integration_pr() {
     local request_id="$1" project="$2" state_file="$3" events_file="$4" ts="$5"
 
@@ -3288,9 +3509,158 @@ maybe_merge_integration_pr() {
         return 0
     fi
 
+    # =========================================================================
+    # NEW GATES (REQ-000053): G1 rebase → G2 serialize → G3 duplicate → G4 re-verify
+    # =========================================================================
+
+    # Read rebase_attempts counter (0 when absent).
+    local rebase_attempts
+    rebase_attempts=$(jq -r '.current_phase_metadata.rebase_attempts // 0' \
+        "${state_file}" 2>/dev/null || echo "0")
+
+    # G1 — Up-to-date with base / rebase gate.
+    local g1_rc
+    _pr_branch_up_to_date "${project}" "${pr_url}"; g1_rc=$?
+    if [[ ${g1_rc} -eq 1 ]]; then
+        # PR is behind base. Check rebase counter before attempting.
+        if [[ "${rebase_attempts}" -ge 2 ]]; then
+            _mark_pr_ready_for_human "PR ready for human merge (rebase_attempts=${rebase_attempts} exceeds cap of 2)"
+            _record_merge_decision "skip_rebase_loop_exhausted" \
+                "rebase_attempts=${rebase_attempts} exceeds cap of 2; PR left open for human merge"
+            return 0
+        fi
+        # Increment counter before the attempt.
+        rebase_attempts=$(( rebase_attempts + 1 ))
+        local tmp_ra="${state_file}.merge.$$"
+        if jq --argjson ra "${rebase_attempts}" \
+              '.current_phase_metadata.rebase_attempts = $ra' \
+              "${state_file}" > "${tmp_ra}" 2>/dev/null; then
+            mv "${tmp_ra}" "${state_file}"
+        else
+            rm -f "${tmp_ra}" 2>/dev/null || true
+        fi
+        # Attempt the server-side rebase.
+        local rebase_stderr rebase_rc=0
+        rebase_stderr=$(_attempt_rebase_pr "${project}" "${pr_url}") || rebase_rc=$?
+        if [[ ${rebase_rc} -ne 0 ]]; then
+            _mark_pr_ready_for_human "PR ready for human merge (gh pr update-branch failed)"
+            _record_merge_decision "skip_rebase_failed" \
+                "gh pr update-branch rc=${rebase_rc}: '${rebase_stderr}'"
+            return 0
+        fi
+        # Rebase succeeded — re-read PR state (mergeability may have changed).
+        pr_json=$( (cd "${project}" 2>/dev/null && gh pr view "${pr_url}" \
+                      --json state,mergeable,mergeStateStatus < /dev/null 2>/dev/null) || echo "")
+        if [[ -z "${pr_json}" ]] || ! echo "${pr_json}" | jq empty 2>/dev/null; then
+            _mark_pr_ready_for_human "PR ready for human merge (could not re-read PR status after rebase)"
+            _record_merge_decision "skip_status_unreadable" \
+                "gh pr view returned no/invalid JSON after rebase — left open"
+            return 0
+        fi
+        pr_state=$(echo "${pr_json}" | jq -r '.state // ""' 2>/dev/null || echo "")
+        pr_mergeable=$(echo "${pr_json}" | jq -r '.mergeable // ""' 2>/dev/null || echo "")
+        pr_mergestate=$(echo "${pr_json}" | jq -r '.mergeStateStatus // ""' 2>/dev/null || echo "")
+        if [[ "${pr_mergeable}" != "MERGEABLE" || "${pr_mergestate}" != "CLEAN" ]]; then
+            _mark_pr_ready_for_human "PR ready for human merge (not mergeable post-rebase: mergeable=${pr_mergeable}, mergeStateStatus=${pr_mergestate})"
+            _record_merge_decision "skip_not_mergeable" \
+                "post-rebase: mergeable=${pr_mergeable} mergeStateStatus=${pr_mergestate} (need MERGEABLE+CLEAN)"
+            return 0
+        fi
+    elif [[ ${g1_rc} -eq 2 ]]; then
+        # Could not determine status — conservatively skip.
+        _mark_pr_ready_for_human "PR ready for human merge (could not determine if PR is up-to-date)"
+        _record_merge_decision "skip_status_unreadable" \
+            "could not determine if PR branch is up-to-date with base — left open"
+        return 0
+    fi
+    # g1_rc == 0: already up-to-date; fall through.
+
+    # G2 — Concurrent-PR overlap / serialize (skipped for hotfix type).
+    local req_type
+    req_type=$(jq -r '.type // ""' "${state_file}" 2>/dev/null || echo "")
+    if [[ "${req_type}" != "hotfix" ]]; then
+        local this_files inflight_rows
+        this_files=$(_this_pr_files "${project}" "${pr_url}")
+        if [[ -n "${this_files}" ]]; then
+            inflight_rows=$(_list_inflight_pr_files "${project}" "${request_id}")
+            if [[ -n "${inflight_rows}" ]]; then
+                # Find an earlier in-flight PR that overlaps in files.
+                local blocking_req blocking_pr blocking_at
+                while IFS=$'\t' read -r other_id other_at other_pr other_file; do
+                    [[ -n "${other_id}" ]] || continue
+                    # Check if this file overlaps with our PR's files.
+                    if echo "${this_files}" | grep -qxF "${other_file}"; then
+                        # Determine ordering: earlier dispatched_at or smaller REQ id.
+                        # Simple lexicographic compare on (dispatched_at, req_id).
+                        local my_at
+                        my_at=$(jq -r '.current_phase_metadata.dispatched_at // ""' \
+                            "${state_file}" 2>/dev/null || echo "")
+                        local is_earlier=0
+                        if [[ -n "${other_at}" && -n "${my_at}" ]]; then
+                            [[ "${other_at}" < "${my_at}" ]] && is_earlier=1
+                        elif [[ -z "${my_at}" && -n "${other_at}" ]]; then
+                            is_earlier=1
+                        fi
+                        # Tie-break by numerically-smaller REQ id.
+                        if [[ ${is_earlier} -eq 0 ]]; then
+                            local other_num my_num
+                            other_num=$(echo "${other_id}" | tr -d 'REQ-' | sed 's/^0*//')
+                            my_num=$(echo "${request_id}" | tr -d 'REQ-' | sed 's/^0*//')
+                            [[ -n "${other_num}" && -n "${my_num}" ]] && \
+                                [[ "${other_num}" -lt "${my_num}" ]] 2>/dev/null && is_earlier=1
+                        fi
+                        if [[ ${is_earlier} -eq 1 ]]; then
+                            blocking_req="${other_id}"
+                            blocking_pr="${other_pr}"
+                            blocking_at="${other_at}"
+                            break
+                        fi
+                    fi
+                done < <(echo "${inflight_rows}")
+                if [[ -n "${blocking_req}" ]]; then
+                    _mark_pr_ready_for_human "PR ready for human merge (serialized behind ${blocking_req})"
+                    _record_merge_decision "skip_serialized" \
+                        "deferred behind ${blocking_req} (PR ${blocking_pr}; dispatched_at=${blocking_at}) — overlaps files: ${other_file}"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+
+    # G3 — Duplicate-work detection via git patch-id.
+    local dup_rc dup_shas
+    dup_shas=$(_pr_has_duplicate_patches "${project}" "${pr_url}"); dup_rc=$?
+    if [[ ${dup_rc} -eq 0 && -n "${dup_shas}" ]]; then
+        _mark_pr_ready_for_human "PR ready for human merge (duplicate work detected)"
+        _record_merge_decision "skip_duplicate" \
+            "patch-id match: PR commits $(echo "${dup_shas}" | tr '\n' ',' | sed 's/,$//') already merged into base"
+        return 0
+    elif [[ ${dup_rc} -eq 2 ]]; then
+        log_warn "maybe_merge_integration_pr: git patch-id unavailable — G3 disabled this tick"
+        # Fall through (best-effort; do NOT block the merge).
+    fi
+
+    # G4 — Re-verify on rebased head (only runs when G1 performed a rebase).
+    if [[ "${rebase_attempts}" -gt 0 ]]; then
+        local reverify_rc=0
+        _reverify_pr_after_rebase "${project}" "${request_id}"; reverify_rc=$?
+        if [[ ${reverify_rc} -ne 0 ]]; then
+            local reverify_feedback
+            local reverify_result="${project}/.autonomous-dev/requests/${request_id}/phase-result-integration.json"
+            reverify_feedback=$(jq -r '.feedback // "unknown failure"' \
+                "${reverify_result}" 2>/dev/null | head -c 200 || echo "reverify dispatch unavailable")
+            _mark_pr_ready_for_human "PR ready for human merge (re-verify failed after rebase)"
+            _record_merge_decision "skip_reverify_failed" \
+                "reverify failed: ${reverify_feedback}"
+            return 0
+        fi
+    fi
+
+    # =========================================================================
     # All checks passed. Squash-merge WITHOUT --admin/--force (branch protection
     # is respected). On failure, leave the PR open and record an error — never
     # retry with elevated privileges.
+    # =========================================================================
     local merge_out merge_rc=0
     merge_out=$( (cd "${project}" 2>/dev/null && gh pr merge "${pr_url}" --squash < /dev/null 2>&1) ) || merge_rc=$?
     if [[ ${merge_rc} -eq 0 ]]; then
@@ -3301,7 +3671,8 @@ maybe_merge_integration_pr() {
                .status_reason = "PR auto-merged (trust L3)" |
                .pr_url = $url |
                .effective_trust = $trust |
-               .updated_at = $ts' \
+               .updated_at = $ts |
+               .current_phase_metadata.rebase_attempts = 0' \
               "${state_file}" > "${tmp}" 2>/dev/null; then
             mv "${tmp}" "${state_file}"
         else

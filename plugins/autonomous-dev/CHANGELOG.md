@@ -2,6 +2,26 @@
 
 All notable changes to the autonomous-dev plugin are documented here.
 
+## [Unreleased] — REQ-000053 (2026-06-30)
+
+### Fixed
+
+- **#623 — Order-blind auto-merge**: `maybe_merge_integration_pr` now runs four gates (G1–G4) before calling `gh pr merge`:
+  - **G1 (rebase gate)**: verifies the PR branch is up-to-date with the default branch via `git merge-base --is-ancestor`. When behind, attempts `gh pr update-branch` (server-side rebase respecting branch protection). On success, re-reads mergeability before proceeding. A `rebase_attempts` counter (cap 2) prevents infinite rebase-retry loops (`skip_rebase_loop_exhausted`).
+  - **G2 (serialize gate)**: scans other in-flight requests for PRs touching overlapping files. If an earlier-queued PR overlaps, defers this merge to the next tick (`skip_serialized`). Bypassed for `type=hotfix` requests.
+  - **G3 (duplicate-work gate)**: computes `git patch-id` for each PR commit and compares against commits merged into the base since the PR branched. Any patch-id match halts the merge (`skip_duplicate`). Best-effort: skipped with a `log_warn` if `git patch-id` is unavailable.
+  - **G4 (re-verify gate)**: when G1 performed a rebase, re-dispatches the `integration` phase via `_reverify_pr_after_rebase` to validate the rebased head. Failure routes to `skip_reverify_failed`.
+  - Five new `merge_decision` values: `skip_rebase_failed`, `skip_serialized`, `skip_duplicate`, `skip_reverify_failed`, `skip_rebase_loop_exhausted`. All new skips call `_mark_pr_ready_for_human`.
+
+- **#626 — Duplicated reviewer-timeout helpers**: Extracted `TIMEOUT_MIN / _MAX / _DEFAULT`, `parseTimeoutEnvInt`, and `clampTimeoutMs` from both `chain-resolver.ts` and `invoke-reviewer.ts` into a new zero-import leaf module `intake/reviewers/timeout.ts`. The previous "mirrored to avoid circular import" comment in `chain-resolver.ts` (line 144) is gone — the circular-import risk is structurally eliminated.
+
+### Added
+
+- `plugins/autonomous-dev/intake/reviewers/timeout.ts` — LEAF module. Single source of truth for timeout constants and helpers. Zero imports from reviewer suite; no circular-import risk.
+- `TIMEOUT_MIN`, `TIMEOUT_MAX`, `TIMEOUT_DEFAULT`, `clampTimeoutMs`, `parseTimeoutEnvInt` re-exported from `intake/reviewers/index.ts` barrel.
+- Bash helpers in `supervisor-loop.sh`: `_pr_branch_up_to_date`, `_attempt_rebase_pr`, `_list_inflight_pr_files`, `_this_pr_files`, `_pr_has_duplicate_patches`, `_reverify_pr_after_rebase`.
+- New optional `state.json` fields: `current_phase_metadata.rebase_attempts` (integer; reset to 0 on merge) and `current_phase_metadata.reverify_after_rebase` (boolean flag for integration re-dispatch).
+
 ## [Unreleased] — REQ-000050 (2026-06-29)
 
 ### Fixed
