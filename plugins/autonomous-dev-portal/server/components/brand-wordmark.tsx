@@ -20,7 +20,7 @@
 // AC-04: bracket color comes from .rail-brand .wm .br { color: var(--brand) }
 //        in portal.css; this component does not inline a color style.
 
-import { PLUGIN_VERSION } from "../lib/plugin-version";
+import { PLUGIN_VERSION, DAEMON_VERSION } from "../lib/plugin-version";
 import { readFileSync } from "node:fs";
 
 import type { FC } from "hono/jsx";
@@ -94,7 +94,7 @@ export const BrandWordmark: FC<BrandWordmarkProps> = ({
         <>
             {wordmark}
             {showCaption ? (
-                <div class="meta-mono">CONTROL PLANE · v{PLUGIN_VERSION}</div>
+                <div class="meta-mono">{`CONTROL PLANE · daemon v${DAEMON_VERSION} · portal v${PLUGIN_VERSION}`}</div>
             ) : null}
         </>
     );

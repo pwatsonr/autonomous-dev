@@ -12,6 +12,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 export const PLUGIN_VERSION: string = (() => {
     const fallback = "0.0.0";
@@ -35,6 +36,28 @@ export const PLUGIN_VERSION: string = (() => {
         return fallback;
     } catch {
         return fallback;
+    }
+})();
+
+// DAEMON_VERSION — the autonomous-dev DAEMON plugin's version (distinct from
+// this portal's PLUGIN_VERSION above; they are separate plugins). The portal
+// process has no direct handle on the daemon, so we parse the version from the
+// stable `~/.local/bin/autonomous-dev` wrapper, whose exec path pins the
+// deployed cache version (.../autonomous-dev/autonomous-dev/<version>/bin/...).
+// Falls back to "unknown" so the caption still renders if the wrapper is absent
+// (e.g. CI / test fixtures on machines without the daemon installed).
+export const DAEMON_VERSION: string = (() => {
+    try {
+        const wrapper = readFileSync(
+            join(homedir(), ".local", "bin", "autonomous-dev"),
+            "utf-8",
+        );
+        const m = wrapper.match(
+            /autonomous-dev\/autonomous-dev\/(\d+\.\d+\.\d+)\//,
+        );
+        return m ? m[1] : "unknown";
+    } catch {
+        return "unknown";
     }
 })();
 

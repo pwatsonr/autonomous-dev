@@ -120,9 +120,11 @@ describe("BrandWordmark", () => {
 });
 
 describe("BrandWordmark — SPEC-037-3-03 caption", () => {
-    test("BW-05: default render contains text `CONTROL PLANE · v`", async () => {
+    test("BW-05: default render contains `CONTROL PLANE · daemon v… · portal v…`", async () => {
         const html = await render({});
-        expect(html).toMatch(/CONTROL PLANE · v[0-9]/);
+        // Daemon version may resolve to "unknown" on machines without the
+        // daemon wrapper (CI); the portal version is always a real version.
+        expect(html).toMatch(/CONTROL PLANE · daemon v\S+ · portal v[0-9.]+/);
     });
 
     test("BW-06: caption uses U+00B7 middle dot (not hyphen or ASCII bullet)", async () => {
