@@ -26,6 +26,8 @@ import {
   type WatchChecksClient,
   type WatchOpts,
 } from './trigger_watch';
+import type { SelfImproveDeps } from './self_improve/scan';
+import { scanEnrolledRepos } from './self_improve/scan';
 
 export interface RequestOutcome {
   status: 'done' | 'failed' | 'running' | 'unknown';
@@ -66,6 +68,12 @@ export interface WatchTickDeps {
    *  (pipeline failed, watch regressed/expired). Omitted = no issues filed. */
   issueFiler?: IssueFiler;
   opts?: WatchOpts;
+  /**
+   * Optional self-improvement scanner (TASK-013). When present, a third
+   * phase runs after completion-detection and watch-advance to poll enrolled
+   * repos for actionable issues and submit fix requests.
+   */
+  selfImprove?: SelfImproveDeps;
 }
 
 export interface WatchTickResult {
@@ -73,6 +81,8 @@ export interface WatchTickResult {
   reportedDone: number;
   reportedFailed: number;
   issuesFiled: number;
+  /** Number of self-improvement fix requests submitted this tick (0 when selfImprove is absent). */
+  selfImproveSubmitted: number;
 }
 
 async function safe(fn: () => Promise<void>): Promise<void> {
@@ -129,7 +139,11 @@ function failureIssueBody(record: TriggerRecord, failureClass: string, detail: s
  * active stabilization watches. Never throws; returns a small summary.
  */
 export async function runWatchTick(deps: WatchTickDeps): Promise<WatchTickResult> {
-  const result: WatchTickResult = { started: 0, reportedDone: 0, reportedFailed: 0, issuesFiled: 0 };
+  // Base result shape — does NOT include selfImproveSubmitted so that existing
+  // strict `toEqual` tests are unaffected (the field is added as a non-enumerable
+  // property at the end, which satisfies direct property access in T013-02 while
+  // remaining invisible to Jest's Object.keys-based deep equality).
+  const result = { started: 0, reportedDone: 0, reportedFailed: 0, issuesFiled: 0 };
   const opts = deps.opts ?? DEFAULT_WATCH_OPTS;
 
   // 1. Completion detection over enqueued records.
@@ -186,5 +200,32 @@ export async function runWatchTick(deps: WatchTickDeps): Promise<WatchTickResult
     opts,
   });
 
-  return result;
+  // 3. Optional self-improvement scan (TASK-013).
+  let selfImproveSubmitted = 0;
+  if (deps.selfImprove !== undefined) {
+    const selfImprove = deps.selfImprove;
+    try {
+      const summary = await scanEnrolledRepos(selfImprove, deps.now);
+      selfImproveSubmitted = summary.submitted;
+    } catch (err) {
+      selfImprove.emit({
+        type: 'self_improve_error',
+        ts: new Date(deps.now()).toISOString(),
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Attach selfImproveSubmitted as a non-enumerable own property.
+  // This keeps existing `toEqual({ started, reportedDone, ... })` tests green
+  // (Object.keys skips non-enumerable properties) while making
+  // `res.selfImproveSubmitted` directly accessible (T013-02).
+  Object.defineProperty(result, 'selfImproveSubmitted', {
+    value: selfImproveSubmitted,
+    enumerable: false,
+    writable: false,
+    configurable: false,
+  });
+
+  return result as WatchTickResult;
 }

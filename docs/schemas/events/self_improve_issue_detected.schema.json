@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "self_improve_issue_detected.schema.json",
+  "type": "object",
+  "required": ["type", "ts", "repoId", "issueNumber", "class"],
+  "properties": {
+    "type":        { "const": "self_improve_issue_detected" },
+    "ts":          { "type": "string", "format": "date-time" },
+    "repoId":      { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "issueNumber": { "type": "integer", "minimum": 1 },
+    "class":       { "enum": ["A1", "A2", "A3"] }
+  },
+  "additionalProperties": false
+}
