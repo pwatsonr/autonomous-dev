@@ -43,7 +43,7 @@ import { resolve } from 'node:path';
 import { runReviewGate, type GateDecision } from '../intake/reviewers/review-gate-orchestrator';
 import { createClaudeDispatcher } from '../intake/reviewers/invoke-reviewer';
 import { emitReviewerInvocation } from '../intake/reviewers/telemetry';
-import type { ChangeSetContext } from '../intake/reviewers/types';
+import type { ChangeSetContext, ReviewerEntry } from '../intake/reviewers/types';
 import type { InvokeReviewerFn, TelemetryEmitFn } from '../intake/reviewers/runner';
 
 // ---------------------------------------------------------------------------
@@ -65,6 +65,10 @@ Options:
                              Defaults to a generated UUID.
   --changed-files <f1,f2>    Comma-separated list of changed file paths.
   --frontend                 Mark the change-set as a frontend change.
+  --state-file <path>        Path to state.json for self-heal overrides. Reads
+                             .current_phase_metadata.self_heal.excluded_reviewers,
+                             .reviewer_timeout_overrides, and .review_chain_disabled.
+                             When omitted, behavior is identical to omitting the flag.
   --help, -h                 Print this help and exit 0.
 
 Output:
@@ -89,6 +93,19 @@ interface ParsedArgs {
   changedFiles: string[];
   isFrontendChange: boolean;
   help: boolean;
+  /** Path to state.json for self-heal overrides (REQ-000056 TASK-010). */
+  stateFilePath?: string;
+}
+
+/**
+ * Self-heal fields extracted from state.json (REQ-000056 TASK-010).
+ * All fields are optional — absent values MUST be treated as defaults
+ * (no exclusion, no overrides, chain enabled).
+ */
+interface SelfHealState {
+  excludedReviewers: string[];
+  reviewerTimeoutOverrides: Record<string, number>;
+  reviewChainDisabled: boolean;
 }
 
 /**
@@ -154,6 +171,11 @@ function parseArgs(argv: string[]): ParsedArgs {
         i++;
         break;
 
+      case '--state-file':
+        result.stateFilePath = argv[++i] ?? '';
+        i++;
+        break;
+
       default:
         if (arg.startsWith('-')) {
           throw new Error(`unknown option: ${arg}`);
@@ -164,6 +186,74 @@ function parseArgs(argv: string[]): ParsedArgs {
   }
 
   return result;
+}
+
+/**
+ * Load self-heal state from a state.json file. Returns safe defaults when the
+ * file is absent, unparseable, or the self_heal sub-key is missing.
+ * (REQ-000056 TASK-010)
+ * Exported for testing.
+ */
+export function loadSelfHealState(stateFilePath: string): SelfHealState {
+  const defaults: SelfHealState = {
+    excludedReviewers: [],
+    reviewerTimeoutOverrides: {},
+    reviewChainDisabled: false,
+  };
+
+  if (!stateFilePath) return defaults;
+
+  let raw: string;
+  try {
+    raw = readFileSync(resolve(stateFilePath), 'utf8');
+  } catch {
+    return defaults;
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return defaults;
+  }
+
+  // Navigate to .current_phase_metadata.self_heal
+  const cpm = parsed['current_phase_metadata'] as Record<string, unknown> | undefined;
+  const sh = cpm?.['self_heal'] as Record<string, unknown> | undefined;
+
+  if (!sh) return defaults;
+
+  return {
+    excludedReviewers: Array.isArray(sh['excluded_reviewers'])
+      ? (sh['excluded_reviewers'] as string[])
+      : [],
+    reviewerTimeoutOverrides:
+      sh['reviewer_timeout_overrides'] != null &&
+      typeof sh['reviewer_timeout_overrides'] === 'object' &&
+      !Array.isArray(sh['reviewer_timeout_overrides'])
+        ? (sh['reviewer_timeout_overrides'] as Record<string, number>)
+        : {},
+    reviewChainDisabled: sh['review_chain_disabled'] === true,
+  };
+}
+
+/**
+ * Apply self-heal timeout overrides to a reviewer chain in place.
+ * Patches entry.timeout_ms for each entry that has an override.
+ * (REQ-000056 TASK-010)
+ * Exported for testing.
+ */
+export function applyTimeoutOverrides(
+  chain: ReviewerEntry[],
+  overrides: Record<string, number>,
+): ReviewerEntry[] {
+  return chain.map((entry) => {
+    const override = overrides[entry.name];
+    if (override !== undefined && typeof override === 'number') {
+      return { ...entry, timeout_ms: override };
+    }
+    return entry;
+  });
 }
 
 /**
@@ -237,6 +327,15 @@ export interface ReviewGateCliDeps {
   invoke?: InvokeReviewerFn;
   /** Telemetry emitter. Defaults to `emitReviewerInvocation`. */
   emit?: TelemetryEmitFn;
+  /**
+   * Optional chain resolver for testing. When provided, used instead of
+   * the real resolveChain inside runReviewGate. Supports --state-file tests.
+   */
+  resolveChainOverride?: (
+    repoPath: string,
+    requestType: string,
+    gate: string,
+  ) => Promise<ReviewerEntry[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,6 +384,16 @@ export async function main(argv: string[], deps: ReviewGateCliDeps = {}): Promis
   const invoke = deps.invoke ?? createClaudeDispatcher();
   const emit = deps.emit ?? emitReviewerInvocation;
 
+  // Load self-heal state when --state-file is provided (REQ-000056 TASK-010)
+  const selfHealState = loadSelfHealState(args.stateFilePath ?? '');
+  const selfHeal = args.stateFilePath
+    ? {
+        excludedReviewers: selfHealState.excludedReviewers,
+        reviewerTimeoutOverrides: selfHealState.reviewerTimeoutOverrides,
+        reviewChainDisabled: selfHealState.reviewChainDisabled,
+      }
+    : undefined;
+
   let decision: GateDecision;
   try {
     decision = await runReviewGate({
@@ -294,6 +403,7 @@ export async function main(argv: string[], deps: ReviewGateCliDeps = {}): Promis
       context,
       invoke,
       emit,
+      selfHeal,
     });
   } catch (err) {
     process.stderr.write(`Error running review gate: ${(err as Error).message}\n`);

@@ -57,6 +57,22 @@ _TYPED_LIMITS_DISPATCH_DEFAULTS_BY_PHASE=(
 #   but cheap.
 resolve_phase_timeout() {
     local state_file="$1" phase="$2"
+
+    # H6 — Self-heal: honor budget_extended_to override when set (REQ-000056 §11).
+    # Checked FIRST so the extended budget takes precedence over all other lookups.
+    if [[ -f "${state_file}" ]]; then
+        local extended_at extended_to
+        extended_at=$(jq -r '.current_phase_metadata.self_heal.budget_extended_at // empty' \
+            "${state_file}" 2>/dev/null || true)
+        extended_to=$(jq -r '.current_phase_metadata.self_heal.budget_extended_to // empty' \
+            "${state_file}" 2>/dev/null || true)
+        if [[ -n "${extended_at}" && "${extended_at}" != "null" \
+              && -n "${extended_to}" && "${extended_to}" != "null" && "${extended_to}" != "0" ]]; then
+            printf '%s\n' "${extended_to}"
+            return 0
+        fi
+    fi
+
     local override
     override=$(jq -r --arg p "${phase}" \
         '.type_config.phaseTimeouts[$p] // empty' \
