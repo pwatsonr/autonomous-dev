@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "self_improve_tick_summary.schema.json",
+  "type": "object",
+  "required": ["type", "ts", "scanned", "submitted", "skipped", "errors"],
+  "properties": {
+    "type":      { "const": "self_improve_tick_summary" },
+    "ts":        { "type": "string", "format": "date-time" },
+    "scanned":   { "type": "integer", "minimum": 0 },
+    "submitted": { "type": "integer", "minimum": 0 },
+    "skipped":   { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+    "errors":    { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

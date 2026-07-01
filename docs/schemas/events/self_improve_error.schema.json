@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "self_improve_error.schema.json",
+  "type": "object",
+  "required": ["type", "ts", "error"],
+  "properties": {
+    "type":        { "const": "self_improve_error" },
+    "ts":          { "type": "string", "format": "date-time" },
+    "error":       { "type": "string" },
+    "code":        { "type": "string" },
+    "repoId":      { "type": "string" },
+    "issueNumber": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": false
+}

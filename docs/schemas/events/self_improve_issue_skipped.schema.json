@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "self_improve_issue_skipped.schema.json",
+  "type": "object",
+  "required": ["type", "ts", "repoId", "issueNumber", "guard", "evidence"],
+  "properties": {
+    "type":        { "const": "self_improve_issue_skipped" },
+    "ts":          { "type": "string", "format": "date-time" },
+    "repoId":      { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "issueNumber": { "type": "integer", "minimum": 1 },
+    "guard":       { "enum": ["GD1","GD2","GD3","GD4","GD5","GD6","GD7","GD8","GD9","GD10","GD11","GD12","NA1","NA2","NA3","NA4","NA5","NA6","NA7"] },
+    "evidence":    {}
+  },
+  "additionalProperties": false
+}

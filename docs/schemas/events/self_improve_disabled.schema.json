@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "self_improve_disabled.schema.json",
+  "type": "object",
+  "required": ["type", "ts"],
+  "properties": {
+    "type": { "const": "self_improve_disabled" },
+    "ts":   { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "self_improve_request_submitted.schema.json",
+  "type": "object",
+  "required": ["type", "ts", "repoId", "issueNumber", "requestId", "class"],
+  "properties": {
+    "type":        { "const": "self_improve_request_submitted" },
+    "ts":          { "type": "string", "format": "date-time" },
+    "repoId":      { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "issueNumber": { "type": "integer", "minimum": 1 },
+    "requestId":   { "type": "string", "pattern": "^REQ-[0-9]{6}$" },
+    "class":       { "enum": ["A1", "A2", "A3"] }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "self_improve_config_invalid.schema.json",
+  "type": "object",
+  "required": ["type", "ts", "envVar", "raw", "fallback"],
+  "properties": {
+    "type":     { "const": "self_improve_config_invalid" },
+    "ts":       { "type": "string", "format": "date-time" },
+    "envVar":   { "type": "string" },
+    "raw":      { "type": "string" },
+    "fallback": { "type": "string" }
+  },
+  "additionalProperties": false
+}

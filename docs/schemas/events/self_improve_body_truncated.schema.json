@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "self_improve_body_truncated.schema.json",
+  "type": "object",
+  "required": ["type", "ts", "repoId", "issueNumber", "originalBytes", "truncatedBytes"],
+  "properties": {
+    "type":           { "const": "self_improve_body_truncated" },
+    "ts":             { "type": "string", "format": "date-time" },
+    "repoId":         { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+    "issueNumber":    { "type": "integer", "minimum": 1 },
+    "originalBytes":  { "type": "integer", "minimum": 0 },
+    "truncatedBytes": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

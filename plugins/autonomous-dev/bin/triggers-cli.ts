@@ -26,6 +26,16 @@ import type { TriggerAuditSink, TriggerNotifier } from '../intake/triggers/trigg
 import { defaultTriggerStoreIO, type TriggerRecord } from '../intake/triggers/trigger_store';
 import { outcomeFromState, runWatchTick, type RequestOutcome } from '../intake/triggers/watch_tick';
 import { readOwnership } from '../src/ownership/store';
+import {
+  buildDefaultSelfImproveDeps,
+  scanEnrolledRepos,
+  loadLedger,
+  makeMutator,
+  makeReader,
+} from '../intake/triggers/self_improve/index';
+import type { LedgerIO } from '../intake/triggers/self_improve/ledger';
+import * as os from 'os';
+import * as crypto from 'crypto';
 
 const execFileAsync = promisify(execFile);
 
@@ -231,13 +241,171 @@ function serveCmd(argv: string[]): never {
   }
 }
 
+/** Validate a repo slug used in `self-improve reset`. */
+const SAFE_REPO_SLUG_CLI = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+
+/** Build the real LedgerIO for the production CLI. */
+function realLedgerIO(): LedgerIO {
+  return {
+    homedir: () => os.homedir(),
+    readFile: (p) => (fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : undefined),
+    writeFile: (p, data) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, data, { encoding: 'utf-8', mode: 0o600 });
+    },
+    mkdirp: (p, mode) => fs.mkdirSync(p, { recursive: true, mode }),
+    chmod: (p, mode) => fs.chmodSync(p, mode),
+    openExclusive: (p) =>
+      fs.openSync(p, fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_WRONLY),
+    closeAndUnlink: (fd, p) => {
+      if (fd >= 0) try { fs.closeSync(fd); } catch { /* ignore */ }
+      try { fs.unlinkSync(p); } catch { /* ignore */ }
+    },
+    statMtimeMs: (p) => {
+      try { return fs.statSync(p).mtimeMs; } catch { return null; }
+    },
+    now: () => Date.now(),
+    randSuffix: () => `${process.pid}.${crypto.randomBytes(4).toString('hex')}`,
+  };
+}
+
+const SELF_IMPROVE_USAGE =
+  'usage: autonomous-dev triggers self-improve <tick|status|reset> [args]';
+
+/**
+ * `self-improve tick` — run one scan pass and print a summary.
+ */
+async function selfImproveTick(): Promise<number> {
+  const deps = buildDefaultSelfImproveDeps();
+  if (deps === null) {
+    process.stdout.write('self-improve disabled (set AUTONOMOUS_DEV_SELF_IMPROVE=1)\n');
+    return 0;
+  }
+  const result = await scanEnrolledRepos(deps, deps.now);
+  const skippedStr = JSON.stringify(result.skipped);
+  process.stdout.write(
+    `scanned=${result.scanned} submitted=${result.submitted} errors=${result.errors} skipped=${skippedStr}\n`,
+  );
+  return 0;
+}
+
+/**
+ * `self-improve status [--format table|json]` — print the ledger.
+ */
+async function selfImproveStatus(argv: string[]): Promise<number> {
+  const formatIdx = argv.indexOf('--format');
+  const format = formatIdx >= 0 ? argv[formatIdx + 1] : 'table';
+
+  const io = realLedgerIO();
+  const ledger = loadLedger(io);
+
+  if (ledger.loadWarnings && ledger.loadWarnings.length > 0) {
+    // Derive sidecar path (same pattern as ledger.ts corrupt-file handling)
+    const { ledgerPath } = await import('../intake/triggers/self_improve/ledger');
+    const p = ledgerPath(io);
+    process.stderr.write(
+      `error: ledger unreadable; corrupt file preserved at ${p}.corrupt-*\n`,
+    );
+    return 2;
+  }
+
+  if (format === 'json') {
+    process.stdout.write(JSON.stringify(ledger, null, 2) + '\n');
+    return 0;
+  }
+
+  // Table format
+  const entries = Object.entries(ledger.entries);
+  if (entries.length === 0) {
+    process.stdout.write('(no entries)\n');
+    return 0;
+  }
+
+  const COL = '  '; // 2-space separator
+  const header = [
+    'REPO/ID'.padEnd(30),
+    'ISSUE'.padEnd(8),
+    'ATTEMPTS'.padEnd(10),
+    'LAST_OUTCOME'.padEnd(14),
+    'BACKOFF_UNTIL'.padEnd(27),
+    'STATUS',
+  ].join(COL);
+  process.stdout.write(header + '\n');
+
+  for (const [key, entry] of entries) {
+    const row = [
+      key.padEnd(30),
+      String(entry.issueNumber).padEnd(8),
+      String(entry.attempts).padEnd(10),
+      entry.lastOutcome.padEnd(14),
+      (entry.backoffUntil ?? '-').padEnd(27),
+      entry.status,
+    ].join(COL);
+    process.stdout.write(row + '\n');
+  }
+  return 0;
+}
+
+/**
+ * `self-improve reset <repoId> <issueNumber>` — clear a ledger entry.
+ */
+async function selfImproveReset(argv: string[]): Promise<number> {
+  const [repoId, issueStr] = argv;
+  if (!repoId || !SAFE_REPO_SLUG_CLI.test(repoId)) {
+    process.stderr.write(`Error: invalid repo slug '${repoId ?? ''}'\n`);
+    process.stdout.write(SELF_IMPROVE_USAGE + '\n');
+    return 1;
+  }
+  const issueNumber = parseInt(issueStr ?? '', 10);
+  if (isNaN(issueNumber) || issueNumber <= 0 || String(issueNumber) !== issueStr) {
+    process.stderr.write(`Error: invalid issue number '${issueStr ?? ''}'\n`);
+    process.stdout.write(SELF_IMPROVE_USAGE + '\n');
+    return 1;
+  }
+
+  const io = realLedgerIO();
+  const ledgerFile = loadLedger(io);
+  const key = `${repoId}#${issueNumber}`;
+  const cfg = (await import('../intake/triggers/self_improve/config')).readSelfImproveConfig(process.env);
+  const mutator = makeMutator(ledgerFile, cfg, Date.now());
+
+  if (!ledgerFile.entries[key]) {
+    process.stderr.write(`no ledger entry for ${key}; nothing to reset\n`);
+    return 1;
+  }
+
+  mutator.reset(key);
+  await (await import('../intake/triggers/self_improve/ledger')).saveLedger(mutator.snapshot(), io);
+  process.stdout.write('reset ok\n');
+  return 0;
+}
+
+/**
+ * `self-improve` verb group dispatcher.
+ */
+async function selfImproveCmd(argv: string[]): Promise<number> {
+  const [sub, ...rest] = argv;
+
+  if (sub === '--help') {
+    process.stdout.write(SELF_IMPROVE_USAGE + '\n');
+    return 0;
+  }
+  if (sub === 'tick') return selfImproveTick();
+  if (sub === 'status') return selfImproveStatus(rest);
+  if (sub === 'reset') return selfImproveReset(rest);
+
+  process.stdout.write(SELF_IMPROVE_USAGE + '\n');
+  return 1;
+}
+
 async function main(argv: string[]): Promise<number> {
   const [verb] = argv;
   if (verb === 'watch-tick') return watchTick();
   if (verb === 'file-failure-issue') return fileFailureIssueCmd(argv.slice(1));
   if (verb === 'serve') serveCmd(argv.slice(1)); // never returns
+  if (verb === 'self-improve') return selfImproveCmd(argv.slice(1));
   process.stderr.write(
-    'usage: autonomous-dev triggers (watch-tick | file-failure-issue | serve …)\n',
+    'usage: autonomous-dev triggers (watch-tick | file-failure-issue | serve … | self-improve …)\n',
   );
   return 1;
 }
