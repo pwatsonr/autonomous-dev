@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://autonomous-dev.local/schemas/events/suspicious_empty_result.schema.json",
+  "title": "suspicious_empty_result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "timestamp", "type", "request_id", "phase", "evidence"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "type": {"const": "suspicious_empty_result"},
+    "request_id": {"type": "string", "pattern": "^REQ-[0-9]{6}$"},
+    "phase": {"type": "string"},
+    "failure_mode": {"type": ["string", "null"], "pattern": "^F[1-9]$"},
+    "remediation_planned": {"type": ["string", "null"]},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "artifact_count", "session_duration_seconds", "threshold"],
+      "properties": {
+        "phase": {"type": "string"},
+        "artifact_count": {"type": "integer"},
+        "session_duration_seconds": {"type": "integer"},
+        "threshold": {"type": "integer"}
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://autonomous-dev.local/schemas/events/reviewer_excluded.schema.json",
+  "title": "reviewer_excluded",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "timestamp", "type", "request_id", "phase", "evidence"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "type": {"const": "reviewer_excluded"},
+    "request_id": {"type": "string", "pattern": "^REQ-[0-9]{6}$"},
+    "phase": {"type": "string"},
+    "failure_mode": {"type": ["string", "null"], "pattern": "^F[1-9]$"},
+    "remediation_planned": {"type": ["string", "null"]},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer_name", "reason"],
+      "properties": {
+        "reviewer_name": {"type": "string"},
+        "reason": {"type": "string"}
+      }
+    }
+  }
+}
