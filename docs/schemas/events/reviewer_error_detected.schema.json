@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://autonomous-dev.local/schemas/events/reviewer_error_detected.schema.json",
+  "title": "reviewer_error_detected",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "timestamp", "type", "request_id", "phase", "evidence"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "type": {"const": "reviewer_error_detected"},
+    "request_id": {"type": "string", "pattern": "^REQ-[0-9]{6}$"},
+    "phase": {"type": "string"},
+    "failure_mode": {"type": ["string", "null"], "pattern": "^F[1-9]$"},
+    "remediation_planned": {"type": ["string", "null"]},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status_reason", "stdout_head"],
+      "properties": {
+        "reviewer_name": {"type": ["string", "null"]},
+        "status_reason": {"type": "string"},
+        "exit_code": {"type": ["integer", "null"]},
+        "stdout_head": {"type": "string"}
+      }
+    }
+  }
+}

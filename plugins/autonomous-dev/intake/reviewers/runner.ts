@@ -23,15 +23,81 @@
 
 import { performance } from 'node:perf_hooks';
 
-import { ReviewerParseError } from './invoke-reviewer';
+import { ReviewerParseError, ReviewerTimeoutError } from './invoke-reviewer';
 import type {
   ChangeSetContext,
   ReviewerEntry,
+  ReviewerErrorKind,
   ReviewerInvocation,
   ReviewerResult,
   ReviewerVerdict,
   ScheduledExecution,
 } from './types';
+
+// ---------------------------------------------------------------------------
+// runReviewers: Self-heal exclude + retry wrapper (REQ-000056 TASK-010)
+// ---------------------------------------------------------------------------
+
+/**
+ * Options for `runReviewers`. All optional.
+ */
+export interface RunReviewersOpts {
+  /** Reviewer names to skip entirely (never invoked). */
+  excludedReviewers?: string[];
+  /**
+   * If true, when a reviewer returns verdict === 'ERROR' the runner
+   * re-invokes that reviewer ONCE per gate. If the retry also errors,
+   * the second ERROR result is the one returned.
+   */
+  retryOnce?: boolean;
+}
+
+/**
+ * Run all reviewers in `chain` against `ctx`, honoring per-reviewer
+ * exclusion and one-shot retry. Returns one ReviewerResult per
+ * non-excluded reviewer, in chain order.
+ *
+ * Behavior:
+ *   - For each entry in chain:
+ *       - if entry.name ∈ excludedReviewers: skip (no result emitted)
+ *       - else invoke via deps.invoke
+ *       - if result.verdict === 'ERROR' AND opts.retryOnce: invoke once
+ *         more; return whichever result we end with (first if non-error,
+ *         second on retry).
+ *
+ * @throws Never — all errors are captured into ReviewerResult.verdict='ERROR'.
+ */
+export async function runReviewers(
+  chain: ReviewerEntry[],
+  ctx: ChangeSetContext,
+  opts: RunReviewersOpts,
+  deps: { invoke: InvokeReviewerFn; emit?: TelemetryEmitFn },
+): Promise<ReviewerResult[]> {
+  const excluded = new Set(opts.excludedReviewers ?? []);
+  const results: ReviewerResult[] = [];
+
+  for (const entry of chain) {
+    if (excluded.has(entry.name)) {
+      continue; // skip excluded reviewers — no result emitted
+    }
+
+    const runner = new ReviewerRunner(deps.invoke, deps.emit);
+    const invocation: ReviewerInvocation = { entry, context: ctx };
+
+    // Execute single invocation group
+    const [result] = await runner.run({ groups: [[invocation]] });
+
+    if (result.verdict === 'ERROR' && opts.retryOnce === true) {
+      // Retry once
+      const [retryResult] = await runner.run({ groups: [[invocation]] });
+      results.push(retryResult);
+    } else {
+      results.push(result);
+    }
+  }
+
+  return results;
+}
 
 /**
  * Production reviewer invocation contract. The runner does not care how
@@ -129,6 +195,15 @@ export class ReviewerRunner {
       return result;
     } catch (err) {
       const duration_ms = performance.now() - start;
+      // Determine error_kind for self-heal detectors F2 and F4 (REQ-000056)
+      let error_kind: ReviewerErrorKind | undefined;
+      if (err instanceof ReviewerTimeoutError) {
+        error_kind = 'reviewer_timeout';
+      } else if (err instanceof ReviewerParseError) {
+        error_kind = 'bad_json';
+      } else {
+        error_kind = 'cli_nonzero';
+      }
       const base: ReviewerResult = {
         reviewer_name: entry.name,
         reviewer_type: entry.type,
@@ -138,6 +213,7 @@ export class ReviewerRunner {
         verdict: 'ERROR',
         duration_ms,
         error_message: (err as Error)?.message ?? String(err),
+        error_kind,
       };
       // Populate raw_output on parse errors so downstream consumers can
       // inspect the raw subprocess output without re-running the reviewer.

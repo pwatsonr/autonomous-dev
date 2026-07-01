@@ -1254,6 +1254,21 @@ repo_has_deploy_target() {
 #   emit_pre_author_hook() below.
 should_use_review_chain() {
     local phase="${1:-}"
+    local state_file="${2:-}"
+
+    # H2 — Self-heal: if review_chain_disabled=true in state, fall back to single-agent path (REQ-000056 §11).
+    if [[ -n "${state_file}" && -f "${state_file}" ]]; then
+        if declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+            if declare -F selfheal_state_get >/dev/null 2>&1; then
+                local chain_disabled
+                chain_disabled=$(selfheal_state_get "${state_file}" "review_chain_disabled" 2>/dev/null) || chain_disabled=""
+                if [[ "${chain_disabled}" == "true" ]]; then
+                    return 1
+                fi
+            fi
+        fi
+    fi
+
     [[ "${AUTONOMOUS_DEV_REVIEW_CHAINS:-0}" == "1" && ( "${phase}" == "code_review" || "${phase}" == "spec_review" ) ]]
 }
 
@@ -1386,6 +1401,28 @@ run_review_gate_phase() {
     fi
 
     log_info "Reviewer-chain gate ${request_id}/${phase}: outcome=${outcome} -> status=${status}"
+
+    # H3 — Self-heal: dispatch review_outcome after result written (REQ-000056 §11).
+    if declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+        local sh_ctx_h3
+        sh_ctx_h3=$(jq -n \
+            --arg req "${request_id}" \
+            --arg proj "${project}" \
+            --arg ph "${phase}" \
+            --arg sf "${state_file}" \
+            --arg rf "${result_file}" \
+            --arg ef "${project}/.autonomous-dev/requests/${request_id}/events.jsonl" \
+            --argjson gd "$(printf '%s' "${gate_json}" | jq -c '.' 2>/dev/null || echo '{}')" \
+            '{request_id:$req,project:$proj,phase:$ph,state_file:$sf,result_file:$rf,
+              events_file:$ef,gate_decision:$gd}' 2>/dev/null) || sh_ctx_h3="{}"
+        local sh_rc_h3=0
+        selfheal_dispatch "review_outcome" "${sh_ctx_h3}" || sh_rc_h3=$?
+        if [[ "${sh_rc_h3}" -eq 0 ]]; then
+            # Re-read result_file in case remediator rewrote it
+            result_status=$(jq -r '.status // "pass"' "${result_file}" 2>/dev/null) || result_status="${status}"
+        fi
+    fi
+
     echo "0|0|${output_file}"
     return 0
 }
@@ -1714,7 +1751,7 @@ dispatch_phase_session() {
     # false, this branch is skipped, and the single-agent spawn path below runs
     # byte-for-byte as before. The session_active/dispatched_phase bookkeeping
     # set above already applies, so advance_phase reads phase-result-<phase>.
-    if should_use_review_chain "${phase}"; then
+    if should_use_review_chain "${phase}" "${state_file}"; then
         local rg_out
         rg_out=$(run_review_gate_phase "${request_id}" "${project}" "${state_file}" "${phase}")
         # Clear the session-active flag (mirrors the single-agent path's teardown).
@@ -1854,6 +1891,22 @@ ${scope_appendix}"
     if [[ ${exit_code} -ne 0 && ${exit_code} -ne 124 && ${exit_code} -ne 125 && ! -f "${result_file}" ]]; then
         log_warn "spawn-session.sh exited ${exit_code} without creating phase-result; synthesizing fail result"
         bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}' '${phase}'"
+    fi
+
+    # H4 — Self-heal: dispatch session_outcome after session exits (REQ-000056 §11).
+    if declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+        local sh_ctx_h4
+        sh_ctx_h4=$(jq -n \
+            --arg req "${request_id}" \
+            --arg proj "${project}" \
+            --arg ph "${phase}" \
+            --arg sf "${state_file}" \
+            --arg rf "${result_file}" \
+            --arg ef "${project}/.autonomous-dev/requests/${request_id}/events.jsonl" \
+            --arg slp "${output_file}" \
+            '{request_id:$req,project:$proj,phase:$ph,state_file:$sf,result_file:$rf,
+              events_file:$ef,session_log_path:$slp}' 2>/dev/null) || sh_ctx_h4="{}"
+        selfheal_dispatch "session_outcome" "${sh_ctx_h4}" || true
     fi
 
     # Clear session active flag
@@ -2284,6 +2337,34 @@ check_phase_timeout() {
         req_type=$(resolve_request_type "${state_file}")
         # Contract regex (SPEC-018-2-02 §Escalation Message Format)
         log_warn "Phase '${current_phase}' exceeded timeout (${timeout} seconds, type=${req_type})"
+
+        # H5 — Self-heal: dispatch phase_timeout on hard-timeout with progress context (REQ-000056 §11).
+        if declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+            local pre_tree_sh post_tree_sh req_dir_sh
+            req_dir_sh="${project}/.autonomous-dev/requests/${request_id}"
+            pre_tree_sh=$(cat "${req_dir_sh}/.pre_tree" 2>/dev/null || echo "")
+            post_tree_sh=$(snapshot_working_tree "${project}" 2>/dev/null) || post_tree_sh=""
+            local sh_ctx_h5
+            sh_ctx_h5=$(jq -n \
+                --arg req "${request_id}" \
+                --arg proj "${project}" \
+                --arg ph "${current_phase}" \
+                --arg sf "${state_file}" \
+                --arg ef "${req_dir_sh}/events.jsonl" \
+                --arg pre "${pre_tree_sh}" \
+                --arg post "${post_tree_sh}" \
+                --argjson to "${timeout}" \
+                --argjson el "${elapsed}" \
+                '{request_id:$req,project:$proj,phase:$ph,state_file:$sf,events_file:$ef,
+                  pre_tree:$pre,post_tree:$post,timeout_seconds:$to,elapsed_seconds:$el}' 2>/dev/null) || sh_ctx_h5="{}"
+            local sh_rc_h5=0
+            selfheal_dispatch "phase_timeout" "${sh_ctx_h5}" || sh_rc_h5=$?
+            if [[ "${sh_rc_h5}" -eq 0 ]]; then
+                # Remediator extended the budget — continue instead of hard-failing
+                return 0
+            fi
+        fi
+
         return 1
     fi
 
@@ -4322,6 +4403,38 @@ advance_phase() {
     local ts
     ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
+    # H7 — Self-heal: dispatch advance_phase BEFORE the case switch (REQ-000056 §11).
+    # Handles verification_false_negative (F7) and novel_failure (F8).
+    # skip_escalation is set to 1 if F7 remediator flipped the result to self_verified=pass.
+    local skip_escalation=0
+    if declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+        local sh_ctx_h7
+        sh_ctx_h7=$(jq -n \
+            --arg req "${request_id}" \
+            --arg proj "${project}" \
+            --arg ph "${current_phase}" \
+            --arg sf "${state_file}" \
+            --arg rf "${result_file}" \
+            --arg ef "${events_file}" \
+            --arg psa "$(jq -r '.phase_started_at // empty' "${state_file}" 2>/dev/null || echo "")" \
+            '{request_id:$req,project:$proj,phase:$ph,state_file:$sf,result_file:$rf,
+              events_file:$ef,phase_started_at:$psa}' 2>/dev/null) || sh_ctx_h7="{}"
+        local sh_rc_h7=0
+        selfheal_dispatch "advance_phase" "${sh_ctx_h7}" || sh_rc_h7=$?
+        if [[ "${sh_rc_h7}" -eq 0 ]]; then
+            # Re-read result_status after potential self_verify remediation
+            if [[ -f "${result_file}" ]]; then
+                result_status=$(jq -r '.status // "pass"' "${result_file}" 2>/dev/null) || true
+                local self_verified
+                self_verified=$(jq -r '.self_verified // false' "${result_file}" 2>/dev/null) || self_verified="false"
+                if [[ "${self_verified}" == "true" ]]; then
+                    skip_escalation=1
+                    result_status="pass"
+                fi
+            fi
+        fi
+    fi
+
     case "$result_status" in
         "pass")
             # Before computing next phase, ensure current_phase reflects the dispatched phase
@@ -4388,6 +4501,24 @@ advance_phase() {
                 # Mirror terminal completion to the intake ledger (REQ-000013 Call site C)
                 sync_intake_db_row "$request_id" "$current_phase" "done" "$ts"
 
+                # H8a — Self-heal: emit summary on terminal done (REQ-000056 §11).
+                if declare -F selfheal_emit_summary >/dev/null 2>&1 && declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+                    selfheal_emit_summary "${request_id}" "${project}" "done" || true
+                fi
+
+                # H8b — Self-heal: ledger_check after sync_intake_db_row (REQ-000056 §11).
+                if declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+                    local sh_ctx_h8b_done
+                    sh_ctx_h8b_done=$(jq -n \
+                        --arg req "${request_id}" \
+                        --arg proj "${project}" \
+                        --arg ph "${current_phase}" \
+                        --arg sf "${state_file}" \
+                        --arg ef "${events_file}" \
+                        '{request_id:$req,project:$proj,phase:$ph,state_file:$sf,events_file:$ef}' 2>/dev/null) || sh_ctx_h8b_done="{}"
+                    selfheal_dispatch "ledger_check" "${sh_ctx_h8b_done}" || true
+                fi
+
                 # Clean up gate decision file for completed request
                 local repo_basename
                 repo_basename=$(basename "$project")
@@ -4406,6 +4537,7 @@ advance_phase() {
 
                 local tmp="${state_file}.tmp.$$"
                 if [[ "$next_status" == "gate" ]]; then
+                    # H9 — Self-heal: preserve cross-phase fields while clearing per-phase self_heal state (REQ-000056 §11).
                     jq --arg phase "$next_phase" \
                        --arg status "$next_status" \
                        --arg ts "$ts" \
@@ -4414,9 +4546,19 @@ advance_phase() {
                         .updated_at = $ts |
                         .current_phase_metadata.gate_entered_at = $ts |
                         .current_phase_metadata.dispatched_phase = null |
-                        .current_phase_metadata.soft_timeout_count = 0' \
+                        .current_phase_metadata.soft_timeout_count = 0 |
+                        .current_phase_metadata.self_heal = (
+                            .current_phase_metadata.self_heal // {} |
+                            {
+                                excluded_reviewers: (.excluded_reviewers // []),
+                                review_chain_disabled: (.review_chain_disabled // false),
+                                review_chain_disabled_at: (.review_chain_disabled_at // null),
+                                review_chain_disabled_for_phase: (.review_chain_disabled_for_phase // null)
+                            }
+                        )' \
                        "$state_file" > "$tmp"
                 else
+                    # H9 — Self-heal: preserve cross-phase fields while clearing per-phase self_heal state (REQ-000056 §11).
                     jq --arg phase "$next_phase" \
                        --arg status "$next_status" \
                        --arg ts "$ts" \
@@ -4424,7 +4566,16 @@ advance_phase() {
                         .status = $status |
                         .updated_at = $ts |
                         .current_phase_metadata.dispatched_phase = null |
-                        .current_phase_metadata.soft_timeout_count = 0' \
+                        .current_phase_metadata.soft_timeout_count = 0 |
+                        .current_phase_metadata.self_heal = (
+                            .current_phase_metadata.self_heal // {} |
+                            {
+                                excluded_reviewers: (.excluded_reviewers // []),
+                                review_chain_disabled: (.review_chain_disabled // false),
+                                review_chain_disabled_at: (.review_chain_disabled_at // null),
+                                review_chain_disabled_for_phase: (.review_chain_disabled_for_phase // null)
+                            }
+                        )' \
                        "$state_file" > "$tmp"
                 fi
                 mv "$tmp" "$state_file"
@@ -4520,6 +4671,24 @@ advance_phase() {
             post_status=$(jq -r '.status // ""' "$state_file" 2>/dev/null || echo "")
             if [[ "$post_status" == "failed" ]]; then
                 sync_intake_db_row "$request_id" "$current_phase" "failed" "$ts"
+
+                # H8a — Self-heal: emit summary on terminal failed (REQ-000056 §11).
+                if declare -F selfheal_emit_summary >/dev/null 2>&1 && declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+                    selfheal_emit_summary "${request_id}" "${project}" "failed" || true
+                fi
+
+                # H8b — Self-heal: ledger_check after sync (REQ-000056 §11).
+                if declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
+                    local sh_ctx_h8b_fail
+                    sh_ctx_h8b_fail=$(jq -n \
+                        --arg req "${request_id}" \
+                        --arg proj "${project}" \
+                        --arg ph "${current_phase}" \
+                        --arg sf "${state_file}" \
+                        --arg ef "${events_file}" \
+                        '{request_id:$req,project:$proj,phase:$ph,state_file:$sf,events_file:$ef}' 2>/dev/null) || sh_ctx_h8b_fail="{}"
+                    selfheal_dispatch "ledger_check" "${sh_ctx_h8b_fail}" || true
+                fi
             fi
 
             # Write portal request action after all failure handling
@@ -5774,6 +5943,25 @@ fi
 # shellcheck source=bin/lib/typed-limits.sh
 if [[ -f "${LIB_DIR}/typed-limits.sh" ]]; then
     source "${LIB_DIR}/typed-limits.sh"
+fi
+
+# H1 — Self-healing pipeline modules (REQ-000056 TASK-013).
+# Sourced after typed-limits.sh so resolve_phase_timeout is available to remediators.
+# shellcheck source=bin/lib/self-heal-state.sh
+if [[ -f "${LIB_DIR}/self-heal-state.sh" ]]; then
+    source "${LIB_DIR}/self-heal-state.sh"
+fi
+# shellcheck source=bin/lib/self-heal-events.sh
+if [[ -f "${LIB_DIR}/self-heal-events.sh" ]]; then
+    source "${LIB_DIR}/self-heal-events.sh"
+fi
+# shellcheck source=bin/lib/self-heal.sh
+if [[ -f "${LIB_DIR}/self-heal.sh" ]]; then
+    source "${LIB_DIR}/self-heal.sh"
+fi
+# shellcheck source=bin/lib/self-heal-telemetry.sh
+if [[ -f "${LIB_DIR}/self-heal-telemetry.sh" ]]; then
+    source "${LIB_DIR}/self-heal-telemetry.sh"
 fi
 
 # Rate-limit detection + exponential-backoff state machine (PRD-025 FR-025-12).

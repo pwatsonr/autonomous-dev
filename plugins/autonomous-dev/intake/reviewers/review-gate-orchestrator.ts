@@ -26,7 +26,24 @@ import { resolveChain } from './chain-resolver';
 import { ReviewerScheduler } from './scheduler';
 import { ReviewerRunner, type InvokeReviewerFn, type TelemetryEmitFn } from './runner';
 import { ScoreAggregator } from './aggregator';
-import type { ChangeSetContext, GateOutcome, GateVerdict, ReviewerResult } from './types';
+import type { ChangeSetContext, GateOutcome, GateVerdict, ReviewerEntry, ReviewerResult } from './types';
+
+/**
+ * Self-heal options for the gate runner (REQ-000056 TASK-010).
+ * Sourced from state.json .current_phase_metadata.self_heal when
+ * --state-file is provided to review-gate-cli.
+ */
+export interface SelfHealGateOpts {
+  /** Reviewer names to skip entirely for this gate run. */
+  excludedReviewers?: string[];
+  /** Per-reviewer timeout overrides (ms). Applied before scheduling. */
+  reviewerTimeoutOverrides?: Record<string, number>;
+  /**
+   * When true, the full chain is replaced with a single-reviewer chain
+   * (the first blocking entry, or the first entry if none are blocking).
+   */
+  reviewChainDisabled?: boolean;
+}
 
 /**
  * Full decision returned by `runReviewGate`. Extends the aggregator's
@@ -54,6 +71,12 @@ export interface GateDecision {
   built_in_count_completed: number;
   /** The request_id taken from the ChangeSetContext. */
   request_id: string;
+  /**
+   * Reviewer names skipped due to self-heal exclusion.
+   * Populated by runReviewGate when excludedReviewers opts are provided.
+   * (REQ-000056 TASK-010)
+   */
+  excluded_reviewers?: string[];
 }
 
 /**
@@ -87,6 +110,12 @@ export interface RunReviewGateOpts {
    * CLI passes `emitReviewerInvocation` from `telemetry.ts`.
    */
   emit?: TelemetryEmitFn;
+  /**
+   * Optional self-heal overrides (REQ-000056 TASK-010). When provided,
+   * applies excluded_reviewers, timeout overrides, and review_chain_disabled
+   * before running the gate. When omitted, behavior is unchanged.
+   */
+  selfHeal?: SelfHealGateOpts;
 }
 
 /**
@@ -97,8 +126,9 @@ function toGateDecision(
   verdict: GateVerdict,
   requestType: string,
   results: ReviewerResult[],
+  excludedReviewers?: string[],
 ): GateDecision {
-  return {
+  const decision: GateDecision = {
     gate: verdict.gate,
     requestType,
     outcome: verdict.outcome,
@@ -108,6 +138,51 @@ function toGateDecision(
     built_in_count_completed: verdict.built_in_count_completed,
     request_id: verdict.request_id,
   };
+  if (excludedReviewers && excludedReviewers.length > 0) {
+    decision.excluded_reviewers = excludedReviewers;
+  }
+  return decision;
+}
+
+/**
+ * Apply self-heal modifications to a chain (REQ-000056 TASK-010).
+ *
+ * - If reviewChainDisabled: return a single-entry chain (first blocking entry,
+ *   or first entry if none are blocking).
+ * - Apply timeout overrides (patch entry.timeout_ms).
+ * - Filter out excluded reviewers.
+ */
+function applySelfHealToChain(
+  chain: ReviewerEntry[],
+  selfHeal: SelfHealGateOpts,
+): ReviewerEntry[] {
+  let result = chain;
+
+  // review_chain_disabled → single reviewer
+  if (selfHeal.reviewChainDisabled) {
+    const single = result.find((e) => e.blocking) ?? result[0];
+    result = single ? [single] : [];
+  }
+
+  // Apply timeout overrides
+  if (selfHeal.reviewerTimeoutOverrides) {
+    const overrides = selfHeal.reviewerTimeoutOverrides;
+    result = result.map((entry) => {
+      const override = overrides[entry.name];
+      if (override !== undefined) {
+        return { ...entry, timeout_ms: override };
+      }
+      return entry;
+    });
+  }
+
+  // Filter excluded reviewers
+  if (selfHeal.excludedReviewers && selfHeal.excludedReviewers.length > 0) {
+    const excluded = new Set(selfHeal.excludedReviewers);
+    result = result.filter((e) => !excluded.has(e.name));
+  }
+
+  return result;
 }
 
 /**
@@ -130,10 +205,16 @@ function toGateDecision(
  *   All other errors are captured per-reviewer by the runner (verdict: ERROR).
  */
 export async function runReviewGate(opts: RunReviewGateOpts): Promise<GateDecision> {
-  const { repoPath, requestType, gate, context, invoke, emit } = opts;
+  const { repoPath, requestType, gate, context, invoke, emit, selfHeal } = opts;
 
   // Step 1: resolve chain.
-  const chain = await resolveChain(repoPath, requestType, gate);
+  let chain = await resolveChain(repoPath, requestType, gate);
+
+  // Apply self-heal modifications if provided (REQ-000056 TASK-010)
+  const excludedReviewers = selfHeal?.excludedReviewers ?? [];
+  if (selfHeal) {
+    chain = applySelfHealToChain(chain, selfHeal);
+  }
 
   // Step 2: empty-chain fast path.
   if (chain.length === 0) {
@@ -146,6 +227,7 @@ export async function runReviewGate(opts: RunReviewGateOpts): Promise<GateDecisi
       warnings: [],
       built_in_count_completed: 0,
       request_id: context.requestId,
+      excluded_reviewers: excludedReviewers.length > 0 ? excludedReviewers : undefined,
     };
   }
 
@@ -165,5 +247,5 @@ export async function runReviewGate(opts: RunReviewGateOpts): Promise<GateDecisi
   });
 
   // Step 6: wrap and return.
-  return toGateDecision(verdict, requestType, results);
+  return toGateDecision(verdict, requestType, results, excludedReviewers);
 }

@@ -108,6 +108,24 @@ resolve_phase_prompt() {
     local prompt_file="${plugin_dir}/phase-prompts/${phase}.md"
     local state_file="${project}/.autonomous-dev/requests/${request_id}/state.json"
 
+    # TASK-014 — Self-heal: prepend suspicious_previous_result hint when set (REQ-000056 §11).
+    # The flag is set by remediate_requeue_author_phase_once (F5/F6) and cleared by H9 on the
+    # NEXT phase advance (so it persists only for the immediately re-dispatched session).
+    local selfheal_prefix=""
+    if [[ -f "${state_file}" ]]; then
+        if declare -F selfheal_state_get >/dev/null 2>&1; then
+            local suspicious_flag
+            suspicious_flag=$(selfheal_state_get "${state_file}" "suspicious_previous_result" 2>/dev/null) || suspicious_flag=""
+            if [[ "${suspicious_flag}" == "true" ]]; then
+                selfheal_prefix='[SELF-HEAL HINT] Your previous session for this phase produced a
+suspicious result (either empty or implausibly fast). Re-attempt the
+task fully; do not echo or short-circuit a sentinel result.
+
+'
+            fi
+        fi
+    fi
+
     local base_prompt=""
     if [[ -f "${prompt_file}" ]]; then
         local prompt_template
@@ -395,7 +413,7 @@ ${operator_feedback}
         fi
     fi
 
-    echo "${base_prompt}"
+    echo "${selfheal_prefix}${base_prompt}"
 }
 
 # record_phase_metric(request_id, project, completed_phase, result_status) -> void

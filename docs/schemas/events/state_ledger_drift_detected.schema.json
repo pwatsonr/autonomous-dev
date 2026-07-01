@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://autonomous-dev.local/schemas/events/state_ledger_drift_detected.schema.json",
+  "title": "state_ledger_drift_detected",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "timestamp", "type", "request_id", "phase", "evidence"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "type": {"const": "state_ledger_drift_detected"},
+    "request_id": {"type": "string", "pattern": "^REQ-[0-9]{6}$"},
+    "phase": {"type": "string"},
+    "failure_mode": {"type": ["string", "null"], "pattern": "^F[1-9]$"},
+    "remediation_planned": {"type": ["string", "null"]},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state_status", "db_status"],
+      "properties": {
+        "state_status": {"type": "string"},
+        "db_status": {"type": "string"}
+      }
+    }
+  }
+}

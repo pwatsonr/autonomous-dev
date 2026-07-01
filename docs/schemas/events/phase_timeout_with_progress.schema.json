@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://autonomous-dev.local/schemas/events/phase_timeout_with_progress.schema.json",
+  "title": "phase_timeout_with_progress",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "timestamp", "type", "request_id", "phase", "evidence"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "type": {"const": "phase_timeout_with_progress"},
+    "request_id": {"type": "string", "pattern": "^REQ-[0-9]{6}$"},
+    "phase": {"type": "string"},
+    "failure_mode": {"type": ["string", "null"], "pattern": "^F[1-9]$"},
+    "remediation_planned": {"type": ["string", "null"]},
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pre_tree", "post_tree", "elapsed_seconds", "timeout_seconds"],
+      "properties": {
+        "pre_tree": {"type": "string"},
+        "post_tree": {"type": "string"},
+        "elapsed_seconds": {"type": "integer"},
+        "timeout_seconds": {"type": "integer"}
+      }
+    }
+  }
+}

@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **REQ-000056 / #620**: Self-healing pipeline — autonomous-dev now detects
+  and auto-remediates nine in-run failure modes (F1–F9) without human
+  intervention. Detections are always recorded; each mode maps to an automatic
+  remediation policy or a safe-continue with a human as the final escalation.
+  Key capabilities: review-gate loop breaking (F1), repeated reviewer timeout
+  escalation and fallback (F2), phase-timeout budget extension when progress
+  is detected (F3), reviewer error retry-then-exclude (F4), suspicious
+  empty/fast result re-queuing with prompt hint (F5/F6), verification
+  false-negative self-correction (F7), and novel/unknown failure diagnostic
+  bundling with optional `gh issue create` (F9). Implementation adds four new
+  bash library modules (`self-heal.sh`, `self-heal-state.sh`,
+  `self-heal-events.sh`, `self-heal-telemetry.sh`), nine integration hooks
+  (H1–H9) in `supervisor-loop.sh`, 15 JSON event schemas, TypeScript
+  `runReviewers` API with `excludedReviewers` + `retryOnce` opts, and
+  `--state-file` support in `review-gate-cli.ts`. Master kill switch:
+  `AUTONOMOUS_DEV_SELF_HEAL=0` restores bit-for-bit legacy semantics.
+  Covered by 14 bats tests (TC-001–TC-014) and 13 Jest tests (TC-040–TC-042).
+  See `docs/operations/self-healing-pipeline.md` and
+  `docs/architecture/adr-005-self-heal-dispatch.md`.
+
 ### Fixed
 
 - **REQ-000054 / #629**: Unblock autonomous merge gate — add configurable

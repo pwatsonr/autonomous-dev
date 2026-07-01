@@ -168,7 +168,21 @@ export interface ReviewerResult {
   error_message?: string;
   findings?: object;
   raw_output?: string;
+  /**
+   * Categorical error type when verdict === 'ERROR'. Populated by the runner
+   * to differentiate timeout vs. parse vs. nonzero-exit failures.
+   * Used by self-heal detectors F2 and F4. (REQ-000056 TASK-010)
+   */
+  error_kind?: ReviewerErrorKind;
 }
+
+/**
+ * Categorical error type when verdict === 'ERROR'. Used by the self-heal
+ * detectors (F2, F4) to differentiate timeout vs. parse vs. nonzero-exit
+ * failures. Absent when verdict !== 'ERROR'.
+ * (REQ-000056 TASK-010)
+ */
+export type ReviewerErrorKind = 'reviewer_timeout' | 'bad_json' | 'cli_nonzero';
 
 /** Final outcome of a gate (no `ERROR` — that is captured per-reviewer). */
 export type GateOutcome = 'APPROVE' | 'REQUEST_CHANGES';
