@@ -491,7 +491,11 @@ detect_suspicious_fast() {
 
 # detect_verification_false_negative(ctx_json) -> 0|1|2  [F7]
 detect_verification_false_negative() {
-    local ctx_json="${1:-{}}"
+    # REQ-000058: avoid bash ${var:-{}} brace-parsing bug (trailing literal `}`
+    # is appended when $1 is set, making ctx_json invalid JSON that causes jq
+    # to exit non-zero).  Use explicit empty-check instead.
+    local ctx_json="${1}"
+    [[ -z "${ctx_json}" ]] && ctx_json="{}"
 
     local result_file project phase phase_started_at
     result_file=$(printf '%s' "${ctx_json}" | jq -r '.result_file // empty' 2>/dev/null) || return 1
@@ -544,7 +548,9 @@ detect_verification_false_negative() {
     if [[ -n "${phase_started_at}" ]]; then
         local artifact_mtime phase_started_unix
         artifact_mtime=$(stat -f '%m' "${artifact_path}" 2>/dev/null || stat -c '%Y' "${artifact_path}" 2>/dev/null) || artifact_mtime=0
-        phase_started_unix=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${phase_started_at}" +%s 2>/dev/null \
+        # REQ-000058: -u flag forces UTC interpretation on macOS; GNU date
+        # accepts the trailing Z natively.
+        phase_started_unix=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "${phase_started_at}" +%s 2>/dev/null \
             || date -d "${phase_started_at}" +%s 2>/dev/null) || phase_started_unix=0
 
         if [[ "${artifact_mtime}" -lt "${phase_started_unix}" ]]; then
@@ -947,7 +953,9 @@ remediate_requeue_author_phase_once() {
 
 # remediate_self_verify(ctx_json) -> 0|1|2  [F7]
 remediate_self_verify() {
-    local ctx_json="${1:-{}}"
+    # REQ-000058: avoid bash ${var:-{}} brace-parsing bug.
+    local ctx_json="${1}"
+    [[ -z "${ctx_json}" ]] && ctx_json="{}"
 
     local result_file
     result_file=$(printf '%s' "${ctx_json}" | jq -r '.result_file // empty' 2>/dev/null) || return 2

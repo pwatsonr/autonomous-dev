@@ -351,6 +351,71 @@ command_role() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────
+# REQ-000058: _verifier_daemon_rerun_confirms <req_dir> <phase_started_at_iso>
+#
+# Returns 0 iff <req_dir>/test-results.json exists, has schema_version==1,
+# status=="pass", failures==0, and (if phase_started_at non-empty) the file
+# mtime is >= the parsed phase_started_at timestamp.
+# Returns 1 on any check failure; NEVER aborts the verifier.
+# ─────────────────────────────────────────────────────────────────────────
+_verifier_daemon_rerun_confirms() {
+    local req_dir="$1" phase_started_at="${2:-}"
+    local art="${req_dir}/test-results.json"
+    [[ -f "${art}" ]] || return 1
+
+    local schema status failures
+    schema=$(jq -r '.schema_version // empty' "${art}" 2>/dev/null) || return 1
+    [[ "${schema}" == "1" ]] || return 1
+    status=$(jq -r '.status // empty' "${art}" 2>/dev/null) || return 1
+    [[ "${status}" == "pass" ]] || return 1
+    failures=$(jq -r '.failures // 1' "${art}" 2>/dev/null) || return 1
+    [[ "${failures}" == "0" ]] || return 1
+
+    if [[ -n "${phase_started_at}" ]]; then
+        local mtime phase_unix
+        mtime=$(stat -f '%m' "${art}" 2>/dev/null || stat -c '%Y' "${art}" 2>/dev/null || echo 0)
+        # Parse ISO-8601 UTC: -u flag on macOS date ensures UTC interpretation;
+        # GNU date accepts the trailing Z natively.
+        phase_unix=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "${phase_started_at}" +%s 2>/dev/null \
+            || date -d "${phase_started_at}" +%s 2>/dev/null || echo 0)
+        [[ "${mtime}" -ge "${phase_unix}" ]] || return 1
+    fi
+    return 0
+}
+
+# ─────────────────────────────────────────────────────────────────────────
+# REQ-000058: _is_test_runner_command <cmd>
+#
+# Returns 0 iff cmd's leading token(s) match the closed set of idempotent
+# test-runner patterns (anchored at start). Used to downgrade presence-miss
+# from hard "fail" to "fail_observability_only" for test runner commands
+# where independent re-execution (reexec_check) is the authoritative signal.
+#
+# MUST NOT match state-changing git/gh/npm-publish commands.
+# ─────────────────────────────────────────────────────────────────────────
+_is_test_runner_command() {
+    local cmd="${1:-}"
+    # Strip leading whitespace only; do NOT interpret the command.
+    cmd="${cmd#"${cmd%%[![:space:]]*}"}"
+    case "${cmd}" in
+        "bun test"|"bun test "*)                   return 0 ;;
+        "npm test"|"npm test "*)                   return 0 ;;
+        "pnpm test"|"pnpm test "*)                 return 0 ;;
+        "yarn test"|"yarn test "*)                 return 0 ;;
+        "npx vitest"|"npx vitest "*)               return 0 ;;
+        "npx jest"|"npx jest "*)                   return 0 ;;
+        "vitest"|"vitest "*)                       return 0 ;;
+        "jest"|"jest "*)                           return 0 ;;
+        "pytest"|"pytest "*)                       return 0 ;;
+        "python -m pytest"|"python -m pytest "*)   return 0 ;;
+        "python3 -m pytest"|"python3 -m pytest "*) return 0 ;;
+        "cargo test"|"cargo test "*)               return 0 ;;
+        "go test"|"go test "*)                     return 0 ;;
+    esac
+    return 1
+}
+
+# ─────────────────────────────────────────────────────────────────────────
 # Re-execution — TDD-041 §D-03.
 #
 # Runs CMD with CLAUDE_* / ANTHROPIC_* env stripped, stdin /dev/null,
@@ -572,17 +637,63 @@ verify_envelope() {
                 presence_check="pass"
             elif [[ "${classification}" == "unclassifiable" ]]; then
                 presence_check="skipped"
+            elif _is_test_runner_command "${cmd}" && [[ "${classification}" == "idempotent" ]]; then
+                # REQ-000058 R6/R7: presence is advisory only for the closed set of
+                # idempotent test-runner commands. Re-execution (reexec_check) or
+                # daemon-rerun artefact governs the verdict.
+                presence_check="fail_observability_only"
+                # Attempt rescue — daemon-rerun artefact first (strongest signal),
+                # then artifact-proof fallback.  When BOTH fail AND REEXEC is
+                # disabled, the miss becomes a hard failure so that the existing
+                # artifact-fallback kill-switch (R617-03/04) still works.
+                {
+                    local _tr_phase_started_at=""
+                    _tr_phase_started_at="$(jq -r '.phase_started_at // empty' \
+                        "${req_dir}/phase-result-${phase}.json" 2>/dev/null || true)"
+                    if _verifier_daemon_rerun_confirms "${req_dir}" "${_tr_phase_started_at}"; then
+                        verdict="verified_by_artifact"
+                        reason="artifact_proof=daemon_rerun:${req_dir}/test-results.json"
+                    else
+                        local _tr_art_proof=""
+                        if declare -F verification_artifact_proof_for >/dev/null 2>&1; then
+                            _tr_art_proof="$(verification_artifact_proof_for \
+                                "${req_dir}" "${row}" "${phase}" 2>/dev/null || true)"
+                        fi
+                        if [[ -n "${_tr_art_proof}" ]]; then
+                            verdict="verified_by_artifact"
+                            reason="artifact_proof=${_tr_art_proof}"
+                        elif [[ "${VERIFICATION_REEXEC:-1}" != "1" ]]; then
+                            # No rescue and re-execution disabled:
+                            # advisory miss escalates to hard fail (preserves
+                            # VERIFICATION_ARTIFACT_FALLBACK=0 and
+                            # missing-artifact refusal semantics).
+                            verdict="would_have_failed"
+                            reason="command_not_in_audit_log"
+                        fi
+                        # Else: REEXEC=1; leave verdict="verified" so the
+                        # idempotent reexec branch governs.
+                    fi
+                }
             else
                 presence_check="fail"
                 verdict="would_have_failed"
                 reason="command_not_in_audit_log"
-                # REQ-000052 / #617: artifact-as-proof rescue for substantive
-                # presence misses. When VERIFICATION_ARTIFACT_FALLBACK=1 (the
-                # default), attempt to find a fresh, ecosystem-matched,
-                # content-validated test/build artifact that proves the command
-                # actually ran. Guard the call so a missing/broken artifact-
-                # proof library never aborts the verifier.
-                if declare -F verification_artifact_proof_for >/dev/null 2>&1; then
+
+                # REQ-000058: prefer the daemon's canonical re-execution artefact.
+                # It is the strongest signal (independent, fresh, daemon-owned).
+                local phase_started_at=""
+                phase_started_at="$(jq -r '.phase_started_at // empty' \
+                    "${req_dir}/phase-result-${phase}.json" 2>/dev/null || true)"
+                if _verifier_daemon_rerun_confirms "${req_dir}" "${phase_started_at}"; then
+                    verdict="verified_by_artifact"
+                    reason="artifact_proof=daemon_rerun:${req_dir}/test-results.json"
+                elif declare -F verification_artifact_proof_for >/dev/null 2>&1; then
+                    # REQ-000052 / #617: artifact-as-proof rescue for substantive
+                    # presence misses. When VERIFICATION_ARTIFACT_FALLBACK=1 (the
+                    # default), attempt to find a fresh, ecosystem-matched,
+                    # content-validated test/build artifact that proves the command
+                    # actually ran. Guard the call so a missing/broken artifact-
+                    # proof library never aborts the verifier.
                     local _art_proof=""
                     _art_proof="$(verification_artifact_proof_for \
                         "${req_dir}" "${row}" "${phase}" 2>/dev/null || true)"
@@ -637,18 +748,26 @@ verify_envelope() {
                         fi
                     fi
                     # Output-tail compare.
-                    local cmp_line cmp_ratio cmp_verdict
-                    cmp_line=$(compare_output_tails "${claim_tail}" "${actual_tail}" || true)
-                    cmp_ratio=$(printf '%s' "${cmp_line}" | awk '{print $1}')
-                    cmp_verdict=$(printf '%s' "${cmp_line}" | awk '{print $2}')
-                    if [[ "${cmp_verdict}" == "match" ]]; then
-                        output_tail_check="pass"
-                    else
-                        output_tail_check="fail"
-                        reexec_check="fail"
-                        if [[ "${verdict}" != "would_have_failed" ]]; then
-                            verdict="would_have_failed"
-                            reason="output_tail_mismatch ratio=${cmp_ratio}"
+                    # REQ-000058: skip output_tail for presence-downgraded
+                    # test-runner commands (fail_observability_only). The
+                    # daemon independently confirmed test results via
+                    # test-results.json; the exit code is the authoritative
+                    # signal during re-execution here. Output format varies
+                    # across invocations (different args, reporters, etc.).
+                    if [[ "${presence_check}" != "fail_observability_only" ]]; then
+                        local cmp_line cmp_ratio cmp_verdict
+                        cmp_line=$(compare_output_tails "${claim_tail}" "${actual_tail}" || true)
+                        cmp_ratio=$(printf '%s' "${cmp_line}" | awk '{print $1}')
+                        cmp_verdict=$(printf '%s' "${cmp_line}" | awk '{print $2}')
+                        if [[ "${cmp_verdict}" == "match" ]]; then
+                            output_tail_check="pass"
+                        else
+                            output_tail_check="fail"
+                            reexec_check="fail"
+                            if [[ "${verdict}" != "would_have_failed" ]]; then
+                                verdict="would_have_failed"
+                                reason="output_tail_mismatch ratio=${cmp_ratio}"
+                            fi
                         fi
                     fi
                     if [[ -n "${rexec_err}" ]]; then
