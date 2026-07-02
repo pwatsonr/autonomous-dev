@@ -1893,6 +1893,17 @@ ${scope_appendix}"
         bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}' '${phase}'"
     fi
 
+    # REQ-000058: canonical test re-execution — writes <req_dir>/test-results.json
+    # so verifier's rescue path and F7's detector both have independent proof
+    # of pass/fail regardless of whether the executor's test command was
+    # captured in command-audit.jsonl.
+    if [[ "${VERIFICATION_DAEMON_RERUN:-1}" == "1" ]] \
+       && [[ "${phase}" == "integration" || "${phase}" == "test" ]] \
+       && declare -F daemon_run_tests >/dev/null 2>&1; then
+        daemon_run_tests "${req_dir}" "${project}" "${phase}" \
+            >> "${output_file:-/dev/null}.daemon-rerun" 2>&1 || true
+    fi
+
     # H4 — Self-heal: dispatch session_outcome after session exits (REQ-000056 §11).
     if declare -F selfheal_is_enabled >/dev/null 2>&1 && selfheal_is_enabled; then
         local sh_ctx_h4
@@ -5943,6 +5954,13 @@ fi
 # shellcheck source=bin/lib/typed-limits.sh
 if [[ -f "${LIB_DIR}/typed-limits.sh" ]]; then
     source "${LIB_DIR}/typed-limits.sh"
+fi
+
+# REQ-000058: canonical test re-execution producer.
+# Source before dispatch_phase so daemon_run_tests is available when a session exits.
+# shellcheck source=lib/verification/daemon-run-tests.sh
+if [[ -f "${PLUGIN_DIR}/lib/verification/daemon-run-tests.sh" ]]; then
+    source "${PLUGIN_DIR}/lib/verification/daemon-run-tests.sh"
 fi
 
 # H1 — Self-healing pipeline modules (REQ-000056 TASK-013).
