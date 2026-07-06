@@ -34,8 +34,12 @@ function issueJson(n: number) {
   };
 }
 
-function makeIssuesResponse(count: number, hasNext = false): { stdout: string; ok: boolean } {
-  const issues = Array.from({ length: count }, (_, i) => issueJson(i + 1));
+function makeIssuesResponse(
+  count: number,
+  hasNext = false,
+  startAt = 1,
+): { stdout: string; ok: boolean } {
+  const issues = Array.from({ length: count }, (_, i) => issueJson(startAt + i));
   const body = JSON.stringify(issues);
   let headers = 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n';
   if (hasNext) {
@@ -55,7 +59,7 @@ describe('ghIssueClient.listOpen', () => {
   });
 
   it('T007-02: 100 items + next → page 2 returns 50 → 150 total, truncated=false', async () => {
-    const exec = makeExec([makeIssuesResponse(100, true), makeIssuesResponse(50)]);
+    const exec = makeExec([makeIssuesResponse(100, true), makeIssuesResponse(50, false, 101)]);
     const client = ghIssueClient(exec);
     const result = await client.listOpen('o/r', ['autodev:pipeline-failed'], 100);
     expect(result.issues).toHaveLength(150);
@@ -63,7 +67,7 @@ describe('ghIssueClient.listOpen', () => {
   });
 
   it('T007-03: 100 + next, page2 has 100 + next → 200 total, truncated=true', async () => {
-    const exec = makeExec([makeIssuesResponse(100, true), makeIssuesResponse(100, true)]);
+    const exec = makeExec([makeIssuesResponse(100, true), makeIssuesResponse(100, true, 101)]);
     const client = ghIssueClient(exec);
     const result = await client.listOpen('o/r', ['autodev:pipeline-failed'], 100);
     expect(result.issues).toHaveLength(200);
@@ -97,6 +101,16 @@ describe('ghIssueClient.listOpen', () => {
     const client = ghIssueClient(exec);
     const result = await client.listOpen('o/r', [], 100);
     expect(result.issues[0].reviewerBlockFp).toBe('r-42');
+  });
+
+  it('T007-OR: multiple labels query per-label and union (OR, not AND) — #640', async () => {
+    // Two labels, each returning a DIFFERENT issue; the union must contain both.
+    // Proves we no longer AND-join into a single `labels=a,b` query (which would
+    // require an issue to carry ALL labels and find nothing).
+    const exec = makeExec([makeIssuesResponse(1, false, 5), makeIssuesResponse(1, false, 9)]);
+    const client = ghIssueClient(exec);
+    const result = await client.listOpen('o/r', ['autodev:pipeline-failed', 'autodev/auto-fix'], 100);
+    expect(result.issues.map((i) => i.number).sort((a, b) => a - b)).toEqual([5, 9]);
   });
 });
 

@@ -188,22 +188,31 @@ async function fetchPage(
 export function ghIssueClient(exec: ExecFn): GhIssueClient {
   return {
     async listOpen(repoId, labels, _limit) {
-      // Page 1
-      const page1 = await fetchPage(exec, repoId, labels, 1);
-      const allIssues = [...page1.issues];
+      // #640: GitHub's `labels` query param is AND — an issue must carry ALL
+      // listed labels. The contract here is OR ("any match"), so query each
+      // label separately and union the results by issue number. Empty labels
+      // → a single unfiltered query (all open issues).
+      const queries: string[][] = labels.length > 0 ? labels.map((l) => [l]) : [[]];
+      const byNumber = new Map<number, IssueSnapshot>();
       let truncated = false;
 
-      // Page 2 (only if page 1 indicated a next page)
-      if (page1.hasNext) {
-        const page2 = await fetchPage(exec, repoId, labels, 2);
-        allIssues.push(...page2.issues);
-        // If page 2 ALSO has a next page, we stop and flag truncation
-        if (page2.hasNext) {
-          truncated = true;
+      for (const q of queries) {
+        // Page 1
+        const page1 = await fetchPage(exec, repoId, q, 1);
+        for (const iss of page1.issues) byNumber.set(iss.number, iss);
+
+        // Page 2 (only if page 1 indicated a next page)
+        if (page1.hasNext) {
+          const page2 = await fetchPage(exec, repoId, q, 2);
+          for (const iss of page2.issues) byNumber.set(iss.number, iss);
+          // If page 2 ALSO has a next page, flag truncation
+          if (page2.hasNext) {
+            truncated = true;
+          }
         }
       }
 
-      return { issues: allIssues, truncated };
+      return { issues: [...byNumber.values()], truncated };
     },
 
     async getEvents(repoId, issueNumber) {
