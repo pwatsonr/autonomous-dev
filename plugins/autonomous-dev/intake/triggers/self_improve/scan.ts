@@ -187,25 +187,33 @@ export function buildDefaultSelfImproveDeps(): SelfImproveDeps | null {
   // through the cli_adapter_entry routerProvider
   const submitDeps: SubmitDeps = {
     requestSubmit: async (input) => {
-      // Dynamically import to avoid circular deps in tests
+      // #641: the in-process router.route() submit loads better-sqlite3 via the
+      // intake framework, which Bun cannot load — and this self-improve tick
+      // runs under Bun. Shell out to the node CLI (~/.local/bin/autonomous-dev)
+      // so the submit executes under node, where better-sqlite3 works.
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const entry = require('../../adapters/cli_adapter_entry') as
-        typeof import('../../adapters/cli_adapter_entry');
-      const router = await entry.routerProvider();
+      const childProcess = require('node:child_process') as typeof import('node:child_process');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const { buildCommand } = require('../../adapters/cli_adapter') as
-        typeof import('../../adapters/cli_adapter');
-      const cmd = buildCommand('submit', {
-        description: input.description,
-        repo: input.repo,
-        priority: input.priority,
-        type: input.type,
-      });
-      const result = await router.route(cmd);
-      if (!result.success) throw new Error(result.error ?? 'submit failed');
-      const data = result.data as { requestId?: string; id?: string } | undefined;
-      const requestId = data?.requestId ?? data?.id ?? 'UNKNOWN';
-      return { requestId };
+      const util = require('node:util') as typeof import('node:util');
+      const execFileAsync = util.promisify(childProcess.execFile);
+      const cli = `${nodeOs.homedir()}/.local/bin/autonomous-dev`;
+      const args = [
+        'request',
+        'submit',
+        input.description,
+        '--repo',
+        input.repo,
+        '--type',
+        input.type,
+        '--priority',
+        input.priority,
+      ];
+      const { stdout } = await execFileAsync(cli, args, { maxBuffer: 16 * 1024 * 1024 });
+      const m = /"requestId":\s*"(REQ-\d+)"/.exec(stdout);
+      if (!m) {
+        throw new Error(`submit: no requestId in CLI output: ${stdout.slice(0, 200)}`);
+      }
+      return { requestId: m[1] };
     },
     postGithubComment: async (repoId, issueNumber, body) => {
       await gh.comment(repoId, issueNumber, body);

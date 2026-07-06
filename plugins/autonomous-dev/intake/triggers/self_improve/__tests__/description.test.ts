@@ -107,13 +107,15 @@ Some text.
     expect(payload.type).toBe('refactor');
   });
 
-  it('T008-10: A1 + autodev/type:refactor → type bug (override only for A3)', () => {
+  it('T008-10: #641 — all self-improve submits are refactor (bug needs bug-context)', () => {
+    // `type: bug` requires a --bug-context-path the loop cannot synthesize, so
+    // every self-improve submit is 'refactor' regardless of class/type-label.
     const payload = buildSubmitPayload(
       makeIssue({ labels: ['autodev:pipeline-failed', 'autodev/type:refactor'] }),
       'A1',
       DEFAULT_CFG,
     );
-    expect(payload.type).toBe('bug');
+    expect(payload.type).toBe('refactor');
   });
 
   it('T008-11: description has correct composition order', () => {

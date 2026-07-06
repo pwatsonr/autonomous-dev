@@ -148,12 +148,17 @@ function mapPriority(labels: string[]): 'high' | 'normal' | 'low' {
 // ---------------------------------------------------------------------------
 
 function mapType(issue: IssueSnapshot, klass: ActionableClassId): 'bug' | 'refactor' {
-  // Base: all three classes default to 'bug'
+  // #641: `type: bug` requires a --bug-context-path that the self-improve
+  // submit path does not synthesize, so a bug-typed submit fails validation.
+  // Until bug-context synthesis lands, submit self-improvement fixes as
+  // 'refactor' — the full pipeline runs, needs no bug-context, and the issue
+  // detail is carried verbatim in the request description. An explicit A3
+  // `refactor` type-label is honoured (same result).
   if (klass === 'A3') {
     const typeTag = parseTypeLabel(issue.labels);
     if (typeTag === 'refactor') return 'refactor';
   }
-  return 'bug';
+  return 'refactor';
 }
 
 // ---------------------------------------------------------------------------
