@@ -498,6 +498,27 @@ restore_interrupted_session() {
     local checkpoint_file="${req_dir}/checkpoint.json"
     local events_file="${req_dir}/events.jsonl"
 
+    # REQ-000059 BR-1: refuse to overwrite state.json from checkpoint if the
+    # request has been cancelled. Also clear session_active in-place so the
+    # next poll iteration does not re-enter this function, and remove any
+    # lingering gate-decision file.
+    if is_request_cancelled_tombstoned "${req_dir}"; then
+        log_info "restore_interrupted_session: skipping ${request_id} (cancelled tombstone present)"
+        if [[ -f "${state_file}" ]] && jq empty "${state_file}" 2>/dev/null; then
+            local tmp="${state_file}.tmp"
+            if jq '.current_phase_metadata.session_active = false' "${state_file}" > "${tmp}" 2>/dev/null; then
+                mv "${tmp}" "${state_file}"
+            else
+                rm -f "${tmp}" 2>/dev/null || true
+            fi
+        fi
+        local repo_basename gate_file
+        repo_basename=$(basename "${project}")
+        gate_file="${GATE_DECISIONS_DIR}/${repo_basename}__${request_id}.json"
+        rm -f "${gate_file}" 2>/dev/null || true
+        return 0
+    fi
+
     # Restore from checkpoint if available
     if [[ -f "${checkpoint_file}" ]]; then
         if jq empty "${checkpoint_file}" 2>/dev/null; then
@@ -568,6 +589,26 @@ validate_state_file() {
 
     local req_dir
     req_dir=$(dirname "${state_file}")
+
+    # REQ-000059: if a cancelled tombstone is present, do NOT recover from
+    # checkpoint (the checkpoint predates the cancel). Instead, rebuild a
+    # minimal cancelled state.json so downstream select_request filters skip.
+    if is_request_cancelled_tombstoned "${req_dir}"; then
+        log_warn "State corrupt for cancelled request; rebuilding minimal cancelled state.json"
+        local request_id_local ts_local
+        request_id_local=$(basename "${req_dir}")
+        ts_local=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        jq -n \
+            --arg id "${request_id_local}" \
+            --arg ts "${ts_local}" \
+            '{
+                id: $id,
+                status: "cancelled",
+                updated_at: $ts
+            }' > "${state_file}"
+        return 0
+    fi
+
     local checkpoint_file="${req_dir}/checkpoint.json"
 
     if [[ -f "${checkpoint_file}" ]] && jq empty "${checkpoint_file}" 2>/dev/null; then
@@ -600,6 +641,19 @@ validate_state_file() {
     emit_alert "state_corruption" "Unrecoverable state corruption for request ${request_id}"
 
     return 1
+}
+
+###############################################################################
+# Cancelled-Tombstone Sentinel (REQ-000059)
+###############################################################################
+
+# is_request_cancelled_tombstoned(req_dir: string) -> int
+#   Returns 0 (true) when <req_dir>/cancelled.tombstone exists.
+#   Used by every reconciliation/recovery path to short-circuit
+#   resurrection of a cancelled request.
+is_request_cancelled_tombstoned() {
+    local req_dir="$1"
+    [[ -e "${req_dir}/cancelled.tombstone" ]]
 }
 
 ###############################################################################
@@ -832,6 +886,13 @@ select_request() {
         for state_file in "${req_dir}"/*/state.json; do
             [[ -f "${state_file}" ]] || continue
             validate_state_file "${state_file}" || continue  # Skip corrupt files
+
+            # REQ-000059 BR-1/BR-4: skip cancelled-tombstoned requests defensively —
+            # defends against state.json having been resurrected from checkpoint.json
+            # between polls.
+            if is_request_cancelled_tombstoned "$(dirname "${state_file}")"; then
+                continue
+            fi
 
             local parsed
             parsed=$(jq -r '[.id, .status, (.priority // 999 | tostring), .created_at, (.blocked_by // [] | length | tostring), (.current_phase_metadata.next_retry_after // "")] | join("|")' "${state_file}" 2>/dev/null)
@@ -5428,6 +5489,15 @@ reconcile_portal_markers() {
                     log_info "reconcile_portal_markers: refreshing stale marker for ${req_id} (marker=${m_status:-unset} state=${s_status})"
                     write_portal_request_action "$req_id" "$repo"
                     rm -f "${GATE_DECISIONS_DIR}/$(basename "$repo")__${req_id}.json" 2>/dev/null || true
+                    ;;
+                *)
+                    # REQ-000059: tombstone forces terminal-marker refresh even if
+                    # state.json is corrupt/stale.
+                    if is_request_cancelled_tombstoned "$(dirname "$state_file")"; then
+                        log_info "reconcile_portal_markers: refreshing marker for tombstoned ${req_id} (state=${s_status:-unset})"
+                        write_portal_request_action "$req_id" "$repo"
+                        rm -f "${GATE_DECISIONS_DIR}/$(basename "$repo")__${req_id}.json" 2>/dev/null || true
+                    fi
                     ;;
             esac
             break

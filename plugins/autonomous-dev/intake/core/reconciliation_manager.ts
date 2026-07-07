@@ -43,6 +43,7 @@ import {
   type TempCleanupReport,
   ReconcileBusyError,
 } from './types/reconciliation';
+import { isCancelledTombstonePresent } from '../handlers/cancel_finalizer';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -260,6 +261,11 @@ export class ReconciliationManager {
     const reports: DivergenceReport[] = [];
 
     for (const request of requests) {
+      // REQ-000059: skip cancelled-tombstoned requests — never surface as divergence.
+      if (isCancelledTombstonePresent(this.requestDir(repoPath, request.request_id))) {
+        continue;
+      }
+
       const statePath = path.join(requestsDir, request.request_id, 'state.json');
       if (!fs.existsSync(statePath)) {
         reports.push({
@@ -415,6 +421,11 @@ export class ReconciliationManager {
       const requestId = this.extractRequestIdFromPath(statePath);
       if (requestId === null) continue;
 
+      // REQ-000059: skip cancelled-tombstoned requests — never surface as divergence.
+      if (isCancelledTombstonePresent(this.requestDir(repoPath, requestId))) {
+        continue;
+      }
+
       const row = this.db.getRequest(requestId);
       if (row !== null) continue; // handled in Phase A
 
@@ -489,6 +500,16 @@ export class ReconciliationManager {
     report: DivergenceReport,
     options: RepairOptions = {},
   ): Promise<RepairResult> {
+    // REQ-000059: tombstone short-circuit — never repair a cancelled request.
+    if (isCancelledTombstonePresent(this.requestDir(report.repository, report.request_id))) {
+      return {
+        request_id: report.request_id,
+        category: report.category,
+        action: 'skipped',
+        error_message: 'request cancelled (tombstone)',
+      };
+    }
+
     const dryRun = options.dryRun === true;
     const force = options.force === true;
     const confirm =
