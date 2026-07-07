@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "updated_at", "phases"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "phases": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["samples_ms", "p50_ms", "p95_ms", "mean_ms",
+                       "sample_count", "last_updated"],
+          "properties": {
+            "samples_ms":   { "type": "array",   "items": { "type": "integer", "minimum": 0 },
+                              "maxItems": 200 },
+            "p50_ms":       { "type": ["integer","null"], "minimum": 0 },
+            "p95_ms":       { "type": ["integer","null"], "minimum": 0 },
+            "mean_ms":      { "type": ["integer","null"], "minimum": 0 },
+            "sample_count": { "type": "integer", "minimum": 0 },
+            "last_updated": { "type": "string",  "format": "date-time" }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

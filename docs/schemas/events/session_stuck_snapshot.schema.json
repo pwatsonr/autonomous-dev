@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "captured_at", "mode", "reason",
+               "request_id", "phase", "elapsed_ms",
+               "session", "transcript", "heartbeat", "baselines"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "captured_at":    { "type": "string" },
+    "mode":           { "enum": ["advisory", "postmortem"] },
+    "reason":         { "enum": ["silent_stall", "elapsed_over_p95",
+                                 "hard_timeout", "soft_timeout_with_progress",
+                                 "agent_exited_nonzero", "kill_signal"] },
+    "request_id":     { "type": "string" },
+    "phase":          { "type": "string" },
+    "agent":          { "type": ["string","null"] },
+    "elapsed_ms":     { "type": "integer", "minimum": 0 },
+    "session": {
+      "type": "object",
+      "required": ["pid", "ps_line", "open_fds", "lsof_truncated", "lsof_error"],
+      "properties": {
+        "pid":             { "type": ["integer","null"] },
+        "ps_line":         { "type": "string" },
+        "open_fds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["fd", "type", "name"],
+            "properties": {
+              "fd":   { "type": "string" },
+              "type": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "lsof_truncated": { "type": "boolean" },
+        "lsof_error":     { "type": ["string","null"] }
+      }
+    },
+    "transcript": {
+      "type": "object",
+      "required": ["path", "bytes", "last_mtime",
+                   "silent_seconds", "tail_128_lines"],
+      "properties": {
+        "path":            { "type": "string" },
+        "bytes":           { "type": "integer", "minimum": 0 },
+        "last_mtime":      { "type": ["string","null"] },
+        "silent_seconds":  { "type": "integer", "minimum": 0 },
+        "tail_128_lines":  { "type": "array", "items": { "type": "string" },
+                             "maxItems": 128 }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "required": ["last_two_samples", "hung_suspected_count"],
+      "properties": {
+        "last_two_samples": {
+          "type": "array", "maxItems": 2,
+          "items": { "type": "object" }
+        },
+        "hung_suspected_count": { "type": "integer", "minimum": 0 },
+        "first_suspected_at":   { "type": ["string","null"] }
+      }
+    },
+    "baselines": {
+      "type": "object",
+      "required": ["phase", "p50_ms", "p95_ms", "sample_count"],
+      "properties": {
+        "phase":                 { "type": "string" },
+        "p50_ms":                { "type": ["integer","null"] },
+        "p95_ms":                { "type": ["integer","null"] },
+        "sample_count":          { "type": "integer", "minimum": 0 },
+        "elapsed_vs_p95_ratio":  { "type": ["number","null"] }
+      }
+    },
+    "recovery_hint": { "type": ["string","null"] }
+  }
+}

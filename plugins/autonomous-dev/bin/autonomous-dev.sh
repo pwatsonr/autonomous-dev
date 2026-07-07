@@ -1156,6 +1156,40 @@ case "${COMMAND}" in
     override-verification)
         cmd_override_verification "$@"
         ;;
+    observability)
+        _obs_sub="${1:-}"; shift || true
+        case "${_obs_sub}" in
+            list-stuck)
+                # shellcheck source=/dev/null
+                source "${PLUGIN_DIR}/lib/observability/session_transcript.sh"
+                # shellcheck source=/dev/null
+                source "${PLUGIN_DIR}/lib/observability/cli_list_stuck.sh"
+                cli_list_stuck "$@"
+                ;;
+            show-stuck)
+                # shellcheck source=/dev/null
+                source "${PLUGIN_DIR}/lib/observability/session_transcript.sh"
+                # shellcheck source=/dev/null
+                source "${PLUGIN_DIR}/lib/observability/cli_show_stuck.sh"
+                cli_show_stuck "$@"
+                ;;
+            ""|help|--help|-h)
+                cat <<'EOF'
+Usage: autonomous-dev observability <sub-verb> [args]
+
+Sub-verbs:
+  list-stuck [--request <REQ>] [--since <iso>] [--json]
+    List every session-stuck-*.json under .autonomous-dev/requests/.
+  show-stuck <path|REQ-ID>
+    Pretty-print one snapshot; highlights recovery_hint.
+EOF
+                ;;
+            *)
+                echo "unknown sub-verb: observability ${_obs_sub}" >&2
+                exit 2
+                ;;
+        esac
+        ;;
     --help|-h)
         usage
         exit 0

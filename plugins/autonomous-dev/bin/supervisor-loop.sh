@@ -1882,22 +1882,65 @@ ${scope_appendix}"
     # resolve_timeout_bin). Exit 124 is the GNU-timeout "timed out" code.
     local timeout_bin
     timeout_bin=$(resolve_timeout_bin)
-    (
-        set -euo pipefail
-        if [[ -n "${timeout_bin}" ]]; then
-            "${timeout_bin}" --kill-after=10s "${timeout_seconds}" \
+
+    # ── REQ-000060: observability — progress + heartbeat sidecar ──
+    local progress_file="${req_dir}/session-progress.json"
+    local phase_start_ms
+    phase_start_ms=$(date +%s000)
+    local obs_enabled="${AUTONOMOUS_DEV_OBSERVABILITY:-1}"
+
+    if [[ "${obs_enabled}" == "1" ]]; then
+        # Initial "starting" sample so operators/inspectors have SOMETHING
+        # to read even if the pipeline dies before the first heartbeat tick.
+        printf '{"schema_version":1,"request_id":"%s","phase":"%s","session_pid":null,"started_at":"%s","ts":"%s","elapsed_ms":0,"transcript":{"path":"%s","bytes":0,"last_mtime":null,"delta_bytes_last_interval":0,"silent_seconds":0},"status":"starting"}\n' \
+            "${request_id}" "${phase}" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            "${output_file}" > "${progress_file}" || true
+        chmod 0600 "${progress_file}" 2>/dev/null || true
+    fi
+
+    if [[ "${obs_enabled}" == "1" ]]; then
+        # shellcheck source=/dev/null
+        source "${PLUGIN_DIR}/lib/observability/session_transcript.sh"
+        # shellcheck source=/dev/null
+        source "${PLUGIN_DIR}/lib/observability/session_heartbeat.sh"
+        (
+            set -uo pipefail
+            HB_PID=$(heartbeat_start \
+                "${req_dir}" "${output_file}" "${progress_file}" \
+                "${request_id}" "${phase}" "${phase_start_ms}")
+
+            run_streamed_session \
+                "${timeout_bin}" "${timeout_seconds}" \
+                "${PLUGIN_DIR}/bin/spawn-session.sh" \
+                "${state_file}" "${phase}" "${agent}" "${prompt_override}" \
+                "${output_file}"
+            rc=$?
+
+            heartbeat_stop "${HB_PID}" "${progress_file}" || true
+            exit "${rc}"
+        )
+        exit_code=$?
+    else
+        # (existing invocation preserved verbatim as the fallback — INV-4)
+        (
+            set -euo pipefail
+            if [[ -n "${timeout_bin}" ]]; then
+                "${timeout_bin}" --kill-after=10s "${timeout_seconds}" \
+                    bash "${PLUGIN_DIR}/bin/spawn-session.sh" \
+                         "${state_file}" "${phase}" "${agent}" \
+                         "${prompt_override}" \
+                > "${output_file}" 2>&1
+            else
                 bash "${PLUGIN_DIR}/bin/spawn-session.sh" \
                      "${state_file}" "${phase}" "${agent}" \
                      "${prompt_override}" \
-            > "${output_file}" 2>&1
-        else
-            bash "${PLUGIN_DIR}/bin/spawn-session.sh" \
-                 "${state_file}" "${phase}" "${agent}" \
-                 "${prompt_override}" \
-            > "${output_file}" 2>&1
-        fi
-    )
-    exit_code=$?
+                > "${output_file}" 2>&1
+            fi
+        )
+        exit_code=$?
+    fi
 
     # Snapshot working tree after session for progress detection (REQ-000051).
     local post_tree
@@ -1905,6 +1948,22 @@ ${scope_appendix}"
 
     # Handle timeout case
     if [[ ${exit_code} -eq 124 ]]; then
+        # ── REQ-000060: Insertion C — post-mortem snapshot on hard timeout ──
+        if [[ "${obs_enabled}" == "1" ]]; then
+            # shellcheck source=/dev/null
+            source "${PLUGIN_DIR}/lib/observability/session_stuck_snapshot.sh" || true
+            # shellcheck source=/dev/null
+            source "${PLUGIN_DIR}/lib/observability/observability_events.sh" || true
+            _snap_path=$(stuck_snapshot_postmortem \
+                "${req_dir}" "${output_file}" "${progress_file}" \
+                "${request_id}" "${phase}" "hard_timeout" "" 2>/dev/null || true)
+            _phase_end_ms=$(date +%s000)
+            emit_session_stuck \
+                "${req_dir}/events.jsonl" "${request_id}" \
+                "${SESSION_ID:-unknown}" "${phase}" \
+                "hard_timeout" "${_snap_path:-}" \
+                "$(( _phase_end_ms - phase_start_ms ))" 2>/dev/null || true
+        fi
         local result_file="${req_dir}/phase-result-${phase}.json"
         if working_tree_advanced "${pre_tree}" "${post_tree}"; then
             # Soft timeout: session timed out but working tree advanced.
@@ -1951,6 +2010,22 @@ ${scope_appendix}"
     local result_file="${req_dir}/phase-result-${phase}.json"
     if [[ ${exit_code} -ne 0 && ${exit_code} -ne 124 && ${exit_code} -ne 125 && ! -f "${result_file}" ]]; then
         log_warn "spawn-session.sh exited ${exit_code} without creating phase-result; synthesizing fail result"
+        # ── REQ-000060: Insertion D — post-mortem snapshot on agent-exited-nonzero ──
+        if [[ "${obs_enabled}" == "1" ]]; then
+            # shellcheck source=/dev/null
+            source "${PLUGIN_DIR}/lib/observability/session_stuck_snapshot.sh" || true
+            # shellcheck source=/dev/null
+            source "${PLUGIN_DIR}/lib/observability/observability_events.sh" || true
+            _snap_path=$(stuck_snapshot_postmortem \
+                "${req_dir}" "${output_file}" "${progress_file}" \
+                "${request_id}" "${phase}" "agent_exited_nonzero" "" 2>/dev/null || true)
+            _phase_end_ms=$(date +%s000)
+            emit_session_stuck \
+                "${req_dir}/events.jsonl" "${request_id}" \
+                "${SESSION_ID:-unknown}" "${phase}" \
+                "agent_exited_nonzero" "${_snap_path:-}" \
+                "$(( _phase_end_ms - phase_start_ms ))" 2>/dev/null || true
+        fi
         bash -c "source '${PLUGIN_DIR}/bin/spawn-session.sh'; write_synthesized_phase_result '${result_file}' 'fail' 'AGENT_EXITED_NONZERO' '${exit_code}' '${phase}'"
     fi
 
@@ -1984,6 +2059,20 @@ ${scope_appendix}"
     # Clear session active flag
     jq '.current_phase_metadata.session_active = false' "${state_file}" > "${tmp}"
     mv "${tmp}" "${state_file}"
+
+    # ── REQ-000060: Insertion E — record phase baseline before return ──
+    if [[ "${obs_enabled}" == "1" ]]; then
+        # shellcheck source=/dev/null
+        source "${PLUGIN_DIR}/lib/observability/phase_baselines.sh" 2>/dev/null || true
+        if declare -F phase_baselines_record >/dev/null 2>&1; then
+            local _phase_end_ms_final
+            _phase_end_ms_final=$(date +%s000)
+            phase_baselines_record \
+                "${phase}" \
+                "$(( _phase_end_ms_final - phase_start_ms ))" \
+                "${exit_code}" 2>/dev/null || true
+        fi
+    fi
 
     echo "${exit_code}|${session_cost}|${output_file}"
     return ${exit_code}

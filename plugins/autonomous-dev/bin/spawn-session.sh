@@ -180,6 +180,15 @@ spawn_session_typed() {
     local state_file="$1" target_phase="$2" agent="$3"
     local prompt_override="${4:-}"
 
+    # REQ-000060: Emit a startup line before the first agent turn so that a
+    # hang on the very first turn still leaves a non-empty transcript.
+    # Derive request_id from the state_file path (parent dir basename).
+    local _req_id
+    _req_id="$(basename "$(dirname "${state_file}")" 2>/dev/null || echo "unknown")"
+    printf '[spawn-session] request=%s phase=%s agent=%s pid=%s ts=%s\n' \
+        "${_req_id}" "${target_phase:-unknown}" "${agent:-unknown}" \
+        "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
     local cmd_line
     cmd_line=$(assemble_spawn_command "${state_file}" "${target_phase}" "${agent}")
 
