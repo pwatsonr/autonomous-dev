@@ -67,7 +67,20 @@
     "max_concurrent_requests": 3,
     "disk_usage_limit_gb": 10.0,
     "rate_limit_backoff_base_seconds": 30,
-    "rate_limit_backoff_max_seconds": 900
+    "rate_limit_backoff_max_seconds": 900,
+    "session_limit": {
+      "enabled": true,
+      "buffer_seconds": 60,
+      "floor_seconds": 900,
+      "next_day_rollover": true,
+      "abbreviation_map": {
+        "PST": "-08:00", "PDT": "-07:00",
+        "MST": "-07:00", "MDT": "-06:00",
+        "CST": "-06:00", "CDT": "-05:00",
+        "EST": "-05:00", "EDT": "-04:00",
+        "UTC": "+00:00", "Z":   "+00:00"
+      }
+    }
   },
 
   "repositories": {
