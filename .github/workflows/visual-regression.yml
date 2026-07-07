@@ -19,9 +19,17 @@
 name: visual-regression
 
 on:
+  # This suite tests ONLY the portal (working-directory below). Scope both
+  # triggers to portal changes so it is SKIPPED (neutral) on PRs that don't
+  # touch the portal — instead of failing on golden-image debt and blocking
+  # unrelated (e.g. daemon-only) PRs. Portal PRs still run it in full.
   pull_request:
+    paths:
+      - 'plugins/autonomous-dev-portal/**'
   push:
     branches: [main]
+    paths:
+      - 'plugins/autonomous-dev-portal/**'
 
 concurrency:
   group: visual-regression-${{ github.ref }}
