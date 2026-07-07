@@ -13,7 +13,7 @@ source "${_EL_DIR}/state_file_manager.sh"
 # Maximum event log size in bytes (10 MB)
 readonly EVENT_LOG_MAX_SIZE=10485760
 
-# All valid event types (28 values: original 25 + 3 added by REQ-000060)
+# All valid event types (29 values: 28 prior + 1 added by REQ-000061)
 readonly -a VALID_EVENT_TYPES=(
   request_created state_transition phase_started phase_completed
   review_pass review_fail retry timeout error paused resumed
@@ -23,6 +23,7 @@ readonly -a VALID_EVENT_TYPES=(
   session_ended artifact_created pr_created pr_merged
   cleanup_started cleanup_completed
   session_hung_suspected session_stuck session_recovered_after_stall
+  rate_limit_backoff
 )
 
 # event_append -- Append a validated event to the JSONL event log
@@ -80,7 +81,7 @@ event_append() {
   # Validate request_id format
   local request_id
   request_id="$(echo "$event_json" | jq -r '.request_id')"
-  if [[ ! "$request_id" =~ ^REQ-[0-9]{8}-[0-9a-f]{4}$ ]]; then
+  if [[ ! "$request_id" =~ ^REQ-[0-9]{6}$ ]] && [[ ! "$request_id" =~ ^REQ-[0-9]{8}-[0-9a-f]{4}$ ]]; then
     echo "event_append: invalid request_id format: ${request_id}" >&2
     return 1
   fi

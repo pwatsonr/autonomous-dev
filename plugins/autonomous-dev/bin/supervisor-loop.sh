@@ -6021,6 +6021,28 @@ main_loop() {
         local exit_code session_cost output_file
         IFS='|' read -r exit_code session_cost output_file <<< "${session_result}"
 
+        # REQ-000061: session-limit 429 (Claude quota) is a distinct class from the
+        # generic RPM/overload 429 handled below. Detect it FIRST so it wins on match;
+        # park dispatch until the parsed reset (+buffer) or a floor backoff. Never
+        # advances the exponential ladder; never records a crash.
+        local session_limit_json=""
+        if [[ "$(echo "$(cat "${EFFECTIVE_CONFIG}" 2>/dev/null || echo '{}')" \
+               | jq -r '.governance.session_limit.enabled // true')" != "false" ]] \
+           && [[ "${AUTONOMOUS_DEV_SL_ENABLED:-true}" != "false" ]] \
+           && declare -F detect_session_limit >/dev/null 2>&1 \
+           && [[ -f "${output_file}" ]] \
+           && session_limit_json="$(detect_session_limit "$(cat "${output_file}" 2>/dev/null || echo "")")"; then
+            log_warn "Session-limit 429 detected for ${request_id}; parking dispatch until reset."
+            update_state_cost "${request_id}" "${project}" "${session_cost}" || true
+            update_cost_ledger "${session_cost}" "${request_id}" || true
+            handle_session_limit \
+                "${session_limit_json}" \
+                "$(cat "${EFFECTIVE_CONFIG}" 2>/dev/null || echo '{}')" \
+                "${request_id}" "${project}" || true
+            [[ "${ONCE_MODE}" == "true" ]] && break
+            continue
+        fi
+
         # PRD-025 FR-025-12: an API rate limit is a transient infra condition,
         # not a code failure. Detect it in the session output BEFORE the normal
         # branching: record the cost already incurred, advance the backoff state
