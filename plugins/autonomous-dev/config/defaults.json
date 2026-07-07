@@ -8,14 +8,11 @@
     "error_backoff_base_seconds": 30,
     "error_backoff_max_seconds": 900,
     "max_retries_per_phase": 3,
-    "daily_cost_cap_usd": 50.00,
-    "monthly_cost_cap_usd": 500.00,
+    "daily_cost_cap_usd": 50.0,
+    "monthly_cost_cap_usd": 500.0,
     "log_max_size_mb": 50,
     "log_retention_days": 7,
     "merge_gate_non_blocking_checks": [
-      "markdown",
-      "lychee",
-      "visual-regression",
       "scope-enforcement",
       "scope-enforcement/kind"
     ],

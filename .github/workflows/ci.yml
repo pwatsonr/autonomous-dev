@@ -99,7 +99,9 @@ jobs:
           # Pin the lychee binary so config compatibility can't drift out from
           # under us (the floating action silently upgraded lychee and the old
           # `base` config key started failing the whole gate).
-          lycheeVersion: v0.24.2
+          # NOTE: lychee-action@v1 prepends its own `v`; this value must NOT
+          # start with `v` (`v0.24.2` became `vv0.24.2` -> 404 -> perma-red).
+          lycheeVersion: 0.24.2
           args: >-
             --cache
             --max-cache-age 1d
