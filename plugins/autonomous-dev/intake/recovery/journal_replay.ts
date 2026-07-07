@@ -31,6 +31,10 @@ import {
   readStateJson,
   type StateJsonV11,
 } from '../state/state_validator';
+import {
+  isCancelledTombstonePresent,
+  writeCancelledTombstone,
+} from '../handlers/cancel_finalizer';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,7 +44,8 @@ export type JournalMismatchType =
   | 'STATE_DRIFT'
   | 'ORPHANED_LOST'
   | 'RECOVERY_INSERT'
-  | 'RECOVERY_INSERT_FAILED';
+  | 'RECOVERY_INSERT_FAILED'
+  | 'CANCELLED_SKIPPED';
 
 export interface JournalMismatch {
   requestId: string;
@@ -140,6 +145,16 @@ export async function replayJournal(
     const fsEntry = fsState.get(row.request_id);
 
     if (fsEntry) {
+      // REQ-000059: tombstone present → skip; never update SQLite for a cancelled row.
+      if (isCancelledTombstonePresent(path.join(requestsDir, row.request_id))) {
+        report.mismatches.push({
+          requestId: row.request_id,
+          type: 'CANCELLED_SKIPPED',
+          details: 'tombstone present',
+        });
+        continue;
+      }
+
       // Both sides present — compare priority + status.
       const drift = computeDrift(row, fsEntry);
       if (drift.length > 0) {
@@ -175,6 +190,22 @@ export async function replayJournal(
       continue;
     }
 
+    // REQ-000059: SQLite row with status='cancelled' and no FS entry →
+    // back-fill tombstone and skip (do NOT downgrade to orphaned_lost).
+    if (row.status === 'cancelled') {
+      const reqDir = path.join(requestsDir, row.request_id);
+      const warnings: string[] = [];
+      const ok = writeCancelledTombstone(reqDir, warnings);
+      report.mismatches.push({
+        requestId: row.request_id,
+        type: 'CANCELLED_SKIPPED',
+        details: ok
+          ? 'backfilled tombstone for legacy cancelled row'
+          : `backfill failed: ${warnings.join('; ')}`,
+      });
+      continue;
+    }
+
     // SQLite present, FS missing → orphaned_lost.
     try {
       db.updateRequest(row.request_id, {
@@ -202,6 +233,26 @@ export async function replayJournal(
   // --- FS rows without a SQLite row → INSERT (F3 cosmic-ray recovery) --
   for (const [requestId, parsed] of fsState) {
     if (seenIds.has(requestId)) continue;
+
+    // REQ-000059: tombstone present → refuse to reinsert a cancelled row.
+    if (isCancelledTombstonePresent(path.join(requestsDir, requestId))) {
+      report.mismatches.push({
+        requestId,
+        type: 'CANCELLED_SKIPPED',
+        details: 'tombstone present; refusing to reinsert cancelled row',
+      });
+      continue;
+    }
+
+    // Belt-and-suspenders: if parsed state.json says cancelled, treat as CANCELLED_SKIPPED.
+    if (parsed.status === 'cancelled') {
+      report.mismatches.push({
+        requestId,
+        type: 'CANCELLED_SKIPPED',
+        details: 'state.json.status=cancelled; not reinserting',
+      });
+      continue;
+    }
 
     const entity = entityFromState(requestId, parsed);
     if (!entity) {

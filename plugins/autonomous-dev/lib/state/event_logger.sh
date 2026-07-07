@@ -13,7 +13,7 @@ source "${_EL_DIR}/state_file_manager.sh"
 # Maximum event log size in bytes (10 MB)
 readonly EVENT_LOG_MAX_SIZE=10485760
 
-# All valid event types (25 values from TDD Section 4.2)
+# All valid event types (28 values: original 25 + 3 added by REQ-000060)
 readonly -a VALID_EVENT_TYPES=(
   request_created state_transition phase_started phase_completed
   review_pass review_fail retry timeout error paused resumed
@@ -22,6 +22,7 @@ readonly -a VALID_EVENT_TYPES=(
   dependency_resolved dependency_blocked session_started
   session_ended artifact_created pr_created pr_merged
   cleanup_started cleanup_completed
+  session_hung_suspected session_stuck session_recovered_after_stall
 )
 
 # event_append -- Append a validated event to the JSONL event log
@@ -97,7 +98,10 @@ event_append() {
   # Compact the JSON to a single line and append
   local compact
   compact="$(echo "$event_json" | jq -c '.')"
-  printf '%s\n' "$compact" >> "$events_file"
+  printf '%s\n' "$compact" >> "$events_file" || {
+    echo "event_append: write failed for ${events_file}" >&2
+    return 1
+  }
 
   # Ensure permissions
   ensure_file_permissions "$events_file"

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "event_type", "timestamp",
+               "request_id", "session_id", "phase", "reason", "snapshot_path"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "event_type":     { "const": "session_stuck" },
+    "timestamp":      { "type": "string", "format": "date-time" },
+    "request_id":     { "type": "string" },
+    "session_id":     { "type": "string" },
+    "phase":          { "type": "string" },
+    "reason": {
+      "enum": ["silent_stall","elapsed_over_p95","hard_timeout",
+               "soft_timeout_with_progress","agent_exited_nonzero","kill_signal"]
+    },
+    "snapshot_path":  { "type": ["string","null"] },
+    "elapsed_ms":     { "type": "integer", "minimum": 0 }
+  }
+}

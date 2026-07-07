@@ -63,5 +63,19 @@
   },
   "repositories": {
     "allowlist": []
+  },
+  "observability": {
+    "hung_session": {
+      "enabled": true,
+      "heartbeat_interval_seconds": 15,
+      "silent_stall_seconds": 300,
+      "anomaly_multiplier": 3.0,
+      "min_baseline_samples": 5,
+      "baselines_max_samples_per_phase": 200,
+      "lsof_max_rows": 200,
+      "transcript_tail_bytes": 65536,
+      "transcript_tail_lines": 128,
+      "kill_on_anomaly": false
+    }
   }
 }

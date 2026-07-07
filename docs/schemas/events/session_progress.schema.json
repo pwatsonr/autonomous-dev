@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "phase", "session_pid",
+               "started_at", "ts", "elapsed_ms", "transcript", "status"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "request_id":     { "type": "string" },
+    "phase":          { "type": "string" },
+    "session_pid":    { "type": ["integer", "null"], "minimum": 1 },
+    "started_at":     { "type": "string", "format": "date-time" },
+    "ts":             { "type": "string", "format": "date-time" },
+    "elapsed_ms":     { "type": "integer", "minimum": 0 },
+    "transcript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "bytes", "last_mtime",
+                   "delta_bytes_last_interval", "silent_seconds"],
+      "properties": {
+        "path":                        { "type": "string" },
+        "bytes":                       { "type": "integer", "minimum": 0 },
+        "last_mtime":                  { "type": ["string","null"] },
+        "delta_bytes_last_interval":   { "type": "integer", "minimum": 0 },
+        "silent_seconds":              { "type": "integer", "minimum": 0 }
+      }
+    },
+    "status":     { "enum": ["starting", "running", "suspected", "exited"] },
+    "anomaly": {
+      "type": ["object","null"],
+      "additionalProperties": false,
+      "properties": {
+        "elapsed_vs_p95_ratio": { "type": ["number","null"], "minimum": 0 },
+        "silent_stall_ratio":   { "type": ["number","null"], "minimum": 0 },
+        "verdict":              { "enum": ["ok", "suspected"] },
+        "reason":               { "type": ["string","null"] }
+      }
+    }
+  }
+}
