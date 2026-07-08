@@ -76,7 +76,6 @@ import {
 } from "./artifact-comments";
 import { healthHandler } from "./health";
 import { buildKillSwitchRoutes } from "./kill-switch";
-import { homelabHandler, homelabObservationsApiHandler } from "./homelab";
 import { logsHandler } from "./logs";
 import { opsHandler } from "./ops";
 import { requestDetailHandler, artifactFragmentHandler } from "./request-detail";
@@ -458,10 +457,6 @@ export function registerRoutes(
             },
         });
     });
-
-    // Homelab discovery surface — read-only page + JSON API.
-    app.get("/portal/homelab", homelabHandler);
-    app.get("/portal/homelab/api/observations", homelabObservationsApiHandler);
 
     // SPEC-035-3 — kill-switch sub-router (mounts /ops/kill-switch* paths).
     app.route("/", buildKillSwitchRoutes());

@@ -27,12 +27,11 @@ async function render(node: unknown): Promise<string> {
     return typeof v === "string" ? v : String(v);
 }
 
-describe("RailNav — SPEC-037-3-01 (13-item nav)", () => {
-    test("N-08: renders thirteen anchors with the documented hrefs in order", async () => {
+describe("RailNav — SPEC-037-3-01 (12-item nav)", () => {
+    test("N-08: renders twelve anchors with the documented hrefs in order", async () => {
         // BUG-22 (PR #296) added Logs (OPERATE) and Repos (SYSTEM) so
         // operators can discover those pages without typing the URL.
         // ONBOARD #594 added the Onboard group (Onboard / Ingestion / Questions).
-        // Homelab surface added as a hardcoded portal-core page (HOMELAB group).
         const html = await render(<RailNav activePath="/" />);
         const hrefs = [...html.matchAll(/href=["']([^"']+)["']/g)].map(
             (m) => m[1],
@@ -50,7 +49,6 @@ describe("RailNav — SPEC-037-3-01 (13-item nav)", () => {
             "/onboard",
             "/onboard/ingestion",
             "/onboard/questions",
-            "/portal/homelab",
         ]);
     });
 
@@ -61,12 +59,12 @@ describe("RailNav — SPEC-037-3-01 (13-item nav)", () => {
         );
     });
 
-    test("renders four rail-nav-group containers (operate + system + onboard + homelab)", async () => {
+    test("renders three rail-nav-group containers (operate + system + onboard)", async () => {
         const html = await render(<RailNav activePath="/" />);
         const groups = [...html.matchAll(/data-group=["']([^"']+)["']/g)].map(
             (m) => m[1],
         );
-        expect(groups).toEqual(["operate", "system", "onboard", "homelab"]);
+        expect(groups).toEqual(["operate", "system", "onboard"]);
     });
 
     test("N-10: Operate group has 5 items, System group has 4 (post-BUG-22)", () => {
@@ -85,11 +83,6 @@ describe("RailNav — SPEC-037-3-01 (13-item nav)", () => {
             "/settings",
             "/ops",
         ]);
-    });
-
-    test("N-10b: Homelab group has 1 item (/portal/homelab)", () => {
-        const homelab = NAV_ITEMS.filter((i) => i.group === "homelab");
-        expect(homelab.map((i) => i.href)).toEqual(["/portal/homelab"]);
     });
 
     test("N-11: each rail-nav-group begins with a rail-nav-group-label", async () => {
@@ -116,7 +109,7 @@ describe("RailNav — SPEC-037-3-01 (13-item nav)", () => {
         const anchorSegments = [...html.matchAll(/<a[^>]*>[\s\S]*?<\/a>/g)].map(
             (m) => m[0],
         );
-        expect(anchorSegments.length).toBe(13);
+        expect(anchorSegments.length).toBe(12);
         for (const segment of anchorSegments) {
             // Each anchor has an `<span class="ic">` that contains an
             // inline <svg> (Lucide markup).
@@ -139,10 +132,10 @@ describe("RailNav — SPEC-037-3-01 (13-item nav)", () => {
         expect(markup).toContain("</svg>");
     });
 
-    test("N-13: /portal/homelab IS in the rendered hrefs (Homelab is a hardcoded portal-core page)", async () => {
+    test("N-13: /homelab is NOT in any rendered href (Homelab is plugin-contributed)", async () => {
         const html = await render(<RailNav activePath="/" />);
-        expect(html).toContain("/portal/homelab");
-        expect(html).toContain("Homelab");
+        expect(html).not.toContain("/homelab");
+        expect(html).not.toContain("homelab");
     });
 
     test("active item gets aria-current=\"page\" AND class includes 'active'", async () => {
@@ -202,16 +195,14 @@ describe("RailNav — SPEC-037-3-01 (13-item nav)", () => {
         expect(html).not.toContain('class="count"');
     });
 
-    test("NAV_ITEMS exposes 13 entries split 5/4/3/1 across operate/system/onboard/homelab", () => {
-        expect(NAV_ITEMS.length).toBe(13);
+    test("NAV_ITEMS exposes 12 entries split 5/4/3 across operate/system/onboard", () => {
+        expect(NAV_ITEMS.length).toBe(12);
         const operate = NAV_ITEMS.filter((i) => i.group === "operate");
         const system = NAV_ITEMS.filter((i) => i.group === "system");
         const onboard = NAV_ITEMS.filter((i) => i.group === "onboard");
-        const homelab = NAV_ITEMS.filter((i) => i.group === "homelab");
         expect(operate.length).toBe(5);
         expect(system.length).toBe(4);
         expect(onboard.length).toBe(3);
-        expect(homelab.length).toBe(1);
     });
 
     test("N-18: the ONBOARD group renders after SYSTEM with the 3 onboard items", async () => {
