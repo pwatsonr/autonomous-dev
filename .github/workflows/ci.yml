@@ -92,16 +92,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Link check
-        uses: lycheeverse/lychee-action@v1
+        uses: lycheeverse/lychee-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # Pin the lychee binary so config compatibility can't drift out from
-          # under us (the floating action silently upgraded lychee and the old
-          # `base` config key started failing the whole gate).
-          # NOTE: lychee-action@v1 prepends its own `v`; this value must NOT
-          # start with `v` (`v0.24.2` became `vv0.24.2` -> 404 -> perma-red).
-          lycheeVersion: 0.24.2
+          # lychee-action@v1 was too old for lychee's CURRENT release naming
+          # (tag `lychee-vX.Y.Z`, asset `lychee-x86_64-...tar.gz`), so its
+          # binary download 404'd -> `gzip: not in gzip format` -> the gate
+          # never ran. @v2 runs lychee via its Docker image (no curl+tar), so
+          # no version pin is needed. lychee.toml is already compatible (the
+          # old `base` key was removed).
           args: >-
             --cache
             --max-cache-age 1d
