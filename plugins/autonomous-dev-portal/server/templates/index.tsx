@@ -33,6 +33,7 @@ import { ApprovalsView } from "./views/approvals";
 import { AuditView } from "./views/audit";
 import { CostsView } from "./views/costs";
 import { DashboardView } from "./views/dashboard";
+import { HomelabView } from "./views/homelab";
 import { LogsView } from "./views/logs";
 import { NotFoundView } from "./views/404";
 import { OnboardView } from "./views/onboard";
@@ -99,6 +100,8 @@ function renderViewBody<V extends ViewName>(
             return <OnboardIngestionView {...(props as RenderProps["onboard-ingestion"])} />;
         case "onboard-questions":
             return <OnboardQuestionsView {...(props as RenderProps["onboard-questions"])} />;
+        case "homelab":
+            return <HomelabView {...(props as RenderProps["homelab"])} />;
         case "404":
             return <NotFoundView {...(props as RenderProps["404"])} />;
         case "500":
@@ -156,6 +159,8 @@ function activePathFor(view: ViewName): string {
             return "/onboard/ingestion";
         case "onboard-questions":
             return "/onboard/questions";
+        case "homelab":
+            return "/portal/homelab";
         case "dashboard":
         case "request-detail":
         case "404":
