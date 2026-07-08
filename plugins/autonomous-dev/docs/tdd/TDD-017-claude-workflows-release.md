@@ -1598,7 +1598,7 @@ concurrency:
 - **[PRD-003: Agent Factory & Self-Improvement](../prd/PRD-003-agent-factory.md)** — Agent meta-reviewer security requirements
 - **[PRD-008: Unified Request Submission](../prd/PRD-008-unified-request-submission.md)** — Assist eval framework and CLI commands
 - **[PRD-009: Web Control Plane](../prd/PRD-009-web-control-plane.md)** — Security eval requirements
-- **Claude Code Actions Documentation**: https://code.claude.com/docs/github-actions
+- **Claude Code Actions Documentation**: https://docs.claude.com/en/docs/claude-code/github-actions
 - **Anthropic Claude Code Action**: https://github.com/anthropics/claude-code-action
 - **Anthropic Security Review Action**: https://github.com/anthropics/claude-code-security-review  
 - **OWASP LLM Security Guidelines**: https://owasp.org/www-project-top-10-for-large-language-model-applications/
