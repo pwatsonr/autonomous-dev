@@ -363,8 +363,11 @@ and explain your reasoning in 'feedback' rather than silently ignoring it."
 
 ## Branch and PR Instructions
 
-1. Create a branch named 'autonomous/${request_id}' (single-quoted in any shell command):
-   git checkout -b 'autonomous/${request_id}'
+1. Create branch 'autonomous/${request_id}' OFF THE LATEST ${default_branch}
+   (single-quoted in any shell command). This is REQUIRED (#649): branching off
+   whatever happens to be checked out makes this PR pile another request's
+   in-flight commits on top. Always start from a freshly-fetched ${default_branch}:
+   git fetch origin ${default_branch} && git checkout -B 'autonomous/${request_id}' \"origin/${default_branch}\"
 
 2. Make commits using Conventional Commits format (feat:, fix:, docs:, etc.).
 

@@ -24,6 +24,15 @@ setup() {
     [[ "${result}" == *"autonomous/REQ-"* ]]
 }
 
+@test "code_phase_prompt branches off latest main (#649)" {
+    # First-pass code prompt must create the branch off a freshly-fetched
+    # default branch, not off whatever HEAD happens to be checked out.
+    result=$(resolve_phase_prompt "code" "REQ-123456" "/tmp/project")
+    [[ "${result}" == *"checkout -B 'autonomous/REQ-123456'"* ]]
+    [[ "${result}" == *"origin/"* ]]
+    [[ "${result}" == *"git fetch origin"* ]]
+}
+
 @test "code_phase_prompt_contains_pr_instruction" {
     result=$(resolve_phase_prompt "code" "REQ-123456" "/tmp/project")
     [[ "${result}" == *"gh pr create"* ]]

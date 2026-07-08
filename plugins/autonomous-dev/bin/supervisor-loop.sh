@@ -3378,12 +3378,66 @@ resolve_effective_trust() {
 read_request_pr_url() {
     local project="$1" request_id="$2"
     local result_code="${project}/.autonomous-dev/requests/${request_id}/phase-result-code.json"
-    [[ -f "${result_code}" ]] || { echo ""; return 0; }
-    jq -r '
-        ([.artifacts[]? | select((.kind // "") == "github_pr")]
-         | .[0] // {}) as $a
-        | ($a.url // $a.path // "")
-        ' "${result_code}" 2>/dev/null || echo ""
+    local url=""
+    if [[ -f "${result_code}" ]]; then
+        url=$(jq -r '
+            ([.artifacts[]? | select((.kind // "") == "github_pr")]
+             | .[0] // {}) as $a
+            | ($a.url // $a.path // "")
+            ' "${result_code}" 2>/dev/null || echo "")
+    fi
+    if [[ -n "${url}" ]]; then
+        echo "${url}"
+        return 0
+    fi
+
+    # #648: the github_pr artifact is missing — e.g. a mid-build sleep/wake
+    # restart dropped phase-result-code.json (or it was written without the
+    # artifact). If a PR was created it lives on the deterministic head branch
+    # autonomous/<request_id>. Recover its URL from GitHub and persist it back
+    # so the reference is durable and the merge gate never strands a real PR
+    # again (the skip_no_pr incident that stranded #645).
+    local branch="autonomous/${request_id}"
+    local recovered=""
+    recovered=$( (cd "${project}" 2>/dev/null &&
+        gh pr list --head "${branch}" --state open --json url \
+            --jq '.[0].url // ""' 2>/dev/null) || echo "" )
+    if [[ -n "${recovered}" ]]; then
+        _persist_recovered_pr_artifact "${result_code}" "${recovered}"
+        log_info "read_request_pr_url: recovered PR for ${request_id} from branch ${branch} (#648): ${recovered}"
+        echo "${recovered}"
+        return 0
+    fi
+
+    echo ""
+    return 0
+}
+
+# _persist_recovered_pr_artifact(result_code_path, pr_url) -> always 0
+#   #648: durably record a recovered github_pr artifact so later reads (and a
+#   restart) find it without another GitHub round-trip. Atomic (tmp + mv). Adds
+#   or replaces the github_pr artifact on an existing result file, or writes a
+#   minimal pass result if the file was lost entirely (the code phase must have
+#   already passed for the merge gate to be running at all).
+_persist_recovered_pr_artifact() {
+    local result_code="$1" url="$2"
+    [[ -n "${url}" ]] || return 0
+    local dir; dir="$(dirname "${result_code}")"
+    [[ -d "${dir}" ]] || return 0
+    local tmp="${result_code}.tmp.$$"
+    if [[ -f "${result_code}" ]]; then
+        jq --arg u "${url}" '
+            .artifacts = (((.artifacts // []) | map(select((.kind // "") != "github_pr")))
+                          + [{ kind: "github_pr", url: $u, title: "recovered from branch (#648)" }])
+        ' "${result_code}" > "${tmp}" 2>/dev/null && mv "${tmp}" "${result_code}" || rm -f "${tmp}"
+    else
+        jq -n --arg u "${url}" '{
+            status: "pass", phase: "code",
+            feedback: "PR reference recovered from head branch (#648)",
+            artifacts: [{ kind: "github_pr", url: $u, title: "recovered from branch (#648)" }]
+        }' > "${tmp}" 2>/dev/null && mv "${tmp}" "${result_code}" || rm -f "${tmp}"
+    fi
+    return 0
 }
 
 # ===========================================================================
