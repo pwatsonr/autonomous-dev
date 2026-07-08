@@ -25,6 +25,7 @@ export type ViewName =
     | "onboard" // ONBOARD Phase 3 (#594) — org/project/repo browser
     | "onboard-ingestion" // ONBOARD Phase 3 (#594) — live ingestion status
     | "onboard-questions" // ONBOARD Phase 3 (#594) — blocking-question answer UI
+    | "homelab" // Homelab plugin discovery surface (hardcoded portal core page)
     | "404"
     | "500";
 
@@ -927,6 +928,48 @@ export interface RenderProps {
     "onboard-ingestion": OnboardIngestionPageData;
     // ONBOARD Phase 3 (#594) — blocking-question answer UI. See OnboardQuestionsPageData below.
     "onboard-questions": OnboardQuestionsPageData;
+    // Homelab discovery surface — platforms and observations read from the homelab plugin data dir.
+    homelab: HomelabPageData;
+}
+
+// Homelab discovery surface — shape mirrors `~/.autonomous-dev-homelab/`.
+
+/** One discovered platform from `inventory.yaml`. */
+export interface HomelabPlatform {
+    /** Platform identifier (e.g. `"proxmox-01"`). */
+    id: string;
+    /** Platform type (e.g. `"proxmox"`, `"unraid"`, `"k3s"`). */
+    type: string;
+    /** Hostname or IP. */
+    host: string;
+    /** Port number. */
+    port: number;
+    /** ISO-8601 last-seen timestamp. */
+    last_seen: string;
+}
+
+/** One observation from `observations/*.json`. */
+export interface HomelabObservation {
+    /** Observation id. */
+    id: string;
+    /** Platform the observation targets. */
+    platform: string;
+    /** Detected fault/pattern name. */
+    pattern: string;
+    /** Affected resource. */
+    resource: string;
+    /** Severity tier. */
+    severity: string;
+    /** ISO-8601 discovery timestamp. */
+    discovered_at: string;
+    /** Free-form details object (rendered as JSON). */
+    details: Record<string, unknown>;
+}
+
+/** Props for the `/portal/homelab` page view. */
+export interface HomelabPageData {
+    platforms: HomelabPlatform[];
+    observations: HomelabObservation[];
 }
 
 // ONBOARD Phase 3 (#594) — blocking-question answer surface.

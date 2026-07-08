@@ -10,10 +10,6 @@
 // (passed through ShellLayout). Approvals / Requests / Agents items optionally
 // render a count badge when their corresponding prop is `> 0`.
 //
-// Homelab is intentionally omitted from portal core (SPEC-037-3-01 §Objective):
-// a future `autonomous-dev-homelab` plugin will contribute that entry via the
-// planned portal-plugin-contribution mechanism — do NOT hardcode it here.
-//
 // Composition (per TDD-035 SS 6.2 + SPEC-037-3-01 SS 4):
 //   <nav class="rail-nav" aria-label="Primary">
 //     <div class="rail-nav-group" data-group="operate">
@@ -36,7 +32,7 @@ import type { FC } from "hono/jsx";
 import { icon } from "../lib/icons";
 
 /** Group identifier for the rail-nav sections. */
-export type NavGroup = "operate" | "system" | "onboard";
+export type NavGroup = "operate" | "system" | "onboard" | "homelab";
 
 /** Single navigation entry rendered inside the rail. */
 export interface NavItem {
@@ -74,6 +70,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     { href: "/onboard", label: "Onboard", group: "onboard", iconName: "users" },
     { href: "/onboard/ingestion", label: "Ingestion", group: "onboard", iconName: "database" },
     { href: "/onboard/questions", label: "Questions", group: "onboard", iconName: "attention-needed" },
+    // Homelab discovery surface — platforms and observations from the homelab plugin.
+    { href: "/portal/homelab", label: "Homelab", group: "homelab", iconName: "cpu" },
 ];
 
 /** Group label text rendered inside each `.rail-nav-group-label`. */
@@ -81,6 +79,7 @@ const GROUP_LABELS: Record<NavGroup, string> = {
     operate: "OPERATE",
     system: "SYSTEM",
     onboard: "ONBOARD",
+    homelab: "HOMELAB",
 };
 
 /**
@@ -207,6 +206,7 @@ export const RailNav: FC<RailNavProps> = ({
     const operate = NAV_ITEMS.filter((i) => i.group === "operate");
     const system = NAV_ITEMS.filter((i) => i.group === "system");
     const onboard = NAV_ITEMS.filter((i) => i.group === "onboard");
+    const homelab = NAV_ITEMS.filter((i) => i.group === "homelab");
     return (
         <nav class="rail-nav" aria-label="Primary">
             <div class="rail-nav-group" data-group="operate">
@@ -226,6 +226,12 @@ export const RailNav: FC<RailNavProps> = ({
                     {GROUP_LABELS.onboard}
                 </div>
                 {onboard.map((item) => renderItem(item, activePath, counts))}
+            </div>
+            <div class="rail-nav-group" data-group="homelab">
+                <div class="rail-nav-group-label">
+                    {GROUP_LABELS.homelab}
+                </div>
+                {homelab.map((item) => renderItem(item, activePath, counts))}
             </div>
         </nav>
     );
