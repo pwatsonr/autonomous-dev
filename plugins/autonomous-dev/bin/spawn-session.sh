@@ -277,80 +277,83 @@ spawn_session_typed() {
     # pipeline.
     local audit_settings_file=""
     local audit_log_file=""
+
+    # ── #653: merge-guard (EVERY phase) ──
+    # A PreToolUse Bash hook that BLOCKS any spawned agent session from merging
+    # a PR or pushing to main. Merging is the EXCLUSIVE job of the daemon's
+    # merge_decision (a supervisor-loop.sh bash function, not a spawned session),
+    # which enforces the green-required policy / infra-gate allowlist / order-
+    # aware rebase / human gate. Without this, a code-executor with unrestricted
+    # Bash + bypassPermissions could `gh pr merge` straight to main, defeating
+    # every gate (observed: REQ-000062 self-merged off-task PR #651). Applies to
+    # ALL phases (the old audit shim only covered integration|deploy|test, so the
+    # code phase — where PRs are created — had no Bash guard at all).
+    local merge_guard_hook="${LIB_DIR}/../hooks/merge-guard.sh"
+    if [[ ! -x "${merge_guard_hook}" ]]; then
+        merge_guard_hook="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/merge-guard.sh"
+    fi
+    if [[ ! -x "${merge_guard_hook}" ]]; then
+        merge_guard_hook=""
+        echo "spawn-session: WARNING merge-guard hook missing — agent PR-merge block DISABLED (#653)" >&2
+    fi
+
+    # ── PLAN-042: command-audit shim (integration|deploy|test only) ──
+    # Best-effort observability; never break the pipeline. Resolves the audit
+    # PreToolUse writer + PostToolUse finalizer for the executor phases.
+    local audit_pre="" audit_post=""
     case "${target_phase}" in
         integration|deploy|test)
             audit_log_file="${req_dir}/command-audit.jsonl"
-            # Create the file (or truncate if it already exists from a
-            # prior phase-attempt) and lock it down to operator-only.
             # `: > file` is a portable, atomic-enough truncate-or-create.
             : > "${audit_log_file}" 2>/dev/null || audit_log_file=""
             if [[ -n "${audit_log_file}" ]]; then
                 chmod 0600 "${audit_log_file}" 2>/dev/null || true
-                # Resolve the hook script path. We compute it relative to
-                # this script so the daemon can move with the plugin.
                 local hook_script="${LIB_DIR}/../hooks/audit-log-writer.sh"
                 if [[ ! -x "${hook_script}" ]]; then
                     hook_script="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/audit-log-writer.sh"
                 fi
-                if [[ -x "${hook_script}" ]]; then
-                    # REQ-000052: also resolve the PostToolUse finalizer hook.
-                    local finalizer_script="${LIB_DIR}/../hooks/audit-log-finalizer.sh"
-                    if [[ ! -x "${finalizer_script}" ]]; then
-                        finalizer_script="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/audit-log-finalizer.sh"
-                    fi
-
-                    # Build a per-session settings JSON registering both
-                    # PreToolUse (audit-log-writer) and PostToolUse (audit-log-
-                    # finalizer, only when the script is present and executable)
-                    # hooks for the Bash tool. Both receive the SDK event on
-                    # stdin and read AUDIT_LOG_PATH / AUDIT_PHASE from the
-                    # environment exported below. If the finalizer is absent,
-                    # we emit PreToolUse-only settings (no failure).
-                    audit_settings_file="$(mktemp -t advsetup.XXXXXX 2>/dev/null || echo "")"
-                    if [[ -n "${audit_settings_file}" ]]; then
-                        if [[ -x "${finalizer_script}" ]]; then
-                            jq -n --arg pre "${hook_script}" --arg post "${finalizer_script}" '{
-                                hooks: {
-                                    PreToolUse: [
-                                        {
-                                            matcher: "Bash",
-                                            hooks: [
-                                                { type: "command", command: $pre }
-                                            ]
-                                        }
-                                    ],
-                                    PostToolUse: [
-                                        {
-                                            matcher: "Bash",
-                                            hooks: [
-                                                { type: "command", command: $post }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }' > "${audit_settings_file}" 2>/dev/null || audit_settings_file=""
-                        else
-                            jq -n --arg cmd "${hook_script}" '{
-                                hooks: {
-                                    PreToolUse: [
-                                        {
-                                            matcher: "Bash",
-                                            hooks: [
-                                                { type: "command", command: $cmd }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }' > "${audit_settings_file}" 2>/dev/null || audit_settings_file=""
-                        fi
-                    fi
+                [[ -x "${hook_script}" ]] && audit_pre="${hook_script}"
+                local finalizer_script="${LIB_DIR}/../hooks/audit-log-finalizer.sh"
+                if [[ ! -x "${finalizer_script}" ]]; then
+                    finalizer_script="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/audit-log-finalizer.sh"
                 fi
+                [[ -x "${finalizer_script}" ]] && audit_post="${finalizer_script}"
             fi
             ;;
     esac
 
-    # Compose the audit-related claude flag array (empty unless we set
-    # up the shim above).
+    # Build ONE per-session settings JSON combining the merge-guard (always)
+    # and the audit hooks (when present). PreToolUse Bash hooks run in listed
+    # order: merge-guard first (so a blocked command never reaches the audit
+    # writer), then the audit writer. Best-effort — a jq/mktemp failure falls
+    # through to an un-instrumented call (the merge-guard warning above already
+    # surfaced if the hook itself was missing).
+    if [[ -n "${merge_guard_hook}" || -n "${audit_pre}" || -n "${audit_post}" ]]; then
+        audit_settings_file="$(mktemp -t advsetup.XXXXXX 2>/dev/null || echo "")"
+        if [[ -n "${audit_settings_file}" ]]; then
+            jq -n \
+                --arg mg "${merge_guard_hook}" \
+                --arg pre "${audit_pre}" \
+                --arg post "${audit_post}" '
+                def cmd(c): { type: "command", command: c };
+                def nz(s): (s != null and s != "");
+                {
+                    hooks: (
+                        ( ([ if nz($mg)  then cmd($mg)  else empty end,
+                             if nz($pre) then cmd($pre) else empty end ]) as $preHooks
+                          | if ($preHooks | length) > 0
+                            then { PreToolUse: [ { matcher: "Bash", hooks: $preHooks } ] }
+                            else {} end )
+                        +
+                        ( if nz($post)
+                          then { PostToolUse: [ { matcher: "Bash", hooks: [ cmd($post) ] } ] }
+                          else {} end )
+                    )
+                }' > "${audit_settings_file}" 2>/dev/null || audit_settings_file=""
+        fi
+    fi
+
+    # Compose the settings claude flag array (empty unless we built a file).
     local -a audit_flags=()
     if [[ -n "${audit_settings_file}" && -f "${audit_settings_file}" ]]; then
         audit_flags+=(--settings "${audit_settings_file}")
