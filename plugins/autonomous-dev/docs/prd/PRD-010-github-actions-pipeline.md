@@ -572,7 +572,7 @@ PRD-008, PRD-009, and PRD-010 all reference this table as the canonical sequence
 - [PRD-007: Escalation & Trust Framework](./PRD-007-escalation-trust.md) — FR-14 security pause rule enforced by §5.6.
 - [PRD-008: Unified Request Submission Packaging](./PRD-008-unified-request-submission.md) — §12.8 assist eval regression gate enforced by §5.2; `observe --scope all` CLI provided by PRD-008 used in §5.9.
 - [PRD-009: Web Control Plane](./PRD-009-web-control-plane.md) — §13.7 portal security cases must pass at 100%, enforced by §5.2 FR-2006.
-- Claude Code GitHub Actions documentation: https://code.claude.com/docs/en/github-actions
+- Claude Code GitHub Actions documentation: https://docs.claude.com/en/docs/claude-code/github-actions
 - `anthropics/claude-code-action` repo: https://github.com/anthropics/claude-code-action
 - `anthropics/claude-code-security-review` repo: https://github.com/anthropics/claude-code-security-review
 

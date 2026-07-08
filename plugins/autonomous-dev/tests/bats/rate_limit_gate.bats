@@ -71,3 +71,18 @@ teardown() {
     run check_gates
     [ "$status" -eq 0 ]
 }
+
+# REQ-000061 GATE-01: class-tagged session-limit state (v2 schema) still gates
+@test "GATE-01: class-tagged session-limit state still blocks check_gates" {
+    local future
+    if [[ "$(uname)" == "Darwin" ]]; then
+        future=$(date -u -v "+3600S" +"%Y-%m-%dT%H:%M:%SZ")
+    else
+        future=$(date -u -d "+3600 seconds" +"%Y-%m-%dT%H:%M:%SZ")
+    fi
+    # Write a v2 session-limit state file (class-tagged, retry_at 1h in future)
+    write_rate_limit_state_v2 "$RL_STATE" true 1 3600 false "$future" \
+        "session_limit" "resets 1:20pm (America/Chicago)" "parsed"
+    run check_rate_limit_state
+    [ "$status" -eq 1 ]
+}

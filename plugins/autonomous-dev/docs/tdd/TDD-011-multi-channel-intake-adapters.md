@@ -2157,7 +2157,7 @@ autonomous-dev config validate
 - **Slack Bolt Framework** — https://slack.dev/bolt-js/
 - **Commander.js** — https://github.com/tj/commander.js
 - **better-sqlite3** — https://github.com/WiseLibs/better-sqlite3
-- **no-color.org Standard** — https://no-color.org/
+- **no-color.org Standard** — no-color.org
 
 ### Standards and Specifications
 - **RFC 3339 (ISO 8601)** — Date/time format specification

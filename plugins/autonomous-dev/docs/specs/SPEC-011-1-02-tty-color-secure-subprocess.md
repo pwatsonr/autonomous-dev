@@ -26,7 +26,7 @@ detect_color(args: string[]) -> string
 
 Decision tree (evaluated in order):
 
-1. If `NO_COLOR` env var is set (regardless of value, per https://no-color.org): return `0`.
+1. If `NO_COLOR` env var is set (regardless of value, per no-color.org): return `0`.
 2. If any argument equals `--no-color`: return `0`.
 3. If `[ ! -t 1 ]` (stdout is NOT a TTY — e.g., piped or redirected): return `0`.
 4. If `TERM` env var equals `dumb` or is empty: return `0`.
