@@ -375,11 +375,11 @@ describe('runDeployService --dry-run', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. runDeployService without --dry-run
+// 5. runDeployService without --dry-run (#662: --confirm required)
 // ---------------------------------------------------------------------------
 
 describe('runDeployService without --dry-run', () => {
-  it('prints resolved target and handoff message, returns 0', async () => {
+  it('without --confirm: writes error to stderr and returns 1', async () => {
     const registry = makeRegistry(makeTarget({ id: 'live-node', name: 'Live Node' }));
     const streams = makeStreams();
 
@@ -388,25 +388,92 @@ describe('runDeployService without --dry-run', () => {
       streams,
     );
 
-    expect(code).toBe(0);
-    expect(streams.out()).toContain('live-node');
-    expect(streams.out()).toContain('api');
-    expect(streams.out()).toContain('#662');
+    expect(code).toBe(1);
+    expect(streams.err()).toContain('--confirm');
+    expect(streams.err()).toContain('refusing to execute');
   });
 
-  it('does not write anything irreversible (no mutation side effects in this implementation)', async () => {
-    // This is a structural test — the run function only writes to streams
-    // and does no filesystem/network operations.
-    const registry = makeRegistry(makeTarget({ id: 'safe-node' }));
+  it('with --confirm: runs the pipeline and returns 0 on success', async () => {
+    const registry = makeRegistry(makeTarget({ id: 'live-node', name: 'Live Node' }));
     const streams = makeStreams();
 
-    await runDeployService(
-      { service: 'svc', targetRaw: 'safe-node', dryRun: false, registry },
+    const mockBackend = {
+      id: 'mock-backend',
+      supports: () => true,
+      deploy: jest.fn().mockResolvedValue({ success: true, message: 'ok', details: {} }),
+    };
+
+    const code = await runDeployService(
+      {
+        service: 'api',
+        targetRaw: 'live-node',
+        dryRun: false,
+        confirm: true,
+        registry,
+        _backendOverride: mockBackend,
+      },
       streams,
     );
 
-    // The only side effect observable to us is stream output
-    expect(streams.out()).toBeTruthy();
+    expect(code).toBe(0);
+    expect(streams.out()).toContain('live-node');
+    expect(streams.out()).toContain('api');
+    expect(streams.out()).toContain('SUCCESS');
+  });
+
+  it('with --confirm: returns 1 when pipeline fails', async () => {
+    const registry = makeRegistry(makeTarget({ id: 'bad-node', name: 'Bad Node' }));
+    const streams = makeStreams();
+
+    const failingBackend = {
+      id: 'failing-backend',
+      supports: () => true,
+      deploy: jest
+        .fn()
+        .mockResolvedValue({ success: false, message: 'deploy failed', details: {} }),
+    };
+
+    const code = await runDeployService(
+      {
+        service: 'api',
+        targetRaw: 'bad-node',
+        dryRun: false,
+        confirm: true,
+        registry,
+        _backendOverride: failingBackend,
+      },
+      streams,
+    );
+
+    expect(code).toBe(1);
+    expect(streams.err()).toContain('Deploy failed');
+  });
+
+  it('with --dry-run and --confirm: --dry-run takes precedence (no mutation)', async () => {
+    const registry = makeRegistry(makeTarget({ id: 'safe-node' }));
+    const streams = makeStreams();
+
+    const mutatingBackend = {
+      id: 'mutating-backend',
+      supports: () => true,
+      deploy: jest.fn().mockResolvedValue({ success: true, details: {} }),
+    };
+
+    const code = await runDeployService(
+      {
+        service: 'svc',
+        targetRaw: 'safe-node',
+        dryRun: true,
+        confirm: true,
+        registry,
+        _backendOverride: mutatingBackend,
+      },
+      streams,
+    );
+
+    expect(code).toBe(0);
+    expect(mutatingBackend.deploy).not.toHaveBeenCalled();
+    expect(streams.out()).toContain('dry-run');
   });
 });
 
