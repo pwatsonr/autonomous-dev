@@ -66,7 +66,6 @@ import { registerChainsCommand } from '../cli/chains_command';
 import { registerDeployApproveCommand } from '../cli/deploy_approve_command';
 import { registerDeployBackendsCommand } from '../cli/deploy_backends_command';
 import { registerDeployTargetsCommand } from '../cli/deploy_targets_command';
-import { registerDeployPolicyCommand } from '../cli/deploy_policy_command';
 import { registerDeployCostCommand } from '../cli/deploy_cost_command';
 import { registerDeployLogsCommand } from '../cli/deploy_logs_command';
 import { registerDeployPlanCommand } from '../cli/deploy_plan_command';
@@ -849,9 +848,6 @@ export function buildProgram(
 
   // #661: deploy targets list + deploy run --target subcommands.
   registerDeployTargetsCommand(program);
-
-  // #668/#669: deploy policy check subcommand.
-  registerDeployPolicyCommand(program);
 
   // SPEC-023-2-04: deploy approve / reject / plan subcommands.
   registerDeployApproveCommand(program);
