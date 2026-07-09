@@ -361,6 +361,26 @@ and explain your reasoning in 'feedback' rather than silently ignoring it."
             # First code pass: create the branch + PR as before.
             code_instructions="
 
+## SCOPE — read this first (#678)
+
+You are implementing EXACTLY the approved spec for this request and NOTHING
+else. The authoritative spec is at:
+   ${project}/docs/specs/${request_id}-*.md
+(and the plan at ${project}/docs/plans/${request_id}-*.md, TDD at
+ ${project}/docs/tdd/${request_id}-*.md). READ THE SPEC FIRST and implement it.
+
+HARD RULES — violating these fails the phase:
+- Change ONLY the files/modules the spec/plan calls for. Do NOT invent new
+  features, modules, subsystems, or a 'roadmap'. Your diff must be about THIS
+  request's issue and nothing else.
+- Do NOT create or edit GitHub issues (no 'gh issue create/edit'). Do NOT
+  reference issue numbers you have not been given.
+- If the spec is unclear or you believe the right work differs, write
+  phase-result-code.json with status 'fail' and explain in 'feedback' — do NOT
+  substitute your own unrelated task.
+- Off-scope changes (files unrelated to this request's spec) are rejected at
+  review — building the wrong thing wastes the whole run.
+
 ## Branch and PR Instructions
 
 1. Create branch 'autonomous/${request_id}' OFF THE LATEST ${default_branch}
