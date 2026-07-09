@@ -1173,6 +1173,13 @@ case "${COMMAND}" in
                 source "${PLUGIN_DIR}/lib/observability/cli_show_stuck.sh"
                 cli_show_stuck "$@"
                 ;;
+            provenance)
+                # shellcheck source=/dev/null
+                source "${PLUGIN_DIR}/lib/observability/provenance.sh"
+                # shellcheck source=/dev/null
+                source "${PLUGIN_DIR}/lib/observability/cli_provenance.sh"
+                cli_provenance "$@"
+                ;;
             ""|help|--help|-h)
                 cat <<'EOF'
 Usage: autonomous-dev observability <sub-verb> [args]
@@ -1182,6 +1189,9 @@ Sub-verbs:
     List every session-stuck-*.json under .autonomous-dev/requests/.
   show-stuck <path|REQ-ID>
     Pretty-print one snapshot; highlights recovery_hint.
+  provenance [--project <dir>] [--json]
+    Classify open PRs + autonomous/* branches as daemon-owned vs external
+    concurrent work, so parallel human/agent work is not misread as rogue.
 EOF
                 ;;
             *)
