@@ -15,11 +15,13 @@ set -euo pipefail
 
 WORKDIR=plugins/autonomous-dev-deploy-aws
 TESTFILE="${WORKDIR}/.lint-test.yml"
+WORKDIR_D=.github/actions/document-review
+TESTFILE_D="${WORKDIR_D}/.lint-test.yml"
 GUARD=scripts/lint/no-tbd-shas.sh
 # `git grep` only sees tracked or staged files. Use `git add --intent-to-add`
 # so the synthesized file enters the index without committing it; cleanup
 # in the EXIT trap removes it from both the index and the working tree.
-trap 'git rm -f --cached --quiet "${TESTFILE}" 2>/dev/null || true; rm -f "${TESTFILE}"' EXIT
+trap 'git rm -f --cached --quiet "${TESTFILE}" "${TESTFILE_D}" 2>/dev/null || true; rm -f "${TESTFILE}" "${TESTFILE_D}"' EXIT
 
 if [ ! -d "${WORKDIR}" ]; then
   echo "FAIL: ${WORKDIR} not found; run from repo root" >&2
@@ -48,5 +50,21 @@ git rm -f --cached --quiet "${TESTFILE}"
 rm "${TESTFILE}"
 bash "${GUARD}"
 echo "Phase C passed (cleanup → exit 0)"
+
+# Phase D: verify .github/actions/document-review is in scope.
+if [ ! -d "${WORKDIR_D}" ]; then
+  echo "FAIL: ${WORKDIR_D} not found; run from repo root" >&2
+  exit 2
+fi
+echo "uses: actions/checkout@TBD-replace-with-pinned-SHA" > "${TESTFILE_D}"
+git add --intent-to-add "${TESTFILE_D}"
+if bash "${GUARD}" 2>/dev/null; then
+  echo "FAIL: guard did not detect literal in ${WORKDIR_D}" >&2
+  exit 1
+fi
+git rm -f --cached --quiet "${TESTFILE_D}"
+rm "${TESTFILE_D}"
+bash "${GUARD}"
+echo "Phase D passed (${WORKDIR_D} literal → exit 1; cleanup → exit 0)"
 
 echo "All round-trip phases passed."

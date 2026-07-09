@@ -146,8 +146,8 @@ runs:
     - name: Detect changed files
       id: changed-files
       if: steps.fork-check.outputs.is-fork != 'true'
-      # tj-actions/changed-files@v45.0.4 pinned by SHA
-      uses: tj-actions/changed-files@40853de9f8ce2d6cfdc73c1b65f9e7e1c3e7e7c3
+      # tj-actions/changed-files@v45.0.4 (pinned 2026-07-09)
+      uses: tj-actions/changed-files@4edd678ac3f81e2dc578756871e4d00c19191daf
       with:
         files: ${{ inputs.path-glob }}
 
@@ -192,8 +192,8 @@ runs:
     - name: Invoke Claude
       id: claude
       if: steps.fork-check.outputs.is-fork != 'true' && steps.stage-payload.outputs.skipped != 'true'
-      # anthropics/claude-code-action@v1 pinned by SHA
-      uses: anthropics/claude-code-action@a4bb1c3a7c1f3d7e0f7b7c4c1e7e1c5b7e7e7e7e
+      # anthropics/claude-code-action@v1 (pinned 2026-07-09)
+      uses: anthropics/claude-code-action@37b464ce72700f7b2c5ff8d2db7fa7b15df792f5
       with:
         anthropic_api_key: ${{ env.ANTHROPIC_API_KEY }}
         prompt: ${{ steps.load-prompt.outputs.prompt }}
