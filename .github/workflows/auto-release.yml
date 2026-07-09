@@ -1,0 +1,117 @@
+# ============================================================
+# auto-release — turn "merged to main" into "published version"
+# ============================================================
+# THE MISSING LINK. release.yml already publishes a GitHub Release on a `v*`
+# tag push, and the daemon auto-upgrades to the newest version in its plugin
+# cache. But nothing bumped the version or pushed a tag, so main/marketplace/
+# cache all sat at one version forever and the installed daemon drifted behind.
+#
+# This workflow closes that gap on the repo side: when main has advanced with
+# real (non-release) commits since the last tag, it bumps the patch version in
+# the two manifest files, commits that to main, and pushes a `v<version>` tag —
+# which triggers the existing release.yml.
+#
+# Cache refresh on the operator's machine is the OTHER half — see
+# bin/plugin-self-update.sh + the plugin-updater launchd timer, and
+# docs/operators/auto-update.md for the end-to-end picture.
+#
+# Loop-safety:
+#   * Triggered by schedule / manual dispatch ONLY (never by push), so the
+#     bump-commit this job pushes cannot re-trigger it.
+#   * Skips when the only commits since the last tag are release commits
+#     (subject starts with "release:"), so a no-op run never cuts an empty
+#     release.
+#   * Concurrency group serializes runs; never cancels a half-done release.
+# ============================================================
+
+name: auto-release
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'   # every 6h at :17 (offset off the hour to dodge load spikes)
+  workflow_dispatch:          # on-demand "cut a release now"
+
+permissions:
+  contents: write             # commit the bump + push the tag
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  bump-and-tag:
+    name: Bump version + push tag if main advanced
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # actions/checkout@v4.3.1 (pinned 2026-05-02)
+        with:
+          fetch-depth: 0      # need full history + tags to diff since last release
+          ref: main
+
+      - name: Decide whether a release is warranted
+        id: decide
+        run: |
+          set -euo pipefail
+          MANIFEST=plugins/autonomous-dev/.claude-plugin/plugin.json
+          CUR="$(jq -r '.version' "$MANIFEST")"
+          LAST_TAG="$(git tag -l 'v*' | sort -V | tail -1)"
+
+          if [ -z "$LAST_TAG" ]; then
+            # No release has ever been cut — publish the current manifest
+            # version as the first release rather than bumping past it.
+            echo "first release: no v* tag exists; releasing current manifest v${CUR}"
+            { echo "release=true"; echo "version=${CUR}"; echo "bump=false"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Count commits since the last tag whose subject is NOT a release
+          # commit. Zero => nothing new to ship; skip (prevents empty releases
+          # and stops the bump-commit from triggering another release).
+          NEW="$(git log "${LAST_TAG}..HEAD" --pretty=format:'%s' \
+                 | grep -vcE '^release:' || true)"
+          echo "commits since ${LAST_TAG} (excluding release commits): ${NEW}"
+          if [ "${NEW}" -eq 0 ]; then
+            echo "no new non-release commits since ${LAST_TAG}; nothing to release"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          NEXT="$(bash scripts/ci/next-version.sh "${CUR}")"
+          echo "main advanced; bumping ${CUR} -> ${NEXT}"
+          { echo "release=true"; echo "version=${NEXT}"; echo "bump=true"; } >> "$GITHUB_OUTPUT"
+
+      - name: Bump manifest + marketplace version
+        if: steps.decide.outputs.release == 'true' && steps.decide.outputs.bump == 'true'
+        env:
+          NEXT: ${{ steps.decide.outputs.version }}
+        run: |
+          set -euo pipefail
+          MANIFEST=plugins/autonomous-dev/.claude-plugin/plugin.json
+          MARKET=.claude-plugin/marketplace.json
+          CUR="$(jq -r '.version' "$MANIFEST")"
+          # jq-based rewrite (not sed) so we only touch the version field.
+          tmp="$(mktemp)"; jq --arg v "$NEXT" '.version=$v' "$MANIFEST" > "$tmp" && mv "$tmp" "$MANIFEST"
+          tmp="$(mktemp)"; jq --arg v "$NEXT" '(.plugins[] | select(.name=="autonomous-dev") | .version) = $v' "$MARKET" > "$tmp" && mv "$tmp" "$MARKET"
+          echo "bumped ${CUR} -> ${NEXT} in manifest + marketplace"
+          git config user.name  "autonomous-dev-release[bot]"
+          git config user.email "release-bot@users.noreply.github.com"
+          git add "$MANIFEST" "$MARKET"
+          git commit -m "release: v${NEXT}"
+          git push origin HEAD:main
+
+      - name: Create + push tag (triggers release.yml)
+        if: steps.decide.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.decide.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name  "autonomous-dev-release[bot]"
+          git config user.email "release-bot@users.noreply.github.com"
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "tag v${VERSION} already exists; nothing to push"
+            exit 0
+          fi
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
+          echo "pushed tag v${VERSION} — release.yml will publish the GitHub Release"
