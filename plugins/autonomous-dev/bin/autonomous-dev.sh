@@ -1087,6 +1087,14 @@ case "${COMMAND}" in
     reconcile)
         cmd_reconcile_delegate "$@"
         ;;
+    self-update)
+        # Refresh the installed plugin from the marketplace (#694 follow-up):
+        # marketplace update + plugin update + repoint the wrapper. Run on a
+        # timer (plugin-updater launchd job) so the installed system tracks
+        # published releases without manual `claude plugin update`. Independent
+        # of the kill-switch — updates code, never runs pipeline work.
+        exec bash "${PLUGIN_BIN_DIR}/plugin-self-update.sh" "$@"
+        ;;
     agent)
         # Bun-executable wrapper for the in-process agent-factory CLI.
         if ! command -v bun >/dev/null 2>&1; then

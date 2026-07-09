@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  plugin-updater: periodic marketplace self-update (launchd timer). (#694 follow-up)
+
+  The daemon's built-in upgrader only ever upgrades to the newest version
+  ALREADY in the plugin cache; it never fetches. This timer does the fetch —
+  `autonomous-dev self-update` runs `claude plugin marketplace update` +
+  `claude plugin update` + repoints the wrapper, so a headless daemon Mac tracks
+  published releases (cut by auto-release.yml) without any manual step.
+
+  Like watch-tick, it points at the STABLE wrapper (~/.local/bin/autonomous-dev),
+  which self-update itself keeps pointed at the newest cached version — so this
+  timer never needs editing across upgrades. Independent of the kill-switch:
+  it updates installed CODE, it does not run pipeline work, so the installed
+  system stays current even while the loop is halted.
+
+  Install (operator): substitute {{USER_HOME}}/{{DAEMON_HOME}}/{{EXTRA_PATH_DIRS}},
+  copy to ~/Library/LaunchAgents/, then
+  `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.autonomous-dev.plugin-updater.plist`.
+  See docs/operators/auto-update.md.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.autonomous-dev.plugin-updater</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{USER_HOME}}/.local/bin/autonomous-dev</string>
+        <string>self-update</string>
+    </array>
+
+    <!-- Every 30 minutes. -->
+    <key>StartInterval</key>
+    <integer>1800</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>{{DAEMON_HOME}}/logs/plugin-updater.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>{{DAEMON_HOME}}/logs/plugin-updater.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{EXTRA_PATH_DIRS}}/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <key>HOME</key>
+        <string>{{USER_HOME}}</string>
+    </dict>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
