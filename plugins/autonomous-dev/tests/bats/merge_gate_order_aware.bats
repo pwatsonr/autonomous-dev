@@ -112,11 +112,17 @@ GHEOF
     #   GIT_MERGE_BASE_SHA  : output for `git merge-base <A> <B>` without --is-ancestor
     #   GIT_LOG_SHAS        : output for `git log --format=%H ...` (one SHA per line)
     #   GIT_PATCH_ID_OUTPUT : output for `git patch-id` (one "<patchid> <sha>" per line)
+    #   GIT_DIFF_NAME_ONLY  : output for `git diff --name-only ...` (one path per line;
+    #                         used by check_code_scope_adherence in the #689 gate)
     cat > "$MOCK_DIR/git" << 'GITEOF'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$GIT_CALL_LOG"
 case "$1" in
     fetch)
+        exit 0
+        ;;
+    diff)
+        printf '%s\n' "${GIT_DIFF_NAME_ONLY:-}"
         exit 0
         ;;
     merge-base)
@@ -633,4 +639,41 @@ gh_update_branch_was_called() {
            | select(.reason | test("abc1234"))' \
         "$TEST_REQ_DIR/events.jsonl" > /dev/null
     [ "$(jq -r '.merge_status' "$TEST_REQ_DIR/state.json")" = "pr_ready_for_human" ]
+}
+
+# ===========================================================================
+# T-ADHERENCE (#689) — off-scope PR diff is NOT auto-merged (left for human)
+# ===========================================================================
+@test "T-ADHERENCE: off-scope code diff -> skip_offscope, no merge (#689)" {
+    write_config "{\"trust\":{\"per_repo_overrides\":{\"$TEST_PROJECT\":3}}}"
+    seed_merge_request "https://github.com/o/r/pull/777"
+    export GH_PR_VIEW_JSON='{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN"}'
+    # check_code_scope_adherence needs a .git dir and reads the request's real
+    # spec file; the branch diff is served by the git stub's GIT_DIFF_NAME_ONLY
+    # knob. Spec names handlers/foo.ts; the diff touches an UNRELATED file, so
+    # the code is off-scope and auto-merge must be withheld for a human.
+    mkdir -p "$TEST_PROJECT/.git" "$TEST_PROJECT/docs/specs"
+    echo "Implement plugins/autonomous-dev/intake/handlers/foo.ts" \
+        > "$TEST_PROJECT/docs/specs/$TEST_REQUEST_ID-spec.md"
+    export GIT_DIFF_NAME_ONLY="plugins/unrelated/thing.ts"
+
+    run run_merge_gate
+    [ "$(last_merge_decision)" = "skip_offscope" ]
+    ! gh_merge_was_called
+}
+
+@test "T-ADHERENCE-ON: on-scope code diff -> merges normally (#689)" {
+    write_config "{\"trust\":{\"per_repo_overrides\":{\"$TEST_PROJECT\":3}}}"
+    seed_merge_request "https://github.com/o/r/pull/778"
+    export GH_PR_VIEW_JSON='{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN"}'
+    # Same setup, but the diff touches a file the spec actually names -> on-scope,
+    # so the #689 gate is a no-op and the normal merge proceeds.
+    mkdir -p "$TEST_PROJECT/.git" "$TEST_PROJECT/docs/specs"
+    echo "Implement plugins/autonomous-dev/intake/handlers/foo.ts" \
+        > "$TEST_PROJECT/docs/specs/$TEST_REQUEST_ID-spec.md"
+    export GIT_DIFF_NAME_ONLY="plugins/autonomous-dev/intake/handlers/foo.ts"
+
+    run run_merge_gate
+    [ "$(last_merge_decision)" = "merged" ]
+    gh_merge_was_called
 }
