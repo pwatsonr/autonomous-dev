@@ -5702,7 +5702,7 @@ reconcile_portal_markers() {
     repos=$(jq -r '.repositories.allowlist[]?' "${EFFECTIVE_CONFIG}" 2>/dev/null)
     [[ -z "${repos}" ]] && return 0
 
-    local marker req_id m_status repo state_file s_status
+    local marker req_id m_status repo state_file s_status found_state db_status
     for marker in "${PORTAL_REQUEST_ACTIONS_DIR}"/*.json; do
         [[ -f "$marker" ]] || continue
         req_id=$(jq -r '.id // empty' "$marker" 2>/dev/null)
@@ -5713,10 +5713,12 @@ reconcile_portal_markers() {
             done|cancelled|failed) continue ;;
         esac
         # Find the request's canonical state.json in an allowlisted repo.
+        found_state=0
         while IFS= read -r repo; do
             [[ -z "$repo" ]] && continue
             state_file="${repo}/.autonomous-dev/requests/${req_id}/state.json"
             [[ -f "$state_file" ]] || continue
+            found_state=1
             s_status=$(jq -r '.status // empty' "$state_file" 2>/dev/null)
             case "$s_status" in
                 done|cancelled|failed)
@@ -5736,6 +5738,33 @@ reconcile_portal_markers() {
             esac
             break
         done <<< "${repos}"
+
+        # No canonical state.json in any allowlisted repo — the request dir was
+        # pruned (manual cleanup) or lives outside the allowlist, but the lane
+        # marker was left behind. The state.json-based sweep above can't see it,
+        # so a CLI-cancelled request strands as a "running"/"gate" lane item
+        # forever (this is exactly how REQ-000066 got stuck). Fall back to the
+        # intake DB: if the request is terminal there, flip the marker to that
+        # terminal status so the portal drops it from the active lanes.
+        if [[ "${found_state}" -eq 0 && -f "${INTAKE_DB}" ]] && command -v sqlite3 >/dev/null 2>&1; then
+            db_status=$(sqlite3 -readonly "${INTAKE_DB}" \
+                "SELECT status FROM requests WHERE request_id = '${req_id//\'/\'\'}';" 2>/dev/null || echo "")
+            case "${db_status}" in
+                done|cancelled|failed)
+                    log_info "reconcile_portal_markers: marker ${req_id} has no state.json; intake DB=${db_status} (terminal) -> flipping stranded marker"
+                    local _pm_ts _pm_tmp
+                    _pm_ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                    _pm_tmp="${marker}.tmp.$$"
+                    if jq --arg st "${db_status}" --arg ts "${_pm_ts}" \
+                          '.status = $st | .completedAt = $ts' "${marker}" > "${_pm_tmp}" 2>/dev/null; then
+                        mv "${_pm_tmp}" "${marker}"
+                    else
+                        rm -f "${_pm_tmp}" 2>/dev/null || true
+                    fi
+                    rm -f "${GATE_DECISIONS_DIR}"/*"__${req_id}.json" 2>/dev/null || true
+                    ;;
+            esac
+        fi
     done
 }
 
