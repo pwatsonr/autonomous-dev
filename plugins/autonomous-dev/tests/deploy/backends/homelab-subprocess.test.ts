@@ -63,19 +63,29 @@ function makeCtx(overrides: Partial<PipelineContext> = {}): PipelineContext {
   };
 }
 
+/*
+ * `& {}` collapses the overloaded execFileFn signature so it satisfies
+ * jest.MockedFunction's `(...args: any[]) => any` constraint. A block-level
+ * disable is used (not line-level) because Prettier may wrap the signature
+ * onto its own line, moving `& {}` away from a `disable-next-line` comment.
+ */
+/* eslint-disable @typescript-eslint/ban-types */
+
 /** Create a mock execFile that resolves with given stdout/stderr. */
-// `& {}` collapses the overloaded execFileFn signature so it satisfies
-// jest.MockedFunction's `(...args: any[]) => any` constraint (ban-types n/a here).
-// eslint-disable-next-line @typescript-eslint/ban-types
-function mockExec(stdout = '', stderr = ''): jest.MockedFunction<HomelabSubprocessBackendDeps['execFileFn'] & {}> {
+function mockExec(
+  stdout = '',
+  stderr = '',
+): jest.MockedFunction<HomelabSubprocessBackendDeps['execFileFn'] & {}> {
   return jest.fn().mockResolvedValue({ stdout, stderr });
 }
 
 /** Create a mock execFile that rejects with an error. */
-// eslint-disable-next-line @typescript-eslint/ban-types
-function mockExecFail(message: string): jest.MockedFunction<HomelabSubprocessBackendDeps['execFileFn'] & {}> {
+function mockExecFail(
+  message: string,
+): jest.MockedFunction<HomelabSubprocessBackendDeps['execFileFn'] & {}> {
   return jest.fn().mockRejectedValue(new Error(message));
 }
+/* eslint-enable @typescript-eslint/ban-types */
 
 /** Build a backend with injected deps. */
 function makeBackend(
@@ -95,7 +105,14 @@ function makeBackend(
 describe('supports()', () => {
   it('returns true for known homelab kinds', () => {
     const backend = makeBackend();
-    for (const kind of ['swarm-node', 'k3s-cluster', 'proxmox-vm', 'proxmox-lxc', 'unraid', 'homelab']) {
+    for (const kind of [
+      'swarm-node',
+      'k3s-cluster',
+      'proxmox-vm',
+      'proxmox-lxc',
+      'unraid',
+      'homelab',
+    ]) {
       expect(backend.supports(makeTarget({ kind }))).toBe(true);
     }
   });
@@ -378,7 +395,11 @@ describe('VAULT_TOKEN', () => {
 
     await backend.deploy(makeCtx());
 
-    const [, , options] = exec.mock.calls[0] as unknown as [string, string[], { env?: NodeJS.ProcessEnv }];
+    const [, , options] = exec.mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env?: NodeJS.ProcessEnv },
+    ];
     expect(options?.env?.['VAULT_TOKEN']).toBe('secret-vault-token');
   });
 
@@ -391,7 +412,11 @@ describe('VAULT_TOKEN', () => {
 
     await backend.build(makeCtx());
 
-    const [, , options] = exec.mock.calls[0] as unknown as [string, string[], { env?: NodeJS.ProcessEnv }];
+    const [, , options] = exec.mock.calls[0] as unknown as [
+      string,
+      string[],
+      { env?: NodeJS.ProcessEnv },
+    ];
     // VAULT_TOKEN should not be injected if absent.
     expect(options?.env?.['VAULT_TOKEN']).toBeUndefined();
   });
@@ -475,16 +500,12 @@ describe('argument builders', () => {
   });
 
   it('buildHealthArgs: includes --target <id>', () => {
-    const args = backend.buildHealthArgs(
-      makeCtx({ target: makeTarget({ id: 'gpu-node-7' }) }),
-    );
+    const args = backend.buildHealthArgs(makeCtx({ target: makeTarget({ id: 'gpu-node-7' }) }));
     expect(args).toEqual(['deploy', 'health', 'my-api', '--target', 'gpu-node-7']);
   });
 
   it('buildRollbackArgs: includes --target <id>', () => {
-    const args = backend.buildRollbackArgs(
-      makeCtx({ target: makeTarget({ id: 'gpu-node-7' }) }),
-    );
+    const args = backend.buildRollbackArgs(makeCtx({ target: makeTarget({ id: 'gpu-node-7' }) }));
     expect(args).toEqual(['deploy', 'rollback', 'my-api', '--target', 'gpu-node-7']);
   });
 });

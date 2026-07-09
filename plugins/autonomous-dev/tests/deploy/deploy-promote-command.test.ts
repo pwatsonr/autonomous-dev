@@ -30,7 +30,11 @@ import {
 } from '../../intake/deploy/target-registry';
 import { resetPromotionLineage } from '../../intake/deploy/promotion';
 import { resetPipelineBackendRegistry } from '../../intake/deploy/backend-types';
-import type { PipelineBackend, DeployResult, HealthResult } from '../../intake/deploy/backend-types';
+import type {
+  PipelineBackend,
+  DeployResult,
+  HealthResult,
+} from '../../intake/deploy/backend-types';
 import type { DeployTarget } from '../../intake/deploy/target-types';
 
 // ---------------------------------------------------------------------------
@@ -51,10 +55,7 @@ function makeTarget(id: string, overrides: Partial<DeployTarget> = {}): DeployTa
   };
 }
 
-function makeMockBackend(
-  id: string,
-  overrides: Partial<PipelineBackend> = {},
-): PipelineBackend {
+function makeMockBackend(id: string, overrides: Partial<PipelineBackend> = {}): PipelineBackend {
   return {
     id,
     supports: () => true,
@@ -73,15 +74,29 @@ function makeMockBackend(
   };
 }
 
-function makeStreams(): { stdout: string[]; stderr: string[]; streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream } } {
+function makeStreams(): {
+  stdout: string[];
+  stderr: string[];
+  streams: { stdout: NodeJS.WritableStream; stderr: NodeJS.WritableStream };
+} {
   const stdout: string[] = [];
   const stderr: string[] = [];
   return {
     stdout,
     stderr,
     streams: {
-      stdout: { write: (s: string) => { stdout.push(s); return true; } } as unknown as NodeJS.WritableStream,
-      stderr: { write: (s: string) => { stderr.push(s); return true; } } as unknown as NodeJS.WritableStream,
+      stdout: {
+        write: (s: string) => {
+          stdout.push(s);
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream,
+      stderr: {
+        write: (s: string) => {
+          stderr.push(s);
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream,
     },
   };
 }

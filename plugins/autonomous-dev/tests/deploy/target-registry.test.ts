@@ -21,10 +21,7 @@ import {
   setDeployTargetRegistry,
   resetDeployTargetRegistry,
 } from '../../intake/deploy/target-registry';
-import type {
-  DeployTarget,
-  TargetSelector,
-} from '../../intake/deploy/target-types';
+import type { DeployTarget, TargetSelector } from '../../intake/deploy/target-types';
 import type { TargetProvider } from '../../intake/deploy/target-registry';
 import { loadConfigTargets } from '../../intake/deploy/environment';
 import type { DeployConfig } from '../../intake/deploy/types-config';

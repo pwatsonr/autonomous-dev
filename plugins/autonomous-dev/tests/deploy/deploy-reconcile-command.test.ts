@@ -32,9 +32,18 @@ import {
   resetDeployTargetRegistry,
 } from '../../intake/deploy/target-registry';
 import { resetPipelineBackendRegistry } from '../../intake/deploy/backend-types';
-import type { PipelineBackend, DeployResult, HealthResult } from '../../intake/deploy/backend-types';
+import type {
+  PipelineBackend,
+  DeployResult,
+  HealthResult,
+} from '../../intake/deploy/backend-types';
 import type { DeployTarget } from '../../intake/deploy/target-types';
-import type { DesiredState, ObservedState, ReconcileAction, ApplyReconcileActionResult } from '../../intake/deploy/reconcile';
+import type {
+  DesiredState,
+  ObservedState,
+  ReconcileAction,
+  ApplyReconcileActionResult,
+} from '../../intake/deploy/reconcile';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,10 +63,7 @@ function makeTarget(id: string, overrides: Partial<DeployTarget> = {}): DeployTa
   };
 }
 
-function makeMockBackend(
-  id: string,
-  overrides: Partial<PipelineBackend> = {},
-): PipelineBackend {
+function makeMockBackend(id: string, overrides: Partial<PipelineBackend> = {}): PipelineBackend {
   return {
     id,
     supports: () => true,
@@ -87,8 +93,18 @@ function makeStreams(): {
     stdout,
     stderr,
     streams: {
-      stdout: { write: (s: string) => { stdout.push(s); return true; } } as unknown as NodeJS.WritableStream,
-      stderr: { write: (s: string) => { stderr.push(s); return true; } } as unknown as NodeJS.WritableStream,
+      stdout: {
+        write: (s: string) => {
+          stdout.push(s);
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream,
+      stderr: {
+        write: (s: string) => {
+          stderr.push(s);
+          return true;
+        },
+      } as unknown as NodeJS.WritableStream,
     },
   };
 }
@@ -224,7 +240,12 @@ describe('renderApplyResults', () => {
           runId: 'run1',
           status: 'success',
           stages: [],
-          policyDecision: { allowed: true, requiredApprovals: [], violations: [], matchedRules: [] },
+          policyDecision: {
+            allowed: true,
+            requiredApprovals: [],
+            violations: [],
+            matchedRules: [],
+          },
           startedAt: new Date().toISOString(),
           totalDurationMs: 100,
         },
@@ -256,10 +277,7 @@ describe('runDeployReconcile — dry-run (default)', () => {
   it('4a. exits 0 when plan is empty (no drift)', async () => {
     const { streams } = makeStreams();
 
-    const code = await runDeployReconcile(
-      { desired: [], observed: [] },
-      streams,
-    );
+    const code = await runDeployReconcile({ desired: [], observed: [] }, streams);
 
     expect(code).toBe(0);
   });
@@ -274,10 +292,7 @@ describe('runDeployReconcile — dry-run (default)', () => {
 
     const { streams, stdout } = makeStreams();
 
-    const code = await runDeployReconcile(
-      { desired, observed },
-      streams,
-    );
+    const code = await runDeployReconcile({ desired, observed }, streams);
 
     expect(code).toBe(1);
     expect(stdout.join('')).toContain('dry-run');
@@ -440,10 +455,7 @@ describe('JSON output', () => {
 
     const { streams, stdout } = makeStreams();
 
-    await runDeployReconcile(
-      { desired, observed, json: true },
-      streams,
-    );
+    await runDeployReconcile({ desired, observed, json: true }, streams);
 
     const jsonStr = stdout.join('');
     const parsed = JSON.parse(jsonStr);
@@ -462,10 +474,7 @@ describe('JSON output', () => {
 
     const { streams } = makeStreams();
 
-    const code = await runDeployReconcile(
-      { desired, observed: [], json: true },
-      streams,
-    );
+    const code = await runDeployReconcile({ desired, observed: [], json: true }, streams);
 
     expect(code).toBe(1);
   });
@@ -473,10 +482,7 @@ describe('JSON output', () => {
   it('exits 0 in JSON mode when no drift', async () => {
     const { streams } = makeStreams();
 
-    const code = await runDeployReconcile(
-      { desired: [], observed: [], json: true },
-      streams,
-    );
+    const code = await runDeployReconcile({ desired: [], observed: [], json: true }, streams);
 
     expect(code).toBe(0);
   });

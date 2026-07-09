@@ -36,13 +36,13 @@ import {
   applyReconcilePlan,
   ReconcileApplyConfirmRequiredError,
 } from '../../intake/deploy/reconcile';
-import type {
-  DesiredState,
-  ObservedState,
-  ReconcileAction,
-} from '../../intake/deploy/reconcile';
+import type { DesiredState, ObservedState, ReconcileAction } from '../../intake/deploy/reconcile';
 import { resetPipelineBackendRegistry } from '../../intake/deploy/backend-types';
-import type { PipelineBackend, DeployResult, HealthResult } from '../../intake/deploy/backend-types';
+import type {
+  PipelineBackend,
+  DeployResult,
+  HealthResult,
+} from '../../intake/deploy/backend-types';
 import type { DeployTarget } from '../../intake/deploy/target-types';
 import type { PolicyDocument } from '../../intake/deploy/policy-types';
 
@@ -63,10 +63,7 @@ function makeTarget(id: string, overrides: Partial<DeployTarget> = {}): DeployTa
   };
 }
 
-function makeMockBackend(
-  id: string,
-  overrides: Partial<PipelineBackend> = {},
-): PipelineBackend {
+function makeMockBackend(id: string, overrides: Partial<PipelineBackend> = {}): PipelineBackend {
   return {
     id,
     supports: () => true,
@@ -174,14 +171,14 @@ describe('computeReconcilePlan — pure diff', () => {
 
   it('1e. mixed plan: deploy + update + remove + none all in one call', () => {
     const desired: DesiredState[] = [
-      { targetId: 'target-a', service: 'api', artifactRef: 'api:2.0' },      // update
+      { targetId: 'target-a', service: 'api', artifactRef: 'api:2.0' }, // update
       { targetId: 'target-a', service: 'worker', artifactRef: 'worker:1.0' }, // deploy (not observed)
-      { targetId: 'target-b', service: 'cache', artifactRef: 'cache:3.0' },   // none (matches)
+      { targetId: 'target-b', service: 'cache', artifactRef: 'cache:3.0' }, // none (matches)
     ];
     const observed: ObservedState[] = [
-      { targetId: 'target-a', service: 'api', artifactRef: 'api:1.0' },       // update
-      { targetId: 'target-b', service: 'cache', artifactRef: 'cache:3.0' },   // none
-      { targetId: 'target-b', service: 'old-svc', artifactRef: 'old:1.0' },   // remove
+      { targetId: 'target-a', service: 'api', artifactRef: 'api:1.0' }, // update
+      { targetId: 'target-b', service: 'cache', artifactRef: 'cache:3.0' }, // none
+      { targetId: 'target-b', service: 'old-svc', artifactRef: 'old:1.0' }, // remove
     ];
 
     const plan = computeReconcilePlan(desired, observed);
@@ -470,11 +467,11 @@ describe('applyReconcilePlan (batch)', () => {
       },
     ];
 
-    const results = await applyReconcilePlan(
-      actions,
-      async () => TARGET_A,
-      { dryRun: false, confirm: true, _backendOverride: backend },
-    );
+    const results = await applyReconcilePlan(actions, async () => TARGET_A, {
+      dryRun: false,
+      confirm: true,
+      _backendOverride: backend,
+    });
 
     expect(results).toHaveLength(0);
     expect(backend.deploy).not.toHaveBeenCalled();
@@ -500,11 +497,11 @@ describe('applyReconcilePlan (batch)', () => {
       },
     ];
 
-    const results = await applyReconcilePlan(
-      actions,
-      async () => TARGET_A,
-      { dryRun: false, confirm: true, _backendOverride: backend },
-    );
+    const results = await applyReconcilePlan(actions, async () => TARGET_A, {
+      dryRun: false,
+      confirm: true,
+      _backendOverride: backend,
+    });
 
     expect(results).toHaveLength(2);
     expect(results.every((r) => r.pipelineResult?.status === 'success')).toBe(true);

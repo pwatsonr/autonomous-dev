@@ -25,7 +25,11 @@ import {
   PromotionConfirmRequiredError,
 } from '../../intake/deploy/promotion';
 import { resetPipelineBackendRegistry } from '../../intake/deploy/backend-types';
-import type { PipelineBackend, DeployResult, HealthResult } from '../../intake/deploy/backend-types';
+import type {
+  PipelineBackend,
+  DeployResult,
+  HealthResult,
+} from '../../intake/deploy/backend-types';
 import type { DeployTarget } from '../../intake/deploy/target-types';
 import type { PolicyDocument } from '../../intake/deploy/policy-types';
 
@@ -46,10 +50,7 @@ function makeTarget(overrides: Partial<DeployTarget> = {}): DeployTarget {
   };
 }
 
-function makeMockBackend(
-  id: string,
-  overrides: Partial<PipelineBackend> = {},
-): PipelineBackend {
+function makeMockBackend(id: string, overrides: Partial<PipelineBackend> = {}): PipelineBackend {
   return {
     id,
     supports: () => true,
@@ -126,7 +127,9 @@ describe('promote() deploys same artifact', () => {
   it('routes through the pipeline runner (policy-check → deploy → health-verify)', async () => {
     const callOrder: string[] = [];
     const backend = makeMockBackend('stage-order', {
-      build: jest.fn().mockImplementation(async () => { callOrder.push('build'); }),
+      build: jest.fn().mockImplementation(async () => {
+        callOrder.push('build');
+      }),
       deploy: jest.fn().mockImplementation(async () => {
         callOrder.push('deploy');
         return { success: true, details: {} };

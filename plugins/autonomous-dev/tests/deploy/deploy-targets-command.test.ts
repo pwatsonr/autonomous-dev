@@ -347,9 +347,7 @@ describe('runDeployService --dry-run', () => {
   });
 
   it('resolves via tag selector in dry-run mode', async () => {
-    const registry = makeRegistry(
-      makeTarget({ id: 'media-node', tags: { role: 'media' } }),
-    );
+    const registry = makeRegistry(makeTarget({ id: 'media-node', tags: { role: 'media' } }));
     const streams = makeStreams();
 
     const code = await runDeployService(
@@ -365,10 +363,7 @@ describe('runDeployService --dry-run', () => {
     const registry = makeRegistry(makeTarget({ id: 'clean' }));
     const streams = makeStreams();
 
-    await runDeployService(
-      { service: 'svc', targetRaw: 'clean', dryRun: true, registry },
-      streams,
-    );
+    await runDeployService({ service: 'svc', targetRaw: 'clean', dryRun: true, registry }, streams);
 
     expect(streams.err()).toBe('');
   });
@@ -527,16 +522,10 @@ describe('runDeployService error paths', () => {
   });
 
   it('no --target and multiple targets → writes error to stderr, returns 1', async () => {
-    const registry = makeRegistry(
-      makeTarget({ id: 'x' }),
-      makeTarget({ id: 'y' }),
-    );
+    const registry = makeRegistry(makeTarget({ id: 'x' }), makeTarget({ id: 'y' }));
     const streams = makeStreams();
 
-    const code = await runDeployService(
-      { service: 'svc', dryRun: true, registry },
-      streams,
-    );
+    const code = await runDeployService({ service: 'svc', dryRun: true, registry }, streams);
 
     expect(code).toBe(1);
     expect(streams.err()).toBeTruthy();
@@ -546,10 +535,7 @@ describe('runDeployService error paths', () => {
     const registry = new InMemoryDeployTargetRegistry();
     const streams = makeStreams();
 
-    const code = await runDeployService(
-      { service: 'svc', dryRun: true, registry },
-      streams,
-    );
+    const code = await runDeployService({ service: 'svc', dryRun: true, registry }, streams);
 
     expect(code).toBe(1);
     expect(streams.err()).toBeTruthy();
@@ -614,7 +600,16 @@ describe('registerDeployTargetsCommand — commander integration', () => {
     const streams = makeStreams();
     registerDeployTargetsCommand(program, { registry }, streams);
 
-    await program.parseAsync(['node', 'cli', 'deploy', 'run', 'my-svc', '--target', 'tgt', '--dry-run']);
+    await program.parseAsync([
+      'node',
+      'cli',
+      'deploy',
+      'run',
+      'my-svc',
+      '--target',
+      'tgt',
+      '--dry-run',
+    ]);
     expect(streams.out()).toContain('Dry-run');
     expect(streams.out()).toContain('tgt');
     expect(streams.out()).toContain('my-svc');
