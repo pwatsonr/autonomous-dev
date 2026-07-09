@@ -1,7 +1,7 @@
 /**
  * `autonomous-dev deploy targets list` and
- * `autonomous-dev deploy <service> --target <id-or-selector> [--dry-run]`
- * (issue #661).
+ * `autonomous-dev deploy run <service> --target <id-or-selector> [--dry-run] [--confirm]`
+ * (issues #661, #662).
  *
  * ## Commands
  *
@@ -16,16 +16,18 @@
  *
  * With `--json`: emits a JSON array of plain target objects on stdout.
  *
- * ### `deploy <service> --target <id-or-selector> [--dry-run]`
+ * ### `deploy run <service> --target <id-or-selector> [--dry-run] [--confirm]`
  *
  * Resolves the target via `resolveTarget()` and either:
- *   - `--dry-run` (default-safe mode): prints the resolved target and the
- *     deployment plan (what would happen) WITHOUT mutating anything.
- *   - without `--dry-run`: resolves the target, then hands off to the
- *     existing deploy pipeline.  For this issue, if full orchestration is not
- *     yet wired end-to-end, prints the resolved target and a message
- *     explaining the handoff point (issue #662) so the user gets useful
- *     feedback rather than silence.
+ *   - `--dry-run` (default-safe mode): calls `runPipeline({ dryRun: true })`,
+ *     evaluates policy, and prints the resolved target, policy decision, and
+ *     planned stages WITHOUT mutating anything. No backend methods are called.
+ *   - `--confirm` (without `--dry-run`): runs the full staged deploy pipeline
+ *     (policy-check → build → push → deploy → health-verify → auto-rollback)
+ *     via `runPipeline()`. Emits stage events to stdout as they arrive.
+ *     Returns exit code 0 on success, 1 on pipeline failure.
+ *   - Without either flag: errors immediately with exit code 1 to prevent
+ *     accidental deploys.
  *
  * `--target` accepts either:
  *   - an exact target id (`prod-node`)
@@ -42,7 +44,7 @@
  *   them to exit codes).
  * - No static target list.  All target data comes from the live registry.
  *
- * Cross-reference: issues #660, #661, #674.
+ * Cross-reference: issues #660, #661, #662, #668, #674.
  *
  * @module intake/cli/deploy_targets_command
  */
@@ -60,6 +62,14 @@ import {
   NoDefaultTargetError,
 } from '../deploy/target-resolver';
 import type { TargetSelector } from '../deploy/target-types';
+import {
+  runPipeline,
+  type PipelineRunOptions,
+  type StageEvent,
+  type PipelineRunResult,
+} from '../deploy/pipeline-runner';
+import type { PipelineBackend } from '../deploy/backend-types';
+import type { PolicyDocument } from '../deploy/policy-types';
 
 // ---------------------------------------------------------------------------
 // Public stream/deps types
@@ -74,6 +84,10 @@ export interface DeployTargetsStreams {
 /** Injected registry for testability. Defaults to the production singleton. */
 export interface DeployTargetsOptions {
   registry?: DeployTargetRegistry;
+  /** Optional policy document to evaluate before executing a real deploy. */
+  policy?: PolicyDocument;
+  /** TEST ONLY — override the backend used by `runPipeline`. */
+  _backendOverride?: PipelineBackend;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +210,7 @@ export function parseTargetArg(
 }
 
 // ---------------------------------------------------------------------------
-// `deploy <service> --target <id> [--dry-run]` implementation
+// `deploy run <service> --target <id> [--dry-run] [--confirm]` implementation
 // ---------------------------------------------------------------------------
 
 /**
@@ -209,25 +223,50 @@ export interface RunDeployServiceOptions {
   targetRaw?: string;
   /** When true, print the plan and exit without mutating anything. */
   dryRun?: boolean;
+  /**
+   * When true (and `dryRun` is false), executes the real deploy pipeline.
+   * Required to prevent accidental deploys — `deploy run` without `--confirm`
+   * errors immediately with exit code 1.
+   */
+  confirm?: boolean;
   /** Injected registry for testability. */
   registry?: DeployTargetRegistry;
+  /** Optional policy document to evaluate before deploying. */
+  policy?: PolicyDocument;
+  /**
+   * Optional artifact metadata for the pipeline run.
+   * Callers that do not supply this get a minimal default derived from
+   * `service` so the pipeline context is always valid.
+   */
+  artifact?: {
+    name: string;
+    sourceDir?: string;
+    tag?: string;
+    meta?: Record<string, unknown>;
+  };
+  /** TEST ONLY — override the backend dispatched by `runPipeline`. */
+  _backendOverride?: PipelineBackend;
 }
 
 /**
  * Render the dry-run plan for a target.
  *
  * Shows the resolved target in a human-readable format, listing all fields
- * that would be used by the deploy pipeline.
+ * that would be used by the deploy pipeline. When a `PipelineRunResult` is
+ * provided (from `runPipeline({ dryRun: true })`), its planned stage list
+ * and policy decision are included.
  *
- * @param service - Service name.
- * @param target  - Resolved deploy target.
- * @param source  - Resolution source (for operator visibility).
- * @returns Multi-line plan string.
+ * @param service        - Service name.
+ * @param target         - Resolved deploy target.
+ * @param source         - Resolution source (for operator visibility).
+ * @param pipelineResult - Optional dry-run pipeline result for stage detail.
+ * @returns Multi-line plan string ending with `\n`.
  */
 export function renderDryRunPlan(
   service: string,
   target: DeployTarget,
   source: string,
+  pipelineResult?: PipelineRunResult,
 ): string {
   const lines: string[] = [];
   lines.push('Deploy plan (dry-run — no changes will be made)');
@@ -243,26 +282,109 @@ export function renderDryRunPlan(
   lines.push(`  Tags:         ${tagEntries.length > 0 ? tagEntries.map(([k, v]) => `${k}=${v}`).join(', ') : '(none)'}`);
   lines.push(`  Source:       ${target.source}`);
   lines.push(`  Resolved via: ${source}`);
-  lines.push('');
-  lines.push('Stages that would execute:');
-  lines.push('  1. Safety gate check (approval / cost-cap)');
-  lines.push('  2. Build artifact for service');
-  lines.push(`  3. Deploy artifact to target '${target.id}' via backend '${target.provider}'`);
-  lines.push('  4. Post-deploy health check');
+
+  if (pipelineResult) {
+    // Policy decision from the pipeline dry-run.
+    const pd = pipelineResult.policyDecision;
+    lines.push('');
+    lines.push(`Policy decision: ${pd.allowed ? 'ALLOWED' : 'BLOCKED'}`);
+    if (pd.violations.length > 0) {
+      for (const v of pd.violations) {
+        lines.push(`  [deny] ${v.message}`);
+      }
+    }
+    if (pd.requiredApprovals.length > 0) {
+      lines.push(`  Required approvals: ${pd.requiredApprovals.join(', ')}`);
+    }
+
+    lines.push('');
+    lines.push('Stages that would execute:');
+    for (let i = 0; i < pipelineResult.stages.length; i++) {
+      const s = pipelineResult.stages[i];
+      lines.push(`  ${i + 1}. [${s.stage}] → ${s.status}${s.message ? ` — ${s.message}` : ''}`);
+    }
+  } else {
+    lines.push('');
+    lines.push('Stages that would execute:');
+    lines.push('  1. Safety gate check (approval / cost-cap)');
+    lines.push('  2. Build artifact for service');
+    lines.push(`  3. Deploy artifact to target '${target.id}' via backend '${target.provider}'`);
+    lines.push('  4. Post-deploy health check');
+  }
+
   lines.push('');
   lines.push('(Dry-run complete. No changes were made.)');
   return lines.join('\n') + '\n';
 }
 
 /**
- * Run `deploy <service> --target <id-or-selector> [--dry-run]`.
+ * Format a `StageEvent` as a human-readable line for CLI output.
+ *
+ * Emitted to stdout during a real pipeline run so operators see live progress.
+ *
+ * @param event - The stage event to format.
+ * @returns A single log line (no trailing newline).
+ */
+export function formatStageEvent(event: StageEvent): string {
+  const duration = event.durationMs !== undefined ? ` (${event.durationMs}ms)` : '';
+  const msg = event.message ? ` — ${event.message}` : '';
+  return `[${event.ts}] [${event.stage}] ${event.status.toUpperCase()}${duration}${msg}`;
+}
+
+/**
+ * Render a final `PipelineRunResult` summary for CLI output.
+ *
+ * Shown after `runPipeline()` completes in the real (non-dry-run) path.
+ *
+ * @param result - The completed pipeline result.
+ * @returns Multi-line summary string ending with `\n`.
+ */
+export function renderPipelineResult(result: PipelineRunResult): string {
+  const lines: string[] = [];
+  const statusLabel = result.status.toUpperCase();
+  const total = `${result.totalDurationMs}ms`;
+  lines.push('');
+  lines.push(`Pipeline ${statusLabel} in ${total}`);
+  lines.push(`  Run ID: ${result.runId}`);
+  lines.push(`  Started: ${result.startedAt}`);
+  lines.push('');
+  lines.push('Stage summary:');
+  for (const s of result.stages) {
+    lines.push(
+      `  [${s.stage.padEnd(14)}] ${s.status.toUpperCase().padEnd(8)} ${s.durationMs}ms${s.message ? ` — ${s.message}` : ''}`,
+    );
+  }
+  if (result.deployResult) {
+    lines.push('');
+    lines.push(`Deploy result: ${result.deployResult.success ? 'success' : 'failed'}`);
+    if (result.deployResult.message) {
+      lines.push(`  ${result.deployResult.message}`);
+    }
+  }
+  if (result.rollbackResult) {
+    lines.push('');
+    lines.push(`Rollback result: ${result.rollbackResult.success ? 'success' : 'failed'}`);
+    if (result.rollbackResult.errors.length > 0) {
+      for (const e of result.rollbackResult.errors) {
+        lines.push(`  [error] ${e}`);
+      }
+    }
+  }
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * Run `deploy run <service> --target <id-or-selector> [--dry-run] [--confirm]`.
  *
  * Resolves the target, then:
- *   - `--dry-run`: prints the plan and returns 0. No mutations.
- *   - Without `--dry-run`: resolves the target and reports the handoff to
- *     the deploy pipeline.  Full execution is wired in issue #662; this
- *     issue delivers the target-selection surface and dry-run, which are the
- *     user-facing "select where to deploy" capability.
+ *   - `--dry-run`: calls `runPipeline({ dryRun: true })` — evaluates policy
+ *     and emits planned stage events without executing any backend method.
+ *     Prints the resolved target, policy decision, and planned stages.
+ *   - `--confirm` (without `--dry-run`): executes the full staged deploy
+ *     pipeline via `runPipeline()`. Stage events are emitted to stdout as
+ *     they arrive. Returns exit code 0 on success, 1 on pipeline failure.
+ *   - Without `--confirm` or `--dry-run`: errors immediately with exit code
+ *     1 to prevent accidental deploys.
  *
  * @param opts    - Service + target options.
  * @param streams - Injected streams.
@@ -311,20 +433,48 @@ export async function runDeployService(
 
   const { target, source } = resolved;
 
+  // ---- Build shared pipeline options ----------------------------------------
+  const artifact = opts.artifact ?? { name: opts.service, meta: {} };
+  const pipelineOpts: PipelineRunOptions = {
+    target,
+    service: opts.service,
+    artifact,
+    policy: opts.policy,
+    _backendOverride: opts._backendOverride,
+  };
+
   // ---- Dry-run --------------------------------------------------------------
   if (opts.dryRun) {
-    stdout.write(renderDryRunPlan(opts.service, target, source));
+    const result = await runPipeline({ ...pipelineOpts, dryRun: true });
+    stdout.write(renderDryRunPlan(opts.service, target, source, result));
     return 0;
   }
 
-  // ---- Non-dry-run: resolved target + handoff note -------------------------
-  // Full execution of the deploy pipeline is delivered by issue #662.
-  // This issue (#661) delivers the user-facing target selection + dry-run.
-  stdout.write(`Resolved target: ${target.id} (${target.name}) via ${source}\n`);
-  stdout.write(`Deploying '${opts.service}' to target '${target.id}':\n`);
-  stdout.write(`  Handoff to deploy pipeline is tracked in issue #662.\n`);
-  stdout.write(`  (Use --dry-run to preview the plan without executing it.)\n`);
-  return 0;
+  // ---- Guard: require --confirm for a real deploy --------------------------
+  if (!opts.confirm) {
+    stderr.write(
+      `deploy run: refusing to execute a real deploy without --confirm.\n` +
+        `  Use --dry-run to preview the plan, or add --confirm to execute it.\n`,
+    );
+    return 1;
+  }
+
+  // ---- Real pipeline run ---------------------------------------------------
+  stdout.write(`Deploying '${opts.service}' to target '${target.id}' (${target.name}) [via ${source}]\n`);
+
+  const onStageEvent = (event: StageEvent): void => {
+    stdout.write(formatStageEvent(event) + '\n');
+  };
+
+  const result = await runPipeline({ ...pipelineOpts, onStageEvent });
+  stdout.write(renderPipelineResult(result));
+
+  if (result.status === 'success') {
+    return 0;
+  }
+
+  stderr.write(`Deploy failed: ${result.status}\n`);
+  return 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -332,7 +482,7 @@ export async function runDeployService(
 // ---------------------------------------------------------------------------
 
 /**
- * Register `deploy targets list` and `deploy <service> --target ...` under
+ * Register `deploy targets list` and `deploy run <service> --target ...` under
  * the top-level `deploy` commander group.
  *
  * If the `deploy` group does not yet exist it is created (same pattern as
@@ -379,25 +529,29 @@ export function registerDeployTargetsCommand(
       if (code !== 0) throw new Error('deploy targets list failed');
     });
 
-  // ---- `deploy <service> --target ...` ------------------------------------
+  // ---- `deploy run <service> --target ...` ---------------------------------
   deployGroup
     .command('run')
     .description(
-      'Deploy a service to a resolved target. Use --dry-run to preview without executing.',
+      'Deploy a service to a resolved target. Use --dry-run to preview; --confirm to execute.',
     )
     .argument('<service>', 'Service name to deploy')
     .option(
       '--target <id-or-selector>',
       'Target id or selector (kind=<k>, env=<e>, capability=<c>, tag.<key>=<val>)',
     )
-    .option('--dry-run', 'Print the resolved target and plan; make no changes', false)
+    .option('--dry-run', 'Print the resolved target, policy decision, and planned stages; make no changes', false)
+    .option('--confirm', 'Execute the real deploy pipeline (required without --dry-run)', false)
     .action(async (service: string, opts: Record<string, unknown>) => {
       const code = await runDeployService(
         {
           service,
           targetRaw: typeof opts.target === 'string' ? opts.target : undefined,
           dryRun: opts.dryRun === true,
+          confirm: opts.confirm === true,
           registry: deps.registry,
+          policy: deps.policy,
+          _backendOverride: deps._backendOverride,
         },
         streams,
       );
