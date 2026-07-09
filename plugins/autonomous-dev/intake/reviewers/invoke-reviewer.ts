@@ -200,6 +200,7 @@ export class ReviewerParseError extends Error {
  * Successful parse — one of three legitimate reviewer output shapes.
  *
  *   - `verdict-json`: bare JSON with `score` (number) + `verdict`.
+ *     Accepts `APPROVE`, `REQUEST_CHANGES`, or `CONCERNS` (REQ-000068).
  *   - `phase-result-envelope`: `{ status: 'pass'|'fail', phase: string, ... }`.
  *   - `verdict-marker`: a `VERDICT: APPROVE|REQUEST_CHANGES` line.
  */
@@ -207,7 +208,7 @@ export type ParsedVerdict =
   | {
       kind: 'verdict-json';
       score: number;
-      verdict: 'APPROVE' | 'REQUEST_CHANGES';
+      verdict: 'APPROVE' | 'REQUEST_CHANGES' | 'CONCERNS';
       findings?: object;
     }
   | {
@@ -270,9 +271,22 @@ function* scanJsonCandidates(text: string): Generator<string> {
 // ---------------------------------------------------------------------------
 
 /**
+ * The set of accepted `verdict` values for strategy 1 (verdict-json).
+ * Widened in REQ-000068 to include `CONCERNS` (defense-in-depth fallback;
+ * the canonical agent output is APPROVE or REQUEST_CHANGES, but a reviewer
+ * that still emits CONCERNS is coerced to REQUEST_CHANGES by normaliseVerdict).
+ * Comparison is CASE-SENSITIVE via Set.has.
+ */
+const VALID_VERDICT_JSON_VERDICTS = new Set<string>([
+  'APPROVE',
+  'REQUEST_CHANGES',
+  'CONCERNS',
+]);
+
+/**
  * Strategy 1: Verdict-JSON — scan right-to-left for the last balanced
  * `{…}` block whose parsed shape has `score: number` and `verdict` in
- * `{'APPROVE', 'REQUEST_CHANGES'}`.
+ * `{'APPROVE', 'REQUEST_CHANGES', 'CONCERNS'}`.
  */
 function tryVerdictJson(text: string): Extract<ParsedVerdict, { kind: 'verdict-json' }> | null {
   for (const candidate of scanJsonCandidates(text)) {
@@ -280,12 +294,13 @@ function tryVerdictJson(text: string): Extract<ParsedVerdict, { kind: 'verdict-j
       const parsed = JSON.parse(candidate) as Record<string, unknown>;
       if (
         typeof parsed.score === 'number' &&
-        (parsed.verdict === 'APPROVE' || parsed.verdict === 'REQUEST_CHANGES')
+        typeof parsed.verdict === 'string' &&
+        VALID_VERDICT_JSON_VERDICTS.has(parsed.verdict)
       ) {
         return {
           kind: 'verdict-json',
           score: parsed.score,
-          verdict: parsed.verdict,
+          verdict: parsed.verdict as 'APPROVE' | 'REQUEST_CHANGES' | 'CONCERNS',
           findings:
             typeof parsed.findings === 'object' && parsed.findings !== null
               ? (parsed.findings as object)
@@ -409,7 +424,8 @@ function truncateRawOutput(stdout: string): string {
  *   1. Verdict-JSON: scan stdout right-to-left for the LAST balanced
  *      `{...}` block and JSON.parse it. Accept iff
  *      `typeof parsed.score === 'number'` AND
- *      `parsed.verdict ∈ {'APPROVE','REQUEST_CHANGES'}`.
+ *      `parsed.verdict ∈ {'APPROVE','REQUEST_CHANGES','CONCERNS'}`.
+ *      `CONCERNS` is coerced to REQUEST_CHANGES by normaliseVerdict (REQ-000068).
  *   2. Phase-result envelope: scan stdout right-to-left for the LAST
  *      balanced `{...}` block whose parsed shape is
  *      `{ status: 'pass'|'fail', phase: string, feedback?: string,
@@ -527,7 +543,10 @@ export function resolveReviewerTimeoutMs(
  * Map a ParsedVerdict to the InvokeReviewerFn return shape
  * `{ score, verdict, findings? }`. Score defaulting per SPEC-REQ-000050:
  *
- *   - kind 'verdict-json': pass through verbatim.
+ *   - kind 'verdict-json', verdict 'CONCERNS' (REQ-000068):
+ *       verdict = 'REQUEST_CHANGES',
+ *       score = min(entry.threshold - 1, 60) — soft-fail by 1 point, cap 60.
+ *   - kind 'verdict-json', verdict 'APPROVE' | 'REQUEST_CHANGES': pass through verbatim.
  *   - kind 'phase-result-envelope', status 'pass':
  *       verdict = 'APPROVE', score = entry.threshold,
  *       findings = parsed.findings if typeof === 'object' && not null.
@@ -538,12 +557,28 @@ export function resolveReviewerTimeoutMs(
  *       verdict = 'APPROVE', score = entry.threshold.
  *   - kind 'verdict-marker', verdict 'REQUEST_CHANGES':
  *       verdict = 'REQUEST_CHANGES', score = 0.
+ *
+ * Return type does NOT expose 'CONCERNS'; downstream consumers (runner.ts,
+ * aggregator.ts) see only the two hard verdicts. (ADR-618-01)
+ *
+ * @internal Exported for direct-invoke unit tests only. Not re-exported from
+ * the barrel `intake/reviewers/index.ts`.
  */
-function normaliseVerdict(
+export function normaliseVerdict(
   parsed: ParsedVerdict,
   entry: ReviewerEntry,
 ): { score: number; verdict: 'APPROVE' | 'REQUEST_CHANGES'; findings?: object } {
   if (parsed.kind === 'verdict-json') {
+    if (parsed.verdict === 'CONCERNS') {
+      // ADR-618-03: soft-fail one point below threshold, capped at 60.
+      const softScore = Math.min(entry.threshold - 1, 60);
+      return {
+        score: softScore,
+        verdict: 'REQUEST_CHANGES',
+        findings: parsed.findings,
+      };
+    }
+    // APPROVE or REQUEST_CHANGES → pass through verbatim.
     return { score: parsed.score, verdict: parsed.verdict, findings: parsed.findings };
   }
 

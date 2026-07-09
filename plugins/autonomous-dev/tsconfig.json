@@ -15,6 +15,7 @@
     "types": ["node", "jest"]
   },
   "include": [
+    "agents/**/*.ts",
     "intake/**/*.ts",
     "tests/**/*.ts",
     "src/**/*.ts",
