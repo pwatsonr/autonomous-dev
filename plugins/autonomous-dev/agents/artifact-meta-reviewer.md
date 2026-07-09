@@ -68,6 +68,28 @@ A single `blocking` finding (or a `block` verdict) gates the skill. Even with ze
 
 6. **Proportionality** — the skill should be a proportionate response to the opportunity, not a sprawling catch-all. Disproportionate scope → **warn**.
 
+## Output Instruction (dispatcher contract)
+
+When invoked as a pipeline reviewer (not the direct skill-safety invocation), follow the standard dispatcher contract:
+
+1. Write your full analysis to `phase-result-<your-phase>.json` in the
+   request directory. This is the audit trail and is consumed by humans and
+   downstream tooling.
+
+2. As the **absolute last line** of stdout, print exactly ONE compact JSON object
+   matching this schema and nothing after it:
+
+   {"score": <integer 0-100>, "verdict": "APPROVE" | "REQUEST_CHANGES", "findings": [ {"severity": "blocking|warn|info", "file": "<path>", "line": <n>, "message": "<one sentence>"} ]}
+
+   - `score` is your overall 0-100 quality score. A passing gate is
+     `score >= threshold` (this reviewer's threshold: **70**).
+   - `verdict` MUST be exactly `APPROVE` or `REQUEST_CHANGES`. Map any
+     semantic `CONCERNS` or `BLOCK` value to `REQUEST_CHANGES`.
+   - `findings` MAY be `[]`. Do not omit the key.
+   - Do **NOT** wrap this JSON in markdown code fences.
+   - Do **NOT** print anything after this line (no trailing prose, no blank
+     lines with visible characters).
+
 ## Constraints
 
 - You are read-only; you never modify files.

@@ -109,4 +109,24 @@ Look for buttons whose text or accessible name does not describe the action they
 
 ## Output
 
-Produce JSON that validates against `schemas/reviewer-finding-v1.json`. Set `reviewer` to `ux-ui-reviewer`. Choose `verdict`: `APPROVE` if no findings; `CONCERNS` if findings are all `low` or `medium`; `REQUEST_CHANGES` if any finding is `high` or `critical`. Compute `score` as `100 - (sum of severity weights)` where critical=25, high=15, medium=8, low=3, floored at 0.
+Produce JSON that validates against `schemas/reviewer-finding-v1.json`. Set `reviewer` to `ux-ui-reviewer`. Compute `score` as `100 - (sum of severity weights)` where critical=25, high=15, medium=8, low=3, floored at 0.
+
+## Output Instruction (dispatcher contract)
+
+1. Write your full analysis to `phase-result-<your-phase>.json` in the
+   request directory. This is the audit trail and is consumed by humans and
+   downstream tooling.
+
+2. As the **absolute last line** of stdout, print exactly ONE compact JSON object
+   matching this schema and nothing after it:
+
+   {"score": <integer 0-100>, "verdict": "APPROVE" | "REQUEST_CHANGES", "findings": [ {"severity": "blocking|warn|info", "file": "<path>", "line": <n>, "message": "<one sentence>"} ]}
+
+   - `score` is your overall 0-100 quality score. A passing gate is
+     `score >= threshold` (this reviewer's threshold: **70**).
+   - `verdict` MUST be exactly `APPROVE` or `REQUEST_CHANGES`. Map any
+     semantic `CONCERNS` or `BLOCK` value to `REQUEST_CHANGES`.
+   - `findings` MAY be `[]`. Do not omit the key.
+   - Do **NOT** wrap this JSON in markdown code fences.
+   - Do **NOT** print anything after this line (no trailing prose, no blank
+     lines with visible characters).

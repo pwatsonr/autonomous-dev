@@ -134,3 +134,23 @@ Compute `score` as `100 - (sum of severity weights)` where critical=25, high=15,
 ## Output
 
 Produce JSON that validates against `schemas/reviewer-finding-v1.json`. Set `reviewer` to `rule-set-enforcement-reviewer`. Every finding MUST have a `rule_id` set to a rule defined in `.autonomous-dev/standards.yaml`.
+
+## Output Instruction (dispatcher contract)
+
+1. Write your full analysis to `phase-result-<your-phase>.json` in the
+   request directory. This is the audit trail and is consumed by humans and
+   downstream tooling.
+
+2. As the **absolute last line** of stdout, print exactly ONE compact JSON object
+   matching this schema and nothing after it:
+
+   {"score": <integer 0-100>, "verdict": "APPROVE" | "REQUEST_CHANGES", "findings": [ {"severity": "blocking|warn|info", "file": "<path>", "line": <n>, "message": "<one sentence>"} ]}
+
+   - `score` is your overall 0-100 quality score. A passing gate is
+     `score >= threshold` (this reviewer's threshold: **70**).
+   - `verdict` MUST be exactly `APPROVE` or `REQUEST_CHANGES`. Map any
+     semantic `CONCERNS` or `BLOCK` value to `REQUEST_CHANGES`.
+   - `findings` MAY be `[]`. Do not omit the key.
+   - Do **NOT** wrap this JSON in markdown code fences.
+   - Do **NOT** print anything after this line (no trailing prose, no blank
+     lines with visible characters).
