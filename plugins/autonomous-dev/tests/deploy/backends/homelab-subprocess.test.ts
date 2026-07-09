@@ -64,11 +64,15 @@ function makeCtx(overrides: Partial<PipelineContext> = {}): PipelineContext {
 }
 
 /** Create a mock execFile that resolves with given stdout/stderr. */
+// `& {}` collapses the overloaded execFileFn signature so it satisfies
+// jest.MockedFunction's `(...args: any[]) => any` constraint (ban-types n/a here).
+// eslint-disable-next-line @typescript-eslint/ban-types
 function mockExec(stdout = '', stderr = ''): jest.MockedFunction<HomelabSubprocessBackendDeps['execFileFn'] & {}> {
   return jest.fn().mockResolvedValue({ stdout, stderr });
 }
 
 /** Create a mock execFile that rejects with an error. */
+// eslint-disable-next-line @typescript-eslint/ban-types
 function mockExecFail(message: string): jest.MockedFunction<HomelabSubprocessBackendDeps['execFileFn'] & {}> {
   return jest.fn().mockRejectedValue(new Error(message));
 }
