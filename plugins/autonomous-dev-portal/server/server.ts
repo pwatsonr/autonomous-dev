@@ -13,11 +13,6 @@ import { Hono } from "hono";
 
 import { loadPortalConfig } from "./lib/config";
 import { resolveBindHostname, validateBindingConfig } from "./lib/binding";
-import {
-    registerContribution,
-    loadContributionsFromConfig,
-} from "./contrib/registry";
-import { homelabContribution } from "./contrib/homelab";
 import { serverError } from "./lib/error-handlers";
 import { notFound } from "./lib/response-utils";
 import {
@@ -166,17 +161,6 @@ export async function startServer(): Promise<Server<unknown>> {
         store: new InMemoryConfirmationStore(),
     };
 
-    // #670/#674 — Register the homelab contribution programmatically (it
-    // ships with the portal). Then load any additional contributions from
-    // the portal config's `contributions` array. Missing/broken modules
-    // are logged + skipped; the portal stays up (fail-safe).
-    registerContribution(homelabContribution);
-    await loadContributionsFromConfig(config.contributions ?? [], {
-        warn: (event, fields) => phaseLog(event, fields ?? {}),
-        error: (event, fields) => phaseLog(event, fields ?? {}),
-        info: (event, fields) => phaseLog(event, fields ?? {}),
-    });
-
     // SPEC-013-3-01: register all nine portal routes (incl. JSON /health).
     // The legacy inline /health handler is removed in favour of the JSON
     // shape documented in SPEC-013-3-01 §`/health` Handler.
@@ -271,13 +255,6 @@ export async function startServer(): Promise<Server<unknown>> {
         onboardActions: {
             audit,
             logger: log,
-        },
-        // #670/#671/#672 — Contribution routes with real audit/logger and the
-        // portal roles config for RBAC resolution.
-        contribRoutes: {
-            audit,
-            logger: log,
-            rolesConfig: config.portal_roles,
         },
     });
 
