@@ -41,22 +41,55 @@ log "updating plugin '${PLUGIN}@${MARKET}'"
 claude plugin update "${PLUGIN}@${MARKET}" >/dev/null 2>&1 \
     || log "WARN: plugin update returned non-zero (continuing)"
 
-# Repoint the CLI wrapper shim to the newest complete cached version, so
-# `autonomous-dev ...` CLI calls match what the marketplace just installed.
-# (The launchd SERVICE is repointed separately by the daemon's own upgrader.)
 if [[ -d "${CACHE_DIR}" ]]; then
+    # Newest cached version whose CLI entrypoint exists (a half-extracted dir at
+    # the top of the sort order must not win).
     newest=""
     while IFS= read -r v; do
         [[ -x "${CACHE_DIR}/${v}/bin/autonomous-dev.sh" ]] && newest="${v}"
     done < <(ls -1 "${CACHE_DIR}" 2>/dev/null | sort -V)
-    if [[ -n "${newest}" && -f "${WRAPPER}" ]]; then
-        target="${CACHE_DIR}/${newest}/bin/autonomous-dev.sh"
-        if ! grep -qF "${target}" "${WRAPPER}" 2>/dev/null; then
-            printf '#!/usr/bin/env bash\nexec %s "$@"\n' "${target}" > "${WRAPPER}"
-            chmod +x "${WRAPPER}"
-            log "repointed wrapper -> ${newest}"
+
+    if [[ -n "${newest}" ]]; then
+        vdir="${CACHE_DIR}/${newest}"
+
+        # CRITICAL: `claude plugin update` ships fresh node_modules but never
+        # rebuilds NATIVE bindings. Without this, better-sqlite3's compiled
+        # binding is absent in every freshly-pulled version, so `request submit`
+        # (and therefore the whole self-improve loop + Discord intake) crashes
+        # with "Could not locate the bindings file" — while the daemon itself
+        # keeps running (it uses the sqlite3 CLI), so the breakage is SILENT.
+        # This is what made a routine auto-update kneecap request submission.
+        # Rebuild is idempotent: skipped when the binding is already present.
+        binding="${vdir}/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+        if [[ ! -f "${binding}" ]]; then
+            if [[ -d "${vdir}/node_modules/better-sqlite3" ]] && command -v npm >/dev/null 2>&1; then
+                log "native binding missing for ${newest}; rebuilding better-sqlite3"
+                if (cd "${vdir}" && npm rebuild better-sqlite3 >/dev/null 2>&1); then
+                    [[ -f "${binding}" ]] && log "rebuilt better-sqlite3 for ${newest}" \
+                        || log "ERROR: rebuild ran but binding still absent for ${newest}"
+                else
+                    log "ERROR: 'npm rebuild better-sqlite3' failed for ${newest} — request submit will be broken until fixed"
+                fi
+            else
+                log "WARN: cannot rebuild better-sqlite3 for ${newest} (no npm or no module dir)"
+            fi
         else
-            log "wrapper already at ${newest}"
+            log "native binding present for ${newest}"
+        fi
+
+        # Repoint the CLI wrapper shim to the newest version, so `autonomous-dev`
+        # CLI calls match what the marketplace just installed. (The launchd
+        # SERVICE is repointed separately by the daemon's own upgrader.) Done
+        # AFTER the rebuild so we never point at a version with a broken binding.
+        if [[ -f "${WRAPPER}" ]]; then
+            target="${vdir}/bin/autonomous-dev.sh"
+            if ! grep -qF "${target}" "${WRAPPER}" 2>/dev/null; then
+                printf '#!/usr/bin/env bash\nexec %s "$@"\n' "${target}" > "${WRAPPER}"
+                chmod +x "${WRAPPER}"
+                log "repointed wrapper -> ${newest}"
+            else
+                log "wrapper already at ${newest}"
+            fi
         fi
     fi
 fi
