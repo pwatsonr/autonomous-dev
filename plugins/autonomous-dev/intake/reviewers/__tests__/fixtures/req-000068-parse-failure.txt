@@ -1,0 +1,12 @@
+# standards-meta-reviewer review
+
+## Analysis
+
+I reviewed the changed standards.yaml diff and found two medium-severity concerns:
+
+1. Rule `S-042` broadens its `applies_to` glob significantly …
+2. Rule `S-101` adds an `advisory` severity level not covered by aggregator …
+
+## Findings
+
+{"verdict": "CONCERNS", "findings": [{"severity": "medium", "category": "impact", "file": "standards.yaml", "line": 42, "message": "rule S-042 broadens applies_to glob"}, {"severity": "medium", "category": "breadth", "file": "standards.yaml", "line": 101, "message": "rule S-101 adds advisory severity"}], "requires_two_person_approval": false, "score": 74}
