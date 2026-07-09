@@ -309,7 +309,9 @@ export async function runDeployPromote(
     onStageEvent: (event: StageEvent) => {
       const duration = event.durationMs !== undefined ? ` (${event.durationMs}ms)` : '';
       const msg = event.message ? ` — ${event.message}` : '';
-      stdout.write(`[${event.ts}] [${event.stage}] ${event.status.toUpperCase()}${duration}${msg}\n`);
+      stdout.write(
+        `[${event.ts}] [${event.stage}] ${event.status.toUpperCase()}${duration}${msg}\n`,
+      );
     },
     _backendOverride: opts._backendOverride,
   };
@@ -368,17 +370,12 @@ export function registerDeployPromoteCommand(
     (c: Command) => c.name() === 'deploy',
   );
   if (!deployGroup) {
-    deployGroup = program
-      .command('deploy')
-      .description('Deployment operations')
-      .exitOverride();
+    deployGroup = program.command('deploy').description('Deployment operations').exitOverride();
   }
 
   deployGroup
     .command('promote')
-    .description(
-      'Promote a pre-built artifact from one target to another without rebuilding.',
-    )
+    .description('Promote a pre-built artifact from one target to another without rebuilding.')
     .argument('<service>', 'Service name to promote')
     .requiredOption('--from <target>', 'Source target id or selector (the artifact came FROM here)')
     .requiredOption('--to <target>', 'Destination target id or selector (promote TO here)')

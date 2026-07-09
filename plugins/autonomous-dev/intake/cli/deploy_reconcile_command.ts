@@ -84,10 +84,7 @@ export interface DeployReconcileOptions {
  * @param dryRun  - When true, appends a note that no changes will be made.
  * @returns Multi-line plan string ending with `\n`.
  */
-export function renderReconcilePlan(
-  actions: ReconcileAction[],
-  dryRun: boolean,
-): string {
+export function renderReconcilePlan(actions: ReconcileAction[], dryRun: boolean): string {
   const lines: string[] = [];
   const modeLabel = dryRun
     ? 'Reconcile plan (dry-run — no changes will be made)'
@@ -146,13 +143,13 @@ export function renderApplyResults(
   lines.push('');
   lines.push('Apply results:');
 
-  const successes = results.filter(
-    (r) => r.pipelineResult?.status === 'success',
-  ).length;
+  const successes = results.filter((r) => r.pipelineResult?.status === 'success').length;
   const failures = results.filter(
     (r) =>
       r.error !== undefined ||
-      (r.pipelineResult !== null && r.pipelineResult.status !== 'success' && r.pipelineResult.status !== 'dry-run'),
+      (r.pipelineResult !== null &&
+        r.pipelineResult.status !== 'success' &&
+        r.pipelineResult.status !== 'dry-run'),
   ).length;
 
   lines.push(`  ${successes} action(s) succeeded, ${failures} failed`);
@@ -365,10 +362,7 @@ export function registerDeployReconcileCommand(
     (c: Command) => c.name() === 'deploy',
   );
   if (!deployGroup) {
-    deployGroup = program
-      .command('deploy')
-      .description('Deployment operations')
-      .exitOverride();
+    deployGroup = program.command('deploy').description('Deployment operations').exitOverride();
   }
 
   deployGroup

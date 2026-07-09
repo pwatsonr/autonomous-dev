@@ -434,16 +434,21 @@ export async function applyReconcileAction(
       runId: 'remove-not-implemented',
       status: 'no-backend',
       stages: [],
-      policyDecision: { allowed: false, requiredApprovals: [], violations: [
-        {
-          ruleId: 'remove-not-implemented',
-          type: 'reconcile',
-          message:
-            `'remove' action for service '${action.service}' on target '${action.targetId}' ` +
-            `is not implemented by the pipeline runner. ` +
-            `Use a backend-specific removal path to decommission this service.`,
-        },
-      ], matchedRules: [] },
+      policyDecision: {
+        allowed: false,
+        requiredApprovals: [],
+        violations: [
+          {
+            ruleId: 'remove-not-implemented',
+            type: 'reconcile',
+            message:
+              `'remove' action for service '${action.service}' on target '${action.targetId}' ` +
+              `is not implemented by the pipeline runner. ` +
+              `Use a backend-specific removal path to decommission this service.`,
+          },
+        ],
+        matchedRules: [],
+      },
       startedAt: new Date().toISOString(),
       totalDurationMs: 0,
     };
