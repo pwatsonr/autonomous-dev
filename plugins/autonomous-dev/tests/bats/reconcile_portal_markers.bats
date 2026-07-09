@@ -98,3 +98,31 @@ JSON
     run jq -r '.status' "$MARKERS/REQ-000016.json"
     [ "$output" = "running" ]
 }
+
+# Regression: a marker whose request dir was pruned (no state.json anywhere) but
+# which is terminal in the intake DB must be flipped, not stranded forever. This
+# is exactly how REQ-000066 got stuck as a "running" swim-lane item after a CLI
+# cancel + cleanup removed its state.json.
+@test "stranded marker with no state.json but terminal in intake DB is flipped" {
+    mkdir -p "$(dirname "$INTAKE_DB")"
+    sqlite3 "$INTAKE_DB" "CREATE TABLE requests(request_id TEXT, status TEXT); INSERT INTO requests VALUES('REQ-000066','cancelled');"
+    echo '{"id":"REQ-000066","repo":"repo-a","status":"running"}' > "$MARKERS/REQ-000066.json"
+    echo '{"id":"REQ-000066","state":"pending"}' > "$GATES/repo-a__REQ-000066.json"
+
+    reconcile_portal_markers
+
+    run jq -r '.status' "$MARKERS/REQ-000066.json"
+    [ "$output" = "cancelled" ]
+    run jq -r '.completedAt' "$MARKERS/REQ-000066.json"
+    [ -n "$output" ] && [ "$output" != "null" ]
+    [ ! -f "$GATES/repo-a__REQ-000066.json" ]   # gate file removed via glob
+}
+
+@test "stranded marker whose request is still non-terminal in the DB is left alone" {
+    mkdir -p "$(dirname "$INTAKE_DB")"
+    sqlite3 "$INTAKE_DB" "CREATE TABLE requests(request_id TEXT, status TEXT); INSERT INTO requests VALUES('REQ-000067','queued');"
+    echo '{"id":"REQ-000067","repo":"repo-a","status":"running"}' > "$MARKERS/REQ-000067.json"
+    reconcile_portal_markers
+    run jq -r '.status' "$MARKERS/REQ-000067.json"
+    [ "$output" = "running" ]
+}
