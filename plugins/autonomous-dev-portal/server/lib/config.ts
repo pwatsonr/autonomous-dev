@@ -93,28 +93,6 @@ export interface PortalConfig {
      * opens.
      */
     public_bind_acknowledged?: boolean;
-    /**
-     * #670 — Portal plugin-panel contribution mechanism.
-     *
-     * Array of module paths (absolute or `~/…`-expanded) whose default
-     * export is a `PortalContribution` object. Each module is dynamically
-     * imported at startup; missing/broken modules are logged and skipped —
-     * the portal never crashes due to a bad contribution path.
-     *
-     * Default: [] (no additional contributions). The homelab contribution
-     * is registered programmatically in server.ts; other contributions
-     * can be added here without any core code edit (#674).
-     */
-    contributions?: string[];
-    /**
-     * #672 — Per-action RBAC role configuration.
-     *
-     * Maps authenticated principals to roles (viewer / operator /
-     * deployer / admin). See `server/contrib/rbac.ts` for the full
-     * resolution semantics. Default: all callers get "admin" (preserving
-     * zero-config behavior for single-operator installs).
-     */
-    portal_roles?: import("../contrib/rbac").PortalRolesConfig;
 }
 
 interface DefaultsShape {

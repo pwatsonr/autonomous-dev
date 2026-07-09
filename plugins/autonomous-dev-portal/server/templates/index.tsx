@@ -28,7 +28,6 @@ import {
 } from "../lib/shell-rail-state";
 import type { RenderProps, ViewName } from "../types/render";
 import { ShellLayout } from "../components/shell";
-import { navItems } from "../contrib/registry";
 import { AgentsView } from "./views/agents";
 import { ApprovalsView } from "./views/approvals";
 import { AuditView } from "./views/audit";
@@ -213,7 +212,6 @@ export async function renderFullPage<V extends ViewName>(
             cspNonce={cspNonce}
             theme={theme}
             csrfToken={csrfToken}
-            contributedNavItems={navItems()}
             {...resolvedShellState}
         >
             {body}
