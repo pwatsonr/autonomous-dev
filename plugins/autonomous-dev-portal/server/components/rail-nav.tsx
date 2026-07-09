@@ -3,6 +3,12 @@
 //                 Lucide icons + mono uppercase group labels (OPERATE/SYSTEM).
 // SPEC-037-3-02 — added optional `requestsCount` + `agentsAlertCount` badge
 //                 inputs alongside the existing `approvalsCount` contract.
+// #670/#674 — `contributedItems` prop: contributed nav entries from the
+//             plugin registry. Items with a group matching an existing static
+//             group are appended to that group; new group names create a new
+//             section below ONBOARD. Icon fallback: when the icon file is
+//             missing, an empty <span class="ic"> is rendered rather than
+//             crashing (fail-safe per #670 AC).
 //
 // Renders the portal's primary section navigation as a `<nav class="rail-nav">`
 // containing two groups (Operate / System) per TDD-035 SS 6.2. Active-route
@@ -10,9 +16,9 @@
 // (passed through ShellLayout). Approvals / Requests / Agents items optionally
 // render a count badge when their corresponding prop is `> 0`.
 //
-// Homelab is intentionally omitted from portal core (SPEC-037-3-01 §Objective):
-// a future `autonomous-dev-homelab` plugin will contribute that entry via the
-// planned portal-plugin-contribution mechanism — do NOT hardcode it here.
+// Homelab is contributed via the registry (not hardcoded here). It appears
+// in the nav only when `contributedItems` is supplied (e.g. from the shell
+// layout or a test that exercises contribution rendering).
 //
 // Composition (per TDD-035 SS 6.2 + SPEC-037-3-01 SS 4):
 //   <nav class="rail-nav" aria-label="Primary">
@@ -34,6 +40,7 @@
 import type { FC } from "hono/jsx";
 
 import { icon } from "../lib/icons";
+import type { ContributionNavEntry } from "../contrib/types";
 
 /** Group identifier for the rail-nav sections. */
 export type NavGroup = "operate" | "system" | "onboard";
@@ -120,6 +127,14 @@ interface RailNavCounts {
 export interface RailNavProps extends RailNavCounts {
     /** Current request path; the matching item gets `.active` + `aria-current`. */
     activePath: string;
+    /**
+     * #670/#674 — Contributed nav entries from the plugin registry.
+     * Items with a `group` matching a static group are appended to that
+     * group's section; items with a new group name create a new group
+     * rendered below the ONBOARD group.
+     * Default: [] (no contributions).
+     */
+    contributedItems?: ContributionNavEntry[];
 }
 
 /**
@@ -148,6 +163,43 @@ function ariaLabelFor(item: NavItem, badge: number | undefined): string {
     const noun = BADGE_NOUN[item.href] ?? "";
     if (noun === "") return `${item.label} (${badge})`;
     return `${item.label} (${badge} ${noun})`;
+}
+
+/**
+ * Safe icon loader: returns the SVG string for `name` or an empty string
+ * when the file is missing. Used for contributed items whose plugin may
+ * reference an icon not shipped with the portal's static bundle.
+ */
+function safeIcon(name: string, size: number): string {
+    try {
+        return icon(name, size);
+    } catch {
+        return "";
+    }
+}
+
+function renderContribItem(
+    item: ContributionNavEntry,
+    activePath: string,
+): unknown {
+    const isActive = item.href === activePath;
+    const cls = isActive ? "rail-nav-item active" : "rail-nav-item";
+    const iconMarkup = safeIcon(item.iconName, 14);
+    return (
+        <a
+            href={item.href}
+            class={cls}
+            aria-current={isActive ? "page" : undefined}
+            aria-label={item.label}
+        >
+            <span
+                class="ic"
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{ __html: iconMarkup }}
+            ></span>
+            <span class="label">{item.label}</span>
+        </a>
+    );
 }
 
 function renderItem(
@@ -197,6 +249,7 @@ export const RailNav: FC<RailNavProps> = ({
     requestsCount,
     agentsAlertCount,
     onboardQuestionsCount,
+    contributedItems = [],
 }) => {
     const counts: RailNavCounts = {
         approvalsCount,
@@ -207,6 +260,26 @@ export const RailNav: FC<RailNavProps> = ({
     const operate = NAV_ITEMS.filter((i) => i.group === "operate");
     const system = NAV_ITEMS.filter((i) => i.group === "system");
     const onboard = NAV_ITEMS.filter((i) => i.group === "onboard");
+
+    // Contributed items that extend an existing static group.
+    const contribOperate = contributedItems.filter((i) => i.group === "operate");
+    const contribSystem = contributedItems.filter((i) => i.group === "system");
+    const contribOnboard = contributedItems.filter((i) => i.group === "onboard");
+
+    // Contributed items with NEW group names → rendered as extra groups below ONBOARD.
+    const staticGroups = new Set(["operate", "system", "onboard"]);
+    const extraGroupNames = [
+        ...new Set(
+            contributedItems
+                .filter((i) => !staticGroups.has(i.group))
+                .map((i) => i.group),
+        ),
+    ];
+    const extraGroups = extraGroupNames.map((g) => ({
+        name: g,
+        items: contributedItems.filter((i) => i.group === g),
+    }));
+
     return (
         <nav class="rail-nav" aria-label="Primary">
             <div class="rail-nav-group" data-group="operate">
@@ -214,19 +287,30 @@ export const RailNav: FC<RailNavProps> = ({
                     {GROUP_LABELS.operate}
                 </div>
                 {operate.map((item) => renderItem(item, activePath, counts))}
+                {contribOperate.map((item) => renderContribItem(item, activePath))}
             </div>
             <div class="rail-nav-group" data-group="system">
                 <div class="rail-nav-group-label">
                     {GROUP_LABELS.system}
                 </div>
                 {system.map((item) => renderItem(item, activePath, counts))}
+                {contribSystem.map((item) => renderContribItem(item, activePath))}
             </div>
             <div class="rail-nav-group" data-group="onboard">
                 <div class="rail-nav-group-label">
                     {GROUP_LABELS.onboard}
                 </div>
                 {onboard.map((item) => renderItem(item, activePath, counts))}
+                {contribOnboard.map((item) => renderContribItem(item, activePath))}
             </div>
+            {extraGroups.map((g) => (
+                <div class="rail-nav-group" data-group={g.name}>
+                    <div class="rail-nav-group-label">
+                        {g.name.toUpperCase()}
+                    </div>
+                    {g.items.map((item) => renderContribItem(item, activePath))}
+                </div>
+            ))}
         </nav>
     );
 };
