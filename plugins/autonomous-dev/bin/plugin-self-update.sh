@@ -94,5 +94,17 @@ if [[ -d "${CACHE_DIR}" ]]; then
     fi
 fi
 
+# Post-update health check — makes a broken update LOUD instead of silent. If an
+# update leaves the system unhealthy (e.g. the native-binding rebuild above
+# somehow failed), this surfaces it in the plugin-updater log rather than letting
+# request submission die quietly.
+if [[ -x "${WRAPPER}" ]]; then
+    if "${WRAPPER}" doctor >/dev/null 2>&1; then
+        log "post-update health check PASSED"
+    else
+        log "ERROR: post-update health check FAILED — run 'autonomous-dev doctor' for detail"
+    fi
+fi
+
 log "done"
 exit 0
