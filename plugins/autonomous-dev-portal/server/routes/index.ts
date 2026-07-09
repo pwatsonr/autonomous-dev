@@ -28,10 +28,6 @@
 // object. server.ts wires production deps; tests opt-in per group. When
 // a dep is omitted, registerRoutes installs an explicit 503 stub so the
 // gap is visible to operators (no silent 404s).
-//
-// #670 — Contribution routes are mounted via `registerContribRoutes` from
-// the contribution registry. Contributed panels, API routes, and action
-// routes are all mounted here with no per-contribution core edit required.
 
 import type { Hono } from "hono";
 
@@ -104,10 +100,6 @@ import {
     buildStandardsActionRoutes,
     type StandardsActionDeps,
 } from "./standards-actions";
-import {
-    registerContribRoutes,
-    type RegisterContribRoutesOptions,
-} from "../contrib/registry";
 
 export interface RegisterRoutesOptions {
     /**
@@ -187,13 +179,6 @@ export interface RegisterRoutesOptions {
      * the audit trail + SSE broadcast. Omitted in tests → no-op sinks.
      */
     onboardActions?: OnboardActionDeps;
-    /**
-     * #670 — Contribution route deps. When present, mounts all registered
-     * contribution page/api/action routes via the registry. When omitted,
-     * contribution routes are still mounted (the registry always runs) but
-     * with no-op audit and logger sinks.
-     */
-    contribRoutes?: RegisterContribRoutesOptions;
 }
 
 function disabledHandler(error: string) {
@@ -423,18 +408,6 @@ export function registerRoutes(
             return c.json({ success: true, message: "Test state reset (Phase 1A stub)" });
         });
     }
-
-    // -----------------------------------------------------------------
-    // #670 — Contribution routes (page + api + actions).
-    //
-    // Mounted BEFORE the core GET page routes so contributed pages at
-    // /portal/<id> are reachable before the wildcard catch-all path. The
-    // audit + logger sinks default to no-ops when `contribRoutes` is
-    // omitted, keeping tests zero-config.
-    // -----------------------------------------------------------------
-    registerContribRoutes(app, options.contribRoutes ?? {
-        audit: { append: async () => undefined },
-    });
 
     // -----------------------------------------------------------------
     // GET page routes — order is purely organizational.

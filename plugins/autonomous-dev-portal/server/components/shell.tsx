@@ -47,7 +47,6 @@ import type { FC } from "hono/jsx";
 import type { Theme } from "../lib/theme";
 import { RailNav } from "./rail-nav";
 import { BrandWordmark } from "./brand-wordmark";
-import type { ContributionNavEntry } from "../contrib/types";
 
 /**
  * SPEC-034-1-06 — FOUC-prevention IIFE.
@@ -104,12 +103,6 @@ export interface ShellProps {
     agentsAlertCount?: number;
     /** ONBOARD #594 — pending blocking-question count badge for the Questions item. */
     onboardQuestionsCount?: number;
-    /**
-     * #670/#674 — Contributed nav entries from the plugin registry.
-     * Passed to `<RailNav contributedItems>` so the rail reflects the live
-     * contribution set at render time. Default: [] (no contributions).
-     */
-    contributedNavItems?: ContributionNavEntry[];
     /** Daemon status pill in the RailOpsBar. */
     daemonStatus?: DaemonStatusTone;
     /** SPEC-037-3-04 AC-02 — daemon heartbeat age in seconds (right-aligned). */
@@ -228,7 +221,6 @@ export const ShellLayout: FC<ShellProps> = ({
     requestsCount,
     agentsAlertCount,
     onboardQuestionsCount,
-    contributedNavItems = [],
     daemonStatus = "unknown",
     daemonAgeSeconds,
     killSwitchEngaged = false,
@@ -387,7 +379,6 @@ export const ShellLayout: FC<ShellProps> = ({
                             requestsCount={requestsCount}
                             agentsAlertCount={agentsAlertCount}
                             onboardQuestionsCount={onboardQuestionsCount}
-                            contributedItems={contributedNavItems}
                         />
                         {/* SPEC-037-3-04 — 3-line metrics layout. The MTD row
                             is conditionally rendered; Daemon + Breaker rows
