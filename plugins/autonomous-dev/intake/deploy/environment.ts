@@ -1,16 +1,12 @@
 /**
- * Deploy `EnvironmentResolver` (SPEC-023-2-01) + config-target loader
- * (issues #658 + #659).
+ * Deploy `EnvironmentResolver` (SPEC-023-2-01).
  *
  * Loads `<repo>/.autonomous-dev/deploy.yaml`, validates it against
- * `schemas/deploy-config-v2.json` (backward-compatible superset of v1), and
- * resolves a `ResolvedEnvironment` for downstream consumers (BackendSelector,
- * approval state machine, cost-cap pre-check, `deploy plan`).
+ * `schemas/deploy-config-v1.json`, and resolves a `ResolvedEnvironment`
+ * for downstream consumers (BackendSelector, approval state machine,
+ * cost-cap pre-check, `deploy plan`).
  *
- * The v2 schema accepts both `version: "1.0"` and `version: "2.0"` documents,
- * so existing v1 configs load unchanged.
- *
- * Cross-reference: TDD-023 §9 (config shape), issues #658, #659.
+ * Cross-reference: TDD-023 §9 (config shape).
  *
  * Strict TypeScript, no `any`.
  *
@@ -37,10 +33,7 @@ const AjvLib = require('ajv');
 const AjvCtor: any = (AjvLib as any).default ?? AjvLib;
 /* eslint-enable @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any */
 
-// Use the v2 schema which accepts both "1.0" and "2.0" version strings
-// (backward-compatible superset of v1). The v1 schema file is retained for
-// documentation and external tooling that pins to it.
-const SCHEMA_PATH = resolve(__dirname, '..', '..', 'schemas', 'deploy-config-v2.json');
+const SCHEMA_PATH = resolve(__dirname, '..', '..', 'schemas', 'deploy-config-v1.json');
 
 let cachedValidator: ((value: unknown) => boolean) | null = null;
 interface AjvLikeError {
@@ -183,41 +176,6 @@ export function resolveEnvironment(
     source: 'deploy.yaml',
     configPath: options?.configPath ?? null,
   };
-}
-
-/**
- * Extract statically-declared targets from a loaded `DeployConfig` and
- * register them in `registry` (issues #658 + #659).
- *
- * Targets absent from the config (v1 documents, or v2 without a `targets`
- * key) yield an empty array — the function is always safe to call. Each
- * target is stamped with `source: 'config'` to track provenance.
- *
- * Intended call site: the orchestrator / daemon startup that calls
- * `loadConfig(repoPath)` should immediately follow with
- * `loadConfigTargets(config, registry)` so statically-declared targets are
- * available before the first deploy request arrives.
- *
- * Dynamic targets (from homelab plugins) arrive via
- * `registry.registerProvider()` and are NOT touched here.
- *
- * @param config   - Resolved `DeployConfig`, or `null` (no-op when null).
- * @param registry - The `DeployTargetRegistry` to register targets into.
- * @returns Array of the targets that were registered (empty when none).
- */
-export function loadConfigTargets(
-  config: DeployConfig | null,
-  registry: import('./target-registry').DeployTargetRegistry,
-): import('./target-types').DeployTarget[] {
-  if (!config || !config.targets || config.targets.length === 0) return [];
-
-  const registered: import('./target-types').DeployTarget[] = [];
-  for (const raw of config.targets) {
-    const target: import('./target-types').DeployTarget = { ...raw, source: 'config' };
-    registry.register(target);
-    registered.push(target);
-  }
-  return registered;
 }
 
 // Re-export config types so callers can import from one place.
