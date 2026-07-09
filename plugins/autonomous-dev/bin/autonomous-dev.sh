@@ -1029,6 +1029,13 @@ case "${COMMAND}" in
     install-daemon)
         exec bash "${PLUGIN_BIN_DIR}/install-daemon.sh" "$@"
         ;;
+    doctor)
+        # Health check — fails loudly when the installed system is broken
+        # (missing native binding, DB/submit path down, version drift). Exists
+        # because those broke SILENTLY (daemon uses the sqlite3 CLI so it keeps
+        # running while request submission is dead). Exit 1 on critical failure.
+        exec bash "${PLUGIN_BIN_DIR}/doctor.sh" "$@"
+        ;;
     daemon)
         if [[ $# -eq 0 ]]; then
             echo "ERROR: daemon requires a subcommand (start, stop, restart, status)" >&2
