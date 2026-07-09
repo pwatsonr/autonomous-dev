@@ -11,6 +11,7 @@
 #   - plugins/autonomous-dev-deploy-azure/**
 #   - plugins/autonomous-dev-deploy-k8s/**
 #   - .github/workflows/release.yml
+#   - .github/actions/document-review/**
 # PRD/TDD docs that mention the literal as illustration do NOT trigger
 # the guard. Path-broadening is the highest-risk regression mode; the
 # closeout PR description and the runbook both reiterate this scope.
@@ -34,6 +35,7 @@ PATHS=(
   'plugins/autonomous-dev-deploy-azure'
   'plugins/autonomous-dev-deploy-k8s'
   '.github/workflows/release.yml'
+  '.github/actions/document-review'
 )
 
 # `git grep -F` is literal-string match; exit 1 = no match (clean), 0 = match.
