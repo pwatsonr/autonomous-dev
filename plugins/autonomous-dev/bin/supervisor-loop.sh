@@ -4572,6 +4572,67 @@ record_phase_history() {
 #   transition table, atomically updates state.json (current_phase, status,
 #   updated_at), appends to events.jsonl. Implements retry budget enforcement:
 #   on MAX_RETRIES_PER_PHASE exhaustion, marks status='failed' per SPEC-039-1-06.
+#
+# check_code_scope_adherence(request_id, project) -> 0 on-scope/unknown, 1 off-scope
+#   #678: catch a code phase whose diff touches NONE of the files/dirs named in
+#   the request's spec/plan/tdd (the executor confabulated unrelated work — a
+#   portal page and a deploy-registry, both for daemon-core issue #648). Strictly
+#   FAIL-OPEN: returns 0 (on-scope) whenever it cannot confidently judge — no git,
+#   no branch diff, no spec docs, or a docs/tests-only diff — so it never blocks
+#   legit work. Only returns 1 when there IS a real code diff AND there ARE spec
+#   docs AND not one changed source file is referenced anywhere in them.
+check_code_scope_adherence() {
+    local request_id="$1" project="$2"
+    [[ -d "${project}/.git" ]] || return 0
+    local branch="autonomous/${request_id}"
+    local base; base="$(detect_default_branch "${project}" 2>/dev/null || echo main)"
+
+    local changed
+    changed=$( (cd "${project}" 2>/dev/null &&
+        { git diff --name-only "origin/${base}...${branch}" 2>/dev/null \
+          || git diff --name-only "${base}...${branch}" 2>/dev/null; }) || echo "" )
+    [[ -n "${changed}" ]] || return 0
+
+    local docs
+    docs=$(ls "${project}"/docs/specs/${request_id}-*.md \
+             "${project}"/docs/plans/${request_id}-*.md \
+             "${project}"/docs/tdd/${request_id}-*.md 2>/dev/null)
+    [[ -n "${docs}" ]] || return 0
+    local spec_text; spec_text="$(cat ${docs} 2>/dev/null)"
+    [[ -n "${spec_text}" ]] || return 0
+
+    local f base_name parent considered=0 hit=0
+    while IFS= read -r f; do
+        [[ -n "${f}" ]] || continue
+        case "${f}" in
+            docs/specs/${request_id}-*|docs/plans/${request_id}-*|docs/tdd/${request_id}-*) continue ;;
+        esac
+        considered=$((considered+1))
+        base_name="$(basename "${f}")"
+        parent="$(dirname "${f}")"
+        if printf '%s' "${spec_text}" | grep -qF "${f}" \
+           || printf '%s' "${spec_text}" | grep -qF "${base_name}" \
+           || { [[ "${parent}" != "." ]] && printf '%s' "${spec_text}" | grep -qF "${parent}"; }; then
+            hit=1; break
+        fi
+    done <<< "${changed}"
+
+    [[ ${considered} -eq 0 ]] && return 0
+    [[ ${hit} -eq 1 ]] && return 0
+    return 1
+}
+
+# _mark_result_offscope(result_file) -> always 0. #678: annotate + fail the result.
+_mark_result_offscope() {
+    local result_file="$1"
+    [[ -f "${result_file}" ]] || return 0
+    local tmp="${result_file}.tmp.$$"
+    jq '.status = "fail"
+        | .feedback = ("OFF-SCOPE (#678): the code diff touches no files named in this request'"'"'s spec/plan/tdd — the executor likely built unrelated work. " + (.feedback // ""))' \
+        "${result_file}" > "${tmp}" 2>/dev/null && mv "${tmp}" "${result_file}" || rm -f "${tmp}"
+    return 0
+}
+
 advance_phase() {
     local request_id="$1"
     local project="$2"
@@ -4607,6 +4668,19 @@ advance_phase() {
     else
         log_warn "phase-result missing for $request_id phase $current_phase; treating as pass"
         result_status="pass"
+    fi
+
+    # #678 — spec-adherence gate: fail an off-scope code diff. The executor
+    # confabulated unrelated work on 2/2 #648 attempts (a portal page, a deploy
+    # registry). Fail-open: only flips a passing CODE result to fail when it can
+    # prove the diff touches none of the files/dirs named in the spec/plan/tdd.
+    if [[ "${current_phase}" == "code" && "${result_status}" == "pass" ]]; then
+        if declare -F check_code_scope_adherence >/dev/null 2>&1 \
+           && ! check_code_scope_adherence "${request_id}" "${project}"; then
+            log_warn "code-scope adherence FAILED for ${request_id}: diff touches nothing in the spec/plan/tdd (#678) — failing the code phase"
+            result_status="fail"
+            _mark_result_offscope "${result_file}"
+        fi
     fi
 
     # Self-feed the self-improvement loop: at a `<X>_review` completion, record an
