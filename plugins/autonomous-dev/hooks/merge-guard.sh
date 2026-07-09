@@ -30,5 +30,9 @@ printf '%s' "$norm" | grep -qiE '(^|[^[:alnum:]_-])gh +pr +review\b.*--approve' 
 printf '%s' "$norm" | grep -qiE '(^|[^[:alnum:]_-])gh +api\b.*(/merge\b|/merges\b|:merge\b)'    && deny "merge via gh api"
 # direct push to main (any of: origin main, HEAD:main, :main, refs/heads/main)
 printf '%s' "$norm" | grep -qiE '(^|[^[:alnum:]_-])git +push\b.*(\bmain\b|:main\b|/main\b)'      && deny "push to main (git push … main)"
+# #678: filing/editing GitHub issues. A confabulating executor spammed the
+# tracker (#655-676) inventing a roadmap. The pipeline files issues through its
+# own channels (issue_filer.ts on failure); an agent session must not.
+printf '%s' "$norm" | grep -qiE '(^|[^[:alnum:]_-])gh +issue +(create|edit|develop|transfer|pin|delete)\b' && deny "create/edit GitHub issues (gh issue ...)"
 
 exit 0

@@ -24,3 +24,9 @@ run_hook() { # $1 = command string the agent tried to run
 @test "MG-13 allows gh pr view" { run run_hook 'gh pr view 5 --json state'; [ "$status" -eq 0 ]; }
 @test "MG-14 allows test runner" { run run_hook 'npm test'; [ "$status" -eq 0 ]; }
 @test "MG-15 empty command is a no-op" { run run_hook ''; [ "$status" -eq 0 ]; }
+
+# ── #678: issue fence ──
+@test "MG-20 blocks gh issue create" { run run_hook 'gh issue create --title x --body y'; [ "$status" -eq 2 ]; }
+@test "MG-21 blocks gh issue edit" { run run_hook 'gh issue edit 5 --add-label foo'; [ "$status" -eq 2 ]; }
+@test "MG-22 allows gh issue view" { run run_hook 'gh issue view 5 --json state'; [ "$status" -eq 0 ]; }
+@test "MG-23 allows gh issue list" { run run_hook 'gh issue list --state open'; [ "$status" -eq 0 ]; }
