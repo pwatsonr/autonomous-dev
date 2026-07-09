@@ -59,9 +59,7 @@ function makeTarget(overrides: Partial<DeployTarget> = {}): DeployTarget {
   };
 }
 
-function makeRequest(
-  overrides: Partial<PolicyRequest> = {},
-): PolicyRequest {
+function makeRequest(overrides: Partial<PolicyRequest> = {}): PolicyRequest {
   return {
     service: 'my-service',
     target: makeTarget(),
@@ -729,57 +727,39 @@ describe('maintenance-window rule type', () => {
 
   it('allow window: fires when current time is outside the window', () => {
     const now = utcTimestamp(2, 0); // 02:00 UTC — outside 06:00–22:00
-    const d = evaluatePolicy(
-      makeRequest({ context: { now } }),
-      makeDoc([allowWindowRule]),
-    );
+    const d = evaluatePolicy(makeRequest({ context: { now } }), makeDoc([allowWindowRule]));
     expect(d.allowed).toBe(false);
     expect(d.violations[0].message).toMatch(/outside allowed/i);
   });
 
   it('allow window: does not fire when current time is inside the window', () => {
     const now = utcTimestamp(10, 30); // 10:30 UTC — inside 06:00–22:00
-    const d = evaluatePolicy(
-      makeRequest({ context: { now } }),
-      makeDoc([allowWindowRule]),
-    );
+    const d = evaluatePolicy(makeRequest({ context: { now } }), makeDoc([allowWindowRule]));
     expect(d.allowed).toBe(true);
   });
 
   it('allow window: does not fire at window start boundary', () => {
     const now = utcTimestamp(6, 0); // exactly 06:00
-    const d = evaluatePolicy(
-      makeRequest({ context: { now } }),
-      makeDoc([allowWindowRule]),
-    );
+    const d = evaluatePolicy(makeRequest({ context: { now } }), makeDoc([allowWindowRule]));
     expect(d.allowed).toBe(true);
   });
 
   it('allow window: fires at window end boundary (exclusive end)', () => {
     const now = utcTimestamp(22, 0); // exactly 22:00 — exclusive end
-    const d = evaluatePolicy(
-      makeRequest({ context: { now } }),
-      makeDoc([allowWindowRule]),
-    );
+    const d = evaluatePolicy(makeRequest({ context: { now } }), makeDoc([allowWindowRule]));
     expect(d.allowed).toBe(false);
   });
 
   it('block window: fires when current time is inside the blocked window', () => {
     const now = utcTimestamp(3, 0); // 03:00 UTC — inside 00:00–06:00 block
-    const d = evaluatePolicy(
-      makeRequest({ context: { now } }),
-      makeDoc([blockWindowRule]),
-    );
+    const d = evaluatePolicy(makeRequest({ context: { now } }), makeDoc([blockWindowRule]));
     expect(d.allowed).toBe(false);
     expect(d.violations[0].message).toMatch(/blocked during/i);
   });
 
   it('block window: does not fire when current time is outside the blocked window', () => {
     const now = utcTimestamp(12, 0); // 12:00 UTC — outside 00:00–06:00 block
-    const d = evaluatePolicy(
-      makeRequest({ context: { now } }),
-      makeDoc([blockWindowRule]),
-    );
+    const d = evaluatePolicy(makeRequest({ context: { now } }), makeDoc([blockWindowRule]));
     expect(d.allowed).toBe(true);
   });
 
@@ -817,19 +797,13 @@ describe('maintenance-window rule type', () => {
   });
 
   it('missing context.now: fires as fail-safe deny', () => {
-    const d = evaluatePolicy(
-      makeRequest({ context: {} }),
-      makeDoc([allowWindowRule]),
-    );
+    const d = evaluatePolicy(makeRequest({ context: {} }), makeDoc([allowWindowRule]));
     expect(d.allowed).toBe(false);
     expect(d.violations[0].message).toMatch(/context\.now/);
   });
 
   it('missing context entirely: fires as fail-safe deny', () => {
-    const d = evaluatePolicy(
-      makeRequest(),
-      makeDoc([allowWindowRule]),
-    );
+    const d = evaluatePolicy(makeRequest(), makeDoc([allowWindowRule]));
     expect(d.allowed).toBe(false);
   });
 
@@ -886,7 +860,12 @@ describe('open rule-type registry', () => {
     };
     registerRuleType('my-custom-type', myEvaluator);
 
-    const rule = makeRule({ id: 'custom-rule', type: 'my-custom-type', effect: 'deny', params: {} });
+    const rule = makeRule({
+      id: 'custom-rule',
+      type: 'my-custom-type',
+      effect: 'deny',
+      params: {},
+    });
     const d = evaluatePolicy(makeRequest(), makeDoc([rule]));
     expect(d.allowed).toBe(false);
     expect(d.violations[0].message).toBe('custom-deny-message');

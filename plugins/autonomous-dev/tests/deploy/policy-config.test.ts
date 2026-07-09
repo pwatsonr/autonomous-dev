@@ -234,16 +234,16 @@ describe('extractPolicyFromConfig', () => {
 
   it('throws ConfigValidationError when policy key is an array', () => {
     const config = { policy: [{ id: 'bad' }] };
-    expect(() =>
-      extractPolicyFromConfig(config as Record<string, unknown>, '/fake/path'),
-    ).toThrow(ConfigValidationError);
+    expect(() => extractPolicyFromConfig(config as Record<string, unknown>, '/fake/path')).toThrow(
+      ConfigValidationError,
+    );
   });
 
   it('throws ConfigValidationError when policy key is a string', () => {
     const config = { policy: 'invalid' };
-    expect(() =>
-      extractPolicyFromConfig(config as Record<string, unknown>, '/fake/path'),
-    ).toThrow(ConfigValidationError);
+    expect(() => extractPolicyFromConfig(config as Record<string, unknown>, '/fake/path')).toThrow(
+      ConfigValidationError,
+    );
   });
 
   it('throws ConfigValidationError when inline policy fails schema validation', () => {
@@ -260,9 +260,9 @@ describe('extractPolicyFromConfig', () => {
         ],
       },
     };
-    expect(() =>
-      extractPolicyFromConfig(config as Record<string, unknown>, '/fake/path'),
-    ).toThrow(ConfigValidationError);
+    expect(() => extractPolicyFromConfig(config as Record<string, unknown>, '/fake/path')).toThrow(
+      ConfigValidationError,
+    );
   });
 });
 
@@ -309,7 +309,21 @@ describe('active policy singleton', () => {
     const policy = getActivePolicy();
     expect(policy).toBe(EP);
     // Verifying it allows all deploys
-    const d = evaluatePolicy({ service: 'svc', target: { id: 't1', name: 'T', kind: 'local', provider: 'local', capabilities: [], tags: {}, source: 'config' } }, policy);
+    const d = evaluatePolicy(
+      {
+        service: 'svc',
+        target: {
+          id: 't1',
+          name: 'T',
+          kind: 'local',
+          provider: 'local',
+          capabilities: [],
+          tags: {},
+          source: 'config',
+        },
+      },
+      policy,
+    );
     expect(d.allowed).toBe(true);
   });
 });

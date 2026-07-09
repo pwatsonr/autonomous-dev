@@ -84,10 +84,7 @@ describe('resolveTarget — explicit id (priority 1)', () => {
   });
 
   it('UnknownTargetError lists available ids', async () => {
-    const registry = makeRegistry(
-      makeTarget({ id: 'node-a' }),
-      makeTarget({ id: 'node-b' }),
-    );
+    const registry = makeRegistry(makeTarget({ id: 'node-a' }), makeTarget({ id: 'node-b' }));
 
     let err: UnknownTargetError | undefined;
     try {
@@ -155,9 +152,9 @@ describe('resolveTarget — selector (priority 2)', () => {
       makeTarget({ id: 'b', kind: 'swarm-node' }),
     );
 
-    await expect(
-      resolveTarget({ selector: { kind: 'swarm-node' }, registry }),
-    ).rejects.toThrow(AmbiguousTargetError);
+    await expect(resolveTarget({ selector: { kind: 'swarm-node' }, registry })).rejects.toThrow(
+      AmbiguousTargetError,
+    );
   });
 
   it('AmbiguousTargetError lists matching ids', async () => {
@@ -181,16 +178,13 @@ describe('resolveTarget — selector (priority 2)', () => {
   it('throws NoMatchingTargetError when 0 targets match', async () => {
     const registry = makeRegistry(makeTarget({ id: 'local-only', kind: 'local-pr' }));
 
-    await expect(
-      resolveTarget({ selector: { kind: 'k3s-cluster' }, registry }),
-    ).rejects.toThrow(NoMatchingTargetError);
+    await expect(resolveTarget({ selector: { kind: 'k3s-cluster' }, registry })).rejects.toThrow(
+      NoMatchingTargetError,
+    );
   });
 
   it('NoMatchingTargetError lists available ids', async () => {
-    const registry = makeRegistry(
-      makeTarget({ id: 'node-1' }),
-      makeTarget({ id: 'node-2' }),
-    );
+    const registry = makeRegistry(makeTarget({ id: 'node-1' }), makeTarget({ id: 'node-2' }));
 
     let err: NoMatchingTargetError | undefined;
     try {
@@ -255,9 +249,9 @@ describe('resolveTarget — config-default (priority 3)', () => {
   it('throws UnknownTargetError when the default id is not in the registry', async () => {
     const registry = makeRegistry(makeTarget({ id: 'real-target' }));
 
-    await expect(
-      resolveTarget({ defaultTargetId: 'stale-default', registry }),
-    ).rejects.toThrow(UnknownTargetError);
+    await expect(resolveTarget({ defaultTargetId: 'stale-default', registry })).rejects.toThrow(
+      UnknownTargetError,
+    );
   });
 
   it('explicit targetId overrides defaultTargetId', async () => {
@@ -308,19 +302,13 @@ describe('resolveTarget — fallback (priority 4)', () => {
   });
 
   it('throws NoDefaultTargetError when multiple targets are registered and no hint given', async () => {
-    const registry = makeRegistry(
-      makeTarget({ id: 'a' }),
-      makeTarget({ id: 'b' }),
-    );
+    const registry = makeRegistry(makeTarget({ id: 'a' }), makeTarget({ id: 'b' }));
 
     await expect(resolveTarget({ registry })).rejects.toThrow(NoDefaultTargetError);
   });
 
   it('NoDefaultTargetError lists available ids when there are multiple targets', async () => {
-    const registry = makeRegistry(
-      makeTarget({ id: 'x' }),
-      makeTarget({ id: 'y' }),
-    );
+    const registry = makeRegistry(makeTarget({ id: 'x' }), makeTarget({ id: 'y' }));
 
     let err: NoDefaultTargetError | undefined;
     try {

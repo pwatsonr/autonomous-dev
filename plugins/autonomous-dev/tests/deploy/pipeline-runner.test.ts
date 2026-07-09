@@ -58,10 +58,7 @@ function makeTarget(overrides: Partial<DeployTarget> = {}): DeployTarget {
 }
 
 /** Minimal always-succeeding mock backend. */
-function makeMockBackend(
-  id: string,
-  overrides: Partial<PipelineBackend> = {},
-): PipelineBackend {
+function makeMockBackend(id: string, overrides: Partial<PipelineBackend> = {}): PipelineBackend {
   return {
     id,
     supports: (_t) => true,
@@ -84,9 +81,7 @@ function makeMockBackend(
   };
 }
 
-function baseOpts(
-  overrides: Partial<PipelineRunOptions> = {},
-): PipelineRunOptions {
+function baseOpts(overrides: Partial<PipelineRunOptions> = {}): PipelineRunOptions {
   return {
     target: makeTarget(),
     service: 'my-service',
@@ -113,10 +108,20 @@ describe('stage ordering', () => {
     const callOrder: string[] = [];
     const backend = makeMockBackend('ordered', {
       requiresPush: true,
-      build: jest.fn().mockImplementation(async () => { callOrder.push('build'); }),
-      push: jest.fn().mockImplementation(async () => { callOrder.push('push'); }),
-      deploy: jest.fn().mockImplementation(async () => { callOrder.push('deploy'); return { success: true, details: {} }; }),
-      verifyHealth: jest.fn().mockImplementation(async () => { callOrder.push('health-verify'); return { healthy: true, checks: [] }; }),
+      build: jest.fn().mockImplementation(async () => {
+        callOrder.push('build');
+      }),
+      push: jest.fn().mockImplementation(async () => {
+        callOrder.push('push');
+      }),
+      deploy: jest.fn().mockImplementation(async () => {
+        callOrder.push('deploy');
+        return { success: true, details: {} };
+      }),
+      verifyHealth: jest.fn().mockImplementation(async () => {
+        callOrder.push('health-verify');
+        return { healthy: true, checks: [] };
+      }),
     });
 
     const result = await runPipeline(baseOpts({ _backendOverride: backend }));
@@ -193,9 +198,7 @@ describe('dry-run', () => {
     };
     // Dry-run still evaluates policy but does NOT block — it returns the
     // policy decision in the result for the operator to inspect.
-    const result = await runPipeline(
-      baseOpts({ dryRun: true, policy: denyPolicy }),
-    );
+    const result = await runPipeline(baseOpts({ dryRun: true, policy: denyPolicy }));
     // Dry-run always returns dry-run status (policy is shown, not enforced as a block).
     expect(result.status).toBe('dry-run');
     // Policy is evaluated and reflected.
@@ -222,9 +225,7 @@ describe('policy deny', () => {
       ],
     };
 
-    const result = await runPipeline(
-      baseOpts({ policy: denyPolicy, _backendOverride: backend }),
-    );
+    const result = await runPipeline(baseOpts({ policy: denyPolicy, _backendOverride: backend }));
 
     expect(result.status).toBe('denied');
     expect(result.policyDecision.allowed).toBe(false);
@@ -312,8 +313,13 @@ describe('successful full run', () => {
   it('passes the correct context to each stage', async () => {
     const capturedCtx: PipelineContext[] = [];
     const backend = makeMockBackend('ctx-backend', {
-      build: jest.fn().mockImplementation(async (ctx: PipelineContext) => { capturedCtx.push(ctx); }),
-      deploy: jest.fn().mockImplementation(async (ctx: PipelineContext) => { capturedCtx.push(ctx); return { success: true, details: {} }; }),
+      build: jest.fn().mockImplementation(async (ctx: PipelineContext) => {
+        capturedCtx.push(ctx);
+      }),
+      deploy: jest.fn().mockImplementation(async (ctx: PipelineContext) => {
+        capturedCtx.push(ctx);
+        return { success: true, details: {} };
+      }),
     });
 
     await runPipeline(
@@ -411,8 +417,13 @@ describe('deploy failure triggers rollback', () => {
 
   it('records rollback result when rollback fails', async () => {
     const backend = makeMockBackend('rollback-fail-backend', {
-      deploy: jest.fn().mockResolvedValue({ success: false, message: 'fail', details: {} } satisfies DeployResult),
-      rollback: jest.fn().mockResolvedValue({ success: false, errors: ['rollback exploded'] } satisfies RollbackResult),
+      deploy: jest
+        .fn()
+        .mockResolvedValue({ success: false, message: 'fail', details: {} } satisfies DeployResult),
+      rollback: jest.fn().mockResolvedValue({
+        success: false,
+        errors: ['rollback exploded'],
+      } satisfies RollbackResult),
     });
 
     const result = await runPipeline(baseOpts({ _backendOverride: backend }));
@@ -486,7 +497,9 @@ describe('rollback skipped', () => {
     const { rollback: _r, ...withoutRollback } = makeMockBackend('no-rollback-backend');
     const backend: PipelineBackend = {
       ...withoutRollback,
-      deploy: jest.fn().mockResolvedValue({ success: false, message: 'fail', details: {} } satisfies DeployResult),
+      deploy: jest
+        .fn()
+        .mockResolvedValue({ success: false, message: 'fail', details: {} } satisfies DeployResult),
     };
 
     const result = await runPipeline(baseOpts({ _backendOverride: backend }));
@@ -554,9 +567,7 @@ describe('stage events', () => {
       }),
     );
 
-    const completed = events.filter(
-      (e) => e.status === 'success' || e.status === 'skipped',
-    );
+    const completed = events.filter((e) => e.status === 'success' || e.status === 'skipped');
     for (const evt of completed) {
       expect(typeof evt.durationMs).toBe('number');
       expect(evt.durationMs).toBeGreaterThanOrEqual(0);
@@ -565,7 +576,9 @@ describe('stage events', () => {
 
   it('does not throw when event listener throws', async () => {
     const backend = makeMockBackend('bad-listener-backend');
-    const throwingListener = () => { throw new Error('listener error'); };
+    const throwingListener = () => {
+      throw new Error('listener error');
+    };
 
     await expect(
       runPipeline(baseOpts({ _backendOverride: backend, onStageEvent: throwingListener })),
