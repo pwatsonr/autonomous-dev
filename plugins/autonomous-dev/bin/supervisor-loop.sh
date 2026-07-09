@@ -3889,6 +3889,22 @@ maybe_merge_integration_pr() {
         return 0
     fi
 
+    # Gate 0-adherence (#689): never AUTO-MERGE a PR whose diff is off-scope vs
+    # the request's spec/plan/tdd. The #678 code-phase gate should already have
+    # failed such a diff, but this is defense-in-depth at the merge point: a
+    # code-executor once went off-task and self-merged an unrelated PR (REQ-000062,
+    # reverted in #652), which is what motivated the merge-guard (#653). merge_decision
+    # itself only checked green CI, not on-task. Reuses the #678 helper; fail-open
+    # (returns on-scope when it can't judge) so legit work is never withheld — an
+    # off-scope PR is left OPEN for a human, not merged.
+    if declare -F check_code_scope_adherence >/dev/null 2>&1 \
+       && ! check_code_scope_adherence "${request_id}" "${project}"; then
+        _mark_pr_ready_for_human "PR ready for human merge (off-scope vs spec — auto-merge withheld, #689)"
+        _record_merge_decision "skip_offscope" \
+            "code diff touches nothing in the request's spec/plan/tdd (#689) — left for human review"
+        return 0
+    fi
+
     # Gate 0a: MERGEABLE required. CONFLICTING / UNKNOWN / DRAFT etc. are left for humans.
     # This must short-circuit BEFORE _evaluate_merge_checks (§2.7 invariant).
     if [[ "${pr_mergeable}" != "MERGEABLE" ]]; then
@@ -4585,7 +4601,8 @@ check_code_scope_adherence() {
     local request_id="$1" project="$2"
     [[ -d "${project}/.git" ]] || return 0
     local branch="autonomous/${request_id}"
-    local base; base="$(detect_default_branch "${project}" 2>/dev/null || echo main)"
+    local base; base="$(detect_default_branch "${project}" 2>/dev/null)"
+    [[ -n "${base}" ]] || base="main"
 
     local changed
     changed=$( (cd "${project}" 2>/dev/null &&
