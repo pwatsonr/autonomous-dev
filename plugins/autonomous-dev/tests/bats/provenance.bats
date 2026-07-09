@@ -147,3 +147,31 @@ GIT
     run cli_provenance --project "$(mktemp -d)"
     [ "$status" -eq 2 ]
 }
+
+@test "PR-18 cli_provenance runs cleanly under 'set -e' (dispatcher parity)" {
+    # The CLI is sourced into a dispatcher that runs with `set -euo pipefail`.
+    # Guards against the ((n++))-returns-1-from-zero abort class of bug.
+    MOCK="$(mktemp -d)"
+    cat > "${MOCK}/gh" <<'GH'
+#!/usr/bin/env bash
+[[ "$1" == "pr" && "$2" == "list" ]] && { echo '[{"number":10,"headRefName":"autonomous/REQ-000042","title":"t","author":{"login":"b"}}]'; exit 0; }
+exit 0
+GH
+    chmod +x "${MOCK}/gh"
+    cat > "${MOCK}/git" <<'GIT'
+#!/usr/bin/env bash
+[[ "$1" == "for-each-ref" ]] && { echo "autonomous/REQ-000042"; exit 0; }
+exit 0
+GIT
+    chmod +x "${MOCK}/git"
+
+    run bash -euo pipefail -c '
+      source "'"${PLUGIN_DIR_PATH}"'/lib/observability/provenance.sh"
+      source "'"${PLUGIN_DIR_PATH}"'/lib/observability/cli_provenance.sh"
+      export PATH="'"${MOCK}"':$PATH"
+      cli_provenance --project "'"${TEST_PROJECT}"'"
+    '
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"daemon=2"* ]]
+    rm -rf "${MOCK}"
+}

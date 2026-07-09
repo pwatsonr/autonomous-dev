@@ -92,9 +92,9 @@ EOF
     for r in "${rows[@]:-}"; do
         [[ -n "${r}" ]] || continue
         case "${r%%$'\t'*}" in
-            daemon)           ((n_daemon++)) ;;
-            daemon-untracked) ((n_untracked++)) ;;
-            external)         ((n_external++)) ;;
+            daemon)           n_daemon=$((n_daemon + 1)) ;;
+            daemon-untracked) n_untracked=$((n_untracked + 1)) ;;
+            external)         n_external=$((n_external + 1)) ;;
         esac
     done
 
