@@ -62,9 +62,10 @@ describe('SPEC-023-1-01 canonicalJson', () => {
 
   it('matches the chain-layer canonicalJSON output exactly', () => {
     const r = fixtureRecord();
-    // Issue #665: targetId, location, node are included in the signed payload.
-    // Undefined optional fields are serialized as null for determinism.
-    const expected = canonicalJSON({
+    // Issue #665: targetId, location, node are included in the signed payload
+    // ONLY when present, so a record without them hashes identically to the
+    // pre-#665 payload (backward-compatible with existing golden signatures).
+    const base: Record<string, unknown> = {
       deployId: r.deployId,
       backend: r.backend,
       environment: r.environment,
@@ -72,10 +73,11 @@ describe('SPEC-023-1-01 canonicalJson', () => {
       deployedAt: r.deployedAt,
       status: r.status,
       details: r.details,
-      targetId: r.targetId ?? null,
-      location: r.location ?? null,
-      node: r.node ?? null,
-    });
+    };
+    if (r.targetId != null) base.targetId = r.targetId;
+    if (r.location != null) base.location = r.location;
+    if (r.node != null) base.node = r.node;
+    const expected = canonicalJSON(base);
     expect(canonicalJson(r)).toBe(expected);
   });
 });

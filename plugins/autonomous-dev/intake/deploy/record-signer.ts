@@ -94,14 +94,16 @@ export function loadDeployKey(opts: LoadDeployKeyOptions = {}): Buffer {
  * can pin known input → known output and detect formatter drift.
  *
  * Issue #665: `targetId`, `location`, and `node` are included in the
- * signed payload so tampering with them after signing is detected.
- * Undefined optional fields are included as `null` in the canonical form
- * to keep the payload deterministic regardless of whether the fields are
- * present or absent (avoids ambiguity between `undefined` and `null` at
- * the serialization boundary).
+ * signed payload so tampering with them after signing is detected. They
+ * are included ONLY when present, so a record without them hashes
+ * identically to the pre-#665 payload (backward-compatible — existing
+ * signed records and their golden signatures stay valid). Tamper
+ * detection is preserved: altering or removing a present field changes
+ * the canonical form, and adding a field to a record that lacked one
+ * likewise changes it, so any mutation is still caught.
  */
 export function canonicalJson(record: Omit<DeploymentRecord, 'hmac'>): string {
-  return canonicalJSON({
+  const canonical: Record<string, unknown> = {
     deployId: record.deployId,
     backend: record.backend,
     environment: record.environment,
@@ -109,10 +111,17 @@ export function canonicalJson(record: Omit<DeploymentRecord, 'hmac'>): string {
     deployedAt: record.deployedAt,
     status: record.status,
     details: record.details,
-    targetId: record.targetId ?? null,
-    location: record.location ?? null,
-    node: record.node ?? null,
-  });
+  };
+  if (record.targetId !== undefined && record.targetId !== null) {
+    canonical.targetId = record.targetId;
+  }
+  if (record.location !== undefined && record.location !== null) {
+    canonical.location = record.location;
+  }
+  if (record.node !== undefined && record.node !== null) {
+    canonical.node = record.node;
+  }
+  return canonicalJSON(canonical);
 }
 
 /**
