@@ -312,6 +312,35 @@ gh_update_branch_was_called() {
         "$TEST_REQ_DIR/events.jsonl" >/dev/null
 }
 
+# T-UNKNOWN — a transient mergeable=UNKNOWN (GitHub recomputing after a concurrent
+# merge) must be RE-POLLED, not treated as terminal skip_not_mergeable. Regression
+# for REQ-000069/#709, which a parallel merge dropped on a transient UNKNOWN.
+@test "T-UNKNOWN: transient mergeable=UNKNOWN re-polls to MERGEABLE -> merged (#709)" {
+    write_config "{\"trust\":{\"per_repo_overrides\":{\"$TEST_PROJECT\":3}}}"
+    seed_merge_request "https://github.com/o/r/pull/777"
+    # first status read: UNKNOWN (still computing); 2nd+ read: CLEAN + MERGEABLE.
+    export GH_PR_VIEW_JSON='{"state":"OPEN","mergeable":"UNKNOWN","mergeStateStatus":"UNKNOWN"}'
+    export GH_PR_VIEW_JSON_SECOND='{"state":"OPEN","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN"}'
+    export MERGE_MERGEABLE_RETRY_SLEEP=0   # no real sleep in tests
+
+    run run_merge_gate
+    [ "$status" -eq 0 ]
+    [ "$(last_merge_decision)" = "merged" ]
+    gh_merge_was_called
+}
+
+@test "T-UNKNOWN-STUCK: mergeable stays UNKNOWN after retries -> skip_not_mergeable (safe)" {
+    write_config "{\"trust\":{\"per_repo_overrides\":{\"$TEST_PROJECT\":3}}}"
+    seed_merge_request "https://github.com/o/r/pull/777"
+    export GH_PR_VIEW_JSON='{"state":"OPEN","mergeable":"UNKNOWN","mergeStateStatus":"UNKNOWN"}'
+    export MERGE_MERGEABLE_RETRY_SLEEP=0
+
+    run run_merge_gate
+    [ "$status" -eq 0 ]
+    [ "$(last_merge_decision)" = "skip_not_mergeable" ]
+    ! gh_merge_was_called
+}
+
 # ===========================================================================
 # T02 — G1 BEHIND, rebase succeeds -> merged; gh pr update-branch called once
 # ===========================================================================
