@@ -4659,13 +4659,32 @@ check_code_scope_adherence() {
     changed=$( (cd "${project}" 2>/dev/null && git diff --name-only "${diff_base}...${branch}" 2>/dev/null) || echo "" )
     [[ -n "${changed}" ]] || return 0
 
-    local docs
-    docs=$(ls "${project}"/docs/specs/${request_id}-*.md \
-             "${project}"/docs/plans/${request_id}-*.md \
-             "${project}"/docs/tdd/${request_id}-*.md 2>/dev/null)
-    [[ -n "${docs}" ]] || return 0
-    local spec_text; spec_text="$(cat ${docs} 2>/dev/null)"
-    [[ -n "${spec_text}" ]] || return 0
+    # Read the request's spec/plan/tdd FROM THE BRANCH (git show), NOT the working
+    # tree. The daemon churns the working-tree checkout (git checkout) while
+    # processing, so a working-tree `cat` can read absent/placeholder/older docs
+    # mid-checkout and FALSE-POSITIVE as off-scope. This is the real root cause of
+    # the #704/#714 false-positives: REQ-000070/#714 (a genuine, on-scope,
+    # well-tested #632 fix) was flagged off-scope because the working-tree docs
+    # were momentarily inconsistent when the gate ran — the branch's docs DID name
+    # every changed file. Reading from ${branch} is deterministic and consistent
+    # with the diff, which is also computed against ${branch}.
+    local spec_text="" doc_path
+    while IFS= read -r doc_path; do
+        [[ -n "${doc_path}" ]] || continue
+        spec_text+="$( (cd "${project}" 2>/dev/null && git show "${branch}:${doc_path}" 2>/dev/null) )"$'\n'
+    done < <( (cd "${project}" 2>/dev/null && git ls-tree -r --name-only "${branch}" -- \
+                docs/specs docs/plans docs/tdd 2>/dev/null) \
+              | grep -E "/${request_id}-[^/]*\.md$" || true )
+    # Fall back to the working tree only if the branch yielded nothing (e.g. a
+    # local-only test repo). Fail-open below still applies when both are empty.
+    if [[ -z "${spec_text//[[:space:]]/}" ]]; then
+        local _wt_docs
+        _wt_docs=$(ls "${project}"/docs/specs/${request_id}-*.md \
+                     "${project}"/docs/plans/${request_id}-*.md \
+                     "${project}"/docs/tdd/${request_id}-*.md 2>/dev/null)
+        [[ -n "${_wt_docs}" ]] && spec_text="$(cat ${_wt_docs} 2>/dev/null)"
+    fi
+    [[ -n "${spec_text//[[:space:]]/}" ]] || return 0
 
     local f base_name parent considered=0 hit=0
     while IFS= read -r f; do

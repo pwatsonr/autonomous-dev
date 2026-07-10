@@ -81,3 +81,16 @@ _add_origin() {
     _add_origin
     run check_code_scope_adherence "$RID" "$PROJ"; [ "$status" -eq 1 ]
 }
+
+# Regression for REQ-000070/#714: the daemon churns the working-tree checkout,
+# so the gate must read docs from the BRANCH, not the working tree. Here the
+# BRANCH spec names the changed file, but the WORKING-TREE spec is stale
+# placeholder — reading the working tree would false-positive as off-scope.
+@test "SC-08 WORKING-TREE-CHURN: branch spec names the file, working-tree spec stale → reads branch → 0" {
+    echo "Implement plugins/autonomous-dev/intake/handlers/cancel_finalizer.ts" > "$PROJ/docs/specs/$RID-spec.md"
+    echo "x" > "$PROJ/plugins/autonomous-dev/intake/handlers/cancel_finalizer.ts"; _commit
+    # simulate the daemon mid-checkout: overwrite the on-disk spec with placeholder
+    # content that names NOTHING (uncommitted — the branch still has the real spec).
+    echo "PLACEHOLDER — checkout in progress, no file refs here" > "$PROJ/docs/specs/$RID-spec.md"
+    run check_code_scope_adherence "$RID" "$PROJ"; [ "$status" -eq 0 ]
+}
