@@ -18,13 +18,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -98,9 +92,18 @@ export function loadDeployKey(opts: LoadDeployKeyOptions = {}): Buffer {
 /**
  * Canonical JSON of every record field except `hmac`. Public so tests
  * can pin known input → known output and detect formatter drift.
+ *
+ * Issue #665: `targetId`, `location`, and `node` are included in the
+ * signed payload so tampering with them after signing is detected. They
+ * are included ONLY when present, so a record without them hashes
+ * identically to the pre-#665 payload (backward-compatible — existing
+ * signed records and their golden signatures stay valid). Tamper
+ * detection is preserved: altering or removing a present field changes
+ * the canonical form, and adding a field to a record that lacked one
+ * likewise changes it, so any mutation is still caught.
  */
 export function canonicalJson(record: Omit<DeploymentRecord, 'hmac'>): string {
-  return canonicalJSON({
+  const canonical: Record<string, unknown> = {
     deployId: record.deployId,
     backend: record.backend,
     environment: record.environment,
@@ -108,17 +111,24 @@ export function canonicalJson(record: Omit<DeploymentRecord, 'hmac'>): string {
     deployedAt: record.deployedAt,
     status: record.status,
     details: record.details,
-  });
+  };
+  if (record.targetId !== undefined && record.targetId !== null) {
+    canonical.targetId = record.targetId;
+  }
+  if (record.location !== undefined && record.location !== null) {
+    canonical.location = record.location;
+  }
+  if (record.node !== undefined && record.node !== null) {
+    canonical.node = record.node;
+  }
+  return canonicalJSON(canonical);
 }
 
 /**
  * Sign `record` with HMAC-SHA256. Returns a NEW record (does not mutate
  * the input) with `hmac` set to a 64-char lowercase hex string.
  */
-export function signDeploymentRecord(
-  record: DeploymentRecord,
-  key?: Buffer,
-): DeploymentRecord {
+export function signDeploymentRecord(record: DeploymentRecord, key?: Buffer): DeploymentRecord {
   const k = key ?? loadDeployKey();
   const body = canonicalJson(record);
   const hmac = createHmac('sha256', k).update(body).digest('hex');
@@ -164,7 +174,9 @@ export function verifyDeploymentRecord(
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return {
       valid: false,
-      error: new Error('hmac mismatch: record has been tampered with or signed with a different key'),
+      error: new Error(
+        'hmac mismatch: record has been tampered with or signed with a different key',
+      ),
     };
   }
   return { valid: true };

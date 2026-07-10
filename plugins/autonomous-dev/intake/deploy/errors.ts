@@ -27,11 +27,7 @@ export class DeployError extends Error {
 export class ParameterValidationError extends DeployError {
   public readonly errors: readonly { key: string; message: string }[];
   constructor(errors: readonly { key: string; message: string }[]) {
-    super(
-      `parameter validation failed: ${errors
-        .map((e) => `${e.key}: ${e.message}`)
-        .join('; ')}`,
-    );
+    super(`parameter validation failed: ${errors.map((e) => `${e.key}: ${e.message}`).join('; ')}`);
     this.name = 'ParameterValidationError';
     this.errors = Object.freeze([...errors]);
   }
@@ -42,7 +38,10 @@ export class ParameterValidationError extends DeployError {
 
 /** Raised by `verifyDeploymentRecord` when the record's HMAC does not match. */
 export class DeploymentRecordVerificationError extends DeployError {
-  constructor(public readonly deployId: string, reason: string) {
+  constructor(
+    public readonly deployId: string,
+    reason: string,
+  ) {
     super(`deployment record ${deployId} failed verification: ${reason}`);
     this.name = 'DeploymentRecordVerificationError';
   }
@@ -57,11 +56,12 @@ export class DeploymentRecordVerificationError extends DeployError {
 
 /** Raised by `loadDeployKey` when the on-disk key file has insecure perms. */
 export class InsecureKeyPermissionsError extends DeployError {
-  constructor(public readonly keyPath: string, public readonly mode: number) {
+  constructor(
+    public readonly keyPath: string,
+    public readonly mode: number,
+  ) {
     super(
-      `deploy key at ${keyPath} has insecure permissions: 0o${mode.toString(
-        8,
-      )} (expected 0o600)`,
+      `deploy key at ${keyPath} has insecure permissions: 0o${mode.toString(8)} (expected 0o600)`,
     );
     this.name = 'InsecureKeyPermissionsError';
   }
@@ -126,9 +126,7 @@ export class UnknownEnvironmentError extends DeployError {
     public readonly envName: string,
     public readonly available: readonly string[],
   ) {
-    super(
-      `unknown environment '${envName}'; available: ${available.join(', ') || '(none)'}`,
-    );
+    super(`unknown environment '${envName}'; available: ${available.join(', ') || '(none)'}`);
     this.name = 'UnknownEnvironmentError';
   }
   override toJSON(): Record<string, unknown> {
@@ -193,10 +191,11 @@ export class ApprovalChainError extends DeployError {
 
 /** Raised when the same approver attempts to record two approvals on a two-person gate. */
 export class DuplicateApproverError extends DeployError {
-  constructor(public readonly deployId: string, public readonly approver: string) {
-    super(
-      `approver '${approver}' has already recorded a decision for deploy ${deployId}`,
-    );
+  constructor(
+    public readonly deployId: string,
+    public readonly approver: string,
+  ) {
+    super(`approver '${approver}' has already recorded a decision for deploy ${deployId}`);
     this.name = 'DuplicateApproverError';
   }
   override toJSON(): Record<string, unknown> {
@@ -211,10 +210,11 @@ export class DuplicateApproverError extends DeployError {
 
 /** Raised when an `approval: "admin"` requirement gets an operator-role approve. */
 export class AdminRequiredError extends DeployError {
-  constructor(public readonly deployId: string, public readonly approver: string) {
-    super(
-      `deploy ${deployId} requires admin role; approver '${approver}' has insufficient role`,
-    );
+  constructor(
+    public readonly deployId: string,
+    public readonly approver: string,
+  ) {
+    super(`deploy ${deployId} requires admin role; approver '${approver}' has insufficient role`);
     this.name = 'AdminRequiredError';
   }
   override toJSON(): Record<string, unknown> {
@@ -379,6 +379,40 @@ export class CloudDeployError extends DeployError {
       cloud: this.cloud,
       operation: this.operation,
       retriable: this.retriable,
+    };
+  }
+}
+
+/**
+ * Raised by the orchestrator when a stateful deploy's backup precondition
+ * is not satisfied (issue #666). The caller must either supply a
+ * `verifiedBackupRef` from a completed backup, or set `backupOverride: true`
+ * to bypass the check (admin-level action, recorded in the audit trail).
+ *
+ * Core delegates the actual backup operation to the homelab plugin via the
+ * `HomelabDispatchContext`. This error only fires when the precondition
+ * check inside the orchestrator detects the unsatisfied condition before
+ * the plugin even sees the request.
+ */
+export class StatefulPreconditionError extends DeployError {
+  /**
+   * @param backupClass - The backup class of the target, e.g. `'snapshot'`
+   *   or `'orchestrated'`. Included in the error so callers can surface the
+   *   expected verification path to the operator.
+   */
+  constructor(public readonly backupClass: string) {
+    super(
+      `Stateful deploy blocked: backup precondition not satisfied ` +
+        `(backup_class: ${backupClass}). ` +
+        'Provide a verifiedBackupRef or set backupOverride=true.',
+    );
+    this.name = 'StatefulPreconditionError';
+  }
+  override toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      backupClass: this.backupClass,
     };
   }
 }

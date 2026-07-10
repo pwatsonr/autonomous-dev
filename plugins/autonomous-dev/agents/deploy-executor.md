@@ -1,6 +1,6 @@
 ---
 name: deploy-executor
-version: "1.0.0"
+version: "1.1.0"
 role: executor
 model: "claude-sonnet-4-6"
 temperature: 0.2
@@ -37,10 +37,91 @@ version_history:
   - version: "1.0.0"
     date: "2026-04-08"
     change: "Initial release"
+  - version: "1.1.0"
+    date: "2026-07-09"
+    change: "Add target handoff contract (#665), stateful backup precondition (#666), secret binding (#667)"
 description: "Executes deployment workflows including Docker builds, CI/CD pipeline configuration, and infrastructure provisioning with safety checks"
 ---
 
 # Deploy Executor Agent
+
+## Target Handoff Contract (issues #665, #666, #667)
+
+### Overview
+
+`runDeploy()` in `orchestrator.ts` routes deploys to the correct dispatch path after evaluating the stateful backup precondition and resolving secret bindings just-in-time. All branching is on capability flags and tags — never on instance ids or node names (invariant #674).
+
+```
+orchestrator.runDeploy()
+  ├── evaluateStatefulPrecondition()      (#666) — throws StatefulPreconditionError if blocked
+  ├── resolveSecretBindings()             (#667) — JIT via CredentialProxy; material in-process only
+  │
+  ├── resolvedTarget.tags['location'] === 'homelab'
+  │     └── homelandDispatch(HomelabDispatchContext)
+  │           └── [PLUGIN GATE — not in core]
+  │                 typed-CONFIRM, 24h delay, mutation barrier, actual backup verification
+  │
+  └── resolvedTarget.tags['location'] === 'cloud'  (or no resolvedTarget — backward compat)
+        └── BackendRegistry backend.build() → backend.deploy()  (unchanged)
+```
+
+### HomelabDispatchContext
+
+When `resolvedTarget.target.tags['location'] === 'homelab'`, `runDeploy()` calls the injected `homelandDispatch` function with:
+
+| Field | Type | Description |
+|---|---|---|
+| `deployId` | `string` | ULID for this deploy event |
+| `envName` | `string` | Logical environment label |
+| `resolvedTarget` | `ResolvedTarget` | Fully-resolved target (id, kind, capabilities, tags) |
+| `backupClass` | `BackupClass` | `'none' \| 'snapshot' \| 'orchestrated'` (#666) |
+| `verifiedBackupRef` | `string?` | Pre-verified backup manifest id (#666) |
+| `overrideApplied` | `boolean` | True when `backupOverride=true` was used (#666) |
+| `secretBindings` | `RecordSafeBinding[]` | refHash-only projections — no material (#667) |
+| `args` | `RunDeployArgs` | Full request args for additional plugin context |
+
+Core does NOT implement the plugin gate (typed-CONFIRM, 24h delay, mutation barrier, backup verification). The plugin's `homelandDispatch` function handles all of those.
+
+### DeploymentRecord new fields (#665)
+
+Three optional fields were added to `DeploymentRecord`, all covered by the HMAC signature in `record-signer.ts`:
+
+| Field | Type | Description |
+|---|---|---|
+| `targetId` | `string?` | Opaque target id — audit/correlation only, not for branching |
+| `location` | `'cloud' \| 'homelab'?` | Dispatch path used |
+| `node` | `string?` | Node from `target.tags['node']` — never a hard-coded name (#674) |
+
+Tampering with any of these three fields after signing is detected by `verifyDeploymentRecord`.
+
+### Stateful Precondition (#666)
+
+`evaluateStatefulPrecondition()` in `stateful-contract.ts` blocks a deploy when:
+
+- `target.capabilities` includes `'stateful'`, AND
+- `requiresVerifiedBackup: true` on the request, AND
+- Neither `verifiedBackupRef` nor `backupOverride: true` is supplied.
+
+Throws `StatefulPreconditionError(backupClass)`. The homelab plugin performs actual backup verification; core only checks the precondition flag.
+
+`backup_class` (`'none' | 'snapshot' | 'orchestrated'`) is declared per-target in `DeployTarget.backup_class` and forwarded to the plugin via `HomelabDispatchContext`.
+
+### Secret Binding (#667)
+
+`resolveSecretBindings(bindings, proxy)` in `secret-binding.ts` resolves each `SecretBinding.credentialRef` JIT via the `CredentialProxy`. Resolved material is in-process only — it is never logged, never persisted.
+
+`toRecordSafeBindings(resolved)` projects `ResolvedSecretBinding[]` to `RecordSafeBinding[]`, replacing `credentialRef` with its SHA-256 hex hash (`refHash`). Only `RecordSafeBinding` objects are stored in `DeploymentRecord.secretBindings`.
+
+The homelab plugin implements `CredentialProxy` as a local shim (Vault agent socket, `pass(1)`, etc.). The same `resolveSecretBindings()` function is used for cloud and homelab targets — only the proxy implementation differs.
+
+### Invariant #674 Compliance
+
+All branching in core uses:
+- `target.tags['location']` — `'cloud' | 'homelab'`
+- `target.capabilities` — `['stateful', ...]`
+- `target.backup_class` — `'none' | 'snapshot' | 'orchestrated'`
+
+Never: instance ids, service names, node names, or IP addresses in branching logic. The `targetId` and `node` fields in `DeploymentRecord` are for audit/correlation only.
 
 ## ⚠️ MANDATORY: Evidence-of-work envelope
 

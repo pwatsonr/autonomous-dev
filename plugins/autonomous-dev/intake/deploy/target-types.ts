@@ -23,6 +23,8 @@
  * @module intake/deploy/target-types
  */
 
+import type { BackupClass } from './stateful-contract';
+
 /**
  * A fully-described deploy destination.
  *
@@ -63,6 +65,21 @@ export interface DeployTarget {
    * (e.g., `'dev'`, `'staging'`, `'prod'`).
    */
   env?: string;
+
+  /**
+   * Backup class for stateful targets (issue #666).
+   *
+   * Declared per-target; consumed by the stateful precondition check in the
+   * orchestrator and forwarded to the homelab plugin's approval/backup gate.
+   *
+   * - `'none'`         — target carries no persistent state.
+   * - `'snapshot'`     — filesystem / volume snapshot backup.
+   * - `'orchestrated'` — external backup orchestrator (e.g. PBS, database dump).
+   *
+   * Defaults to `'none'` when omitted (non-stateful targets).
+   * Only meaningful when `capabilities` includes `'stateful'`.
+   */
+  backup_class?: BackupClass;
 
   /**
    * Optional trust level for this target.

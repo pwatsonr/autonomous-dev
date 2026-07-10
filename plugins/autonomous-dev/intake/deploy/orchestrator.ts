@@ -20,6 +20,7 @@ import {
   CostCapExceededError,
   DailyCostCapExceededError,
   AdminOverrideRequiredError,
+  StatefulPreconditionError,
 } from './errors';
 import { checkCostCap, recordCost } from './cost-cap';
 import { CostCapEnforcer } from './cost-cap-enforcer';
@@ -33,6 +34,12 @@ import { emitDeployInit, emitDeployCompletion } from './telemetry';
 import type { ApprovalState } from './approval-types';
 import type { ResolvedEnvironment } from './types-config';
 import type { BuildContext, DeploymentRecord } from './types';
+import type { ResolvedTarget } from './target-resolver';
+import type { BackupClass } from './stateful-contract';
+import { evaluateStatefulPrecondition } from './stateful-contract';
+import type { SecretBinding, ResolvedSecretBinding, RecordSafeBinding } from './secret-binding';
+import { resolveSecretBindings, toRecordSafeBindings } from './secret-binding';
+import type { CredentialProxy } from './credential-proxy-types';
 
 /** Hook for tests to recording escalations without booting PLAN-009. */
 export interface EscalationSink {
@@ -63,6 +70,47 @@ export interface RunDeployResult {
 }
 
 /**
+ * Context forwarded to the homelab dispatch handler (issue #665).
+ *
+ * Core delegates homelab deploys entirely to the plugin's approval/safety
+ * gate. The context carries all information the plugin needs without
+ * requiring a round-trip back to the orchestrator.
+ */
+export interface HomelabDispatchContext {
+  /** The deploy identifier. */
+  deployId: string;
+  /** Logical environment name. */
+  envName: string;
+  /** Resolved target, including id, kind, capabilities, and tags. */
+  resolvedTarget: ResolvedTarget;
+  /** Backup class resolved from the target (issue #666). */
+  backupClass: BackupClass;
+  /** Verified backup manifest ref, if supplied by the caller (issue #666). */
+  verifiedBackupRef?: string;
+  /** True when `backupOverride` was set on the request (issue #666). */
+  overrideApplied: boolean;
+  /** Record-safe secret bindings (refHash only — no material) (issue #667). */
+  secretBindings: RecordSafeBinding[];
+  /** Original request args for any additional context the plugin needs. */
+  args: RunDeployArgs;
+}
+
+/**
+ * Homelab dispatch function injected into `runDeploy()` (issue #665).
+ *
+ * Core calls this for targets with `location: 'homelab'`. The function
+ * is implemented by the homelab plugin and handles the full plugin gate
+ * (typed-CONFIRM, 24h delay, mutation barrier, actual backup verification).
+ * Core does NOT reimplement any of those steps.
+ *
+ * @param ctx - Homelab dispatch context.
+ * @returns A partial `DeploymentRecord` with at minimum `status`, `artifactId`,
+ *   `deployedAt`, and `details` set. Core fills in `deployId`, `backend`,
+ *   `environment`, `targetId`, `location`, and `node`.
+ */
+export type HomelabDispatchFn = (ctx: HomelabDispatchContext) => Promise<Partial<DeploymentRecord>>;
+
+/**
  * Inputs to runDeploy().
  *
  * `actor` (SPEC-032-1-01) is the principal initiating the deploy
@@ -87,6 +135,61 @@ export interface RunDeployArgs {
   selectorRegistry?: SelectorBackendRegistry;
   /** Build context handed to backend.build() / .deploy(). */
   buildContext?: BuildContext;
+
+  // --- Issue #665: daemon handoff ---
+  /**
+   * Resolved deploy target. When supplied, the orchestrator branches on
+   * `resolvedTarget.target.tags['location']` ('cloud' | 'homelab').
+   * Homelab deploys are delegated to `homelandDispatch`; cloud deploys
+   * take the existing backend path (unchanged).
+   *
+   * When absent, the orchestrator takes the existing backend path (backward
+   * compatibility with callers that do not yet supply a resolved target).
+   */
+  resolvedTarget?: ResolvedTarget;
+  /**
+   * Homelab dispatch function (issue #665). Required when `resolvedTarget`
+   * has `location: 'homelab'`. Implemented by the homelab plugin.
+   *
+   * When absent for a homelab target, the orchestrator returns
+   * `{ status: 'failed', reason: 'no homelandDispatch for homelab target' }`.
+   */
+  homelandDispatch?: HomelabDispatchFn;
+
+  // --- Issue #666: stateful contract ---
+  /**
+   * When `true`, the deploy is blocked unless a `verifiedBackupRef` is
+   * supplied or `backupOverride` is `true`. Only checked when the resolved
+   * target has the `'stateful'` capability. Defaults to `false`.
+   */
+  requiresVerifiedBackup?: boolean;
+  /**
+   * A backup manifest id verified by a prior backup operation.
+   * Satisfies `requiresVerifiedBackup` without an override.
+   */
+  verifiedBackupRef?: string;
+  /**
+   * Admin-level explicit override for the stateful backup precondition.
+   * Bypasses the block; recorded in the homelab dispatch context so the
+   * plugin can add it to the audit trail.
+   */
+  backupOverride?: boolean;
+
+  // --- Issue #667: secret bindings ---
+  /**
+   * Secret bindings to resolve JIT before dispatch. Each binding
+   * names a credential ref, injection mode, and target name/path.
+   * Resolved via the `credentialProxy`. Only `refHash` is persisted to
+   * the `DeploymentRecord`.
+   */
+  secretBindings?: SecretBinding[];
+  /**
+   * `CredentialProxy` for JIT secret resolution (issue #667).
+   * Required when `secretBindings` is non-empty. When absent and
+   * `secretBindings` is non-empty, the orchestrator returns
+   * `{ status: 'failed', reason: 'secretBindings require a credentialProxy' }`.
+   */
+  credentialProxy?: CredentialProxy;
 }
 
 // --- Cost-cap enforcer + ledger plumbing (SPEC-032-1-01) ----------------
@@ -129,9 +232,7 @@ function getOrCreateLedger(requestDir: string): CostLedger {
   return ledger;
 }
 
-async function loadCostCapConfig(
-  _requestDir: string,
-): Promise<{ cost_cap_usd_per_day: number }> {
+async function loadCostCapConfig(_requestDir: string): Promise<{ cost_cap_usd_per_day: number }> {
   // The per-env cap from `deploy.yaml` is resolved per-call via
   // `ResolvedEnvironment.costCapUsd`. The enforcer-level config is the
   // operator-wide daily cap; we currently surface 0 (== "use enforcer
@@ -182,9 +283,7 @@ function getOrCreateCostCapEnforcer(requestDir: string): CostCapEnforcer {
  * Test-only escape hatch for SPEC-032-1-01's memoization tests. Not
  * exported from the public surface.
  */
-export function __getOrCreateCostCapEnforcerForTest(
-  requestDir: string,
-): CostCapEnforcer {
+export function __getOrCreateCostCapEnforcerForTest(requestDir: string): CostCapEnforcer {
   return getOrCreateCostCapEnforcer(requestDir);
 }
 
@@ -297,6 +396,84 @@ export async function runDeploy(args: RunDeployArgs): Promise<RunDeployResult> {
     }
   }
 
+  // --- Issue #666: stateful precondition check -------------------------
+  // Evaluate BEFORE cost-cap (fail fast on config errors before incurring
+  // cost-estimation I/O). Runs only when a resolvedTarget is supplied.
+  if (args.resolvedTarget) {
+    const target = args.resolvedTarget.target;
+    const backupClass = target.backup_class ?? 'none';
+    const precondition = evaluateStatefulPrecondition({
+      targetCapabilities: target.capabilities,
+      backupClass,
+      requiresVerifiedBackup: args.requiresVerifiedBackup ?? false,
+      verifiedBackupRef: args.verifiedBackupRef,
+      backupOverride: args.backupOverride,
+    });
+    if (precondition.blocked) {
+      throw new StatefulPreconditionError(backupClass);
+    }
+  }
+
+  // --- Issue #667: JIT secret binding resolution -----------------------
+  // Resolve before dispatch. Persists only refHash; material is in-process.
+  let resolvedBindings: ResolvedSecretBinding[] = [];
+  let safeBindings: RecordSafeBinding[] = [];
+  if (args.secretBindings && args.secretBindings.length > 0) {
+    if (!args.credentialProxy) {
+      return { status: 'failed', reason: 'secretBindings require a credentialProxy' };
+    }
+    // resolveSecretBindings throws on permission-denied; let it propagate.
+    resolvedBindings = await resolveSecretBindings(args.secretBindings, args.credentialProxy);
+    safeBindings = toRecordSafeBindings(resolvedBindings);
+  }
+  // resolvedBindings carries live material for in-process injection;
+  // safeBindings (refHash only) is persisted to DeploymentRecord.
+  void resolvedBindings; // available for injection middleware; not used in core
+
+  // --- Issue #665: location branching ----------------------------------
+  // When a resolvedTarget is supplied and its 'location' tag is 'homelab',
+  // delegate entirely to the homelab plugin's dispatch function. Cloud and
+  // no-target paths continue with the existing backend invocation below.
+  if (args.resolvedTarget) {
+    const target = args.resolvedTarget.target;
+    const location = (target.tags['location'] ?? 'cloud') as 'cloud' | 'homelab';
+    if (location === 'homelab') {
+      if (!args.homelandDispatch) {
+        return { status: 'failed', reason: 'no homelandDispatch for homelab target' };
+      }
+      const backupClass = target.backup_class ?? 'none';
+      const ctx: HomelabDispatchContext = {
+        deployId: args.deployId,
+        envName: args.envName,
+        resolvedTarget: args.resolvedTarget,
+        backupClass,
+        verifiedBackupRef: args.verifiedBackupRef,
+        overrideApplied: args.backupOverride ?? false,
+        secretBindings: safeBindings,
+        args,
+      };
+      const partial = await args.homelandDispatch(ctx);
+      const record: DeploymentRecord = {
+        deployId: args.deployId,
+        backend: selection.backendName,
+        environment: resolved.envName,
+        artifactId: partial.artifactId ?? 'unknown',
+        deployedAt: partial.deployedAt ?? new Date().toISOString(),
+        status: partial.status ?? 'deployed',
+        details: partial.details ?? {},
+        targetId: target.id,
+        location: 'homelab',
+        node: target.tags['node'],
+        hmac: '',
+        ...(safeBindings.length > 0 ? { secretBindings: safeBindings } : {}),
+      };
+      return record.status === 'deployed'
+        ? { status: 'completed', record }
+        : { status: 'failed', reason: record.status, record };
+    }
+    // Cloud path: fall through to existing backend invocation with target metadata.
+  }
+
   // --- Cost-cap pre-check + telemetry init ----------------------------
   const estimatedCost = await safeEstimate(selection.backendName, selection.parameters);
   emitDeployInit({
@@ -348,10 +525,7 @@ export async function runDeploy(args: RunDeployArgs): Promise<RunDeployResult> {
         backend: selection.backendName,
       });
     } catch (err) {
-      if (
-        err instanceof DailyCostCapExceededError ||
-        err instanceof AdminOverrideRequiredError
-      ) {
+      if (err instanceof DailyCostCapExceededError || err instanceof AdminOverrideRequiredError) {
         const reason = `${err.constructor.name}: ${err.message}`;
         emitDeployCompletion({
           type: 'deploy.completion',
@@ -370,9 +544,9 @@ export async function runDeploy(args: RunDeployArgs): Promise<RunDeployResult> {
     }
   }
 
-  // --- Backend invocation ---------------------------------------------
+  // --- Backend invocation (cloud path) --------------------------------
   try {
-    const record = await invokeBackend(args, selection.backendName, resolved);
+    const record = await invokeBackend(args, selection.backendName, resolved, safeBindings);
     await recordCost({
       requestDir: args.requestDir,
       envName: resolved.envName,
@@ -436,8 +610,24 @@ async function invokeBackend(
   args: RunDeployArgs,
   backendName: string,
   resolved: ResolvedEnvironment,
+  safeBindings: RecordSafeBinding[],
 ): Promise<DeploymentRecord> {
   const backend = BackendRegistry.get(backendName);
+
+  // Stamp target-aware fields onto every record produced by this path.
+  // (#665) targetId/location/node are sourced from the resolved target when
+  // supplied; cloud deploys use location:'cloud'. These are added after the
+  // backend's own record is built so backends remain unaware of the new fields.
+  const targetOverrides: Partial<DeploymentRecord> = {};
+  if (args.resolvedTarget) {
+    const tgt = args.resolvedTarget.target;
+    targetOverrides.targetId = tgt.id;
+    targetOverrides.location = 'cloud';
+    targetOverrides.node = tgt.tags['node'];
+  }
+  const bindingOverrides: Partial<DeploymentRecord> =
+    safeBindings.length > 0 ? { secretBindings: safeBindings } : {};
+
   if (!args.buildContext) {
     // Without a buildContext, the orchestrator cannot legitimately
     // invoke build/deploy. Return a synthesized failed record so the
@@ -451,8 +641,11 @@ async function invokeBackend(
       status: 'failed',
       details: { reason: 'no buildContext supplied' },
       hmac: '',
+      ...targetOverrides,
+      ...bindingOverrides,
     };
   }
   const artifact = await backend.build(args.buildContext);
-  return backend.deploy(artifact, resolved.envName, args.buildContext.params);
+  const record = await backend.deploy(artifact, resolved.envName, args.buildContext.params);
+  return { ...record, ...targetOverrides, ...bindingOverrides };
 }
