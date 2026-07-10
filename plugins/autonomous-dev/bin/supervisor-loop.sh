@@ -3873,6 +3873,25 @@ maybe_merge_integration_pr() {
     pr_mergeable=$(echo "${pr_json}" | jq -r '.mergeable // ""' 2>/dev/null || echo "")
     pr_mergestate=$(echo "${pr_json}" | jq -r '.mergeStateStatus // ""' 2>/dev/null || echo "")
 
+    # GitHub computes `mergeable` ASYNCHRONOUSLY. Right after the base branch
+    # advances — e.g. a concurrent merge from a parallel session — it briefly
+    # returns UNKNOWN while it recomputes. Treating UNKNOWN as a terminal
+    # skip_not_mergeable drops a perfectly-green PR on a transient race (observed:
+    # REQ-000069/#709 was skipped because homelab PR #708 merged mid-decision and
+    # triggered a recompute; the PR was CLEAN moments later). Re-poll a few times
+    # so a transient UNKNOWN resolves to its real state (MERGEABLE or CONFLICTING)
+    # before deciding. Sleep is parameterized so unit tests run instantly.
+    local _mg_try
+    for _mg_try in 1 2 3 4; do
+        [[ "${pr_mergeable}" != "UNKNOWN" ]] && break
+        sleep "${MERGE_MERGEABLE_RETRY_SLEEP:-3}"
+        pr_json=$( (cd "${project}" 2>/dev/null && gh pr view "${pr_url}" \
+                      --json state,mergeable,mergeStateStatus < /dev/null 2>/dev/null) || echo "${pr_json}" )
+        pr_state=$(echo "${pr_json}" | jq -r '.state // ""' 2>/dev/null || echo "${pr_state}")
+        pr_mergeable=$(echo "${pr_json}" | jq -r '.mergeable // ""' 2>/dev/null || echo "${pr_mergeable}")
+        pr_mergestate=$(echo "${pr_json}" | jq -r '.mergeStateStatus // ""' 2>/dev/null || echo "${pr_mergestate}")
+    done
+
     # Idempotency: an already-merged (or otherwise closed) PR is terminal. Do
     # not attempt a merge; record success-shaped skip.
     if [[ "${pr_state}" == "MERGED" ]]; then
