@@ -48,3 +48,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `[bot]`, github-actions, dependabot, renovate, codecov) controls the filter.
   User config overrides the default array entirely (replace, not union). Covered
   by T02–T08 in `pr_comment_loop.bats`.
+
+- **REQ-000069 / #628**: PR-comment re-entry no longer counts `APPROVED` /
+  `DISMISSED` / `PENDING` reviews or `[bot]`-suffixed authors as actionable
+  comments. Fixes a miscount where 66 non-actionable review submissions on
+  REQ-000053's PR #627 spuriously drove the request back into the `code`
+  phase. Config surface unchanged.

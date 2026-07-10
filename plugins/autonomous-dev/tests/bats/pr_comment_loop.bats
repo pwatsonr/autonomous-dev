@@ -132,7 +132,7 @@ pr_view_open_with_comment() {
 # ===========================================================================
 
 @test "read_pr_comment_payload: merges issue comments, reviews, and thread comments" {
-    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[{"id":1,"body":"top-level","author":{"login":"alice"},"createdAt":"t1"}],"reviews":[{"id":2,"body":"review body","author":{"login":"bob"},"submittedAt":"t2"}]}'
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[{"id":1,"body":"top-level","author":{"login":"alice"},"createdAt":"t1"}],"reviews":[{"id":2,"state":"COMMENTED","body":"review body","author":{"login":"bob"},"submittedAt":"t2"}]}'
     export GH_API_JSON='[{"id":3,"body":"inline thread","user":{"login":"carol"},"created_at":"t3"}]'
 
     run read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7"
@@ -516,7 +516,8 @@ print(json.dumps({'state': 'OPEN', 'comments': comments}))
 @test "T08: filter respects config override — user array replaces defaults (not union)" {
     # Verify that a user config with pr_comment_non_actionable_authors=["me-bot"]
     # REPLACES the shipped defaults array entirely (jq -s '.[0] * .[1]' replace semantics).
-    # After load_config, "github-actions[bot]" (a default entry) must NOT be filtered.
+    # Note: github-actions[bot] is now ALWAYS filtered by the hard-coded is_bot predicate
+    # (endswith("[bot]")), regardless of PR_COMMENT_NON_ACTIONABLE_AUTHORS.
     cat > "$TEST_WORK_DIR/.claude/autonomous-dev.json" << 'EOF'
 {"daemon": {"pr_comment_non_actionable_authors": ["me-bot"]}}
 EOF
@@ -529,19 +530,223 @@ EOF
 
     # Verify filtering behaviour via pr_comment_new_ids directly:
     #   me-bot              -> filtered (in the user override list)
-    #   github-actions[bot] -> NOT filtered (no longer in the replaced list)
+    #   github-actions[bot] -> filtered (hard-coded is_bot: endswith("[bot]"))
     #   operator            -> NOT filtered
     PR_AUTHOR_LOGIN=""
     local payload
     payload='{"state":"OPEN","comments":[
-        {"id":"issue:1","body":"my comment","author":"me-bot"},
-        {"id":"issue:2","body":"CI check","author":"github-actions[bot]"},
-        {"id":"issue:3","body":"code review","author":"operator"}
+        {"id":"issue:1","body":"my comment","author":"me-bot","author_type":"User"},
+        {"id":"issue:2","body":"CI check","author":"github-actions[bot]","author_type":"Bot"},
+        {"id":"issue:3","body":"code review","author":"operator","author_type":"User"}
     ]}'
     run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
-    # Two comments pass through (issue:2 and issue:3); me-bot is filtered.
-    [ "$(echo "$output" | grep -c 'issue:')" -eq 2 ]
-    echo "$output" | grep -qxF "issue:2"
+    # Only operator passes through; me-bot is filtered by config, github-actions[bot] by is_bot.
+    [ "$(echo "$output" | grep -c 'issue:')" -eq 1 ]
     echo "$output" | grep -qxF "issue:3"
     ! echo "$output" | grep -qxF "issue:1"
+    ! echo "$output" | grep -qxF "issue:2"
+}
+
+# ===========================================================================
+# REQ-000069 / #628: review-state filter + bot suppression (TC-001 – TC-011)
+# ===========================================================================
+
+# ---- fixtures ----------------------------------------------------------------
+
+# Emit a JSON array of N review objects with state, author, and body.
+#   $1 = count (integer >= 1)
+#   $2 = state (e.g. "APPROVED", "COMMENTED")
+#   $3 = author login
+#   $4 = author __typename (e.g. "User", "Bot")
+#   $5 = base id (int); ids are $5, $5+1, ...
+_reviews_json() {
+    local n="$1" state="$2" author="$3" atype="$4" base="$5"
+    local i=0 first=1
+    printf '['
+    while (( i < n )); do
+        (( first )) || printf ','
+        first=0
+        printf '{"id":%d,"state":"%s","body":"noise","author":{"login":"%s","__typename":"%s"},"submittedAt":"t"}' \
+            "$(( base + i ))" "$state" "$author" "$atype"
+        (( i++ ))
+    done
+    printf ']'
+}
+
+# Merge review array + issue-comments array into a `pr view` JSON payload.
+_pr_view_json() {
+    local state="$1" comments="$2" reviews="$3"
+    printf '{"state":"%s","comments":%s,"reviews":%s}' "$state" "$comments" "$reviews"
+}
+
+# ---- TC-001 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-001 regression: 65 APPROVED + 1 CHANGES_REQUESTED + 1 thread -> 2 ids" {
+    # Mirrors the exact #628 miscount: 65 APPROVED reviews (no longer actionable)
+    # + 1 CHANGES_REQUESTED (actionable) + 1 thread comment (actionable) -> 2 ids.
+    local approved_reviews changes_review all_reviews
+    approved_reviews=$(_reviews_json 65 APPROVED bot-ci User 100)
+    changes_review='[{"id":999,"state":"CHANGES_REQUESTED","body":"please fix","author":{"login":"human1","__typename":"User"},"submittedAt":"t"}]'
+    all_reviews=$(printf '%s' "$approved_reviews" "$changes_review" | jq -s 'add')
+
+    export GH_PR_VIEW_JSON=$(_pr_view_json OPEN '[]' "$all_reviews")
+    export GH_API_JSON='[{"id":7,"body":"inline","user":{"login":"human2","type":"User"},"created_at":"t"}]'
+
+    local payload
+    payload=$(read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7")
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    [ "$status" -eq 0 ]
+    [ "$(echo "$output" | sort | tr '\n' ',')" = "review:999,thread:7," ]
+}
+
+# ---- TC-002 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-002 regression: 65 COMMENTED bot reviews + 1 human -> 1 id" {
+    # 65 COMMENTED reviews from a bot author are suppressed by is_bot; only the
+    # human review id remains.
+    local bot_reviews human_review all_reviews
+    bot_reviews=$(_reviews_json 65 COMMENTED "github-actions[bot]" Bot 200)
+    human_review='[{"id":9999,"state":"COMMENTED","body":"do X","author":{"login":"human1","__typename":"User"},"submittedAt":"t"}]'
+    all_reviews=$(printf '%s' "$bot_reviews" "$human_review" | jq -s 'add')
+
+    export GH_PR_VIEW_JSON=$(_pr_view_json OPEN '[]' "$all_reviews")
+    export GH_API_JSON='[]'
+
+    local payload
+    payload=$(read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7")
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    [ "$status" -eq 0 ]
+    [ "$output" = "review:9999" ]
+}
+
+# ---- TC-003 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-003 bot filtering: dependabot issue comment + claude thread -> 0 ids" {
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[{"id":1,"body":"bump","author":{"login":"dependabot[bot]","__typename":"Bot"},"createdAt":"t"}],"reviews":[]}'
+    export GH_API_JSON='[{"id":2,"body":"typo","user":{"login":"claude[bot]","type":"Bot"},"created_at":"t"}]'
+
+    local payload
+    payload=$(read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7")
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# ---- TC-004 ------------------------------------------------------------------
+
+@test "read_pr_comment_payload: TC-004 review state DISMISSED with body -> dropped" {
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[],"reviews":[{"id":1,"state":"DISMISSED","body":"was requested","author":{"login":"human1","__typename":"User"},"submittedAt":"t"}]}'
+    export GH_API_JSON='[]'
+    run read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7"
+    [ "$status" -eq 0 ]
+    [ "$(echo "$output" | jq -r '.comments | length')" = "0" ]
+}
+
+# ---- TC-005 ------------------------------------------------------------------
+
+@test "read_pr_comment_payload: TC-005 review state PENDING with body -> dropped" {
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[],"reviews":[{"id":2,"state":"PENDING","body":"draft feedback","author":{"login":"human1","__typename":"User"},"submittedAt":"t"}]}'
+    export GH_API_JSON='[]'
+    run read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7"
+    [ "$status" -eq 0 ]
+    [ "$(echo "$output" | jq -r '.comments | length')" = "0" ]
+}
+
+# ---- TC-006 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-006 login 'foo[bot]bar' (not suffixed) is NOT filtered" {
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[{"id":1,"body":"real","author":{"login":"foo[bot]bar","__typename":"User"},"createdAt":"t"}],"reviews":[]}'
+    export GH_API_JSON='[]'
+
+    local payload
+    payload=$(read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7")
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    [ "$status" -eq 0 ]
+    [ "$output" = "issue:1" ]
+}
+
+# ---- TC-007 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-007 existing substring filter preserved (cypress-ci)" {
+    export PR_COMMENT_NON_ACTIONABLE_AUTHORS='["cypress-ci"]'
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[{"id":1,"body":"noise","author":{"login":"cypress-ci-runner","__typename":"User"},"createdAt":"t"}],"reviews":[]}'
+    export GH_API_JSON='[]'
+
+    local payload
+    payload=$(read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7")
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+    unset PR_COMMENT_NON_ACTIONABLE_AUTHORS
+}
+
+# ---- TC-008 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-008 author_type==Bot with non-[bot]-suffixed login -> filtered" {
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[{"id":1,"body":"x","author":{"login":"weird-bot-no-suffix","__typename":"Bot"},"createdAt":"t"}],"reviews":[]}'
+    export GH_API_JSON='[]'
+
+    local payload
+    payload=$(read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7")
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/nope.json"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# ---- TC-009 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-009 seen file contains all bot IDs -> 0 new ids" {
+    echo '{"addressed_ids":["issue:1","thread:2"]}' > "$TEST_REQ_DIR/seen.json"
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[{"id":1,"body":"x","author":{"login":"dependabot[bot]","__typename":"Bot"},"createdAt":"t"}],"reviews":[]}'
+    export GH_API_JSON='[{"id":2,"body":"y","user":{"login":"claude[bot]","type":"Bot"},"created_at":"t"}]'
+
+    local payload
+    payload=$(read_pr_comment_payload "$TEST_PROJECT" "$TEST_REQUEST_ID" "https://github.com/o/r/pull/7")
+    run pr_comment_new_ids "$payload" "$TEST_REQ_DIR/seen.json"
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
+}
+
+# ---- TC-010 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-010 end-to-end: 66 APPROVED bot reviews do NOT increment reentries" {
+    # Direct #628 regression guard: maybe_reenter_for_pr_comments must NOT flip
+    # status/phase when all comments are non-actionable (APPROVED + bot).
+    seed_request "done" "pr_ready_for_human" "https://github.com/o/r/pull/7"
+
+    local bot_approved
+    bot_approved=$(_reviews_json 66 APPROVED "github-actions[bot]" Bot 300)
+    export GH_PR_VIEW_JSON=$(_pr_view_json OPEN '[]' "$bot_approved")
+    export GH_API_JSON='[]'
+
+    maybe_reenter_for_pr_comments "$TEST_REQUEST_ID" "$TEST_PROJECT" "$TEST_REQ_DIR/state.json"
+
+    # Status must NOT be flipped to running.
+    [ "$(jq -r '.status' "$TEST_REQ_DIR/state.json")" = "done" ]
+    # Phase must NOT be flipped to code.
+    [ "$(jq -r '.current_phase' "$TEST_REQ_DIR/state.json")" = "monitor" ]
+    # Reentry counter must NOT be incremented.
+    local reentries
+    reentries=$(jq -r '.reentries // 0' "$TEST_REQ_DIR/pr-comment-seen.json" 2>/dev/null || echo "0")
+    [ "$reentries" = "0" ]
+    # No pr_comment_reentry event must have been emitted.
+    [ ! -f "$TEST_REQ_DIR/events.jsonl" ] || \
+      [ "$(jq -s 'map(select(.event=="pr_comment_reentry")) | length' "$TEST_REQ_DIR/events.jsonl")" -eq 0 ]
+}
+
+# ---- TC-011 ------------------------------------------------------------------
+
+@test "pr_comment_new_ids: TC-011 single actionable CHANGES_REQUESTED review still triggers re-entry" {
+    # Non-regression sanity: the fix must NOT accidentally suppress all re-entries.
+    seed_request "done" "pr_ready_for_human" "https://github.com/o/r/pull/7"
+
+    export GH_PR_VIEW_JSON='{"state":"OPEN","comments":[],"reviews":[{"id":42,"state":"CHANGES_REQUESTED","body":"please rename the function","author":{"login":"human1","__typename":"User"},"submittedAt":"t"}]}'
+    export GH_API_JSON='[]'
+
+    maybe_reenter_for_pr_comments "$TEST_REQUEST_ID" "$TEST_PROJECT" "$TEST_REQ_DIR/state.json"
+
+    [ "$(jq -r '.current_phase' "$TEST_REQ_DIR/state.json")" = "code" ]
+    [ "$(jq -r '.status' "$TEST_REQ_DIR/state.json")" = "running" ]
+    [ "$(jq -r '.reentries' "$TEST_REQ_DIR/pr-comment-seen.json")" = "1" ]
+    [[ "$(jq -r '.current_phase_metadata.pr_comment_feedback' "$TEST_REQ_DIR/state.json")" == *"rename the function"* ]]
 }

@@ -4228,21 +4228,29 @@ read_pr_comment_payload() {
                | { id: ("issue:" + ((.id // .databaseId // "") | tostring)),
                    body: (.body // ""),
                    author: (.author.login // .user.login // ""),
+                   author_type: (.author.__typename // .user.type // ""),
                    ts: (.createdAt // "") } ]);
         def norm_reviews:
             ([ ($view.reviews // [])[]
+               # Only actionable review states — COMMENTED or CHANGES_REQUESTED.
+               # APPROVED, DISMISSED, and PENDING reviews carry no actionable
+               # feedback and are dropped. A missing .state is treated as unknown
+               # and dropped (fail-closed).
+               | select((.state // "") | . == "COMMENTED" or . == "CHANGES_REQUESTED")
                # Skip empty-body review submissions (e.g. a bare APPROVE) —
                # they carry no actionable feedback.
                | select((.body // "") != "")
                | { id: ("review:" + ((.id // .databaseId // "") | tostring)),
                    body: (.body // ""),
                    author: (.author.login // .user.login // ""),
+                   author_type: (.author.__typename // .user.type // ""),
                    ts: (.submittedAt // .createdAt // "") } ]);
         def norm_thread:
             ([ ($api // [])[]
                | { id: ("thread:" + ((.id // .databaseId // "") | tostring)),
                    body: (.body // ""),
                    author: (.user.login // .author.login // ""),
+                   author_type: (.user.type // .author.__typename // ""),
                    ts: (.created_at // .createdAt // "") } ]);
         { state: $state,
           comments: (norm_view_comments + norm_reviews + norm_thread) }
@@ -4254,6 +4262,8 @@ read_pr_comment_payload() {
 #   comments that have NOT yet been addressed AND are from actionable authors.
 #   The seen file's .addressed_ids[] is the source of truth; anything already
 #   there is dropped first. Then non-actionable authors are filtered:
+#   - Bot authors: any author whose login ends in the literal "[bot]" suffix OR
+#     whose author_type equals "Bot" is always suppressed (hard-coded, always on).
 #   - Self-comments (author.login == PR_AUTHOR_LOGIN) are excluded when
 #     PR_AUTHOR_LOGIN is set and non-empty.
 #   - Comments from authors matching any substring in
@@ -4271,14 +4281,18 @@ pr_comment_new_ids() {
         --argjson nonact "${PR_COMMENT_NON_ACTIONABLE_AUTHORS:-[]}" \
         --arg author "${PR_AUTHOR_LOGIN:-}" \
         '
-        def is_non_actionable($login):
-            (($author != "") and ($login == $author))
+        def is_bot($login; $type):
+            (($type // "") == "Bot")
+            or (($login // "") | endswith("[bot]"));
+        def is_non_actionable($login; $type):
+            is_bot($login; $type)
+            or (($author != "") and ($login == $author))
             or any($nonact[]; . as $n
                               | ($n | ascii_downcase) as $needle
                               | (($login // "") | ascii_downcase) | contains($needle));
         [ (.comments // [])[]
           | select((.id as $i | ($seen | index($i)) | not))
-          | select(is_non_actionable(.author) | not)
+          | select(is_non_actionable(.author; .author_type) | not)
           | .id
         ] | .[]
         ' 2>/dev/null || true
