@@ -1,6 +1,6 @@
 ---
 name: deploy-executor
-version: "1.0.0"
+version: "1.1.0"
 role: executor
 model: "claude-sonnet-4-6"
 temperature: 0.2
