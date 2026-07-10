@@ -54,3 +54,30 @@ _commit() { git -C "$PROJ" add -A; git -C "$PROJ" commit -qm change; }
     echo "x" > "$PROJ/plugins/autonomous-dev/intake/handlers/new_helper.ts"; _commit
     run check_code_scope_adherence "$RID" "$PROJ"; [ "$status" -eq 0 ]
 }
+
+# --- remote-ref path: exercises diff_base=origin/<base> + the in-check fetch ---
+# Give PROJ an origin (bare) with main + the branch pushed, so origin/main
+# resolves and the check diffs against it (not the local base).
+_add_origin() {
+    REM="$TEST_WORK_DIR/rem.git"; git init -q --bare "$REM"
+    git -C "$PROJ" remote add origin "$REM"
+    git -C "$PROJ" push -q origin \
+        "refs/heads/main:refs/heads/main" \
+        "refs/heads/autonomous/$RID:refs/heads/autonomous/$RID"
+    git -C "$PROJ" fetch -q origin
+}
+
+@test "SC-06 REMOTE path ON-SCOPE: origin/main base, branch touches a spec-named file → 0" {
+    echo "Implement plugins/autonomous-dev/intake/handlers/cancel_finalizer.ts" > "$PROJ/docs/specs/$RID-spec.md"
+    echo "x" > "$PROJ/plugins/autonomous-dev/intake/handlers/cancel_finalizer.ts"; _commit
+    _add_origin
+    run check_code_scope_adherence "$RID" "$PROJ"; [ "$status" -eq 0 ]
+}
+
+@test "SC-07 REMOTE path OFF-SCOPE: origin/main base, branch touches only non-spec files → 1" {
+    echo "Implement plugins/autonomous-dev/intake/handlers/cancel_finalizer.ts" > "$PROJ/docs/specs/$RID-spec.md"
+    mkdir -p "$PROJ/plugins/autonomous-dev-portal/server/routes"
+    echo "x" > "$PROJ/plugins/autonomous-dev-portal/server/routes/homelab.ts"; _commit
+    _add_origin
+    run check_code_scope_adherence "$RID" "$PROJ"; [ "$status" -eq 1 ]
+}
