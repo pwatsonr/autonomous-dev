@@ -18,13 +18,7 @@
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -98,6 +92,13 @@ export function loadDeployKey(opts: LoadDeployKeyOptions = {}): Buffer {
 /**
  * Canonical JSON of every record field except `hmac`. Public so tests
  * can pin known input → known output and detect formatter drift.
+ *
+ * Issue #665: `targetId`, `location`, and `node` are included in the
+ * signed payload so tampering with them after signing is detected.
+ * Undefined optional fields are included as `null` in the canonical form
+ * to keep the payload deterministic regardless of whether the fields are
+ * present or absent (avoids ambiguity between `undefined` and `null` at
+ * the serialization boundary).
  */
 export function canonicalJson(record: Omit<DeploymentRecord, 'hmac'>): string {
   return canonicalJSON({
@@ -108,6 +109,9 @@ export function canonicalJson(record: Omit<DeploymentRecord, 'hmac'>): string {
     deployedAt: record.deployedAt,
     status: record.status,
     details: record.details,
+    targetId: record.targetId ?? null,
+    location: record.location ?? null,
+    node: record.node ?? null,
   });
 }
 
@@ -115,10 +119,7 @@ export function canonicalJson(record: Omit<DeploymentRecord, 'hmac'>): string {
  * Sign `record` with HMAC-SHA256. Returns a NEW record (does not mutate
  * the input) with `hmac` set to a 64-char lowercase hex string.
  */
-export function signDeploymentRecord(
-  record: DeploymentRecord,
-  key?: Buffer,
-): DeploymentRecord {
+export function signDeploymentRecord(record: DeploymentRecord, key?: Buffer): DeploymentRecord {
   const k = key ?? loadDeployKey();
   const body = canonicalJson(record);
   const hmac = createHmac('sha256', k).update(body).digest('hex');
@@ -164,7 +165,9 @@ export function verifyDeploymentRecord(
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return {
       valid: false,
-      error: new Error('hmac mismatch: record has been tampered with or signed with a different key'),
+      error: new Error(
+        'hmac mismatch: record has been tampered with or signed with a different key',
+      ),
     };
   }
   return { valid: true };
