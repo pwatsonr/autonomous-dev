@@ -14,9 +14,19 @@
  * @module intake/deploy/types
  */
 
+// RecordSafeBinding is imported here for the optional secretBindings field
+// on DeploymentRecord (issue #667). We cannot import from secret-binding.ts
+// directly due to circular-dep risk (secret-binding imports credential-proxy-types,
+// which is fine). The import is type-only so there is no runtime cost.
+import type { RecordSafeBinding } from './secret-binding';
+
 /**
  * Capabilities a backend can declare. Adding a new capability requires
  * widening this union and updating every backend's metadata.
+ *
+ * `stateful` — declares that deployments to this target carry persistent
+ * state (databases, volumes) and must satisfy the backup precondition
+ * check before proceeding (issue #666).
  */
 export type BackendCapability =
   | 'github-pr'
@@ -27,7 +37,8 @@ export type BackendCapability =
   | 'gcp-cloud-run'
   | 'aws-ecs-fargate'
   | 'azure-container-apps'
-  | 'k8s-kubectl-apply';
+  | 'k8s-kubectl-apply'
+  | 'stateful';
 
 /** Static metadata describing a backend at registration time. */
 export interface BackendMetadata {
@@ -93,6 +104,13 @@ export interface BuildContext {
 /**
  * Output of `DeploymentBackend.deploy()`. Persisted with an HMAC-SHA256
  * signature so rollback can verify integrity (see `record-signer.ts`).
+ *
+ * Fields added in issue #665 (daemon handoff):
+ *   - `targetId`  — opaque target id from `ResolvedTarget.target.id` (audit/correlation only).
+ *   - `location`  — dispatch path: `'cloud'` or `'homelab'`.
+ *   - `node`      — node within the topology; never a hard-coded name (invariant #674).
+ * All three are optional for backward compatibility with existing records.
+ * They are included in the HMAC-signed payload so tampering is detected.
  */
 export interface DeploymentRecord {
   /** ULID identifier for the deploy event. */
@@ -109,6 +127,31 @@ export interface DeploymentRecord {
   status: 'deployed' | 'failed' | 'rolled-back';
   /** Backend-specific details (e.g., `pr_url`, `container_id`). */
   details: Record<string, string | number | boolean>;
+  /**
+   * Opaque target id from `ResolvedTarget.target.id` (issue #665).
+   * Included in HMAC payload. For audit/correlation only — not used for branching.
+   */
+  targetId?: string;
+  /**
+   * Dispatch path used for this deploy: `'cloud'` or `'homelab'` (issue #665).
+   * Included in HMAC payload.
+   */
+  location?: 'cloud' | 'homelab';
+  /**
+   * Node within the topology that received this deploy (issue #665).
+   * Never a hard-coded name — sourced from the resolved target's tags (invariant #674).
+   * Included in HMAC payload.
+   */
+  node?: string;
+  /**
+   * Record-safe secret bindings (issue #667).
+   *
+   * Contains only `refHash` (SHA-256 hex of the credentialRef), `injectAs`,
+   * and `name`. Secret material and raw credential refs are NEVER stored here.
+   * Populated by `toRecordSafeBindings()` in the orchestrator after JIT resolution.
+   * Absent when no `secretBindings` were declared in the deploy request.
+   */
+  secretBindings?: RecordSafeBinding[];
   /**
    * Lowercase-hex HMAC-SHA256 over the canonical JSON of every other
    * field. EMPTY string before `signDeploymentRecord` is invoked.
