@@ -305,6 +305,42 @@ The cred-proxy will set the projected token's `expirationSeconds` to match `defa
 
 For deep coverage of the TokenRequest projection, audience-binding, and bound-service-account-token-volume semantics, see **TDD-024 §8 cred-proxy-scoper-k8s**. This runbook intentionally keeps K8s coverage shallow per TDD-025 NG-07.
 
+#### Audiences and `--api-audiences`
+
+The `K8sScoperConfig` interface exposes an optional `tokenAudiences?: readonly string[]` field that is forwarded verbatim to `TokenRequest.spec.audiences` when set.
+
+**Default behavior.** When `tokenAudiences` is unset or empty, the field is dropped from the `TokenRequest` body entirely. The API server then issues a token bound to its own default audience — this is always authenticable against the issuing cluster without any additional configuration. This is the correct default for kind, EKS, GKE, AKS, and kubeadm clusters with stock settings.
+
+**Opt-in hardening.** Set `tokenAudiences` to bind tokens to specific audiences and restore cross-cluster replay resistance:
+
+```ts
+// Default — works against any conformant cluster including kind.
+new K8sCredentialScoper(
+  { adminKubeconfigPath: '/etc/cred-proxy/admin.kubeconfig' },
+  clients,
+);
+
+// Hardened — only works when the target API server is booted with
+// --api-audiences=https://cred-proxy.internal,...
+new K8sCredentialScoper(
+  {
+    adminKubeconfigPath: '/etc/cred-proxy/admin.kubeconfig',
+    tokenAudiences: ['https://cred-proxy.internal'],
+  },
+  clients,
+);
+```
+
+**Requires** that the target cluster's `kube-apiserver` is started with `--api-audiences=<audience-1>,...` including every value in `tokenAudiences`. If the audience does not match, the API server rejects the token with **401**.
+
+**Migration note:**
+
+- Before this change, the scoper set `audiences: [cluster.server]` unconditionally. In practice this failed authentication on default kind / EKS / GKE / AKS clusters because their apiservers do not advertise the cluster URL as a valid audience.
+- After this change, the default token's `aud` JWT claim is the API server's default audience, not the cluster URL. Audit-log consumers that grep for the cluster URL in the `aud` claim must be updated to grep for the API server's default audience string, or must set `tokenAudiences` explicitly to restore the prior claim value (and configure `--api-audiences` accordingly).
+- Downstream 401s after upgrade are almost always audience-mismatch: verify the target cluster's `kube-apiserver --api-audiences` flag matches your configured `tokenAudiences`.
+
+The `tokenAudiences` field is documented in `K8sScoperConfig` in `intake/cred-proxy/scopers/k8s.ts`. Per-field config guide enumeration for the k8s scoper (including `tokenAudiences`) is a follow-up item.
+
 ---
 
 ## 4. Common failures
