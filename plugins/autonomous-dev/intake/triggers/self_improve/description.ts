@@ -197,7 +197,11 @@ export function buildSubmitPayload(
 
   const constraintsSection =
     '## Constraints\n\n' +
-    '- Human merge required — this PR will not auto-merge.\n' +
+    // NB: self-improve PRs AUTO-MERGE when CI is green at the repo's trust level
+    // (operator policy). Do NOT claim "human merge required" here — the merge
+    // decision does not honor it, and stamping a false constraint made the
+    // system say one thing and do another. Keep the change minimal + reversible.
+    '- Auto-merges when CI is green at the repo trust level; keep the change minimal and reversible.\n' +
     '- Follow existing test conventions.\n' +
     '- No changes outside the failing scope unless justified.';
 
