@@ -27,7 +27,8 @@ interface FakeState {
     ns: string;
     sa: string;
     expirationSeconds: number;
-    audiences: string[];
+    audiences?: string[];
+    hasAudiencesKey: boolean;
   }>;
   /** Force the Nth delete (1-indexed across binding/role/SA order) to reject. */
   rejectDeletes: { binding?: unknown; role?: unknown; sa?: unknown };
@@ -105,6 +106,7 @@ function makeClients(clusters: Record<string, K8sClusterInfo>): {
         sa,
         expirationSeconds: body.spec.expirationSeconds,
         audiences: body.spec.audiences,
+        hasAudiencesKey: Object.prototype.hasOwnProperty.call(body.spec, 'audiences'),
       });
       const status = state.tokenResponse;
       return state.bodyShape === 'body' ? { body: { status } } : { status };
@@ -176,7 +178,8 @@ describe('K8sCredentialScoper.scope', () => {
         ns: 'app-ns',
         sa: 'cred-proxy-deploy-abcd1234',
         expirationSeconds: 900,
-        audiences: ['https://api.k8s.example:6443'],
+        audiences: undefined,
+        hasAudiencesKey: false,
       },
     ]);
     expect(out.expires_at).toBe('2030-01-01T00:00:00.000Z');
@@ -285,5 +288,59 @@ describe('K8sCredentialScoper.scope', () => {
     const scoper = new K8sCredentialScoper(cfg, clients);
     expect(scoper.provider).toBe('k8s');
     expect(typeof scoper.scope).toBe('function');
+  });
+
+  // TC-002 — audiences omitted when tokenAudiences is unset
+  it('omits audiences key from TokenRequest when tokenAudiences is unset', async () => {
+    const { clients, state } = makeClients({ c1: CLUSTER });
+    const scoper = new K8sCredentialScoper(
+      { adminKubeconfigPath: '/dev/null' },
+      clients,
+      () => 'abcd1234',
+    );
+    await scoper.scope('deploy', SCOPE);
+    expect(state.tokenRequests).toHaveLength(1);
+    expect(state.tokenRequests[0].hasAudiencesKey).toBe(false);
+    expect(state.tokenRequests[0].audiences).toBeUndefined();
+  });
+
+  // TC-003 — audiences omitted when tokenAudiences === []
+  it('omits audiences key from TokenRequest when tokenAudiences is []', async () => {
+    const { clients, state } = makeClients({ c1: CLUSTER });
+    const scoper = new K8sCredentialScoper(
+      { adminKubeconfigPath: '/dev/null', tokenAudiences: [] },
+      clients,
+      () => 'abcd1234',
+    );
+    await scoper.scope('deploy', SCOPE);
+    expect(state.tokenRequests[0].hasAudiencesKey).toBe(false);
+    expect(state.tokenRequests[0].audiences).toBeUndefined();
+  });
+
+  // TC-004 — audiences present when tokenAudiences: ['x']
+  it('includes audiences in TokenRequest when tokenAudiences is set', async () => {
+    const { clients, state } = makeClients({ c1: CLUSTER });
+    const scoper = new K8sCredentialScoper(
+      { adminKubeconfigPath: '/dev/null', tokenAudiences: ['x'] },
+      clients,
+      () => 'abcd1234',
+    );
+    await scoper.scope('deploy', SCOPE);
+    expect(state.tokenRequests[0].hasAudiencesKey).toBe(true);
+    expect(state.tokenRequests[0].audiences).toEqual(['x']);
+  });
+
+  // TC-005 — audiences are a defensive copy (not the caller's reference)
+  it('uses a defensive copy of tokenAudiences so post-construction mutation does not affect the issued token', async () => {
+    const { clients, state } = makeClients({ c1: CLUSTER });
+    const auds: string[] = ['x'];
+    const scoper = new K8sCredentialScoper(
+      { adminKubeconfigPath: '/dev/null', tokenAudiences: auds },
+      clients,
+      () => 'abcd1234',
+    );
+    await scoper.scope('deploy', SCOPE);
+    auds.push('y'); // mutate after issuance
+    expect(state.tokenRequests[0].audiences).toEqual(['x']);
   });
 });

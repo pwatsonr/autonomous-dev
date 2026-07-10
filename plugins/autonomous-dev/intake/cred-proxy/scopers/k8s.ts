@@ -5,9 +5,12 @@
  * Each `scope()` call produces a complete kubeconfig (server URL + CA +
  * bearer token) bound to a per-issuance ServiceAccount in a single
  * namespace, governed by a Role with the operation's `PolicyRules`. The
- * token has a hard `expirationSeconds: 900` and is audience-bound to
- * `cluster.server` so a leaked token cannot be replayed against a
- * different cluster sharing the same OIDC issuer.
+ * token has a hard `expirationSeconds: 900`. By default the `audiences`
+ * field is omitted from the `TokenRequest` so the API server issues a
+ * token bound to its own default audience (authenticable on any conformant
+ * cluster). Set `K8sScoperConfig.tokenAudiences` to bind to a specific
+ * audience for cross-cluster replay resistance (requires the target
+ * cluster's `kube-apiserver --api-audiences` to include that audience).
  *
  * `revoke()` deletes the RoleBinding, Role, and ServiceAccount in
  * reverse-creation order. Each delete is best-effort idempotent (404 is
@@ -31,6 +34,17 @@ import { buildKubeconfig } from './kubeconfig-builder';
 export interface K8sScoperConfig {
   /** Path to the daemon's admin kubeconfig used to issue scoped credentials. */
   readonly adminKubeconfigPath: string;
+  /**
+   * Optional audience list passed to `TokenRequest.spec.audiences`.
+   * Omitted or empty ⇒ the field is dropped from the request and the API
+   * server issues a token bound to its default audience (guaranteed
+   * authenticable against the issuing cluster).
+   *
+   * Set this to a list matching the target API server's `--api-audiences`
+   * flag(s) to preserve cross-cluster replay resistance. If the audience
+   * does not match, the API server rejects the token with 401.
+   */
+  readonly tokenAudiences?: readonly string[];
 }
 
 /** Cluster identity discovered from the admin kubeconfig. */
@@ -90,7 +104,7 @@ export interface AuthV1Like {
     body: {
       apiVersion: 'authentication.k8s.io/v1';
       kind: 'TokenRequest';
-      spec: { expirationSeconds: number; audiences: string[] };
+      spec: { expirationSeconds: number; audiences?: string[] };
     },
   ): Promise<{
     body?: {
@@ -118,9 +132,7 @@ export class K8sCredentialScoper implements CredentialScoper {
     private readonly clients: K8sClients,
     /** Injectable for deterministic-name tests. */
     private readonly tagGen: () => string = () => randomBytes(4).toString('hex'),
-  ) {
-    void this._cfg;
-  }
+  ) {}
 
   async scope(operation: string, scope: Scope) {
     const spec = K8S_OPERATIONS[operation];
@@ -171,14 +183,23 @@ export class K8sCredentialScoper implements CredentialScoper {
       },
     });
 
-    // 4. TokenRequest with 900-second expiration and audience binding.
+    // 4. TokenRequest with 900-second expiration and optional audience binding.
+    //    Audiences default to omitted so the API server issues a token bound to
+    //    its own default audience (works against stock kind / EKS / GKE / AKS /
+    //    kubeadm). Operators who have set `--api-audiences` on the target
+    //    cluster can restore anti-replay binding via `cfg.tokenAudiences`.
+    const audiences = this._cfg.tokenAudiences ?? [];
+    const tokenSpec: { expirationSeconds: number; audiences?: string[] } = {
+      expirationSeconds: 900,
+    };
+    if (audiences.length > 0) tokenSpec.audiences = [...audiences];
     const tokenResp = await this.clients.auth.createServiceAccountToken(
       ns,
       saName,
       {
         apiVersion: 'authentication.k8s.io/v1',
         kind: 'TokenRequest',
-        spec: { expirationSeconds: 900, audiences: [cluster.server] },
+        spec: tokenSpec,
       },
     );
     const status =
