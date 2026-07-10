@@ -4604,10 +4604,26 @@ check_code_scope_adherence() {
     local base; base="$(detect_default_branch "${project}" 2>/dev/null)"
     [[ -n "${base}" ]] || base="main"
 
+    # Refresh the base ref before diffing. This gate runs BEFORE the rebase/fetch
+    # gate in merge_decision, so origin/<base> can be STALE here; a stale base
+    # yields a polluted diff that can FALSE-POSITIVE as off-scope and wrongly
+    # withhold a legitimate merge (observed on REQ-000068/#704, whose diff plainly
+    # matched its spec yet was flagged off-scope). Best-effort — a network failure
+    # just leaves the current ref.
+    ( cd "${project}" 2>/dev/null && git fetch --quiet origin "${base}" 2>/dev/null ) || true
+
+    # Diff base: prefer the (now-refreshed) remote-tracking ref when it exists,
+    # else the local branch (repos without a remote — e.g. unit tests). Do NOT
+    # chain `origin/<base>...<branch> || <base>...<branch>`: falling back to a
+    # stale LOCAL base is exactly what polluted the diff. When origin/<base>
+    # exists but the diff can't be computed, fail OPEN (return on-scope) rather
+    # than withhold a merge on an unreliable diff — this gate is defense-in-depth.
+    local diff_base="${base}"
+    if ( cd "${project}" 2>/dev/null && git rev-parse --verify --quiet "origin/${base}" >/dev/null 2>&1 ); then
+        diff_base="origin/${base}"
+    fi
     local changed
-    changed=$( (cd "${project}" 2>/dev/null &&
-        { git diff --name-only "origin/${base}...${branch}" 2>/dev/null \
-          || git diff --name-only "${base}...${branch}" 2>/dev/null; }) || echo "" )
+    changed=$( (cd "${project}" 2>/dev/null && git diff --name-only "${diff_base}...${branch}" 2>/dev/null) || echo "" )
     [[ -n "${changed}" ]] || return 0
 
     local docs
@@ -4636,6 +4652,12 @@ check_code_scope_adherence() {
 
     [[ ${considered} -eq 0 ]] && return 0
     [[ ${hit} -eq 1 ]] && return 0
+    # Off-scope. Log the inputs so the decision is debuggable — a false-positive
+    # here wrongly withholds a merge, and post-hoc the branch/base refs are gone
+    # (this is why REQ-000068/#704's off-scope call could not be reproduced).
+    if declare -F log_warn >/dev/null 2>&1; then
+        log_warn "code-scope adherence OFF-SCOPE: ${request_id} diff_base=${diff_base} considered=${considered} hit=0 changed=[$(printf '%s' "${changed}" | tr '\n' ',' | cut -c1-300)]"
+    fi
     return 1
 }
 
