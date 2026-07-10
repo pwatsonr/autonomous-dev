@@ -49,6 +49,7 @@ readonly REVISE_REQUESTS_DIR="${AUTONOMOUS_DEV_STATE_DIR:-${HOME}/.autonomous-de
 
 POLL_INTERVAL=30
 CIRCUIT_BREAKER_THRESHOLD=3
+STUCK_RESELECTION_THRESHOLD=3
 HEARTBEAT_INTERVAL=30
 IDLE_BACKOFF_MAX=900
 GRACEFUL_SHUTDOWN_TIMEOUT=300
@@ -519,6 +520,41 @@ restore_interrupted_session() {
         return 0
     fi
 
+    # ── NEW (REQ-000070 Fix B): reconcile with authoritative lifecycle status ──
+    # If the on-disk state.json already has a terminal/paused status set by the
+    # operator (e.g. via `request pause`), refuse to overwrite it with a stale
+    # checkpoint. This prevents a paused request from being silently re-activated
+    # by sleep/wake recovery.
+    if [[ -f "${state_file}" ]] && jq empty "${state_file}" 2>/dev/null; then
+        local current_status
+        current_status=$(jq -r '.status // ""' "${state_file}" 2>/dev/null || echo "")
+        case "${current_status}" in
+            paused|cancelled|failed)
+                log_info "restore_interrupted_session: refusing to restore over lifecycle status '${current_status}' for ${request_id} (REQ-000070 Fix B). Clearing session_active in place."
+                local tmp="${state_file}.tmp.$$"
+                if jq '.current_phase_metadata.session_active = false' "${state_file}" > "${tmp}" 2>/dev/null; then
+                    mv "${tmp}" "${state_file}"
+                else
+                    rm -f "${tmp}" 2>/dev/null || true
+                fi
+                local ts
+                ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+                jq -cn --arg ts "${ts}" \
+                       --arg req "${request_id}" \
+                       --arg st "${current_status}" \
+                       '{timestamp: $ts,
+                         type: "session_interrupted",
+                         request_id: $req,
+                         details: {
+                             recovery_action: "skipped_restore_lifecycle_status",
+                             lifecycle_status: $st
+                         }}' >> "${events_file}"
+                return 0
+                ;;
+            *) ;;  # active / running / queued — fall through to checkpoint restore
+        esac
+    fi
+
     # Restore from checkpoint if available
     if [[ -f "${checkpoint_file}" ]]; then
         if jq empty "${checkpoint_file}" 2>/dev/null; then
@@ -809,6 +845,7 @@ load_config() {
     # 4. Populate shell variables from effective config
     POLL_INTERVAL=$(jq -r '.daemon.poll_interval_seconds // 30' "${EFFECTIVE_CONFIG}")
     CIRCUIT_BREAKER_THRESHOLD=$(jq -r '.daemon.circuit_breaker_threshold // 3' "${EFFECTIVE_CONFIG}")
+    STUCK_RESELECTION_THRESHOLD=$(jq -r '.daemon.stuck_reselection_threshold // 3' "${EFFECTIVE_CONFIG}")
     HEARTBEAT_INTERVAL=$(jq -r '.daemon.heartbeat_interval_seconds // 30' "${EFFECTIVE_CONFIG}")
     IDLE_BACKOFF_MAX=$(jq -r '.daemon.idle_backoff_max_seconds // 900' "${EFFECTIVE_CONFIG}")
     GRACEFUL_SHUTDOWN_TIMEOUT=$(jq -r '.daemon.graceful_shutdown_timeout_seconds // 300' "${EFFECTIVE_CONFIG}")
@@ -839,7 +876,7 @@ load_config() {
     IDLE_BACKOFF_BASE=${POLL_INTERVAL}
 
     # 6. Log effective config summary
-    log_info "Config loaded: poll_interval=${POLL_INTERVAL}s, circuit_breaker_threshold=${CIRCUIT_BREAKER_THRESHOLD}, heartbeat_interval=${HEARTBEAT_INTERVAL}s"
+    log_info "Config loaded: poll_interval=${POLL_INTERVAL}s, circuit_breaker_threshold=${CIRCUIT_BREAKER_THRESHOLD}, heartbeat_interval=${HEARTBEAT_INTERVAL}s, stuck_reselection_threshold=${STUCK_RESELECTION_THRESHOLD}"
 }
 
 # cleanup_effective_config() -> void
@@ -1706,6 +1743,94 @@ record_soft_timeout() {
     return 0
 }
 
+###############################################################################
+# REQ-000070: Wedge Detection (Fix A)
+# _stuck_reselection_check detects requests repeatedly selected in the same
+# phase with no progress (e.g. after sleep/wake restarts) and escalates them
+# to paused before any session is spawned.
+###############################################################################
+
+# _stuck_reselection_check(state_file: string, request_id: string,
+#                          project: string) -> stdout("ok"|"escalated") / rc(0)
+#
+# Bumps or resets .current_phase_metadata.stuck_selection_count based on
+# whether (current_phase, phase_started_at) changed since the last dispatch.
+# Escalates to paused + records a crash + emits an alert when the count
+# exceeds ${STUCK_RESELECTION_THRESHOLD}.
+#
+# Stdout: "ok" (proceed) or "escalated" (do not dispatch).
+# Exit code: always 0 (fail-open). REQ-000070 Fix A.
+_stuck_reselection_check() {
+    local state_file="$1"
+    local request_id="$2"
+    local project="$3"
+
+    # Opt-out: 0 disables the check entirely.
+    local threshold="${STUCK_RESELECTION_THRESHOLD:-3}"
+    if [[ "${threshold}" -le 0 ]]; then
+        echo "ok"
+        return 0
+    fi
+
+    # Guard: if the state file cannot be parsed, fail-open.
+    if ! jq empty "${state_file}" 2>/dev/null; then
+        echo "ok"
+        return 0
+    fi
+
+    local current_phase phase_started_at prev_phase prev_started prev_count
+    if ! IFS=$'\t' read -r current_phase phase_started_at prev_phase prev_started prev_count < <(
+        jq -r '[
+            (.current_phase // ""),
+            (.phase_started_at // ""),
+            (.current_phase_metadata.last_dispatch_phase // ""),
+            (.current_phase_metadata.last_dispatch_phase_started_at // ""),
+            (.current_phase_metadata.stuck_selection_count // 0)
+        ] | @tsv' "${state_file}" 2>/dev/null || true
+    ); then
+        echo "ok"
+        return 0
+    fi
+
+    # Determine next_count.
+    local next_count
+    if [[ -n "${current_phase}" \
+          && "${prev_phase}"   == "${current_phase}" \
+          && "${prev_started}" == "${phase_started_at}" ]]; then
+        next_count=$(( prev_count + 1 ))
+    else
+        next_count=1
+    fi
+
+    # Persist counters BEFORE any escalation decision.
+    local tmp="${state_file}.tmp.$$"
+    if jq --arg cp "${current_phase}" \
+          --arg cs "${phase_started_at}" \
+          --argjson n "${next_count}" \
+          '.current_phase_metadata.last_dispatch_phase              = $cp |
+           .current_phase_metadata.last_dispatch_phase_started_at   = $cs |
+           .current_phase_metadata.stuck_selection_count            = $n' \
+          "${state_file}" > "${tmp}" 2>/dev/null; then
+        mv "${tmp}" "${state_file}"
+    else
+        rm -f "${tmp}" 2>/dev/null || true
+        log_warn "_stuck_reselection_check: failed to persist counters for ${request_id}"
+    fi
+
+    if (( next_count > threshold )); then
+        log_error "Wedge detected for ${request_id}: phase=${current_phase} re-selected ${next_count}x with unchanged phase_started_at (threshold=${threshold}). Escalating to paused."
+        emit_alert "wedged_request" \
+            "Request ${request_id} wedged in phase '${current_phase}' for ${next_count} consecutive dispatches (threshold=${threshold}). Escalating to paused."
+        escalate_to_paused "${request_id}" "${project}" "${current_phase}" "${next_count}"
+        record_crash "${request_id}" "wedge"
+        echo "escalated"
+        return 0
+    fi
+
+    echo "ok"
+    return 0
+}
+
 # dispatch_phase_session(request_id: string, project: string) -> string
 #   Validates request, resolves agent for current phase, and dispatches session
 #   via spawn_session_typed with per-phase timeout. Handles errors gracefully.
@@ -1774,6 +1899,15 @@ dispatch_phase_session() {
         log_warn "No agent for phase '${phase}'; skipping"
         echo "3|0|"
         return 3
+    fi
+
+    # ── NEW (REQ-000070 Fix A): wedge detection prior to session commit ──
+    local _sr
+    _sr=$(_stuck_reselection_check "${state_file}" "${request_id}" "${project}")
+    if [[ "${_sr}" == "escalated" ]]; then
+        log_info "dispatch_phase_session: request ${request_id} escalated to paused by wedge detection; not spawning session."
+        echo "0|0|"
+        return 0
     fi
 
     # Mark session as active and set dispatch timestamp
