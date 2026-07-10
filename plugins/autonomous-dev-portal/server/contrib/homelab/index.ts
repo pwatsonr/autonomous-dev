@@ -1317,6 +1317,153 @@ async function runHomelabCli(
 }
 
 /**
+ * Spawn the homelab plugin CLI with data written to stdin, then close stdin.
+ *
+ * Used by `runAutofixApply` to pipe `CONFIRM\n` to `autofix apply` so the
+ * CLI does not prompt interactively — the portal typed-CONFIRM gate IS the
+ * human confirmation, so the subprocess must not double-prompt.
+ *
+ * Does NOT throw — returns a result object matching `runHomelabCli`.
+ *
+ * @param args      CLI arguments after the binary path.
+ * @param stdin     Data to write to the subprocess stdin (then closes the pipe).
+ * @param vaultToken  Optional VAULT_TOKEN override (from action metadata).
+ */
+async function runHomelabCliWithStdin(
+  args: string[],
+  stdin: string,
+  vaultToken?: string,
+): Promise<{ ok: boolean; stdout: string; stderr: string; exitCode: number }> {
+  const pluginPath = getPluginPath();
+  const token = vaultToken ?? process.env["VAULT_TOKEN"] ?? "";
+
+  return new Promise((resolve) => {
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...(token.length > 0 ? { VAULT_TOKEN: token } : {}),
+    };
+
+    let stdout = "";
+    let stderr = "";
+
+    const child = spawn("node", [pluginPath, ...args], {
+      env,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("close", (code: number | null) => {
+      const exitCode = code ?? 1;
+      resolve({ ok: exitCode === 0, stdout, stderr, exitCode });
+    });
+
+    child.on("error", (err: Error) => {
+      resolve({ ok: false, stdout, stderr: err.message, exitCode: 1 });
+    });
+
+    // Write the confirmation data and close stdin so the CLI does not block
+    // waiting for further input (do not double-prompt).
+    child.stdin.write(stdin, "utf8");
+    child.stdin.end();
+  });
+}
+
+/**
+ * Run `autofix apply <proposalId>` after first running `autofix propose <obsId>`.
+ *
+ * This is the REAL mutation path (#681): the portal typed-CONFIRM gate IS
+ * the human confirmation, so `CONFIRM\n` is piped on stdin to satisfy the CLI
+ * without double-prompting the operator.
+ *
+ * Steps:
+ *   1. `autofix propose <obsId> --json`  → extract proposalId from JSON output.
+ *   2. `autofix apply <proposalId>` with `CONFIRM\n` on stdin.
+ *
+ * When step 1 fails (non-zero exit), step 2 is NOT attempted and the propose
+ * failure is returned immediately (stage: "propose").
+ *
+ * Does NOT throw — returns a structured result for the action handler.
+ *
+ * @param obsId      Observation id (from `observation_id` request body field).
+ * @param vaultToken Optional VAULT_TOKEN override (from action metadata).
+ */
+export async function runAutofixApply(
+  obsId: string,
+  vaultToken?: string,
+): Promise<Record<string, unknown>> {
+  // Step 1: propose.
+  const propose = await runHomelabCli(
+    ["autofix", "propose", obsId, "--json"],
+    vaultToken,
+  );
+
+  if (!propose.ok) {
+    return {
+      action: "apply-autofix",
+      observation_id: obsId,
+      stage: "propose",
+      ok: false,
+      exit_code: propose.exitCode,
+      stdout: propose.stdout.slice(0, 4000),
+      stderr: propose.stderr.slice(0, 1000),
+    };
+  }
+
+  // Extract proposalId from JSON output if possible.
+  let proposalId: string | undefined;
+  try {
+    const parsed = JSON.parse(propose.stdout) as unknown;
+    if (parsed !== null && typeof parsed === "object") {
+      const p = parsed as Record<string, unknown>;
+      if (typeof p["id"] === "string") proposalId = p["id"];
+      else if (typeof p["proposal_id"] === "string")
+        proposalId = p["proposal_id"];
+    }
+  } catch {
+    // stdout was not JSON — continue without proposal id.
+  }
+
+  if (proposalId === undefined) {
+    // Propose succeeded but returned no parseable proposal id.
+    return {
+      action: "apply-autofix",
+      observation_id: obsId,
+      stage: "propose-no-id",
+      ok: false,
+      exit_code: propose.exitCode,
+      stdout: propose.stdout.slice(0, 4000),
+      stderr: propose.stderr.slice(0, 1000),
+      note: "Propose succeeded but proposal id could not be extracted from output.",
+    };
+  }
+
+  // Step 2: apply with CONFIRM piped on stdin (#681 — do not double-prompt).
+  const apply = await runHomelabCliWithStdin(
+    ["autofix", "apply", proposalId],
+    "CONFIRM\n",
+    vaultToken,
+  );
+
+  return {
+    action: "apply-autofix",
+    observation_id: obsId,
+    proposal_id: proposalId,
+    stage: "apply",
+    ok: apply.ok,
+    exit_code: apply.exitCode,
+    propose_stdout: propose.stdout.slice(0, 2000),
+    apply_stdout: apply.stdout.slice(0, 4000),
+    apply_stderr: apply.stderr.slice(0, 1000),
+  };
+}
+
+/**
  * Parse `entity_id` from the action request body.
  * The body may be JSON (`{ entity_id: "..." }`) or a form-encoded value.
  */
@@ -1766,19 +1913,23 @@ export const homelabContribution: PortalContribution = {
     {
       id: "apply-autofix",
       label: "Apply Autofix",
-      destructiveness: "irreversible",
+      destructiveness: "destructive",
       minRole: "operator",
       /**
-       * Propose and dry-run an autofix for the given observation id.
+       * Apply an autofix for the given observation id (#681).
        *
        * Body: `{ observation_id: "<obs-uuid>" }` or metadata from prior
        * confirmation round.
        *
-       * Runs `autofix propose <obs-id> --json` to get the proposal, then
-       * `autofix dry-run <proposal-id> --json` to simulate the gate.
-       * Full `autofix apply` is intentionally deferred to keep the
-       * risk surface minimal — the button+gate wiring is real and the
-       * read path (dry-run output) is returned.
+       * The portal typed-CONFIRM gate IS the human confirmation step.
+       * This handler therefore:
+       *   1. Runs `autofix propose <obs-id> --json` to get the proposal id.
+       *   2. Runs `autofix apply <proposal-id>` with `CONFIRM\n` piped on
+       *      stdin so the CLI does not double-prompt.
+       *
+       * `VAULT_TOKEN` is taken from `process.env` or the request metadata.
+       * The CLI path is resolved from `getPluginPath()` (env var or default).
+       * Full audit logging is handled by the action-gate bridge.
        */
       async handler(ctx: ActionContext): Promise<Record<string, unknown>> {
         const obsId = await parseObservationId(ctx);
@@ -1791,70 +1942,8 @@ export const homelabContribution: PortalContribution = {
 
         const vaultToken = ctx.metadata?.["vault_token"] as string | undefined;
 
-        // Step 1: propose.
-        const propose = await runHomelabCli(
-          ["autofix", "propose", obsId, "--json"],
-          vaultToken,
-        );
-
-        if (!propose.ok) {
-          return {
-            action: "apply-autofix",
-            observation_id: obsId,
-            actor: ctx.actor,
-            stage: "propose",
-            cli_ok: false,
-            exit_code: propose.exitCode,
-            stdout: propose.stdout.slice(0, 4000),
-            stderr: propose.stderr.slice(0, 1000),
-          };
-        }
-
-        // Extract proposal id from JSON output if possible.
-        let proposalId: string | undefined;
-        try {
-          const parsed = JSON.parse(propose.stdout) as unknown;
-          if (parsed !== null && typeof parsed === "object") {
-            const p = parsed as Record<string, unknown>;
-            if (typeof p["id"] === "string") proposalId = p["id"];
-            else if (typeof p["proposal_id"] === "string")
-              proposalId = p["proposal_id"];
-          }
-        } catch {
-          // stdout was not JSON — continue without proposal id.
-        }
-
-        // Step 2: dry-run if we have a proposal id.
-        if (proposalId !== undefined) {
-          const dryRun = await runHomelabCli(
-            ["autofix", "dry-run", proposalId, "--json"],
-            vaultToken,
-          );
-          return {
-            action: "apply-autofix",
-            observation_id: obsId,
-            proposal_id: proposalId,
-            actor: ctx.actor,
-            stage: "dry-run",
-            cli_ok: dryRun.ok,
-            exit_code: dryRun.exitCode,
-            propose_stdout: propose.stdout.slice(0, 2000),
-            dry_run_stdout: dryRun.stdout.slice(0, 4000),
-            dry_run_stderr: dryRun.stderr.slice(0, 1000),
-            note: "Dry-run completed. To apply, call autofix apply <proposal_id> via the CLI.",
-          };
-        }
-
-        return {
-          action: "apply-autofix",
-          observation_id: obsId,
-          actor: ctx.actor,
-          stage: "propose-only",
-          cli_ok: propose.ok,
-          exit_code: propose.exitCode,
-          stdout: propose.stdout.slice(0, 4000),
-          stderr: propose.stderr.slice(0, 1000),
-        };
+        const result = await runAutofixApply(obsId, vaultToken);
+        return { ...result, actor: ctx.actor };
       },
     },
   ],
