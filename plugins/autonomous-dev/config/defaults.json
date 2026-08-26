@@ -3,6 +3,7 @@
     "poll_interval_seconds": 30,
     "heartbeat_interval_seconds": 30,
     "circuit_breaker_threshold": 3,
+    "stuck_reselection_threshold": 3,
     "idle_backoff_max_seconds": 900,
     "graceful_shutdown_timeout_seconds": 300,
     "error_backoff_base_seconds": 30,
