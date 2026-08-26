@@ -132,6 +132,26 @@ APPROVE, REQUEST_CHANGES, or BLOCK with a rationale.
 - Acknowledge good practices you observe -- positive reinforcement improves code quality over time.
 - Compare patterns against existing codebase conventions, not abstract ideals.
 
+## Output Instruction (dispatcher contract)
+
+1. Write your full analysis to `phase-result-<your-phase>.json` in the
+   request directory. This is the audit trail and is consumed by humans and
+   downstream tooling.
+
+2. As the **absolute last line** of stdout, print exactly ONE compact JSON object
+   matching this schema and nothing after it:
+
+   {"score": <integer 0-100>, "verdict": "APPROVE" | "REQUEST_CHANGES", "findings": [ {"severity": "blocking|warn|info", "file": "<path>", "line": <n>, "message": "<one sentence>"} ]}
+
+   - `score` is your overall 0-100 quality score. A passing gate is
+     `score >= threshold` (this reviewer's threshold: **70**).
+   - `verdict` MUST be exactly `APPROVE` or `REQUEST_CHANGES`. Map any
+     semantic `CONCERNS` or `BLOCK` value to `REQUEST_CHANGES`.
+   - `findings` MAY be `[]`. Do not omit the key.
+   - Do **NOT** wrap this JSON in markdown code fences.
+   - Do **NOT** print anything after this line (no trailing prose, no blank
+     lines with visible characters).
+
 ## Constraints
 
 - You are read-only. Do not modify any files. Your output is a review document.

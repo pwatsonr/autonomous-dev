@@ -118,9 +118,37 @@ Rule edits that change ONLY `description` or that only relax severity to `adviso
 
 **False-positive guard.** Treat a rule update (existing rule, modified fields) as a **single change**, **NOT a delete-then-add**. A diff that removes one rule and adds a near-identical one with the same `id` is an update, not a conflict.
 
-## Output instruction
+## Output Instruction (dispatcher contract)
 
-Output JSON matching `schemas/reviewer-finding-v1.json` with the optional top-level field `requires_two_person_approval` set per the directive above. The `findings[]` array MUST include one entry per detected concern (severity: `low`/`medium`/`high`/`critical`) with `category` set to one of `conflict`, `unworkability`, `impact`, `breadth`. The `verdict` field MUST be `APPROVE` if no blockers were found, `CONCERNS` if only `low`/`medium` findings, or `REQUEST_CHANGES` if any `high`/`critical` finding.
+1. Write your full analysis (`reviewer-finding-v1.json`-shaped) to
+   `phase-result-<your-phase>.json` in the request directory. This is the
+   audit trail and is consumed by humans and downstream tooling. The
+   `findings[]` array MUST include one entry per detected concern (severity:
+   `low`/`medium`/`high`/`critical`) with `category` set to one of
+   `conflict`, `unworkability`, `impact`, `breadth`. Include
+   `requires_two_person_approval` per the directive above.
+
+2. As the **absolute last line** of stdout, print exactly ONE compact JSON object
+   matching this schema and nothing after it:
+
+   {"score": <integer 0-100>, "verdict": "APPROVE" | "REQUEST_CHANGES", "findings": [ {"severity": "blocking|warn|info", "file": "<path>", "line": <n>, "message": "<one sentence>"} ]}
+
+   - `score` is your overall 0-100 quality score. A passing gate is
+     `score >= threshold` (this reviewer's threshold: **70**).
+   - `verdict` MUST be exactly `APPROVE` or `REQUEST_CHANGES`. Map any
+     semantic `CONCERNS` or `BLOCK` value to `REQUEST_CHANGES`.
+   - `findings` MAY be `[]`. Do not omit the key.
+   - Do **NOT** wrap this JSON in markdown code fences.
+   - Do **NOT** print anything after this line (no trailing prose, no blank
+     lines with visible characters).
+
+### Projection: analysis verdict → tail JSON
+
+| Analysis `verdict` (in `phase-result-*.json`) | Tail JSON `verdict` | Tail JSON `score` guidance |
+|-----------------------------------------------|----------------------|----------------------------|
+| `APPROVE`                                     | `APPROVE`            | 85–100 (agent picks per rubric) |
+| `CONCERNS` (only low/medium findings)         | `REQUEST_CHANGES`    | `threshold - 1` (i.e. gate fails by 1 point) |
+| `REQUEST_CHANGES` (any high/critical)         | `REQUEST_CHANGES`    | 0–40 |
 
 ## Constraints
 
